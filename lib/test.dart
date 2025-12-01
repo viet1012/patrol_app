@@ -1,9 +1,14 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:chuphinh/reason_model.dart';
 import 'package:chuphinh/take_picture_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
-
+import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:excel/excel.dart' as xls;
+import 'package:excel_facility/excel_facility.dart';
 import 'machine_model.dart';
 
 // ===================== MAIN SCREEN =====================
@@ -60,60 +65,49 @@ class _CameraScreenState extends State<CameraScreen> {
     });
   }
 
-  void _showSubmitDialog() {
+  Future<void> sendDataToServer() async {
     if (_image == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Vui lòng chụp hình trước')));
+      print("No image selected");
       return;
     }
 
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Xác nhận thông tin'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (_image != null)
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: Image.file(
-                    File(_image!.path),
-                    height: 200,
-                    width: double.infinity,
-                    fit: BoxFit.cover,
-                  ),
-                ),
-              const SizedBox(height: 16),
-              _buildDialogText('Division:', _selectedDiv),
-              _buildDialogText('Machine:', _selectedMachine),
-              _buildDialogText('Comment:', _comment),
-              _buildDialogText('Tiêu chuẩn 1:', _selectedReason1),
-              _buildDialogText('Tiêu chuẩn 2:', _selectedReason2),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Hủy'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('✓ Dữ liệu đã được gửi')),
-              );
-              _resetForm();
-            },
-            child: const Text('Gửi'),
-          ),
-        ],
-      ),
-    );
+    final uri = Uri.parse("http://192.168.123.16:9999/api/report");
+
+    var request = http.MultipartRequest('POST', uri);
+    print('_selectedMachine: $_selectedMachine');
+    print('_comment: $_comment');
+    print('_selectedReason1: $_selectedReason1');
+    print('_selectedReason2: $_selectedReason2');
+
+    request.fields['division'] = _selectedDiv ?? "";
+    request.fields['machine'] = _selectedMachine ?? "";
+    request.fields['comment'] = _comment;
+    request.fields['reason1'] = _selectedReason1 ?? "";
+    request.fields['reason2'] = _selectedReason2 ?? "";
+
+    var file = await http.MultipartFile.fromPath('image', _image!.path);
+
+    request.files.add(file);
+
+    print('Sending request with fields: ${request.fields}');
+    print('Sending file: ${file.filename}, length: ${file.length}');
+
+    try {
+      var response = await request.send();
+
+      final respStr = await response.stream.bytesToString();
+
+      print('Response status: ${response.statusCode}');
+      print('Response body: $respStr');
+
+      if (response.statusCode == 200) {
+        print("Send data success");
+      } else {
+        print("Send data failed");
+      }
+    } catch (e) {
+      print("Error sending data: $e");
+    }
   }
 
   void _resetForm() {
@@ -127,38 +121,13 @@ class _CameraScreenState extends State<CameraScreen> {
     });
   }
 
-  Widget _buildDialogText(String label, String? value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: RichText(
-        text: TextSpan(
-          children: [
-            TextSpan(
-              text: label,
-              style: const TextStyle(
-                fontWeight: FontWeight.w700,
-                color: Colors.black87,
-              ),
-            ),
-            TextSpan(
-              text: ' ${value ?? 'N/A'}',
-              style: const TextStyle(color: Colors.black54),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final divs = getDivisions();
     final machineList = _selectedDiv != null
         ? getMachineByDivision(_selectedDiv!)
         : <String>[];
-
     final screenWidth = MediaQuery.of(context).size.width;
-    final screenHeight = MediaQuery.of(context).size.height;
     final isTablet = screenWidth > 600;
     final isLandscape =
         MediaQuery.of(context).orientation == Orientation.landscape;
@@ -167,10 +136,6 @@ class _CameraScreenState extends State<CameraScreen> {
     final imageHeight = isTablet
         ? (isLandscape ? 300.0 : 400.0)
         : (isLandscape ? 200.0 : 300.0);
-    final padding = isTablet ? 24.0 : 16.0;
-    final labelFontSize = isTablet ? 14.0 : 13.0;
-    final buttonHeight = isTablet ? 56.0 : 48.0;
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Camera Inspection'),
@@ -179,7 +144,7 @@ class _CameraScreenState extends State<CameraScreen> {
         elevation: 0,
       ),
       body: SingleChildScrollView(
-        padding: EdgeInsets.all(padding),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -197,9 +162,12 @@ class _CameraScreenState extends State<CameraScreen> {
                   child: _image != null
                       ? ClipRRect(
                           borderRadius: BorderRadius.circular(10),
-                          child: Image.file(
-                            File(_image!.path),
-                            fit: BoxFit.contain,
+                          child: AspectRatio(
+                            aspectRatio: 4 / 3,
+                            child: Image.file(
+                              File(_image!.path),
+                              fit: BoxFit.contain, // giữ toàn bộ ảnh, không cắt
+                            ),
                           ),
                         )
                       : Center(
@@ -208,7 +176,7 @@ class _CameraScreenState extends State<CameraScreen> {
                             children: [
                               Icon(
                                 Icons.image_not_supported_outlined,
-                                size: isTablet ? 64 : 48,
+                                size: 48,
                                 color: Colors.grey.shade400,
                               ),
                               const SizedBox(height: 8),
@@ -216,13 +184,14 @@ class _CameraScreenState extends State<CameraScreen> {
                                 'Ảnh sẽ hiển thị ở đây',
                                 style: TextStyle(
                                   color: Colors.grey.shade600,
-                                  fontSize: isTablet ? 16 : 14,
+                                  fontSize: 14,
                                 ),
                               ),
                             ],
                           ),
                         ),
                 ),
+
                 // Camera Button (Floating)
                 Positioned(
                   bottom: 8,
@@ -230,8 +199,8 @@ class _CameraScreenState extends State<CameraScreen> {
                   child: GestureDetector(
                     onTap: _openCamera,
                     child: Container(
-                      width: isTablet ? 68 : 56,
-                      height: isTablet ? 68 : 56,
+                      width: 56,
+                      height: 56,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         color: Colors.blue.shade600,
@@ -243,21 +212,26 @@ class _CameraScreenState extends State<CameraScreen> {
                           ),
                         ],
                       ),
-                      child: Icon(
+                      child: const Icon(
                         Icons.camera_alt,
                         color: Colors.white,
-                        size: isTablet ? 32 : 28,
+                        size: 28,
                       ),
                     ),
                   ),
                 ),
               ],
             ),
-            SizedBox(height: padding),
+            const SizedBox(height: 12),
 
-            // Form Section - Responsive Grid
-            _buildLabel('Div Group Machine', labelFontSize),
-            _buildDropdownContainer(
+            // Form Section
+            _buildLabel('Div Group Machine'),
+            Container(
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.blue.shade300, width: 1.5),
+                borderRadius: BorderRadius.circular(8),
+                color: Colors.blue.shade50,
+              ),
               child: DropdownButton<String>(
                 value: _selectedDiv,
                 isExpanded: true,
@@ -269,10 +243,7 @@ class _CameraScreenState extends State<CameraScreen> {
                       padding: const EdgeInsets.all(12),
                       child: Text(
                         value,
-                        style: TextStyle(
-                          fontWeight: FontWeight.w500,
-                          fontSize: isTablet ? 16 : 14,
-                        ),
+                        style: const TextStyle(fontWeight: FontWeight.w500),
                       ),
                     ),
                   );
@@ -285,30 +256,29 @@ class _CameraScreenState extends State<CameraScreen> {
                 },
               ),
             ),
-            SizedBox(height: padding * 0.67),
+            const SizedBox(height: 16),
 
-            _buildLabel('Machine', labelFontSize),
-            _buildDropdownContainer(
+            _buildLabel('Machine'),
+            Container(
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.blue.shade300, width: 1.5),
+                borderRadius: BorderRadius.circular(8),
+                color: Colors.blue.shade50,
+              ),
               child: DropdownButton<String>(
                 value: _selectedMachine,
                 isExpanded: true,
                 underline: const SizedBox(),
-                hint: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Text(
-                    "Chọn máy",
-                    style: TextStyle(fontSize: isTablet ? 16 : 14),
-                  ),
+                hint: const Padding(
+                  padding: EdgeInsets.all(12),
+                  child: Text("Chọn máy"),
                 ),
                 items: machineList.map((String value) {
                   return DropdownMenuItem<String>(
                     value: value,
                     child: Padding(
                       padding: const EdgeInsets.all(12),
-                      child: Text(
-                        value,
-                        style: TextStyle(fontSize: isTablet ? 16 : 14),
-                      ),
+                      child: Text(value),
                     ),
                   );
                 }).toList(),
@@ -319,9 +289,9 @@ class _CameraScreenState extends State<CameraScreen> {
                 },
               ),
             ),
-            SizedBox(height: padding * 0.67),
+            const SizedBox(height: 16),
 
-            _buildLabel('Comment', labelFontSize),
+            _buildLabel('Comment'),
             TextField(
               onChanged: (value) => setState(() => _comment = value),
               decoration: InputDecoration(
@@ -340,89 +310,108 @@ class _CameraScreenState extends State<CameraScreen> {
                 ),
                 filled: true,
                 fillColor: Colors.grey.shade50,
-                contentPadding: const EdgeInsets.all(12),
               ),
               minLines: 3,
               maxLines: 5,
-              style: TextStyle(fontSize: isTablet ? 16 : 14),
             ),
-            SizedBox(height: padding * 0.67),
+            const SizedBox(height: 16),
 
-            // Responsive Standards Section
-            isTablet
-                ? Row(
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(
-                        child: _buildStandardColumn(
-                          'Tiêu chuẩn 1',
-                          _selectedReason1,
-                          (v) => setState(() => _selectedReason1 = v),
-                          labelFontSize,
-                          isTablet,
+                      _buildLabel('Tiêu chuẩn 1'),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        decoration: BoxDecoration(
+                          border: Border.all(
+                            color: Colors.green.shade400,
+                            width: 2,
+                          ),
+                          borderRadius: BorderRadius.circular(8),
+                          color: Colors.green.shade50,
                         ),
-                      ),
-                      SizedBox(width: padding * 0.5),
-                      Expanded(
-                        child: _buildStandardColumn(
-                          'Tiêu chuẩn 2',
-                          _selectedReason2,
-                          (v) => setState(() => _selectedReason2 = v),
-                          labelFontSize,
-                          isTablet,
+                        child: DropdownButton<String>(
+                          isExpanded: true,
+                          hint: const Text("Chọn mức độ"),
+                          underline: const SizedBox(),
+                          value: _selectedReason1,
+                          items: reasonList.map((r) {
+                            return DropdownMenuItem(
+                              value: r.reason1,
+                              child: Text(r.reason1),
+                            );
+                          }).toList(),
+                          onChanged: (v) {
+                            setState(() => _selectedReason1 = v);
+                          },
                         ),
-                      ),
-                    ],
-                  )
-                : Column(
-                    children: [
-                      _buildStandardColumn(
-                        'Tiêu chuẩn 1',
-                        _selectedReason1,
-                        (v) => setState(() => _selectedReason1 = v),
-                        labelFontSize,
-                        isTablet,
-                      ),
-                      SizedBox(height: padding * 0.67),
-                      _buildStandardColumn(
-                        'Tiêu chuẩn 2',
-                        _selectedReason2,
-                        (v) => setState(() => _selectedReason2 = v),
-                        labelFontSize,
-                        isTablet,
                       ),
                     ],
                   ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildLabel('Tiêu chuẩn 2'),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        decoration: BoxDecoration(
+                          border: Border.all(
+                            color: Colors.green.shade400,
+                            width: 2,
+                          ),
+                          borderRadius: BorderRadius.circular(8),
+                          color: Colors.green.shade50,
+                        ),
+                        child: DropdownButton<String>(
+                          isExpanded: true,
+                          hint: const Text("Chọn mức độ"),
+                          underline: const SizedBox(),
+                          value: _selectedReason2,
+                          items: reasonList.map((r) {
+                            return DropdownMenuItem(
+                              value: r.reason2,
+                              child: Text(r.reason2),
+                            );
+                          }).toList(),
+                          onChanged: (v) {
+                            setState(() => _selectedReason2 = v);
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
 
-            SizedBox(height: padding),
+            const SizedBox(height: 24),
 
-            // Button Section - Responsive
             SizedBox(
               width: double.infinity,
-              height: buttonHeight,
+              height: 48,
               child: ElevatedButton(
-                onPressed: _showSubmitDialog,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue.shade600,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                child: Text(
-                  'Gửi',
-                  style: TextStyle(
-                    fontSize: isTablet ? 18 : 16,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
-                  ),
-                ),
+                onPressed: () {
+                  sendDataToServer(); // <<=== GỌI HÀM LƯU EXCEL
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('✓ Dữ liệu đã được gửi')),
+                  );
+                  _resetForm();
+                },
+                child: const Text('Gửi'),
               ),
             ),
-            SizedBox(height: padding * 0.5),
+            const SizedBox(height: 12),
 
             if (_image != null)
               SizedBox(
                 width: double.infinity,
-                height: buttonHeight,
+                height: 48,
                 child: OutlinedButton(
                   onPressed: _clearImage,
                   style: OutlinedButton.styleFrom(
@@ -434,74 +423,27 @@ class _CameraScreenState extends State<CameraScreen> {
                   child: Text(
                     'Xóa ảnh',
                     style: TextStyle(
-                      fontSize: isTablet ? 18 : 16,
+                      fontSize: 16,
                       fontWeight: FontWeight.w600,
                       color: Colors.red.shade400,
                     ),
                   ),
                 ),
               ),
-            SizedBox(height: padding),
+            const SizedBox(height: 20),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildStandardColumn(
-    String label,
-    String? value,
-    Function(String?) onChanged,
-    double fontSize,
-    bool isTablet,
-  ) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildLabel(label, fontSize),
-        _buildDropdownContainer(
-          child: DropdownButton<String>(
-            isExpanded: true,
-            hint: Text(
-              "Chọn mức độ",
-              style: TextStyle(fontSize: isTablet ? 16 : 14),
-            ),
-            underline: const SizedBox(),
-            value: value,
-            items: reasonList.map((r) {
-              return DropdownMenuItem(
-                value: r.reason1,
-                child: Text(
-                  r.reason1,
-                  style: TextStyle(fontSize: isTablet ? 16 : 14),
-                ),
-              );
-            }).toList(),
-            onChanged: onChanged,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildDropdownContainer({required Widget child}) {
-    return Container(
-      decoration: BoxDecoration(
-        border: Border.all(color: Colors.blue.shade300, width: 1.5),
-        borderRadius: BorderRadius.circular(8),
-        color: Colors.blue.shade50,
-      ),
-      child: child,
-    );
-  }
-
-  Widget _buildLabel(String text, double fontSize) {
+  Widget _buildLabel(String text) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Text(
         text,
-        style: TextStyle(
-          fontSize: fontSize,
+        style: const TextStyle(
+          fontSize: 13,
           fontWeight: FontWeight.w700,
           color: Colors.black87,
         ),
@@ -509,5 +451,3 @@ class _CameraScreenState extends State<CameraScreen> {
     );
   }
 }
-
-// ===================== TAKE PICTURE SCREEN =====================

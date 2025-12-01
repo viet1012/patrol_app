@@ -99,7 +99,9 @@ class _TakePictureScreenState extends State<TakePictureScreen> {
         children: [
           // Camera Preview
           if (isCameraReady)
-            SizedBox.expand(child: CameraPreview(_controller))
+            SizedBox.expand(
+              child: RepaintBoundary(child: CameraPreview(_controller)),
+            )
           else
             const Center(child: CircularProgressIndicator()),
 
