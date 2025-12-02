@@ -377,6 +377,17 @@ class _TakePictureScreenState extends State<TakePictureScreen> {
     _startCameraPreview();
   }
 
+  @override
+  void dispose() {
+    if (_stream != null) {
+      final tracks = _stream!.getTracks() as List<html.MediaStreamTrack>;
+      for (final track in tracks) {
+        track.stop();
+      }
+    }
+    super.dispose();
+  }
+
   void _startCameraPreview() async {
     try {
       final newViewType = 'camera_${DateTime.now().millisecondsSinceEpoch}';
@@ -402,8 +413,7 @@ class _TakePictureScreenState extends State<TakePictureScreen> {
       // BƯỚC 2: ÁP DỤNG ĐỘ PHÂN GIẢI CAO NHẤT (sau khi video load)
       video.onLoadedMetadata.listen((_) async {
         final track = stream.getVideoTracks().first;
-        final capabilities = track.getCapabilities() as Map<String, dynamic>;
-
+        final capabilities = track.getCapabilities();
         final maxW = (capabilities['width'] as Map)['max'] as int? ?? 4000;
         final maxH = (capabilities['height'] as Map)['max'] as int? ?? 4000;
 
@@ -434,13 +444,26 @@ class _TakePictureScreenState extends State<TakePictureScreen> {
   }
 
   void _retake() {
+    // 1. Stop tracks một cách an toàn (cast đúng kiểu)
+    if (_stream != null) {
+      // FIX: Cast đúng kiểu JS → Dart
+      final tracks = _stream!.getTracks() as List<html.MediaStreamTrack>;
+      for (final track in tracks) {
+        track.stop();
+      }
+    }
+
+    // 2. Reset hoàn toàn state
     setState(() {
       _capturedImage = null;
       _videoElement = null;
-      _stream?.getTracks().forEach((t) => t.stop());
       _stream = null;
+      _viewType =
+          'camera_${DateTime.now().millisecondsSinceEpoch}'; // Quan trọng: đổi viewType mới
     });
-    _startCameraPreview(); // GỌI LẠI
+
+    // 3. Khởi động lại camera
+    _startCameraPreview();
   }
 
   Future<void> _capturePhoto() async {
@@ -522,12 +545,6 @@ class _TakePictureScreenState extends State<TakePictureScreen> {
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.red));
-  }
-
-  @override
-  void dispose() {
-    _stream?.getTracks().forEach((t) => t.stop());
-    super.dispose();
   }
 
   @override

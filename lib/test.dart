@@ -17,7 +17,9 @@ class CameraScreen extends StatefulWidget {
 class _CameraScreenState extends State<CameraScreen> {
   Uint8List? _image;
   String? _selectedDiv = 'PE';
+  String? _selectedGroup;
   String? _selectedMachine;
+
   String _comment = '';
   String? _selectedReason1;
   String? _selectedReason2;
@@ -31,10 +33,20 @@ class _CameraScreenState extends State<CameraScreen> {
         .toList();
   }
 
-  List<String> getMachineByDivision(String division) {
+  List<String> getGroupByDivision(String division) {
     return machines
         .where((m) => m.division?.toString() == division)
         .map((m) => m.machineType?.toString())
+        .where((g) => g != null && g.isNotEmpty)
+        .cast<String>()
+        .toSet()
+        .toList();
+  }
+
+  List<String> getMachineByGroup(String group) {
+    return machines
+        .where((m) => m.machineType?.toString() == group)
+        .map((m) => m.code?.toString())
         .where((g) => g != null && g.isNotEmpty)
         .cast<String>()
         .toSet()
@@ -85,7 +97,7 @@ class _CameraScreenState extends State<CameraScreen> {
       return;
     }
 
-    if (_selectedMachine == null) {
+    if (_selectedGroup == null) {
       _showSnackBar('Vui lòng chọn máy!', Colors.orange);
       return;
     }
@@ -105,7 +117,7 @@ class _CameraScreenState extends State<CameraScreen> {
     // Thêm fields
     request.fields.addAll({
       'division': _selectedDiv ?? "",
-      'machine': _selectedMachine ?? "",
+      'machine': _selectedGroup ?? "",
       'comment': _comment,
       'reason1': _selectedReason1 ?? "",
       'reason2': _selectedReason2 ?? "",
@@ -147,56 +159,11 @@ class _CameraScreenState extends State<CameraScreen> {
     }
   }
 
-  Future<void> sendDataToServer1() async {
-    if (_image == null) {
-      print("No image selected");
-      return;
-    }
-
-    final uri = Uri.parse("http://localhost:9299/api/report");
-
-    var request = http.MultipartRequest('POST', uri);
-
-    request.fields['division'] = _selectedDiv ?? "";
-    request.fields['machine'] = _selectedMachine ?? "";
-    request.fields['comment'] = _comment;
-    request.fields['reason1'] = _selectedReason1 ?? "";
-    request.fields['reason2'] = _selectedReason2 ?? "";
-
-    var file = await http.MultipartFile.fromBytes(
-      'image',
-      _image!,
-      filename: 'image.png',
-      contentType: http.MediaType('image', 'png'),
-    );
-
-    request.files.add(file);
-
-    print('Sending request with fields: ${request.fields}');
-    print('Sending file: ${file.filename}, length: ${file.length}');
-
-    try {
-      var response = await request.send();
-
-      final respStr = await response.stream.bytesToString();
-
-      print('Response status: ${response.statusCode}');
-      print('Response body: $respStr');
-
-      if (response.statusCode == 200) {
-        print("Send data success");
-      } else {
-        print("Send data failed");
-      }
-    } catch (e) {
-      print("Error sending data: $e");
-    }
-  }
-
   void _resetForm() {
     setState(() {
       _image = null;
       _selectedDiv = 'PE';
+      _selectedGroup = null;
       _selectedMachine = null;
       _comment = '';
       _selectedReason1 = null;
@@ -207,9 +174,14 @@ class _CameraScreenState extends State<CameraScreen> {
   @override
   Widget build(BuildContext context) {
     final divs = getDivisions();
-    final machineList = _selectedDiv != null
-        ? getMachineByDivision(_selectedDiv!)
+    final groupList = _selectedDiv != null
+        ? getGroupByDivision(_selectedDiv!)
         : <String>[];
+
+    final machineList = _selectedGroup != null
+        ? getMachineByGroup(_selectedGroup!)
+        : <String>[];
+
     final screenWidth = MediaQuery.of(context).size.width;
     final isTablet = screenWidth > 600;
     final isLandscape =
@@ -349,7 +321,7 @@ class _CameraScreenState extends State<CameraScreen> {
                           onChanged: (String? newValue) {
                             setState(() {
                               _selectedDiv = newValue;
-                              _selectedMachine = null;
+                              _selectedGroup = null;
                             });
                           },
                         ),
@@ -357,9 +329,51 @@ class _CameraScreenState extends State<CameraScreen> {
                     ],
                   ),
                 ),
-
                 const SizedBox(width: 16),
-
+                // Dropdown Group (Machine)
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildLabel('Group'),
+                      const SizedBox(height: 4),
+                      Container(
+                        decoration: BoxDecoration(
+                          border: Border.all(
+                            color: Colors.blue.shade300,
+                            width: 1.5,
+                          ),
+                          borderRadius: BorderRadius.circular(8),
+                          color: Colors.blue.shade50,
+                        ),
+                        child: DropdownButton<String>(
+                          value: _selectedGroup,
+                          isExpanded: true,
+                          underline: const SizedBox(),
+                          hint: const Padding(
+                            padding: EdgeInsets.all(12),
+                            child: Text("Chọn Nhóm"),
+                          ),
+                          items: groupList.map((String value) {
+                            return DropdownMenuItem<String>(
+                              value: value,
+                              child: Padding(
+                                padding: const EdgeInsets.all(12),
+                                child: Text(value),
+                              ),
+                            );
+                          }).toList(),
+                          onChanged: (String? newValue) {
+                            setState(() {
+                              _selectedGroup = newValue;
+                            });
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 16),
                 // Dropdown Group (Machine)
                 Expanded(
                   child: Column(
