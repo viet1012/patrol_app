@@ -74,10 +74,6 @@ class _CameraScreenState extends State<CameraScreen> {
     final uri = Uri.parse("http://192.168.123.16:9999/api/report");
 
     var request = http.MultipartRequest('POST', uri);
-    print('_selectedMachine: $_selectedMachine');
-    print('_comment: $_comment');
-    print('_selectedReason1: $_selectedReason1');
-    print('_selectedReason2: $_selectedReason2');
 
     request.fields['division'] = _selectedDiv ?? "";
     request.fields['machine'] = _selectedMachine ?? "";
@@ -258,7 +254,7 @@ class _CameraScreenState extends State<CameraScreen> {
             ),
             const SizedBox(height: 16),
 
-            _buildLabel('Machine'),
+            _buildLabel('Group'),
             Container(
               decoration: BoxDecoration(
                 border: Border.all(color: Colors.blue.shade300, width: 1.5),

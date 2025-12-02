@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:ui_web' as ui;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -6,7 +7,17 @@ import 'package:image_picker/image_picker.dart';
 import 'test.dart';
 import 'machine_model.dart';
 
+import 'dart:ui' show platformViewRegistry;
+import 'dart:html' as html;
+
 void main() {
+  ui.platformViewRegistry.registerViewFactory(
+    'videoElement',
+    (int viewId) => html.VideoElement()
+      ..autoplay = true
+      ..width = 640
+      ..height = 480,
+  );
   runApp(const MyApp());
 }
 

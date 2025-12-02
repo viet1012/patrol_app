@@ -1,20 +1,14 @@
+import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
-
 import 'package:chuphinh/reason_model.dart';
+import 'package:chuphinh/take_picture_screen.dart';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:permission_handler/permission_handler.dart';
-import 'machine_model.dart';
-
-import 'dart:io';
-
 import 'package:camera/camera.dart';
-import 'package:flutter/material.dart';
-import 'package:permission_handler/permission_handler.dart';
-
+import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
 import 'machine_model.dart';
-import 'reason_model.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 
 class CameraScreen extends StatefulWidget {
   const CameraScreen({super.key});
@@ -23,75 +17,48 @@ class CameraScreen extends StatefulWidget {
   State<CameraScreen> createState() => _CameraScreenState();
 }
 
+// Thêm 1 biến trạng thái mạng và danh sách lưu offline:
 class _CameraScreenState extends State<CameraScreen> {
-  List<CameraDescription>? cameras;
-  CameraController? controller;
+  // Existing fields...
   XFile? _image;
-
   String? _selectedDiv = 'PE';
   String? _selectedMachine;
   String _comment = '';
-  String _standard1 = '';
-  String _standard2 = '';
-  String _standard3 = '';
-
   String? _selectedReason1;
   String? _selectedReason2;
 
-  bool isCameraReady = false;
+  // Mới:
+  bool _isOnline = true;
+  List<Map<String, dynamic>> _offlineReports = [];
+
+  late StreamSubscription<List<ConnectivityResult>> _connectivitySubscription;
 
   @override
   void initState() {
     super.initState();
-    _initCamera();
-  }
+    Connectivity().checkConnectivity().then((result) {
+      setState(() {
+        _isOnline = result != ConnectivityResult.none;
+      });
+    });
 
-  Future<void> _initCamera() async {
-    var status = await Permission.camera.status;
-    if (!status.isGranted) {
-      status = await Permission.camera.request();
-      if (!status.isGranted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Không có quyền truy cập camera')),
-        );
-        return;
+    _connectivitySubscription = Connectivity().onConnectivityChanged.listen((
+      result,
+    ) {
+      bool nowOnline = result != ConnectivityResult.none;
+      if (nowOnline && !_isOnline) {
+        _uploadOfflineReports();
       }
-    }
-
-    cameras = await availableCameras();
-
-    if (cameras == null || cameras!.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Không tìm thấy camera nào')),
-      );
-      return;
-    }
-
-    controller = CameraController(
-      cameras![0],
-      ResolutionPreset.medium,
-      enableAudio: false,
-    );
-    await controller!.initialize();
-
-    if (!mounted) return;
-
-    setState(() {
-      isCameraReady = true;
+      setState(() {
+        _isOnline = nowOnline;
+      });
     });
   }
 
-  Future<void> _takePicture() async {
-    if (!isCameraReady || controller == null) return;
-
-    try {
-      final photo = await controller!.takePicture();
-      setState(() {
-        _image = photo;
-      });
-    } catch (e) {
-      debugPrint('Lỗi chụp ảnh: $e');
-    }
+  @override
+  void dispose() {
+    _connectivitySubscription.cancel();
+    super.dispose();
   }
 
   List<String> getDivisions() {
@@ -107,66 +74,217 @@ class _CameraScreenState extends State<CameraScreen> {
     return machines
         .where((m) => m.division?.toString() == division)
         .map((m) => m.machineType?.toString())
-        .where((g) => g != null && g!.isNotEmpty)
+        .where((g) => g != null && g.isNotEmpty)
         .cast<String>()
         .toSet()
         .toList();
   }
 
-  void _showSubmitDialog() {
+  Future<void> _openCamera() async {
+    final result = await Navigator.push<XFile?>(
+      context,
+      MaterialPageRoute(builder: (context) => const TakePictureScreen()),
+    );
+
+    if (result != null) {
+      setState(() {
+        _image = result;
+      });
+    }
+  }
+
+  void _clearImage() {
+    setState(() {
+      _image = null;
+    });
+  }
+
+  // Hàm lưu offline khi không có mạng
+  Future<void> _saveReportOffline() async {
+    if (_image == null) return;
+    final fileBytes = await File(_image!.path).readAsBytes();
+    final base64Image = base64Encode(fileBytes);
+    Map<String, dynamic> report = {
+      'division': _selectedDiv ?? "",
+      'machine': _selectedMachine ?? "",
+      'comment': _comment,
+      'reason1': _selectedReason1 ?? "",
+      'reason2': _selectedReason2 ?? "",
+      'imageBase64': base64Image,
+      'timestamp': DateTime.now().toIso8601String(),
+    };
+    setState(() {
+      _offlineReports.add(report);
+    });
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text('Lưu báo cáo offline thành công')));
+    _resetForm();
+  }
+
+  void _resetForm() {
+    setState(() {
+      _image = null;
+      _selectedDiv = 'PE';
+      _selectedMachine = null;
+      _comment = '';
+      _selectedReason1 = null;
+      _selectedReason2 = null;
+    });
+  }
+
+  // Gửi báo cáo (gồm 2 trường hợp: online gửi ngay, offline lưu)
+  Future<void> sendDataToServer() async {
     if (_image == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Vui lòng chụp hình trước')));
+      print("No image selected");
       return;
     }
 
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Xác nhận thông tin'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (_image != null)
-              ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: Image.file(File(_image!.path)),
-              ),
-            const SizedBox(height: 12),
-            Text('Division: $_selectedDiv'),
-            Text('Machine: $_selectedMachine'),
-            Text('Comment: $_comment'),
-            Text('Standard 1: $_standard1'),
-            Text('Standard 2: $_standard2'),
-            Text('Standard 3: $_standard3'),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Hủy'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Dữ liệu đã được gửi')),
-              );
-              // Xử lý gửi dữ liệu hoặc ảnh tại đây
-            },
-            child: const Text('Gửi'),
-          ),
-        ],
-      ),
-    );
+    if (!_isOnline) {
+      // Lưu offline
+      await _saveReportOffline();
+      return;
+    }
+
+    // Gửi online
+    final uri = Uri.parse("http://192.168.123.16:9999/api/report");
+
+    var request = http.MultipartRequest('POST', uri);
+
+    request.fields['division'] = _selectedDiv ?? "";
+    request.fields['machine'] = _selectedMachine ?? "";
+    request.fields['comment'] = _comment;
+    request.fields['reason1'] = _selectedReason1 ?? "";
+    request.fields['reason2'] = _selectedReason2 ?? "";
+
+    var file = await http.MultipartFile.fromPath('image', _image!.path);
+
+    request.files.add(file);
+
+    try {
+      var response = await request.send();
+
+      final respStr = await response.stream.bytesToString();
+
+      print('Response status: ${response.statusCode}');
+      print('Response body: $respStr');
+
+      if (response.statusCode == 200) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('✓ Dữ liệu đã được gửi')));
+        _resetForm();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Gửi dữ liệu thất bại, lưu offline')),
+        );
+        await _saveReportOffline();
+      }
+    } catch (e) {
+      print("Error sending data: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Lỗi gửi dữ liệu, lưu offline')),
+      );
+      await _saveReportOffline();
+    }
   }
 
-  @override
-  void dispose() {
-    controller?.dispose();
-    super.dispose();
+  // Upload dữ liệu offline khi có mạng
+  Future<void> _uploadOfflineReports() async {
+    if (_offlineReports.isEmpty) return;
+
+    int successCount = 0;
+
+    // Tạo bản sao để tránh lỗi setState khi xoá trong vòng for
+    List<Map<String, dynamic>> copyReports = List.from(_offlineReports);
+
+    for (var report in copyReports) {
+      bool success = await _uploadSingleReport(report);
+      if (success) {
+        setState(() {
+          _offlineReports.remove(report);
+        });
+        successCount++;
+      }
+    }
+
+    if (successCount > 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Đã gửi $successCount báo cáo offline thành công'),
+        ),
+      );
+    }
+  }
+
+  // Upload từng báo cáo offline một
+  Future<bool> _uploadSingleReport(Map<String, dynamic> report) async {
+    final uri = Uri.parse("http://192.168.123.16:9999/api/report");
+    var request = http.MultipartRequest('POST', uri);
+
+    request.fields['division'] = report['division'] ?? "";
+    request.fields['machine'] = report['machine'] ?? "";
+    request.fields['comment'] = report['comment'] ?? "";
+    request.fields['reason1'] = report['reason1'] ?? "";
+    request.fields['reason2'] = report['reason2'] ?? "";
+
+    try {
+      // Từ base64 tạo MultipartFile tạm
+      final bytes = base64Decode(report['imageBase64']);
+      final tempDir = await getTemporaryDirectory();
+      final tempFile = await File(
+        '${tempDir.path}/${DateTime.now().millisecondsSinceEpoch}.jpg',
+      ).writeAsBytes(bytes);
+
+      var file = await http.MultipartFile.fromPath('image', tempFile.path);
+
+      request.files.add(file);
+
+      var response = await request.send();
+
+      if (response.statusCode == 200) {
+        await tempFile.delete();
+        return true;
+      } else {
+        await tempFile.delete();
+        return false;
+      }
+    } catch (e) {
+      print('Error uploading offline report: $e');
+      return false;
+    }
+  }
+
+  // Mở màn hình danh sách offline reports
+  void _openOfflineReportList() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => OfflineReportListScreen(
+          reports: _offlineReports,
+          onDelete: (report) {
+            setState(() {
+              _offlineReports.remove(report);
+            });
+          },
+          onSendNow: (report) async {
+            bool success = await _uploadSingleReport(report);
+            if (success) {
+              setState(() {
+                _offlineReports.remove(report);
+              });
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Gửi báo cáo thành công')),
+              );
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Gửi báo cáo thất bại')),
+              );
+            }
+          },
+        ),
+      ),
+    );
   }
 
   @override
@@ -175,66 +293,152 @@ class _CameraScreenState extends State<CameraScreen> {
     final machineList = _selectedDiv != null
         ? getMachineByDivision(_selectedDiv!)
         : <String>[];
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isTablet = screenWidth > 600;
+    final isLandscape =
+        MediaQuery.of(context).orientation == Orientation.landscape;
+
+    final imageHeight = isTablet
+        ? (isLandscape ? 300.0 : 400.0)
+        : (isLandscape ? 200.0 : 300.0);
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Camera Inspection'),
         centerTitle: true,
+        backgroundColor: Colors.blue.shade600,
         elevation: 0,
+        actions: [
+          // Hiển thị trạng thái mạng
+          Padding(
+            padding: const EdgeInsets.only(right: 16),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.circle,
+                  size: 14,
+                  color: _isOnline ? Colors.green : Colors.red,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  _isOnline ? 'Online' : 'Offline',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: _isOnline ? Colors.green : Colors.red,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.list_alt),
+            tooltip: 'Báo cáo offline',
+            onPressed: _openOfflineReportList,
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Camera preview hoặc ảnh chụp
-            Container(
-              width: double.infinity,
-              height: 200,
-              decoration: BoxDecoration(
-                color: Colors.green.shade100,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.green.shade400, width: 2),
-              ),
-              child: GestureDetector(
-                onTap: _takePicture,
-                child: _image != null
-                    ? ClipRRect(
-                        borderRadius: BorderRadius.circular(10),
-                        child: Image.file(
-                          File(_image!.path),
-                          width: double.infinity,
-                          height: 200,
-                          fit: BoxFit.cover,
+            // Image Preview Section
+            Stack(
+              children: [
+                Container(
+                  width: double.infinity,
+                  height: imageHeight,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade200,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.blue.shade300, width: 2),
+                  ),
+                  child: _image != null
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(10),
+                          child: AspectRatio(
+                            aspectRatio: 4 / 3,
+                            child: Image.file(
+                              File(_image!.path),
+                              fit: BoxFit.contain, // giữ toàn bộ ảnh, không cắt
+                            ),
+                          ),
+                        )
+                      : Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.image_not_supported_outlined,
+                                size: 48,
+                                color: Colors.grey.shade400,
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Ảnh sẽ hiển thị ở đây',
+                                style: TextStyle(
+                                  color: Colors.grey.shade600,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                      )
-                    : isCameraReady && controller != null
-                    ? ClipRRect(
-                        borderRadius: BorderRadius.circular(10),
-                        child: CameraPreview(controller!),
-                      )
-                    : const Center(child: CircularProgressIndicator()),
-              ),
-            ),
-            const SizedBox(height: 24),
+                ),
 
-            // Phần dropdown, comment, tiêu chuẩn giữ nguyên
+                // Camera Button (Floating)
+                Positioned(
+                  bottom: 8,
+                  right: 8,
+                  child: GestureDetector(
+                    onTap: _openCamera,
+                    child: Container(
+                      width: 56,
+                      height: 56,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.blue.shade600,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.blue.shade600.withOpacity(0.4),
+                            blurRadius: 12,
+                            spreadRadius: 2,
+                          ),
+                        ],
+                      ),
+                      child: const Icon(
+                        Icons.camera_alt,
+                        color: Colors.white,
+                        size: 28,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            // Form Section
             _buildLabel('Div Group Machine'),
             Container(
               decoration: BoxDecoration(
-                border: Border.all(color: Colors.green.shade400, width: 2),
+                border: Border.all(color: Colors.blue.shade300, width: 1.5),
                 borderRadius: BorderRadius.circular(8),
-                color: Colors.green.shade50,
+                color: Colors.blue.shade50,
               ),
               child: DropdownButton<String>(
                 value: _selectedDiv,
                 isExpanded: true,
+                underline: const SizedBox(),
                 items: divs.map((String value) {
                   return DropdownMenuItem<String>(
                     value: value,
                     child: Padding(
                       padding: const EdgeInsets.all(12),
-                      child: Text(value),
+                      child: Text(
+                        value,
+                        style: const TextStyle(fontWeight: FontWeight.w500),
+                      ),
                     ),
                   );
                 }).toList(),
@@ -251,9 +455,9 @@ class _CameraScreenState extends State<CameraScreen> {
             _buildLabel('Machine'),
             Container(
               decoration: BoxDecoration(
-                border: Border.all(color: Colors.green.shade400, width: 2),
+                border: Border.all(color: Colors.blue.shade300, width: 1.5),
                 borderRadius: BorderRadius.circular(8),
-                color: Colors.green.shade50,
+                color: Colors.blue.shade50,
               ),
               child: DropdownButton<String>(
                 value: _selectedMachine,
@@ -261,7 +465,7 @@ class _CameraScreenState extends State<CameraScreen> {
                 underline: const SizedBox(),
                 hint: const Padding(
                   padding: EdgeInsets.all(12),
-                  child: Text("Select Machine"),
+                  child: Text("Chọn máy"),
                 ),
                 items: machineList.map((String value) {
                   return DropdownMenuItem<String>(
@@ -285,7 +489,7 @@ class _CameraScreenState extends State<CameraScreen> {
             TextField(
               onChanged: (value) => setState(() => _comment = value),
               decoration: InputDecoration(
-                hintText: 'Enter comment',
+                hintText: 'Ghi chú thêm...',
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
                   borderSide: BorderSide(color: Colors.grey.shade400),
@@ -298,6 +502,8 @@ class _CameraScreenState extends State<CameraScreen> {
                   borderRadius: BorderRadius.circular(8),
                   borderSide: const BorderSide(color: Colors.blue, width: 2),
                 ),
+                filled: true,
+                fillColor: Colors.grey.shade50,
               ),
               minLines: 3,
               maxLines: 5,
@@ -384,23 +590,41 @@ class _CameraScreenState extends State<CameraScreen> {
               width: double.infinity,
               height: 48,
               child: ElevatedButton(
-                onPressed: _showSubmitDialog,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green.shade600,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
+                onPressed: () {
+                  sendDataToServer(); // <<=== GỌI HÀM LƯU EXCEL
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('✓ Dữ liệu đã được gửi')),
+                  );
+                  _resetForm();
+                },
+                child: const Text('Gửi'),
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            if (_image != null)
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: OutlinedButton(
+                  onPressed: _clearImage,
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(color: Colors.red.shade400, width: 1.5),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                   ),
-                ),
-                child: const Text(
-                  'Gửi',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
+                  child: Text(
+                    'Xóa ảnh',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.red.shade400,
+                    ),
                   ),
                 ),
               ),
-            ),
+            const SizedBox(height: 20),
           ],
         ),
       ),
@@ -413,8 +637,8 @@ class _CameraScreenState extends State<CameraScreen> {
       child: Text(
         text,
         style: const TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w600,
+          fontSize: 13,
+          fontWeight: FontWeight.w700,
           color: Colors.black87,
         ),
       ),
@@ -422,186 +646,67 @@ class _CameraScreenState extends State<CameraScreen> {
   }
 }
 
-// import 'dart:io';
-//
-// import 'package:camera/camera.dart';
-// import 'package:flutter/material.dart';
-// import 'package:permission_handler/permission_handler.dart';
-//
-// class CameraScreen extends StatefulWidget {
-//   const CameraScreen({Key? key}) : super(key: key);
-//
-//   @override
-//   State<CameraScreen> createState() => _CameraScreenState();
-// }
-//
-// class _CameraScreenState extends State<CameraScreen> {
-//   List<CameraDescription>? cameras;
-//   CameraController? controller;
-//   XFile? imageFile;
-//
-//   bool isCameraInitialized = false;
-//
-//   @override
-//   void initState() {
-//     super.initState();
-//     _initCamera();
-//   }
-//
-//   Future<void> _initCamera() async {
-//     // Yêu cầu quyền camera
-//     var status = await Permission.camera.status;
-//     if (!status.isGranted) {
-//       status = await Permission.camera.request();
-//       if (!status.isGranted) {
-//         ScaffoldMessenger.of(context).showSnackBar(
-//           const SnackBar(content: Text('Không có quyền truy cập camera')),
-//         );
-//         return;
-//       }
-//     }
-//
-//     try {
-//       cameras = await availableCameras();
-//       if (cameras == null || cameras!.isEmpty) {
-//         ScaffoldMessenger.of(context).showSnackBar(
-//           const SnackBar(content: Text('Không tìm thấy camera nào')),
-//         );
-//         return;
-//       }
-//
-//       controller = CameraController(
-//         cameras![0],
-//         ResolutionPreset.medium,
-//         enableAudio: false,
-//       );
-//
-//       await controller!.initialize();
-//
-//       if (!mounted) return;
-//
-//       setState(() {
-//         isCameraInitialized = true;
-//       });
-//     } catch (e) {
-//       debugPrint('Lỗi khởi tạo camera: $e');
-//     }
-//   }
-//
-//   Future<void> _takePicture() async {
-//     if (!controller!.value.isInitialized) {
-//       return;
-//     }
-//     if (controller!.value.isTakingPicture) {
-//       return;
-//     }
-//
-//     try {
-//       final XFile file = await controller!.takePicture();
-//       setState(() {
-//         imageFile = file;
-//       });
-//     } catch (e) {
-//       debugPrint('Lỗi khi chụp ảnh: $e');
-//     }
-//   }
-//
-//   void _showSubmitDialog() {
-//     if (imageFile == null) {
-//       ScaffoldMessenger.of(
-//         context,
-//       ).showSnackBar(const SnackBar(content: Text('Vui lòng chụp hình trước')));
-//       return;
-//     }
-//
-//     showDialog(
-//       context: context,
-//       builder: (context) => AlertDialog(
-//         title: const Text('Xác nhận gửi ảnh'),
-//         content: Image.file(File(imageFile!.path)),
-//         actions: [
-//           TextButton(
-//             onPressed: () => Navigator.pop(context),
-//             child: const Text('Hủy'),
-//           ),
-//           ElevatedButton(
-//             onPressed: () {
-//               Navigator.pop(context);
-//               ScaffoldMessenger.of(context).showSnackBar(
-//                 const SnackBar(content: Text('Dữ liệu đã được gửi')),
-//               );
-//               // Xử lý gửi ảnh lên server hoặc lưu ở đây
-//             },
-//             child: const Text('Gửi'),
-//           ),
-//         ],
-//       ),
-//     );
-//   }
-//
-//   @override
-//   void dispose() {
-//     controller?.dispose();
-//     super.dispose();
-//   }
-//
-//   @override
-//   Widget build(BuildContext context) {
-//     return Scaffold(
-//       appBar: AppBar(title: const Text('Camera Inspection'), centerTitle: true),
-//       body: Column(
-//         children: [
-//           Expanded(
-//             flex: 4,
-//             child: Container(
-//               color: Colors.black,
-//               child: isCameraInitialized && controller != null
-//                   ? CameraPreview(controller!)
-//                   : const Center(child: CircularProgressIndicator()),
-//             ),
-//           ),
-//           Expanded(
-//             flex: 3,
-//             child: SingleChildScrollView(
-//               padding: const EdgeInsets.all(16),
-//               child: Column(
-//                 children: [
-//                   if (imageFile != null)
-//                     ClipRRect(
-//                       borderRadius: BorderRadius.circular(12),
-//                       child: Image.file(File(imageFile!.path)),
-//                     )
-//                   else
-//                     Container(
-//                       height: 150,
-//                       color: Colors.grey[300],
-//                       alignment: Alignment.center,
-//                       child: const Text('Chưa có ảnh nào'),
-//                     ),
-//                   const SizedBox(height: 16),
-//                   ElevatedButton.icon(
-//                     onPressed: _takePicture,
-//                     icon: const Icon(Icons.camera_alt),
-//                     label: const Text('Chụp ảnh'),
-//                     style: ElevatedButton.styleFrom(
-//                       minimumSize: const Size(double.infinity, 48),
-//                     ),
-//                   ),
-//                   const SizedBox(height: 12),
-//                   ElevatedButton(
-//                     onPressed: _showSubmitDialog,
-//                     child: const Text('Gửi dữ liệu'),
-//                     style: ElevatedButton.styleFrom(
-//                       minimumSize: const Size(double.infinity, 48),
-//                       backgroundColor: Colors.green,
-//                     ),
-//                   ),
-//                 ],
-//               ),
-//             ),
-//           ),
-//         ],
-//       ),
-//     );
-//   }
-// }
+// Màn hình danh sách báo cáo offline
+class OfflineReportListScreen extends StatelessWidget {
+  final List<Map<String, dynamic>> reports;
+  final void Function(Map<String, dynamic>) onDelete;
+  final Future<void> Function(Map<String, dynamic>) onSendNow;
+
+  const OfflineReportListScreen({
+    super.key,
+    required this.reports,
+    required this.onDelete,
+    required this.onSendNow,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Báo cáo Offline Chưa Gửi'),
+        backgroundColor: Colors.blue.shade600,
+      ),
+      body: reports.isEmpty
+          ? const Center(child: Text('Không có báo cáo offline chưa gửi'))
+          : ListView.builder(
+              itemCount: reports.length,
+              itemBuilder: (context, index) {
+                final report = reports[index];
+                final imageBytes = base64Decode(report['imageBase64']);
+                return Card(
+                  margin: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  child: ListTile(
+                    leading: Image.memory(
+                      imageBytes,
+                      width: 60,
+                      fit: BoxFit.cover,
+                    ),
+                    title: Text(
+                      'Division: ${report['division']} - Machine: ${report['machine']}',
+                    ),
+                    subtitle: Text(report['comment']),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.send, color: Colors.green),
+                          tooltip: 'Gửi ngay',
+                          onPressed: () => onSendNow(report),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.delete, color: Colors.red),
+                          tooltip: 'Xóa',
+                          onPressed: () => onDelete(report),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+    );
+  }
+}
