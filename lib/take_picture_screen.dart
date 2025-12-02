@@ -348,6 +348,11 @@ import 'dart:typed_data';
 import 'dart:ui_web' as ui_web;
 import 'package:flutter/material.dart';
 import 'dart:html' as html;
+import 'dart:async';
+import 'dart:typed_data';
+import 'dart:ui_web' as ui_web;
+import 'package:flutter/material.dart';
+import 'dart:html' as html;
 
 class TakePictureScreen extends StatefulWidget {
   const TakePictureScreen({super.key});
@@ -358,53 +363,67 @@ class TakePictureScreen extends StatefulWidget {
 
 class _TakePictureScreenState extends State<TakePictureScreen> {
   html.MediaStream? _stream;
+  html.VideoElement? _videoElement;
   Uint8List? _capturedImage;
   bool _isCapturing = false;
   String? _error;
 
+  late final String _viewType;
+
   @override
-  void dispose() {
-    _stream?.getTracks().forEach((t) => t.stop());
-    super.dispose();
+  void initState() {
+    super.initState();
+    _viewType = 'camera_${DateTime.now().millisecondsSinceEpoch}';
+    _startCameraPreview();
   }
 
-  Future<void> _capturePhoto() async {
-    if (_isCapturing) return;
-    setState(() => _isCapturing = true);
-
+  void _startCameraPreview() async {
     try {
-      // Bật camera (không hiển thị)
       final stream = await html.window.navigator.mediaDevices!.getUserMedia({
-        'video': {'facingMode': 'environment'},
+        'video': {'facingMode': 'environment', 'width': 640, 'height': 480},
       });
       _stream = stream;
 
-      final video = html.VideoElement()
+      _videoElement = html.VideoElement()
         ..autoplay = true
         ..srcObject = stream;
 
-      // Đợi video sẵn sàng
+      ui_web.platformViewRegistry.registerViewFactory(
+        _viewType,
+        (int viewId) => _videoElement!,
+      );
+
+      setState(() {});
+    } catch (e) {
+      setState(() => _error = "Không thể mở camera: $e");
+    }
+  }
+
+  Future<void> _capturePhoto() async {
+    if (_isCapturing || _videoElement == null) return;
+    setState(() => _isCapturing = true);
+
+    try {
+      final video = _videoElement!;
       final completer = Completer<void>();
-      void onLoadedMetadata(html.Event _) {
-        video.removeEventListener('loadedmetadata', onLoadedMetadata);
+
+      void onMetadata(html.Event _) {
+        video.removeEventListener('loadedmetadata', onMetadata);
         if (!completer.isCompleted) completer.complete();
       }
 
-      video.addEventListener('loadedmetadata', onLoadedMetadata);
+      video.addEventListener('loadedmetadata', onMetadata);
 
       if (video.readyState >= 1) {
         completer.complete();
       } else {
         Future.delayed(const Duration(seconds: 3), () {
-          if (!completer.isCompleted) {
-            completer.completeError("Timeout");
-          }
+          if (!completer.isCompleted) completer.completeError("Timeout");
         });
       }
 
       await completer.future;
 
-      // Tạo canvas + chụp
       final canvas = html.CanvasElement(
         width: video.videoWidth,
         height: video.videoHeight,
@@ -425,9 +444,6 @@ class _TakePictureScreenState extends State<TakePictureScreen> {
           _capturedImage = bytes;
         });
       }
-
-      // Dừng camera ngay
-      stream.getTracks().forEach((t) => t.stop());
     } catch (e) {
       _showError("Lỗi chụp ảnh: $e");
     } finally {
@@ -438,9 +454,8 @@ class _TakePictureScreenState extends State<TakePictureScreen> {
   void _retake() {
     setState(() {
       _capturedImage = null;
-      _stream?.getTracks().forEach((t) => t.stop());
-      _stream = null;
     });
+    // Không cần restart stream → vẫn đang chạy
   }
 
   void _usePhoto() {
@@ -457,6 +472,12 @@ class _TakePictureScreenState extends State<TakePictureScreen> {
   }
 
   @override
+  void dispose() {
+    _stream?.getTracks().forEach((t) => t.stop());
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
@@ -468,7 +489,7 @@ class _TakePictureScreenState extends State<TakePictureScreen> {
       ),
       body: Column(
         children: [
-          // Khu vực ảnh / nút chụp
+          // Preview / Ảnh tĩnh
           Expanded(
             child: _capturedImage != null
                 ? Padding(
@@ -478,42 +499,31 @@ class _TakePictureScreenState extends State<TakePictureScreen> {
                       child: Image.memory(_capturedImage!, fit: BoxFit.contain),
                     ),
                   )
-                : Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.camera_alt,
-                          size: 80,
-                          color: Colors.grey.shade400,
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'Nhấn nút để chụp ảnh',
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: Colors.grey.shade600,
-                          ),
-                        ),
-                      ],
+                : _videoElement != null
+                ? Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: AspectRatio(
+                        aspectRatio: 4 / 3,
+                        child: HtmlElementView(viewType: _viewType),
+                      ),
                     ),
-                  ),
+                  )
+                : const Center(child: CircularProgressIndicator()),
           ),
 
           // Nút điều khiển
           Container(
             padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
+            decoration: const BoxDecoration(
               color: Colors.black87,
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(20),
-              ),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 if (_capturedImage != null) ...[
-                  // Chụp lại
                   ElevatedButton.icon(
                     onPressed: _retake,
                     icon: const Icon(Icons.refresh),
@@ -523,7 +533,6 @@ class _TakePictureScreenState extends State<TakePictureScreen> {
                     ),
                   ),
                   const SizedBox(width: 16),
-                  // Dùng ảnh
                   ElevatedButton.icon(
                     onPressed: _usePhoto,
                     icon: const Icon(Icons.check),
@@ -533,7 +542,6 @@ class _TakePictureScreenState extends State<TakePictureScreen> {
                     ),
                   ),
                 ] else
-                  // Nút chụp
                   SizedBox(
                     width: 80,
                     height: 80,
