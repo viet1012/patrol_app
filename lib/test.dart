@@ -310,69 +310,100 @@ class _CameraScreenState extends State<CameraScreen> {
             const SizedBox(height: 12),
 
             // Form Section
-            _buildLabel('Div Group Machine'),
-            Container(
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.blue.shade300, width: 1.5),
-                borderRadius: BorderRadius.circular(8),
-                color: Colors.blue.shade50,
-              ),
-              child: DropdownButton<String>(
-                value: _selectedDiv,
-                isExpanded: true,
-                underline: const SizedBox(),
-                items: divs.map((String value) {
-                  return DropdownMenuItem<String>(
-                    value: value,
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Text(
-                        value,
-                        style: const TextStyle(fontWeight: FontWeight.w500),
+            Row(
+              children: [
+                // Dropdown Div Group Machine
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildLabel('Div Group Machine'),
+                      const SizedBox(height: 4),
+                      Container(
+                        decoration: BoxDecoration(
+                          border: Border.all(
+                            color: Colors.blue.shade300,
+                            width: 1.5,
+                          ),
+                          borderRadius: BorderRadius.circular(8),
+                          color: Colors.blue.shade50,
+                        ),
+                        child: DropdownButton<String>(
+                          value: _selectedDiv,
+                          isExpanded: true,
+                          underline: const SizedBox(),
+                          items: divs.map((String value) {
+                            return DropdownMenuItem<String>(
+                              value: value,
+                              child: Padding(
+                                padding: const EdgeInsets.all(12),
+                                child: Text(
+                                  value,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                          onChanged: (String? newValue) {
+                            setState(() {
+                              _selectedDiv = newValue;
+                              _selectedMachine = null;
+                            });
+                          },
+                        ),
                       ),
-                    ),
-                  );
-                }).toList(),
-                onChanged: (String? newValue) {
-                  setState(() {
-                    _selectedDiv = newValue;
-                    _selectedMachine = null;
-                  });
-                },
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            _buildLabel('Group'),
-            Container(
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.blue.shade300, width: 1.5),
-                borderRadius: BorderRadius.circular(8),
-                color: Colors.blue.shade50,
-              ),
-              child: DropdownButton<String>(
-                value: _selectedMachine,
-                isExpanded: true,
-                underline: const SizedBox(),
-                hint: const Padding(
-                  padding: EdgeInsets.all(12),
-                  child: Text("Chọn máy"),
+                    ],
+                  ),
                 ),
-                items: machineList.map((String value) {
-                  return DropdownMenuItem<String>(
-                    value: value,
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Text(value),
-                    ),
-                  );
-                }).toList(),
-                onChanged: (String? newValue) {
-                  setState(() {
-                    _selectedMachine = newValue;
-                  });
-                },
-              ),
+
+                const SizedBox(width: 16),
+
+                // Dropdown Group (Machine)
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildLabel('Group'),
+                      const SizedBox(height: 4),
+                      Container(
+                        decoration: BoxDecoration(
+                          border: Border.all(
+                            color: Colors.blue.shade300,
+                            width: 1.5,
+                          ),
+                          borderRadius: BorderRadius.circular(8),
+                          color: Colors.blue.shade50,
+                        ),
+                        child: DropdownButton<String>(
+                          value: _selectedMachine,
+                          isExpanded: true,
+                          underline: const SizedBox(),
+                          hint: const Padding(
+                            padding: EdgeInsets.all(12),
+                            child: Text("Chọn máy"),
+                          ),
+                          items: machineList.map((String value) {
+                            return DropdownMenuItem<String>(
+                              value: value,
+                              child: Padding(
+                                padding: const EdgeInsets.all(12),
+                                child: Text(value),
+                              ),
+                            );
+                          }).toList(),
+                          onChanged: (String? newValue) {
+                            setState(() {
+                              _selectedMachine = newValue;
+                            });
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 16),
 
