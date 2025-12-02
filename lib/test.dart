@@ -1,17 +1,12 @@
-import 'dart:convert';
+import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:chuphinh/reason_model.dart';
 import 'package:chuphinh/take_picture_screen.dart';
 import 'package:flutter/material.dart';
-import 'package:camera/camera.dart';
 import 'package:http/http.dart' as http;
-import 'package:path_provider/path_provider.dart';
-import 'package:permission_handler/permission_handler.dart';
-import 'package:excel/excel.dart' as xls;
-import 'package:excel_facility/excel_facility.dart';
 import 'machine_model.dart';
 
-// ===================== MAIN SCREEN =====================
 class CameraScreen extends StatefulWidget {
   const CameraScreen({super.key});
 
@@ -20,7 +15,7 @@ class CameraScreen extends StatefulWidget {
 }
 
 class _CameraScreenState extends State<CameraScreen> {
-  XFile? _image;
+  Uint8List? _image;
   String? _selectedDiv = 'PE';
   String? _selectedMachine;
   String _comment = '';
@@ -47,7 +42,7 @@ class _CameraScreenState extends State<CameraScreen> {
   }
 
   Future<void> _openCamera() async {
-    final result = await Navigator.push<XFile?>(
+    final result = await Navigator.push<Uint8List?>(
       context,
       MaterialPageRoute(builder: (context) => const TakePictureScreen()),
     );
@@ -65,13 +60,100 @@ class _CameraScreenState extends State<CameraScreen> {
     });
   }
 
+  void _showSnackBar(
+    String message,
+    Color color, {
+    Duration duration = const Duration(seconds: 3),
+  }) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).removeCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: color,
+        duration: duration,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
+    );
+  }
+
   Future<void> sendDataToServer() async {
+    if (_image == null) {
+      _showSnackBar('Vui lòng chụp ảnh trước!', Colors.orange);
+      return;
+    }
+
+    if (_selectedMachine == null) {
+      _showSnackBar('Vui lòng chọn máy!', Colors.orange);
+      return;
+    }
+
+    // Hiển thị loading
+    _showSnackBar(
+      'Đang gửi dữ liệu...',
+      Colors.blue,
+      duration: const Duration(seconds: 10),
+    );
+
+    // final uri = Uri.parse("http://localhost:9299/api/report");
+    final uri = Uri.parse("http://192.168.123.108:9299/api/report");
+
+    var request = http.MultipartRequest('POST', uri);
+
+    // Thêm fields
+    request.fields.addAll({
+      'division': _selectedDiv ?? "",
+      'machine': _selectedMachine ?? "",
+      'comment': _comment,
+      'reason1': _selectedReason1 ?? "",
+      'reason2': _selectedReason2 ?? "",
+    });
+
+    // Thêm file
+    try {
+      var file = await http.MultipartFile.fromBytes(
+        'image',
+        _image!,
+        filename: 'image.png',
+        contentType: http.MediaType('image', 'png'),
+      );
+      request.files.add(file);
+    } catch (e) {
+      _showSnackBar('Lỗi xử lý ảnh: $e', Colors.red);
+      return;
+    }
+
+    try {
+      final response = await request.send().timeout(
+        const Duration(seconds: 15),
+      );
+
+      // BỎ ĐỌC BODY NẾU KHÔNG CẦN
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        _showSnackBar('Gửi dữ liệu thành công!', Colors.green);
+        _resetForm();
+        return; // ← THOÁT SỚM, KHÔNG ĐỌC STREAM
+      } else {
+        _showSnackBar('Lỗi server: ${response.statusCode}', Colors.red);
+      }
+    } on TimeoutException {
+      _showSnackBar('Kết nối timeout. Vui lòng thử lại.', Colors.red);
+    } on SocketException {
+      _showSnackBar('Không có kết nối mạng hoặc server offline', Colors.red);
+    } on http.ClientException catch (e) {
+      _showSnackBar('Lỗi kết nối (CORS?): $e', Colors.red);
+    }
+  }
+
+  Future<void> sendDataToServer1() async {
     if (_image == null) {
       print("No image selected");
       return;
     }
 
-    final uri = Uri.parse("http://192.168.123.16:9999/api/report");
+    final uri = Uri.parse("http://localhost:9299/api/report");
 
     var request = http.MultipartRequest('POST', uri);
 
@@ -81,7 +163,12 @@ class _CameraScreenState extends State<CameraScreen> {
     request.fields['reason1'] = _selectedReason1 ?? "";
     request.fields['reason2'] = _selectedReason2 ?? "";
 
-    var file = await http.MultipartFile.fromPath('image', _image!.path);
+    var file = await http.MultipartFile.fromBytes(
+      'image',
+      _image!,
+      filename: 'image.png',
+      contentType: http.MediaType('image', 'png'),
+    );
 
     request.files.add(file);
 
@@ -160,9 +247,11 @@ class _CameraScreenState extends State<CameraScreen> {
                           borderRadius: BorderRadius.circular(10),
                           child: AspectRatio(
                             aspectRatio: 4 / 3,
-                            child: Image.file(
-                              File(_image!.path),
-                              fit: BoxFit.contain, // giữ toàn bộ ảnh, không cắt
+                            child: Image.memory(
+                              _image!,
+                              width: 300,
+                              height: 300,
+                              fit: BoxFit.contain,
                             ),
                           ),
                         )
@@ -392,13 +481,8 @@ class _CameraScreenState extends State<CameraScreen> {
               width: double.infinity,
               height: 48,
               child: ElevatedButton(
-                onPressed: () {
-                  sendDataToServer(); // <<=== GỌI HÀM LƯU EXCEL
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('✓ Dữ liệu đã được gửi')),
-                  );
-                  _resetForm();
-                },
+                onPressed:
+                    sendDataToServer, // ← Chỉ gọi hàm, KHÔNG show SnackBar ở đây
                 child: const Text('Gửi'),
               ),
             ),

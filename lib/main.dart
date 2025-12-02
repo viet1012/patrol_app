@@ -11,13 +11,6 @@ import 'dart:ui' show platformViewRegistry;
 import 'dart:html' as html;
 
 void main() {
-  ui.platformViewRegistry.registerViewFactory(
-    'videoElement',
-    (int viewId) => html.VideoElement()
-      ..autoplay = true
-      ..width = 640
-      ..height = 480,
-  );
   runApp(const MyApp());
 }
 
