@@ -381,8 +381,13 @@ class _TakePictureScreenState extends State<TakePictureScreen> {
     try {
       final newViewType = 'camera_${DateTime.now().millisecondsSinceEpoch}';
 
+      // BƯỚC 1: LẤY CAMERA SAU + ĐỘ PHÂN GIẢI CAO NHẤT
       final stream = await html.window.navigator.mediaDevices!.getUserMedia({
-        'video': {'facingMode': 'environment', 'width': 640, 'height': 480},
+        'video': {
+          'facingMode': 'environment',
+          'width': {'min': 1080, 'ideal': 4000, 'max': 4000},
+          'height': {'min': 1080, 'ideal': 4000, 'max': 4000},
+        },
       });
 
       final video = html.VideoElement()
@@ -394,13 +399,37 @@ class _TakePictureScreenState extends State<TakePictureScreen> {
         (int viewId) => video,
       );
 
+      // BƯỚC 2: ÁP DỤNG ĐỘ PHÂN GIẢI CAO NHẤT (sau khi video load)
+      video.onLoadedMetadata.listen((_) async {
+        final track = stream.getVideoTracks().first;
+        final capabilities = track.getCapabilities() as Map<String, dynamic>;
+
+        final maxW = (capabilities['width'] as Map)['max'] as int? ?? 4000;
+        final maxH = (capabilities['height'] as Map)['max'] as int? ?? 4000;
+
+        // CẮT VUÔNG: LẤY GIÁ TRỊ NHỎ HƠN
+        final size = maxW < maxH ? maxW : maxH;
+
+        await track.applyConstraints({'width': size, 'height': size});
+
+        // Cập nhật lại state để rebuild
+        if (mounted) {
+          setState(() {
+            _stream = stream;
+            _videoElement = video;
+            _viewType = newViewType;
+          });
+        }
+      });
+
+      // Gán tạm để hiển thị preview
       setState(() {
         _stream = stream;
         _videoElement = video;
         _viewType = newViewType;
       });
     } catch (e) {
-      setState(() => _error = "Lỗi: $e");
+      setState(() => _error = "Lỗi camera: $e");
     }
   }
 
@@ -444,7 +473,23 @@ class _TakePictureScreenState extends State<TakePictureScreen> {
         height: video.videoHeight,
       );
       final ctx = canvas.context2D;
-      ctx.drawImage(video, 0, 0);
+      // CẮT VUÔNG TỪ GIỮA
+      final size = video.videoWidth < video.videoHeight
+          ? video.videoWidth
+          : video.videoHeight;
+      final offsetX = (video.videoWidth - size) ~/ 2;
+      final offsetY = (video.videoHeight - size) ~/ 2;
+      ctx.drawImageScaledFromSource(
+        video,
+        offsetX,
+        offsetY,
+        size,
+        size, // CẮT VUÔNG TỪ GIỮA
+        0,
+        0,
+        size,
+        size, // VẼ VÀO CANVAS
+      );
 
       final blob = await canvas.toBlob('image/png');
       if (blob == null) throw "Blob rỗng";
@@ -513,7 +558,7 @@ class _TakePictureScreenState extends State<TakePictureScreen> {
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(12),
                       child: AspectRatio(
-                        aspectRatio: 4 / 3,
+                        aspectRatio: 1.0,
                         child: HtmlElementView(
                           key: ValueKey(_viewType), // ← THÊM DÒNG NÀY
                           viewType: _viewType,
