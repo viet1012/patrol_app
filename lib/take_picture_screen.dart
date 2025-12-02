@@ -368,7 +368,7 @@ class _TakePictureScreenState extends State<TakePictureScreen> {
   bool _isCapturing = false;
   String? _error;
 
-  late final String _viewType;
+  late String _viewType;
 
   @override
   void initState() {
@@ -379,64 +379,39 @@ class _TakePictureScreenState extends State<TakePictureScreen> {
 
   void _startCameraPreview() async {
     try {
-      // BƯỚC 1: Lấy danh sách khả năng camera
-      final devices = await html.window.navigator.mediaDevices!
-          .enumerateDevices();
-      final videoDevices = devices
-          .where((d) => d.kind == 'videoinput')
-          .toList();
+      final newViewType = 'camera_${DateTime.now().millisecondsSinceEpoch}';
 
-      if (videoDevices.isEmpty) throw "Không tìm thấy camera";
-
-      // BƯỚC 2: Lấy track đầu tiên (camera sau)
       final stream = await html.window.navigator.mediaDevices!.getUserMedia({
-        'video': {
-          'deviceId': videoDevices.first.deviceId,
-          'facingMode': 'environment',
-        },
+        'video': {'facingMode': 'environment', 'width': 640, 'height': 480},
       });
 
-      _stream = stream;
-
-      // BƯỚC 3: Tạo video element
-      _videoElement = html.VideoElement()
+      final video = html.VideoElement()
         ..autoplay = true
         ..srcObject = stream;
 
       ui_web.platformViewRegistry.registerViewFactory(
-        _viewType,
-        (int viewId) => _videoElement!,
+        newViewType,
+        (int viewId) => video,
       );
 
-      // BƯỚC 4: Đợi video load → lấy kích thước thực
-      final completer = Completer<void>();
-      void onLoadedMetadata(html.Event _) {
-        _videoElement!.removeEventListener('loadedmetadata', onLoadedMetadata);
-        if (!completer.isCompleted) completer.complete();
-      }
-
-      _videoElement!.addEventListener('loadedmetadata', onLoadedMetadata);
-
-      // BƯỚC 5: Áp dụng độ phân giải cao nhất có thể
-      final track = stream.getVideoTracks().first;
-      final capabilities = track.getCapabilities() as Map<String, dynamic>;
-
-      final maxWidth = capabilities['width'] is Map
-          ? (capabilities['width'] as Map)['max'] as int
-          : 4000;
-      final maxHeight = capabilities['height'] is Map
-          ? (capabilities['height'] as Map)['max'] as int
-          : 3000;
-
-      await track.applyConstraints({'width': maxWidth, 'height': maxHeight});
-
-      // Đợi apply xong
-      await Future.delayed(const Duration(milliseconds: 500));
-
-      setState(() {});
+      setState(() {
+        _stream = stream;
+        _videoElement = video;
+        _viewType = newViewType;
+      });
     } catch (e) {
-      setState(() => _error = "Lỗi camera: $e");
+      setState(() => _error = "Lỗi: $e");
     }
+  }
+
+  void _retake() {
+    setState(() {
+      _capturedImage = null;
+      _videoElement = null;
+      _stream?.getTracks().forEach((t) => t.stop());
+      _stream = null;
+    });
+    _startCameraPreview(); // GỌI LẠI
   }
 
   Future<void> _capturePhoto() async {
@@ -445,23 +420,25 @@ class _TakePictureScreenState extends State<TakePictureScreen> {
 
     try {
       final video = _videoElement!;
+      final completer = Completer<void>();
 
-      // Đợi metadata (đảm bảo kích thước đã cập nhật)
-      if (video.videoWidth == 0 || video.videoHeight == 0) {
-        final completer = Completer<void>();
-        void onMetadata(html.Event _) {
-          video.removeEventListener('loadedmetadata', onMetadata);
-          if (!completer.isCompleted) completer.complete();
-        }
-
-        video.addEventListener('loadedmetadata', onMetadata);
-        await Future.any([
-          completer.future,
-          Future.delayed(const Duration(seconds: 3)),
-        ]);
+      void onMetadata(html.Event _) {
+        video.removeEventListener('loadedmetadata', onMetadata);
+        if (!completer.isCompleted) completer.complete();
       }
 
-      // Dùng kích thước thực tế (có thể lên 4000x3000)
+      video.addEventListener('loadedmetadata', onMetadata);
+
+      if (video.readyState >= 1) {
+        completer.complete();
+      } else {
+        Future.delayed(const Duration(seconds: 3), () {
+          if (!completer.isCompleted) completer.completeError("Timeout");
+        });
+      }
+
+      await completer.future;
+
       final canvas = html.CanvasElement(
         width: video.videoWidth,
         height: video.videoHeight,
@@ -469,10 +446,7 @@ class _TakePictureScreenState extends State<TakePictureScreen> {
       final ctx = canvas.context2D;
       ctx.drawImage(video, 0, 0);
 
-      final blob = await canvas.toBlob(
-        'image/jpeg',
-        0.95,
-      ); // JPEG chất lượng cao
+      final blob = await canvas.toBlob('image/png');
       if (blob == null) throw "Blob rỗng";
 
       final reader = html.FileReader();
@@ -486,17 +460,10 @@ class _TakePictureScreenState extends State<TakePictureScreen> {
         });
       }
     } catch (e) {
-      _showError("Lỗi chụp: $e");
+      _showError("Lỗi chụp ảnh: $e");
     } finally {
       setState(() => _isCapturing = false);
     }
-  }
-
-  void _retake() {
-    setState(() {
-      _capturedImage = null;
-    });
-    // Không cần restart stream → vẫn đang chạy
   }
 
   void _usePhoto() {
@@ -547,7 +514,10 @@ class _TakePictureScreenState extends State<TakePictureScreen> {
                       borderRadius: BorderRadius.circular(12),
                       child: AspectRatio(
                         aspectRatio: 4 / 3,
-                        child: HtmlElementView(viewType: _viewType),
+                        child: HtmlElementView(
+                          key: ValueKey(_viewType), // ← THÊM DÒNG NÀY
+                          viewType: _viewType,
+                        ),
                       ),
                     ),
                   )
