@@ -167,6 +167,182 @@
 //     );
 //   }
 // }
+// import 'dart:async';
+// import 'dart:typed_data';
+// import 'dart:ui_web' as ui_web;
+// import 'package:flutter/material.dart';
+// import 'dart:html' as html;
+//
+// class TakePictureScreen extends StatefulWidget {
+//   const TakePictureScreen({super.key});
+//
+//   @override
+//   State<TakePictureScreen> createState() => _TakePictureScreenState();
+// }
+//
+// class _TakePictureScreenState extends State<TakePictureScreen> {
+//   late html.VideoElement _videoElement; // Không nullable
+//   Uint8List? _capturedImage;
+//   bool _cameraStarted = false;
+//   String? _error;
+//
+//   late final String _viewType; // Thêm dòng này
+//
+//   @override
+//   void initState() {
+//     super.initState();
+//
+//     _viewType =
+//         'videoElement_${DateTime.now().millisecondsSinceEpoch}'; // Tạo mới
+//
+//     _videoElement = html.VideoElement()
+//       ..width = 640
+//       ..height = 480
+//       ..autoplay = true;
+//
+//     ui_web.platformViewRegistry.registerViewFactory(
+//       _viewType, // Dùng _viewType
+//       (int viewId) => _videoElement,
+//     );
+//
+//     _startCamera();
+//   }
+//
+//   void _startCamera() async {
+//     try {
+//       final stream = await html.window.navigator.mediaDevices!.getUserMedia({
+//         'video': {'facingMode': 'environment'},
+//       });
+//       _videoElement.srcObject = stream;
+//       setState(() {
+//         _cameraStarted = true;
+//         _error = null;
+//       });
+//     } catch (e) {
+//       setState(() {
+//         _error = "Không thể truy cập camera: $e";
+//       });
+//     }
+//   }
+//
+//   void _capturePhoto() async {
+//     final video = _videoElement;
+//
+//     // ĐỢI VIDEO SẴN SÀNG (readyState >= 1 = HAVE_METADATA)
+//     if (video.videoWidth == 0 || video.videoHeight == 0) {
+//       final completer = Completer<void>();
+//
+//       void onMetadata(html.Event _) {
+//         video.removeEventListener('loadedmetadata', onMetadata);
+//         if (!completer.isCompleted) completer.complete();
+//       }
+//
+//       video.addEventListener('loadedmetadata', onMetadata);
+//
+//       // Nếu đã có metadata → complete ngay
+//       if (video.readyState >= 1) {
+//         // HAVE_METADATA = 1
+//         completer.complete();
+//       } else {
+//         // Timeout an toàn
+//         Future.delayed(const Duration(seconds: 3), () {
+//           if (!completer.isCompleted) {
+//             completer.completeError("Timeout waiting for video metadata");
+//           }
+//         });
+//       }
+//
+//       try {
+//         await completer.future;
+//       } catch (e) {
+//         print("Lỗi đợi video: $e");
+//         _showError("Không thể chụp ảnh. Vui lòng thử lại.");
+//         return;
+//       }
+//     }
+//
+//     // BÂY GIỜ videoWidth/Height đã có giá trị
+//     final canvas = html.CanvasElement(
+//       width: video.videoWidth,
+//       height: video.videoHeight,
+//     );
+//     final ctx = canvas.context2D;
+//     ctx.drawImage(video, 0, 0);
+//
+//     canvas
+//         .toBlob('image/png')
+//         .then((blob) {
+//           if (blob == null) {
+//             print("Blob rỗng!");
+//             _showError("Lỗi xử lý ảnh");
+//             return;
+//           }
+//
+//           final reader = html.FileReader();
+//           reader.readAsArrayBuffer(blob);
+//           reader.onLoadEnd.listen((_) {
+//             if (reader.readyState == html.FileReader.DONE) {
+//               final bytes = reader.result as Uint8List;
+//               setState(() {
+//                 _capturedImage = bytes;
+//               });
+//               Navigator.pop(context, bytes);
+//             }
+//           });
+//         })
+//         .catchError((e) {
+//           print("Lỗi toBlob: $e");
+//           _showError("Lỗi chụp ảnh: $e");
+//         });
+//   }
+//
+//   void _showError(String message) {
+//     if (!mounted) return;
+//     ScaffoldMessenger.of(context).showSnackBar(
+//       SnackBar(content: Text(message), backgroundColor: Colors.red),
+//     );
+//   }
+//
+//   @override
+//   void dispose() {
+//     _videoElement.srcObject?.getTracks().forEach((t) => t.stop());
+//     super.dispose();
+//   }
+//
+//   @override
+//   Widget build(BuildContext context) {
+//     return Scaffold(
+//       appBar: AppBar(title: const Text('Chụp ảnh Web')),
+//       body: Center(
+//         child: _error != null
+//             ? Text(_error!, style: const TextStyle(color: Colors.red))
+//             : Column(
+//                 mainAxisSize: MainAxisSize.min,
+//                 children: [
+//                   if (_cameraStarted)
+//                     SizedBox(
+//                       width: 320,
+//                       height: 240,
+//                       child: HtmlElementView(viewType: _viewType),
+//                     )
+//                   else
+//                     const CircularProgressIndicator(),
+//                   const SizedBox(height: 20),
+//                   ElevatedButton(
+//                     onPressed: _cameraStarted ? _capturePhoto : null,
+//                     child: const Text('Chụp ảnh'),
+//                   ),
+//                   if (_capturedImage != null) ...[
+//                     const SizedBox(height: 20),
+//                     const Text('Ảnh chụp:'),
+//                     Image.memory(_capturedImage!, width: 200),
+//                   ],
+//                 ],
+//               ),
+//       ),
+//     );
+//   }
+// }
 import 'dart:async';
 import 'dart:typed_data';
 import 'dart:ui_web' as ui_web;
@@ -181,164 +357,213 @@ class TakePictureScreen extends StatefulWidget {
 }
 
 class _TakePictureScreenState extends State<TakePictureScreen> {
-  late html.VideoElement _videoElement; // Không nullable
+  html.MediaStream? _stream;
   Uint8List? _capturedImage;
-  bool _cameraStarted = false;
+  bool _isCapturing = false;
   String? _error;
-
-  late final String _viewType; // Thêm dòng này
-
-  @override
-  void initState() {
-    super.initState();
-
-    _viewType =
-        'videoElement_${DateTime.now().millisecondsSinceEpoch}'; // Tạo mới
-
-    _videoElement = html.VideoElement()
-      ..width = 640
-      ..height = 480
-      ..autoplay = true;
-
-    ui_web.platformViewRegistry.registerViewFactory(
-      _viewType, // Dùng _viewType
-      (int viewId) => _videoElement,
-    );
-
-    _startCamera();
-  }
-
-  void _startCamera() async {
-    try {
-      final stream = await html.window.navigator.mediaDevices!.getUserMedia({
-        'video': {'facingMode': 'environment'},
-      });
-      _videoElement.srcObject = stream;
-      setState(() {
-        _cameraStarted = true;
-        _error = null;
-      });
-    } catch (e) {
-      setState(() {
-        _error = "Không thể truy cập camera: $e";
-      });
-    }
-  }
-
-  void _capturePhoto() async {
-    final video = _videoElement;
-
-    // ĐỢI VIDEO SẴN SÀNG (readyState >= 1 = HAVE_METADATA)
-    if (video.videoWidth == 0 || video.videoHeight == 0) {
-      final completer = Completer<void>();
-
-      void onMetadata(html.Event _) {
-        video.removeEventListener('loadedmetadata', onMetadata);
-        if (!completer.isCompleted) completer.complete();
-      }
-
-      video.addEventListener('loadedmetadata', onMetadata);
-
-      // Nếu đã có metadata → complete ngay
-      if (video.readyState >= 1) {
-        // HAVE_METADATA = 1
-        completer.complete();
-      } else {
-        // Timeout an toàn
-        Future.delayed(const Duration(seconds: 3), () {
-          if (!completer.isCompleted) {
-            completer.completeError("Timeout waiting for video metadata");
-          }
-        });
-      }
-
-      try {
-        await completer.future;
-      } catch (e) {
-        print("Lỗi đợi video: $e");
-        _showError("Không thể chụp ảnh. Vui lòng thử lại.");
-        return;
-      }
-    }
-
-    // BÂY GIỜ videoWidth/Height đã có giá trị
-    final canvas = html.CanvasElement(
-      width: video.videoWidth,
-      height: video.videoHeight,
-    );
-    final ctx = canvas.context2D;
-    ctx.drawImage(video, 0, 0);
-
-    canvas
-        .toBlob('image/png')
-        .then((blob) {
-          if (blob == null) {
-            print("Blob rỗng!");
-            _showError("Lỗi xử lý ảnh");
-            return;
-          }
-
-          final reader = html.FileReader();
-          reader.readAsArrayBuffer(blob);
-          reader.onLoadEnd.listen((_) {
-            if (reader.readyState == html.FileReader.DONE) {
-              final bytes = reader.result as Uint8List;
-              setState(() {
-                _capturedImage = bytes;
-              });
-              Navigator.pop(context, bytes);
-            }
-          });
-        })
-        .catchError((e) {
-          print("Lỗi toBlob: $e");
-          _showError("Lỗi chụp ảnh: $e");
-        });
-  }
-
-  void _showError(String message) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: Colors.red),
-    );
-  }
 
   @override
   void dispose() {
-    _videoElement.srcObject?.getTracks().forEach((t) => t.stop());
+    _stream?.getTracks().forEach((t) => t.stop());
     super.dispose();
+  }
+
+  Future<void> _capturePhoto() async {
+    if (_isCapturing) return;
+    setState(() => _isCapturing = true);
+
+    try {
+      // Bật camera (không hiển thị)
+      final stream = await html.window.navigator.mediaDevices!.getUserMedia({
+        'video': {'facingMode': 'environment'},
+      });
+      _stream = stream;
+
+      final video = html.VideoElement()
+        ..autoplay = true
+        ..srcObject = stream;
+
+      // Đợi video sẵn sàng
+      final completer = Completer<void>();
+      void onLoadedMetadata(html.Event _) {
+        video.removeEventListener('loadedmetadata', onLoadedMetadata);
+        if (!completer.isCompleted) completer.complete();
+      }
+
+      video.addEventListener('loadedmetadata', onLoadedMetadata);
+
+      if (video.readyState >= 1) {
+        completer.complete();
+      } else {
+        Future.delayed(const Duration(seconds: 3), () {
+          if (!completer.isCompleted) {
+            completer.completeError("Timeout");
+          }
+        });
+      }
+
+      await completer.future;
+
+      // Tạo canvas + chụp
+      final canvas = html.CanvasElement(
+        width: video.videoWidth,
+        height: video.videoHeight,
+      );
+      final ctx = canvas.context2D;
+      ctx.drawImage(video, 0, 0);
+
+      final blob = await canvas.toBlob('image/png');
+      if (blob == null) throw "Blob rỗng";
+
+      final reader = html.FileReader();
+      reader.readAsArrayBuffer(blob);
+      await reader.onLoadEnd.first;
+
+      if (reader.readyState == html.FileReader.DONE) {
+        final bytes = reader.result as Uint8List;
+        setState(() {
+          _capturedImage = bytes;
+        });
+      }
+
+      // Dừng camera ngay
+      stream.getTracks().forEach((t) => t.stop());
+    } catch (e) {
+      _showError("Lỗi chụp ảnh: $e");
+    } finally {
+      setState(() => _isCapturing = false);
+    }
+  }
+
+  void _retake() {
+    setState(() {
+      _capturedImage = null;
+      _stream?.getTracks().forEach((t) => t.stop());
+      _stream = null;
+    });
+  }
+
+  void _usePhoto() {
+    if (_capturedImage != null) {
+      Navigator.pop(context, _capturedImage);
+    }
+  }
+
+  void _showError(String msg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.red));
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Chụp ảnh Web')),
-      body: Center(
-        child: _error != null
-            ? Text(_error!, style: const TextStyle(color: Colors.red))
-            : Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (_cameraStarted)
-                    SizedBox(
-                      width: 320,
-                      height: 240,
-                      child: HtmlElementView(viewType: _viewType),
-                    )
-                  else
-                    const CircularProgressIndicator(),
-                  const SizedBox(height: 20),
-                  ElevatedButton(
-                    onPressed: _cameraStarted ? _capturePhoto : null,
-                    child: const Text('Chụp ảnh'),
+      appBar: AppBar(
+        title: const Text('Chụp ảnh'),
+        leading: IconButton(
+          icon: const Icon(Icons.close),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
+      body: Column(
+        children: [
+          // Khu vực ảnh / nút chụp
+          Expanded(
+            child: _capturedImage != null
+                ? Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image.memory(_capturedImage!, fit: BoxFit.contain),
+                    ),
+                  )
+                : Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.camera_alt,
+                          size: 80,
+                          color: Colors.grey.shade400,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Nhấn nút để chụp ảnh',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  if (_capturedImage != null) ...[
-                    const SizedBox(height: 20),
-                    const Text('Ảnh chụp:'),
-                    Image.memory(_capturedImage!, width: 200),
-                  ],
-                ],
+          ),
+
+          // Nút điều khiển
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.black87,
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(20),
               ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (_capturedImage != null) ...[
+                  // Chụp lại
+                  ElevatedButton.icon(
+                    onPressed: _retake,
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Chụp lại'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.grey,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  // Dùng ảnh
+                  ElevatedButton.icon(
+                    onPressed: _usePhoto,
+                    icon: const Icon(Icons.check),
+                    label: const Text('Dùng ảnh'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                    ),
+                  ),
+                ] else
+                  // Nút chụp
+                  SizedBox(
+                    width: 80,
+                    height: 80,
+                    child: ElevatedButton(
+                      onPressed: _isCapturing ? null : _capturePhoto,
+                      style: ElevatedButton.styleFrom(
+                        shape: const CircleBorder(),
+                        padding: const EdgeInsets.all(20),
+                        backgroundColor: Colors.white,
+                      ),
+                      child: _isCapturing
+                          ? const SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 3,
+                                color: Colors.blue,
+                              ),
+                            )
+                          : const Icon(
+                              Icons.camera_alt,
+                              size: 36,
+                              color: Colors.blue,
+                            ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
