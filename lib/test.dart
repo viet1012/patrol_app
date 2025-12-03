@@ -289,7 +289,7 @@ class _CameraScreenState extends State<CameraScreen> {
             Center(
               child: CameraPreviewBox(
                 key: _cameraKey,
-                size: 380, // kích thước vuông 320x320
+                size: 320, // kích thước vuông 320x320
                 onPhotoTaken: (bytes) {
                   setState(() => _image = bytes);
                   print("Đã chụp ảnh 1:1 thành công!");
@@ -307,7 +307,7 @@ class _CameraScreenState extends State<CameraScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildLabel('Div Group Machine'),
+                      _buildLabel('Div'),
                       const SizedBox(height: 4),
                       Container(
                         decoration: BoxDecoration(
@@ -348,7 +348,7 @@ class _CameraScreenState extends State<CameraScreen> {
                     ],
                   ),
                 ),
-                const SizedBox(width: 16),
+                const SizedBox(width: 8),
                 // Dropdown Group (Machine)
                 Expanded(
                   child: Column(
@@ -393,7 +393,7 @@ class _CameraScreenState extends State<CameraScreen> {
                     ],
                   ),
                 ),
-                const SizedBox(width: 16),
+                const SizedBox(width: 8),
                 // Dropdown Group (Machine)
                 Expanded(
                   child: Column(
@@ -439,7 +439,7 @@ class _CameraScreenState extends State<CameraScreen> {
                 ),
               ],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 8),
 
             _buildLabel('Comment'),
             TextField(
@@ -464,7 +464,7 @@ class _CameraScreenState extends State<CameraScreen> {
               minLines: 3,
               maxLines: 5,
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 8),
 
             Row(
               children: [
@@ -540,7 +540,7 @@ class _CameraScreenState extends State<CameraScreen> {
               ],
             ),
 
-            const SizedBox(height: 24),
+            const SizedBox(height: 16),
 
             SizedBox(
               width: double.infinity,
