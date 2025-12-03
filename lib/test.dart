@@ -24,47 +24,50 @@ class _CameraScreenState extends State<CameraScreen> {
   String? _selectedReason1;
   String? _selectedReason2;
 
+  final GlobalKey<CameraPreviewBoxState> _cameraKey =
+      GlobalKey<CameraPreviewBoxState>();
+
   List<String> getDivisions() {
+    final Set<String> unique = {};
     return machines
-        .map((m) => m.division?.toString())
+        .map((m) => m.division.toString())
         .where((d) => d != null && d!.isNotEmpty)
-        .cast<String>()
-        .toSet()
+        .where((d) => unique.add(d!)) // Chỉ thêm nếu chưa có
         .toList();
   }
 
   List<String> getGroupByDivision(String division) {
+    final Set<String> unique = {};
     return machines
-        .where((m) => m.division?.toString() == division)
-        .map((m) => m.machineType?.toString())
-        .where((g) => g != null && g.isNotEmpty)
-        .cast<String>()
-        .toSet()
+        .where((m) => m.division.toString() == division)
+        .map((m) => m.machineType.toString())
+        .where((g) => g.isNotEmpty)
+        .where((g) => unique.add(g))
         .toList();
   }
 
   List<String> getMachineByGroup(String group) {
+    final Set<String> unique = {};
     return machines
-        .where((m) => m.machineType?.toString() == group)
-        .map((m) => m.code?.toString())
-        .where((g) => g != null && g.isNotEmpty)
-        .cast<String>()
-        .toSet()
+        .where((m) => m.machineType.toString() == group)
+        .map((m) => m.code.toString())
+        .where((c) => c.isNotEmpty)
+        .where((c) => unique.add(c))
         .toList();
   }
 
-  Future<void> _openCamera() async {
-    final result = await Navigator.push<Uint8List?>(
-      context,
-      MaterialPageRoute(builder: (context) => const TakePictureScreen()),
-    );
-
-    if (result != null) {
-      setState(() {
-        _image = result;
-      });
-    }
-  }
+  // Future<void> _openCamera() async {
+  //   final result = await Navigator.push<Uint8List?>(
+  //     context,
+  //     MaterialPageRoute(builder: (context) => const TakePictureScreen()),
+  //   );
+  //
+  //   if (result != null) {
+  //     setState(() {
+  //       _image = result;
+  //     });
+  //   }
+  // }
 
   void _clearImage() {
     setState(() {
@@ -109,8 +112,8 @@ class _CameraScreenState extends State<CameraScreen> {
       duration: const Duration(seconds: 10),
     );
 
-    // final uri = Uri.parse("http://localhost:9299/api/report");
-    final uri = Uri.parse("http://192.168.123.108:9299/api/report");
+    final uri = Uri.parse("http://localhost:9299/api/report");
+    // final uri = Uri.parse("http://192.168.123.108:9299/api/report");
 
     var request = http.MultipartRequest('POST', uri);
 
@@ -146,7 +149,7 @@ class _CameraScreenState extends State<CameraScreen> {
       if (response.statusCode >= 200 && response.statusCode < 300) {
         _showSnackBar('Gửi dữ liệu thành công!', Colors.green);
         _resetForm();
-        return; // ← THOÁT SỚM, KHÔNG ĐỌC STREAM
+        return;
       } else {
         _showSnackBar('Lỗi server: ${response.statusCode}', Colors.red);
       }
@@ -169,6 +172,8 @@ class _CameraScreenState extends State<CameraScreen> {
       _selectedReason1 = null;
       _selectedReason2 = null;
     });
+
+    _cameraKey.currentState?.retake();
   }
 
   @override
@@ -202,83 +207,96 @@ class _CameraScreenState extends State<CameraScreen> {
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             // Image Preview Section
-            Stack(
-              children: [
-                Container(
-                  width: double.infinity,
-                  height: imageHeight,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade200,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.blue.shade300, width: 2),
-                  ),
-                  child: _image != null
-                      ? ClipRRect(
-                          borderRadius: BorderRadius.circular(10),
-                          child: AspectRatio(
-                            aspectRatio: 4 / 3,
-                            child: Image.memory(
-                              _image!,
-                              width: 300,
-                              height: 300,
-                              fit: BoxFit.contain,
-                            ),
-                          ),
-                        )
-                      : Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.image_not_supported_outlined,
-                                size: 48,
-                                color: Colors.grey.shade400,
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                'Ảnh sẽ hiển thị ở đây',
-                                style: TextStyle(
-                                  color: Colors.grey.shade600,
-                                  fontSize: 14,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                ),
-
-                // Camera Button (Floating)
-                Positioned(
-                  bottom: 8,
-                  right: 8,
-                  child: GestureDetector(
-                    onTap: _openCamera,
-                    child: Container(
-                      width: 56,
-                      height: 56,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Colors.blue.shade600,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.blue.shade600.withOpacity(0.4),
-                            blurRadius: 12,
-                            spreadRadius: 2,
-                          ),
-                        ],
-                      ),
-                      child: const Icon(
-                        Icons.camera_alt,
-                        color: Colors.white,
-                        size: 28,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
+            // Stack(
+            //   children: [
+            //     Container(
+            //       width: double.infinity,
+            //       height: imageHeight,
+            //       decoration: BoxDecoration(
+            //         color: Colors.grey.shade200,
+            //         borderRadius: BorderRadius.circular(12),
+            //         border: Border.all(color: Colors.blue.shade300, width: 2),
+            //       ),
+            //       child:
+            //       _image != null
+            //           ? ClipRRect(
+            //               borderRadius: BorderRadius.circular(10),
+            //               child: AspectRatio(
+            //                 aspectRatio: 4 / 3,
+            //                 child: Image.memory(
+            //                   _image!,
+            //                   width: 300,
+            //                   height: 300,
+            //                   fit: BoxFit.contain,
+            //                 ),
+            //               ),
+            //             )
+            //           : Center(
+            //               child: Column(
+            //                 mainAxisAlignment: MainAxisAlignment.center,
+            //                 children: [
+            //                   Icon(
+            //                     Icons.image_not_supported_outlined,
+            //                     size: 48,
+            //                     color: Colors.grey.shade400,
+            //                   ),
+            //                   const SizedBox(height: 8),
+            //                   Text(
+            //                     'Ảnh sẽ hiển thị ở đây',
+            //                     style: TextStyle(
+            //                       color: Colors.grey.shade600,
+            //                       fontSize: 14,
+            //                     ),
+            //                   ),
+            //                 ],
+            //               ),
+            //             ),
+            //     ),
+            //
+            //     // Camera Button (Floating)
+            //     Positioned(
+            //       bottom: 8,
+            //       right: 8,
+            //       child: GestureDetector(
+            //         onTap: _openCamera,
+            //         child: Container(
+            //           width: 56,
+            //           height: 56,
+            //           decoration: BoxDecoration(
+            //             shape: BoxShape.circle,
+            //             color: Colors.blue.shade600,
+            //             boxShadow: [
+            //               BoxShadow(
+            //                 color: Colors.blue.shade600.withOpacity(0.4),
+            //                 blurRadius: 12,
+            //                 spreadRadius: 2,
+            //               ),
+            //             ],
+            //           ),
+            //           child: const Icon(
+            //             Icons.camera_alt,
+            //             color: Colors.white,
+            //             size: 28,
+            //           ),
+            //         ),
+            //       ),
+            //     ),
+            //   ],
+            // ),
+            Center(
+              child: CameraPreviewBox(
+                key: _cameraKey,
+                size: 380, // kích thước vuông 320x320
+                onPhotoTaken: (bytes) {
+                  setState(() => _image = bytes);
+                  print("Đã chụp ảnh 1:1 thành công!");
+                },
+              ),
             ),
+
             const SizedBox(height: 12),
 
             // Form Section
@@ -322,6 +340,7 @@ class _CameraScreenState extends State<CameraScreen> {
                             setState(() {
                               _selectedDiv = newValue;
                               _selectedGroup = null;
+                              _selectedMachine = null;
                             });
                           },
                         ),
@@ -366,6 +385,7 @@ class _CameraScreenState extends State<CameraScreen> {
                           onChanged: (String? newValue) {
                             setState(() {
                               _selectedGroup = newValue;
+                              _selectedMachine = null; // Reset máy khi đổi nhóm
                             });
                           },
                         ),
@@ -379,7 +399,7 @@ class _CameraScreenState extends State<CameraScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildLabel('Group'),
+                      _buildLabel('Machine'),
                       const SizedBox(height: 4),
                       Container(
                         decoration: BoxDecoration(
@@ -532,7 +552,6 @@ class _CameraScreenState extends State<CameraScreen> {
               ),
             ),
             const SizedBox(height: 12),
-
             if (_image != null)
               SizedBox(
                 width: double.infinity,
@@ -555,7 +574,6 @@ class _CameraScreenState extends State<CameraScreen> {
                   ),
                 ),
               ),
-            const SizedBox(height: 20),
           ],
         ),
       ),
