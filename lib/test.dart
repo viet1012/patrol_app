@@ -112,15 +112,16 @@ class _CameraScreenState extends State<CameraScreen> {
       duration: const Duration(seconds: 10),
     );
 
-    // final uri = Uri.parse("http://localhost:9299/api/report");
-    final uri = Uri.parse("https://192.168.123.108:9299/api/report");
+    final uri = Uri.parse("http://localhost:9299/api/report");
+    // final uri = Uri.parse("https://192.168.123.108:9299/api/report");
 
     var request = http.MultipartRequest('POST', uri);
 
     // Thêm fields
     request.fields.addAll({
       'division': _selectedDiv ?? "",
-      'machine': _selectedGroup ?? "",
+      'group': _selectedGroup ?? "",
+      'machine': _selectedMachine ?? "",
       'comment': _comment,
       'reason1': _selectedReason1 ?? "",
       'reason2': _selectedReason2 ?? "",
