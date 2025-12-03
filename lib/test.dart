@@ -112,8 +112,8 @@ class _CameraScreenState extends State<CameraScreen> {
       duration: const Duration(seconds: 10),
     );
 
-    final uri = Uri.parse("http://localhost:9299/api/report");
-    // final uri = Uri.parse("http://192.168.123.108:9299/api/report");
+    // final uri = Uri.parse("http://localhost:9299/api/report");
+    final uri = Uri.parse("https://192.168.123.108:9299/api/report");
 
     var request = http.MultipartRequest('POST', uri);
 
@@ -197,12 +197,6 @@ class _CameraScreenState extends State<CameraScreen> {
         ? (isLandscape ? 300.0 : 400.0)
         : (isLandscape ? 200.0 : 300.0);
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Camera Inspection'),
-        centerTitle: true,
-        backgroundColor: Colors.blue.shade600,
-        elevation: 0,
-      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -289,7 +283,7 @@ class _CameraScreenState extends State<CameraScreen> {
             Center(
               child: CameraPreviewBox(
                 key: _cameraKey,
-                size: 320, // kích thước vuông 320x320
+                size: 300, // kích thước vuông 320x320
                 onPhotoTaken: (bytes) {
                   setState(() => _image = bytes);
                   print("Đã chụp ảnh 1:1 thành công!");
@@ -540,40 +534,31 @@ class _CameraScreenState extends State<CameraScreen> {
               ],
             ),
 
-            const SizedBox(height: 16),
+            const SizedBox(height: 8),
 
             SizedBox(
               width: double.infinity,
               height: 48,
               child: ElevatedButton(
-                onPressed:
-                    sendDataToServer, // ← Chỉ gọi hàm, KHÔNG show SnackBar ở đây
-                child: const Text('Gửi'),
-              ),
-            ),
-            const SizedBox(height: 12),
-            if (_image != null)
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: OutlinedButton(
-                  onPressed: _clearImage,
-                  style: OutlinedButton.styleFrom(
-                    side: BorderSide(color: Colors.red.shade400, width: 1.5),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blueAccent.shade400, // màu n?n nút
+                  side: BorderSide(
+                    color: Colors
+                        .blueAccent
+                        .shade100, // vi?n nút (nên ch?n màu d?m hon)
+                    width: 1.5,
                   ),
-                  child: Text(
-                    'Xóa ảnh',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.red.shade400,
-                    ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
                   ),
                 ),
+                onPressed: sendDataToServer,
+                child: const Text(
+                  'Gửi',
+                  style: TextStyle(color: Colors.white, fontSize: 18),
+                ),
               ),
+            ),
           ],
         ),
       ),
