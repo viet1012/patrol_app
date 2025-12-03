@@ -40185,25 +40185,27 @@ s=t.Pu
 q.ar(s).f.akB()
 this.c.ar(s).f.VC(A.awc(r,r,r,b,B.ko,B.S,r,A.e_(a,r,r,r,r,r,r),r,c,r,r,r,r,r,r,new A.cW(A.ex(8),B.q),r,r))},
 mA(a,b){return this.NA(a,b,B.Dz)},
-pX(){var s=0,r=A.V(t.H),q,p=2,o=[],n=this,m,l,k,j,i,h,g,f,e,d,c,b,a,a0,a1
-var $async$pX=A.Q(function(a2,a3){if(a2===1){o.push(a3)
+pX(){var s=0,r=A.V(t.H),q,p=2,o=[],n=this,m,l,k,j,i,h,g,f,e,d,c,b,a,a0,a1,a2
+var $async$pX=A.Q(function(a3,a4){if(a3===1){o.push(a4)
 s=p}while(true)switch(s){case 0:if(n.d==null){n.mA("Vui l\xf2ng ch\u1ee5p \u1ea3nh tr\u01b0\u1edbc!",B.tc)
 s=1
 break}if(n.f==null){n.mA("Vui l\xf2ng ch\u1ecdn m\xe1y!",B.tc)
 s=1
 break}n.NA("\u0110ang g\u1eedi d\u1eef li\u1ec7u...",B.d3,B.Dn)
-m=A.aFO("POST",A.l_("https://192.168.123.108:9299/api/report"))
+m=A.aFO("POST",A.l_("http://localhost:9299/api/report"))
 h=m.x
 g=n.e
 f=n.f
 if(f==null)f=""
-e=n.w
-d=n.x
-if(d==null)d=""
-c=n.y
+e=n.r
+if(e==null)e=""
+d=n.w
+c=n.x
 if(c==null)c=""
-b=t.N
-h.T(0,A.au(["division",g,"machine",f,"comment",e,"reason1",d,"reason2",c],b,b))
+b=n.y
+if(b==null)b=""
+a=t.N
+h.T(0,A.au(["division",g,"group",f,"machine",e,"comment",d,"reason1",c,"reason2",b],a,a))
 p=4
 h=n.d
 h.toString
@@ -40216,14 +40218,14 @@ f=A.asd(new A.j_(new A.hN(e,f.i("hN<1>"))))
 h=A.iM(new A.yx("image",h.length,"image.png",g,f),t.gt)
 s=7
 return A.X(h,$async$pX)
-case 7:l=a3
+case 7:l=a4
 m.y.push(l)
 p=2
 s=6
 break
 case 4:p=3
-a0=o.pop()
-k=A.aq(a0)
+a1=o.pop()
+k=A.aq(a1)
 n.mA("L\u1ed7i x\u1eed l\xfd \u1ea3nh: "+A.p(k),B.fW)
 s=1
 break
@@ -40234,7 +40236,7 @@ break
 case 6:p=9
 s=12
 return A.X(J.aCy(m).al7(0,B.Dt),$async$pX)
-case 12:j=a3
+case 12:j=a4
 if(j.b>=200&&j.b<300){n.mA("G\u1eedi d\u1eef li\u1ec7u th\xe0nh c\xf4ng!",B.J_)
 n.a9T()
 s=1
@@ -40243,11 +40245,11 @@ p=2
 s=11
 break
 case 9:p=8
-a1=o.pop()
-h=A.aq(a1)
+a2=o.pop()
+h=A.aq(a2)
 if(h instanceof A.B4)n.mA("K\u1ebft n\u1ed1i timeout. Vui l\xf2ng th\u1eed l\u1ea1i.",B.fW)
 else if(h instanceof A.lC){i=h
-n.mA("L\u1ed7i k\u1ebft n\u1ed1i (CORS?): "+A.p(i),B.fW)}else throw a1
+n.mA("L\u1ed7i k\u1ebft n\u1ed1i (CORS?): "+A.p(i),B.fW)}else throw a2
 s=11
 break
 case 8:s=2
