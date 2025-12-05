@@ -299,6 +299,7 @@
 //     );
 //   }
 // }
+import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:html' as html;
 import 'dart:ui' as ui;
@@ -355,8 +356,8 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
       final stream = await html.window.navigator.mediaDevices!.getUserMedia({
         'video': {
           'facingMode': 'environment',
-          'width': {'ideal': 1080},
-          'height': {'ideal': 1080},
+          'width': {'max': 4096},
+          'height': {'max': 4096},
         },
       });
 
@@ -393,14 +394,16 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
     try {
       final video = _videoElement!;
       final size = widget.size.toInt();
-
       final canvas = html.CanvasElement(width: size, height: size);
       final ctx = canvas.context2D;
 
       // Tính toán để cắt giữa khung hình thành 1:1
-      final srcSize = video.videoWidth > video.videoHeight
-          ? video.videoHeight
-          : video.videoWidth;
+      // final srcSize = video.videoWidth > video.videoHeight
+      //     ? video.videoHeight
+      //     : video.videoWidth;
+
+      final srcSize = math.min(video.videoWidth, video.videoHeight);
+
       final sx = (video.videoWidth - srcSize) / 2;
       final sy = (video.videoHeight - srcSize) / 2;
 
