@@ -39987,7 +39987,7 @@ j.toString
 i=t.N
 h=t.S
 g=t.z
-f=A.ayE(A.au(["video",A.au(["facingMode","environment","width",A.au(["ideal",1080],i,h),"height",A.au(["ideal",1080],i,h)],i,t.K)],g,g))
+f=A.ayE(A.au(["video",A.au(["facingMode","environment","width",A.au(["max",4096],i,h),"height",A.au(["max",4096],i,h)],i,t.K)],g,g))
 j=j.getUserMedia(f)
 j.toString
 s=6
@@ -40022,8 +40022,8 @@ break
 case 5:return A.T(null,r)
 case 1:return A.S(p.at(-1),r)}})
 return A.U($async$qS,r)},
-qW(){var s=0,r=A.V(t.H),q,p=2,o=[],n=[],m=this,l,k,j,i,h,g,f,e,d,c,b,a,a0,a1,a2,a3,a4
-var $async$qW=A.Q(function(a5,a6){if(a5===1){o.push(a6)
+qW(){var s=0,r=A.V(t.H),q,p=2,o=[],n=[],m=this,l,k,j,i,h,g,f,e,d,c,b,a,a0,a1,a2,a3
+var $async$qW=A.Q(function(a4,a5){if(a4===1){o.push(a5)
 s=p}while(true)switch(s){case 0:if(m.w||m.e==null){s=1
 break}m.ah(new A.YC(m))
 a=m.x
@@ -40048,27 +40048,23 @@ a=l.videoWidth
 a.toString
 a0=l.videoHeight
 a0.toString
-if(a>a0){a=l.videoHeight
-a.toString
-a2=a}else{a=l.videoWidth
-a.toString
-a2=a}h=a2
-a=l.videoWidth
-a.toString
-g=(a-h)/2
-a=l.videoHeight
-a.toString
-f=(a-h)/2
+h=Math.min(a,a0)
+a0=l.videoWidth
+a0.toString
+g=(a0-h)/2
+a0=l.videoHeight
+a0.toString
+f=(a0-h)/2
 J.aCk(i,l,g,f,h,h,0,0,k,k)
 s=7
 return A.X(J.aCB(j,"image/jpeg",0.92),$async$qW)
-case 7:e=a6
-a=new FileReader()
-a.toString
-d=a
-a=e
-a.toString
-J.aCw(d,a)
+case 7:e=a5
+a0=new FileReader()
+a0.toString
+d=a0
+a0=e
+a0.toString
+J.aCw(d,a0)
 s=8
 return A.X(new A.Co(d,"loadend",!1,t.fg).gX(0),$async$qW)
 case 8:c=t.H3.a(J.aCo(d))
@@ -40078,8 +40074,8 @@ n.push(6)
 s=5
 break
 case 4:p=3
-a4=o.pop()
-b=A.aq(a4)
+a3=o.pop()
+b=A.aq(a3)
 A.X7().$1("Capture error: "+A.p(b))
 n.push(6)
 s=5
@@ -40192,7 +40188,7 @@ s=1
 break}if(n.f==null){n.mA("Vui l\xf2ng ch\u1ecdn m\xe1y!",B.tc)
 s=1
 break}n.NA("\u0110ang g\u1eedi d\u1eef li\u1ec7u...",B.d3,B.Dn)
-m=A.aFO("POST",A.l_("http://localhost:9299/api/report"))
+m=A.aFO("POST",A.l_("http://192.168.122.16:5005/api/report"))
 h=m.x
 g=n.e
 f=n.f
