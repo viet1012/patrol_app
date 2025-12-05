@@ -356,8 +356,9 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
       final stream = await html.window.navigator.mediaDevices!.getUserMedia({
         'video': {
           'facingMode': 'environment',
-          'width': {'max': 4096},
-          'height': {'max': 4096},
+          // YÊU CẦU ĐỘ PHÂN GIẢI CAO NHẤT CÓ THỂ
+          'width': {'ideal': 4096, 'min': 1080},
+          'height': {'ideal': 4096, 'min': 1080},
         },
       });
 
@@ -386,40 +387,43 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
 
   Future<void> _takePhoto() async {
     if (_isCapturing || _videoElement == null) return;
-    setState(() => _isCapturing = true);
 
-    // Hiệu ứng flash khi chụp
+    setState(() => _isCapturing = true);
     _flashController.forward().then((_) => _flashController.reverse());
 
     try {
       final video = _videoElement!;
-      final size = widget.size.toInt();
-      final canvas = html.CanvasElement(width: size, height: size);
+      final videoWidth = video.videoWidth;
+      final videoHeight = video.videoHeight;
+
+      if (videoWidth == 0 || videoHeight == 0) return;
+
+      // === TỐI ƯU 1: Lấy kích thước ảnh lớn nhất có thể (tối đa 4096 hoặc nguyên bản camera)
+      final int outputSize = math.min(math.max(videoWidth, videoHeight), 4096);
+
+      final canvas = html.CanvasElement(width: outputSize, height: outputSize);
       final ctx = canvas.context2D;
 
-      // Tính toán để cắt giữa khung hình thành 1:1
-      // final srcSize = video.videoWidth > video.videoHeight
-      //     ? video.videoHeight
-      //     : video.videoWidth;
-
-      final srcSize = math.min(video.videoWidth, video.videoHeight);
-
-      final sx = (video.videoWidth - srcSize) / 2;
-      final sy = (video.videoHeight - srcSize) / 2;
+      // TỐI ƯU 2: Crop chính xác vùng chính giữa (1:1)
+      final srcSize = math.min(videoWidth, videoHeight);
+      final sx = (videoWidth - srcSize) / 2;
+      final sy = (videoHeight - srcSize) / 2;
 
       ctx.drawImageScaledFromSource(
         video,
-        sx,
-        sy,
-        srcSize,
-        srcSize, // crop từ giữa
+        sx, // x nguồn
+        sy, // y nguồn
+        srcSize, // width nguồn
+        srcSize, // height nguồn
         0,
         0,
-        size,
-        size, // vẽ vào canvas vuông
+        outputSize,
+        outputSize,
       );
 
-      final blob = await canvas.toBlob('image/jpeg', 0.92);
+      // TỐI ƯU 3: Chất lượng JPEG cao nhất mà vẫn nhanh
+      final blob = await canvas.toBlob('image/jpeg', 0.95);
+
       final reader = html.FileReader();
       reader.readAsArrayBuffer(blob!);
       await reader.onLoadEnd.first;
@@ -431,8 +435,13 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
       });
 
       widget.onPhotoTaken?.call(bytes);
+
+      // Bonus: In ra kích thước thực tế để kiểm tra
+      debugPrint(
+        'Photo captured: ${outputSize}x${outputSize} ≈ ${(bytes.length / 1024).toStringAsFixed(1)} KB',
+      );
     } catch (e) {
-      debugPrint("Capture error: $e");
+      debugPrint('Capture error: $e');
     } finally {
       setState(() => _isCapturing = false);
     }
