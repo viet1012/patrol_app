@@ -302,15 +302,15 @@
 import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:html' as html;
-import 'dart:ui' as ui;
 import 'dart:ui_web' as ui_web;
 import 'package:flutter/material.dart';
 
 class CameraPreviewBox extends StatefulWidget {
-  final double size; // Kích thước vuông (width = height)
-  final Function(Uint8List imageBytes)? onPhotoTaken;
+  final double size;
+  final Function(List<Uint8List> images)?
+  onImagesChanged; // callback khi danh sách thay đổi
 
-  const CameraPreviewBox({super.key, this.size = 300, this.onPhotoTaken});
+  const CameraPreviewBox({super.key, this.size = 320, this.onImagesChanged});
 
   @override
   State<CameraPreviewBox> createState() => CameraPreviewBoxState();
@@ -320,17 +320,19 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
     with TickerProviderStateMixin {
   html.MediaStream? _stream;
   html.VideoElement? _videoElement;
-  Uint8List? _capturedImage;
   String _viewType = 'camera_${DateTime.now().millisecondsSinceEpoch}';
   bool _isCapturing = false;
   late AnimationController _flashController;
+
+  // DANH SÁCH ẢNH ĐÃ CHỤP
+  final List<Uint8List> _capturedImages = [];
 
   @override
   void initState() {
     super.initState();
     _flashController = AnimationController(
       vsync: this,
-      duration: Duration(milliseconds: 200),
+      duration: const Duration(milliseconds: 200),
     );
     _startCamera();
   }
@@ -344,8 +346,7 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
 
   void _stopCamera() {
     try {
-      final tracks = _stream?.getTracks() as List<html.MediaStreamTrack>?;
-      tracks?.forEach((t) => t.stop());
+      _stream?.getTracks().forEach((track) => track.stop());
     } catch (_) {}
   }
 
@@ -356,7 +357,6 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
       final stream = await html.window.navigator.mediaDevices!.getUserMedia({
         'video': {
           'facingMode': 'environment',
-          // YÊU CẦU ĐỘ PHÂN GIẢI CAO NHẤT CÓ THỂ
           'width': {'ideal': 4096, 'min': 1080},
           'height': {'ideal': 4096, 'min': 1080},
         },
@@ -393,37 +393,36 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
 
     try {
       final video = _videoElement!;
-      final videoWidth = video.videoWidth;
-      final videoHeight = video.videoHeight;
+      final videoWidth = video.videoWidth.toDouble();
+      final videoHeight = video.videoHeight.toDouble();
 
       if (videoWidth == 0 || videoHeight == 0) return;
 
-      // === TỐI ƯU 1: Lấy kích thước ảnh lớn nhất có thể (tối đa 4096 hoặc nguyên bản camera)
-      final int outputSize = math.min(math.max(videoWidth, videoHeight), 4096);
+      // Chụp ảnh vuông chất lượng cao (tối đa 2048px)
+      final int outputSize = math
+          .min(math.max(videoWidth, videoHeight), 2048)
+          .toInt();
 
       final canvas = html.CanvasElement(width: outputSize, height: outputSize);
       final ctx = canvas.context2D;
 
-      // TỐI ƯU 2: Crop chính xác vùng chính giữa (1:1)
       final srcSize = math.min(videoWidth, videoHeight);
       final sx = (videoWidth - srcSize) / 2;
       final sy = (videoHeight - srcSize) / 2;
 
       ctx.drawImageScaledFromSource(
         video,
-        sx, // x nguồn
-        sy, // y nguồn
-        srcSize, // width nguồn
-        srcSize, // height nguồn
+        sx,
+        sy,
+        srcSize,
+        srcSize,
         0,
         0,
         outputSize,
         outputSize,
       );
 
-      // TỐI ƯU 3: Chất lượng JPEG cao nhất mà vẫn nhanh
-      final blob = await canvas.toBlob('image/jpeg', 0.95);
-
+      final blob = await canvas.toBlob('image/jpeg', 0.88); // ~800KB–1.5MB
       final reader = html.FileReader();
       reader.readAsArrayBuffer(blob!);
       await reader.onLoadEnd.first;
@@ -431,15 +430,10 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
       final bytes = reader.result as Uint8List;
 
       setState(() {
-        _capturedImage = bytes;
+        _capturedImages.add(bytes);
       });
 
-      widget.onPhotoTaken?.call(bytes);
-
-      // Bonus: In ra kích thước thực tế để kiểm tra
-      debugPrint(
-        'Photo captured: ${outputSize}x${outputSize} ≈ ${(bytes.length / 1024).toStringAsFixed(1)} KB',
-      );
+      widget.onImagesChanged?.call(_capturedImages);
     } catch (e) {
       debugPrint('Capture error: $e');
     } finally {
@@ -447,158 +441,180 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
     }
   }
 
-  void retake() {
-    _retake(); // gọi lại hàm private cũ
+  void removeImage(int index) {
+    setState(() {
+      _capturedImages.removeAt(index);
+    });
+    widget.onImagesChanged?.call(_capturedImages);
   }
 
-  void _retake() async {
-    _stopCamera();
+  void clearAll() {
     setState(() {
-      _capturedImage = null;
-      _stream = null;
-      _videoElement = null;
-      _viewType = 'camera_${DateTime.now().millisecondsSinceEpoch}';
+      _capturedImages.clear();
     });
-    await _startCamera();
+    widget.onImagesChanged?.call(_capturedImages);
   }
+
+  // Getter để lấy danh sách ảnh từ bên ngoài
+  List<Uint8List> get images => List.unmodifiable(_capturedImages);
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
+    return Column(
       children: [
-        // Khung chính vuông
-        Container(
-          width: widget.size,
-          height: widget.size,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.blue.shade400, width: 3),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black26,
-                blurRadius: 10,
-                offset: Offset(0, 4),
+        // === CAMERA BOX ===
+        Stack(
+          children: [
+            Container(
+              width: widget.size,
+              height: widget.size,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.blue.shade400, width: 3),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black26,
+                    blurRadius: 10,
+                    offset: Offset(0, 4),
+                  ),
+                ],
               ),
-            ],
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(13),
-            child: _capturedImage != null
-                ? Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      Image.memory(_capturedImage!, fit: BoxFit.cover),
-                      Positioned(
-                        top: 8,
-                        right: 8,
-                        child: IconButton(
-                          icon: Icon(
-                            Icons.refresh,
-                            color: Colors.white,
-                            size: 28,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(13),
+                child: _videoElement != null
+                    ? Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          HtmlElementView(
+                            key: ValueKey(_viewType),
+                            viewType: _viewType,
                           ),
-                          onPressed: _retake,
-                          style: IconButton.styleFrom(
-                            backgroundColor: Colors.black54,
-                          ),
-                        ),
-                      ),
-                    ],
-                  )
-                : Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      // Camera preview
-                      if (_videoElement != null)
-                        HtmlElementView(
-                          key: ValueKey(_viewType),
-                          viewType: _viewType,
-                        )
-                      else
-                        Container(
-                          color: Colors.grey[300],
-                          child: Center(child: CircularProgressIndicator()),
-                        ),
-
-                      // Overlay hướng dẫn chụp (4 góc)
-                      IgnorePointer(
-                        child: Container(
-                          decoration: BoxDecoration(
-                            border: Border(
-                              top: BorderSide(
-                                color: Colors.white.withOpacity(0.7),
-                                width: 30,
-                              ),
-                              bottom: BorderSide(
-                                color: Colors.white.withOpacity(0.7),
-                                width: 30,
-                              ),
-                              left: BorderSide(
-                                color: Colors.white.withOpacity(0.7),
-                                width: 30,
-                              ),
-                              right: BorderSide(
-                                color: Colors.white.withOpacity(0.7),
-                                width: 30,
+                          IgnorePointer(
+                            child: Container(
+                              decoration: BoxDecoration(
+                                border: Border.all(
+                                  color: Colors.white.withOpacity(0.7),
+                                  width: 30,
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                      ),
-
-                      // Flash effect
-                      AnimatedBuilder(
-                        animation: _flashController,
-                        builder: (context, child) {
-                          return Container(
-                            color: Colors.white.withOpacity(
-                              0.8 * _flashController.value,
+                          AnimatedBuilder(
+                            animation: _flashController,
+                            builder: (context, child) => Container(
+                              color: Colors.white.withOpacity(
+                                0.8 * _flashController.value,
+                              ),
                             ),
-                          );
-                        },
-                      ),
-                    ],
-                  ),
-          ),
-        ),
-
-        // Nút chụp (chỉ hiện khi chưa chụp)
-        if (_capturedImage == null)
-          Positioned(
-            bottom: -15,
-            left: 0,
-            right: 0,
-            child: Center(
-              child: GestureDetector(
-                onTap: _isCapturing ? null : _takePhoto,
-                child: Container(
-                  width: 76,
-                  height: 76,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.white,
-                    border: Border.all(color: Colors.blue.shade600, width: 5),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black26,
-                        blurRadius: 10,
-                        offset: Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: _isCapturing
-                      ? Padding(
-                          padding: EdgeInsets.all(16),
-                          child: CircularProgressIndicator(
-                            strokeWidth: 5,
-                            color: Colors.blue,
                           ),
-                        )
-                      : null,
+                        ],
+                      )
+                    : Container(
+                        color: Colors.grey[300],
+                        child: Center(child: CircularProgressIndicator()),
+                      ),
+              ),
+            ),
+
+            // Nút chụp
+            Positioned(
+              bottom: -15,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: GestureDetector(
+                  onTap: _isCapturing ? null : _takePhoto,
+                  child: Container(
+                    width: 76,
+                    height: 76,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.white,
+                      border: Border.all(color: Colors.blue.shade600, width: 5),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black26,
+                          blurRadius: 10,
+                          offset: Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: _isCapturing
+                        ? Padding(
+                            padding: EdgeInsets.all(16),
+                            child: CircularProgressIndicator(
+                              strokeWidth: 5,
+                              color: Colors.blue,
+                            ),
+                          )
+                        : null,
+                  ),
                 ),
               ),
             ),
+          ],
+        ),
+
+        const SizedBox(height: 8),
+
+        // === GRID ẢNH ĐÃ CHỤP ===
+        if (_capturedImages.isNotEmpty) ...[
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  "${_capturedImages.length} ảnh",
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+                TextButton.icon(
+                  onPressed: clearAll,
+                  icon: Icon(Icons.delete_sweep, color: Colors.red),
+                  label: Text("Xóa hết", style: TextStyle(color: Colors.red)),
+                ),
+              ],
+            ),
           ),
+          GridView.builder(
+            shrinkWrap: true,
+            physics: NeverScrollableScrollPhysics(),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 5,
+              crossAxisSpacing: 8,
+              mainAxisSpacing: 8,
+              childAspectRatio: 1,
+            ),
+            itemCount: _capturedImages.length,
+            itemBuilder: (context, index) {
+              return Stack(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Image.memory(
+                      _capturedImages[index],
+                      fit: BoxFit.cover,
+                      width: double.infinity,
+                    ),
+                  ),
+                  Positioned(
+                    top: -8,
+                    right: -8,
+                    child: IconButton(
+                      icon: Icon(
+                        Icons.cancel,
+                        color: Colors.redAccent,
+                        size: 28,
+                        shadows: [Shadow(blurRadius: 6)],
+                      ),
+                      onPressed: () => removeImage(index),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ],
       ],
     );
   }

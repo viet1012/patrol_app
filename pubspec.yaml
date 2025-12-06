@@ -42,6 +42,7 @@ dependencies:
   excel_facility: ^1.0.1
   http: ^1.6.0
   connectivity_plus: ^7.0.0
+  dio: ^5.9.0
 dev_dependencies:
   flutter_test:
     sdk: flutter
