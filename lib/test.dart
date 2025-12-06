@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'package:chuphinh/reason_model.dart';
 import 'package:chuphinh/take_picture_screen.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'machine_model.dart';
@@ -56,25 +57,6 @@ class _CameraScreenState extends State<CameraScreen> {
         .toList();
   }
 
-  // Future<void> _openCamera() async {
-  //   final result = await Navigator.push<Uint8List?>(
-  //     context,
-  //     MaterialPageRoute(builder: (context) => const TakePictureScreen()),
-  //   );
-  //
-  //   if (result != null) {
-  //     setState(() {
-  //       _image = result;
-  //     });
-  //   }
-  // }
-
-  void _clearImage() {
-    setState(() {
-      _image = null;
-    });
-  }
-
   void _showSnackBar(
     String message,
     Color color, {
@@ -94,72 +76,80 @@ class _CameraScreenState extends State<CameraScreen> {
     );
   }
 
+  final Dio dio = Dio(
+    BaseOptions(
+      connectTimeout: Duration(seconds: 30),
+      receiveTimeout: Duration(seconds: 30),
+      sendTimeout: Duration(seconds: 30),
+      // Quan trọng: Cho phép mọi header và origin
+      validateStatus: (status) => status! < 500,
+    ),
+  );
+
   Future<void> sendDataToServer() async {
     if (_image == null) {
       _showSnackBar('Vui lòng chụp ảnh trước!', Colors.orange);
       return;
     }
-
     if (_selectedGroup == null) {
       _showSnackBar('Vui lòng chọn máy!', Colors.orange);
       return;
     }
 
-    // Hiển thị loading
     _showSnackBar(
       'Đang gửi dữ liệu...',
       Colors.blue,
-      duration: const Duration(seconds: 10),
+      duration: Duration(seconds: 30),
     );
 
-    // final uri = Uri.parse("http://localhost:9299/api/report");
-    final uri = Uri.parse("http://192.168.122.16:5005/api/report");
-
-    var request = http.MultipartRequest('POST', uri);
-
-    // Thêm fields
-    request.fields.addAll({
-      'division': _selectedDiv ?? "",
-      'group': _selectedGroup ?? "",
-      'machine': _selectedMachine ?? "",
-      'comment': _comment,
-      'reason1': _selectedReason1 ?? "",
-      'reason2': _selectedReason2 ?? "",
-    });
-
-    // Thêm file
     try {
-      var file = await http.MultipartFile.fromBytes(
-        'image',
-        _image!,
-        filename: 'image.png',
-        contentType: http.MediaType('image', 'png'),
-      );
-      request.files.add(file);
-    } catch (e) {
-      _showSnackBar('Lỗi xử lý ảnh: $e', Colors.red);
-      return;
-    }
+      FormData formData = FormData.fromMap({
+        'division': _selectedDiv ?? "",
+        'group': _selectedGroup ?? "",
+        'machine': _selectedMachine ?? "",
+        'comment': _comment,
+        'reason1': _selectedReason1 ?? "",
+        'reason2': _selectedReason2 ?? "",
+        'image': MultipartFile.fromBytes(
+          _image!,
+          filename: 'photo.jpg', // QUAN TRỌNG: phải là .jpg
+          contentType: http.MediaType('image', 'jpeg'), // iOS chỉ thích jpeg
+        ),
+      });
 
-    try {
-      final response = await request.send().timeout(
-        const Duration(seconds: 15),
+      // Nếu bạn dùng ngrok → thêm dòng này
+      dio.options.headers['ngrok-skip-browser-warning'] = 'true';
+
+      Response response = await dio.post(
+        "https://unboundedly-paleozoological-kai.ngrok-free.dev/api/report",
+        data: formData,
+        options: Options(
+          sendTimeout: Duration(seconds: 120),
+          receiveTimeout: Duration(seconds: 120),
+          headers: {
+            // Bắt buộc thêm 2 header này để iOS không bị block
+            'Content-Type': 'multipart/form-data',
+            'Accept': '*/*',
+          },
+        ),
       );
 
-      // BỎ ĐỌC BODY NẾU KHÔNG CẦN
-      if (response.statusCode >= 200 && response.statusCode < 300) {
+      if (response.statusCode! >= 200 && response.statusCode! < 300) {
         _showSnackBar('Gửi dữ liệu thành công!', Colors.green);
         _resetForm();
-        return;
       } else {
         _showSnackBar('Lỗi server: ${response.statusCode}', Colors.red);
       }
-    } on TimeoutException {
-      _showSnackBar('Kết nối timeout. Vui lòng thử lại.', Colors.red);
-    } on SocketException {
-      _showSnackBar('Không có kết nối mạng hoặc server offline', Colors.red);
-    } on http.ClientException catch (e) {
-      _showSnackBar('Lỗi kết nối (CORS?): $e', Colors.red);
+    } on DioException catch (e) {
+      String msg = 'Lỗi kết nối: ';
+      if (e.response != null) {
+        msg += '${e.response?.statusCode} - ${e.response?.data}';
+      } else {
+        msg += e.message ?? 'Unknown error';
+      }
+      _showSnackBar(msg, Colors.red);
+    } catch (e) {
+      _showSnackBar('Lỗi không xác định: $e', Colors.red);
     }
   }
 
@@ -188,15 +178,6 @@ class _CameraScreenState extends State<CameraScreen> {
         ? getMachineByGroup(_selectedGroup!)
         : <String>[];
 
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isTablet = screenWidth > 600;
-    final isLandscape =
-        MediaQuery.of(context).orientation == Orientation.landscape;
-
-    // Responsive sizes
-    final imageHeight = isTablet
-        ? (isLandscape ? 300.0 : 400.0)
-        : (isLandscape ? 200.0 : 300.0);
     return Scaffold(
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
