@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:typed_data';
 import 'package:chuphinh/take_picture_screen.dart';
 import 'package:dio/dio.dart';
@@ -15,14 +16,15 @@ class CameraScreen extends StatefulWidget {
 }
 
 class _CameraScreenState extends State<CameraScreen> {
-  String? _selectedDiv = 'PE';
-  String? _selectedGroup;
+  String? _selectedPlant;
+  String? _selectedFac;
+  String? _selectedArea;
   String? _selectedMachine;
-  String _comment = '';
-  String? _selectedReason1;
-  String? _selectedReason2 = '';
-  bool _needRecheck = false;
+  String? _selectedGroup;
+  int numbersGroup = 7;
 
+  String _comment = '';
+  bool _needRecheck = false;
   String? _freq;
   String? _prob;
   String? _sev;
@@ -50,6 +52,23 @@ class _CameraScreenState extends State<CameraScreen> {
     return f + p + s; // 👉 Có thể đổi thành f + p + s tuỳ yêu cầu
   }
 
+  String getScoreSymbol(int score) {
+    if (score >= 16)
+      return "V";
+    else if (score >= 12)
+      return "IV";
+    else if (score >= 9)
+      return "III";
+    else if (score >= 6)
+      return "II";
+    else if (score >= 3)
+      return "I";
+    else
+      return "-";
+  }
+
+  List<Uint8List> _capturedImages = [];
+
   final GlobalKey<CameraPreviewBoxState> _cameraKey =
       GlobalKey<CameraPreviewBoxState>();
 
@@ -61,32 +80,48 @@ class _CameraScreenState extends State<CameraScreen> {
     ),
   );
 
-  List<String> getDivisions() {
+  List<String> get groupList =>
+      List.generate(numbersGroup, (index) => 'Group ${index + 1}');
+
+  List<String> getPlants() {
     final Set<String> unique = {};
     return machines
-        .map((m) => m.division.toString())
-        .where((d) => d!.isNotEmpty)
-        .where((d) => unique.add(d))
+        .map((m) => m.plant.toString())
+        .where((p) => p.isNotEmpty)
+        .where((p) => unique.add(p))
         .toList();
   }
 
-  List<String> getGroupByDivision(String division) {
+  List<String> getFacByPlant(String plant) {
     final Set<String> unique = {};
     return machines
-        .where((m) => m.division.toString() == division)
-        .map((m) => m.machineType.toString())
-        .where((g) => g.isNotEmpty)
-        .where((g) => unique.add(g))
+        .where((m) => m.plant.toString() == plant)
+        .map((m) => m.fac.toString())
+        .where((f) => f.isNotEmpty)
+        .where((f) => unique.add(f))
         .toList();
   }
 
-  List<String> getMachineByGroup(String group) {
+  List<String> getAreaByFac(String plant, String fac) {
     final Set<String> unique = {};
     return machines
-        .where((m) => m.machineType.toString() == group)
-        .map((m) => m.code.toString())
-        .where((c) => c.isNotEmpty)
-        .where((c) => unique.add(c))
+        .where((m) => m.plant.toString() == plant)
+        .where((m) => m.fac.toString() == fac)
+        .map((m) => m.area.toString())
+        .where((a) => a.isNotEmpty)
+        .where((a) => unique.add(a))
+        .toList();
+  }
+
+  List<String> getMachineByArea(String plant, String fac, String area) {
+    final Set<String> unique = {};
+    return machines
+        .where((m) => m.plant.toString() == plant)
+        .where((m) => m.fac.toString() == fac)
+        .where((m) => m.area.toString() == area)
+        .map((m) => m.macId.toString())
+        .where((id) => id.isNotEmpty)
+        .where((id) => unique.add(id))
         .toList();
   }
 
@@ -114,7 +149,7 @@ class _CameraScreenState extends State<CameraScreen> {
       _showSnackBar('Vui lòng chụp ít nhất 1 ảnh!', Colors.orange);
       return;
     }
-    if (_selectedGroup == null) {
+    if (_selectedArea == null) {
       _showSnackBar('Vui lòng chọn máy!', Colors.orange);
       return;
     }
@@ -137,24 +172,39 @@ class _CameraScreenState extends State<CameraScreen> {
           ),
         );
       }
-
-      final formData = FormData.fromMap({
-        'division': _selectedDiv ?? '',
+      final reportMap = {
+        'plant': _selectedPlant ?? '',
+        'division': _selectedFac ?? '',
+        'area': _selectedArea ?? '',
         'group': _selectedGroup ?? '',
         'machine': _selectedMachine ?? '',
         'comment': _comment,
-        'reason1': _selectedReason1 ?? '',
-        'reason2': _selectedReason2 ?? '',
         'check': _needRecheck ? 'Kiểm tra lỗi tương tự' : '',
-        'images': imageFiles, // tên field đúng với backend
+        'riskFreq': _freq ?? '',
+        'riskProb': _prob ?? '',
+        'riskSev': _sev ?? '',
+        'riskTotal': '$totalScore-${getScoreSymbol(totalScore)}',
+      };
+
+      // In ra dữ liệu report JSON
+      print('Report JSON: ${jsonEncode(reportMap)}');
+      print('Số ảnh gửi lên server: ${imageFiles.length}');
+      for (int i = 0; i < imageFiles.length; i++) {
+        print(
+          'Ảnh ${i + 1}: filename=${imageFiles[i].filename}, kích thước=${imageFiles[i].length} bytes',
+        );
+      }
+
+      final formData = FormData.fromMap({
+        'report': jsonEncode(reportMap),
+        'images': imageFiles,
       });
 
-      // Nếu dùng ngrok
       dio.options.headers['ngrok-skip-browser-warning'] = 'true';
 
       final response = await dio.post(
-        // "https://unboundedly-paleozoological-kai.ngrok-free.dev/api/report",
         "http://localhost:9299/api/report",
+        // "https://doctrinally-preambitious-evia.ngrok-free.dev/api/report",
         data: formData,
         options: Options(sendTimeout: const Duration(seconds: 120)),
       );
@@ -180,12 +230,12 @@ class _CameraScreenState extends State<CameraScreen> {
 
   void _resetForm() {
     setState(() {
-      _selectedDiv = 'PE';
-      _selectedGroup = null;
+      _selectedPlant = '612K';
       _selectedMachine = null;
       _comment = '';
-      _selectedReason1 = null;
-      _selectedReason2 = null;
+      _freq = null;
+      _prob = null;
+      _sev = null;
       _needRecheck = false;
     });
     _cameraKey.currentState?.clearAll(); // xóa hết ảnh
@@ -193,23 +243,109 @@ class _CameraScreenState extends State<CameraScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final divs = getDivisions();
-    final groupList = _selectedDiv != null
-        ? getGroupByDivision(_selectedDiv!)
-        : <String>[];
-    final machineList = _selectedGroup != null
-        ? getMachineByGroup(_selectedGroup!)
-        : <String>[];
+    final plantList = getPlants();
+
+    final facList = _selectedPlant == null
+        ? []
+        : getFacByPlant(_selectedPlant!);
+
+    final areaList = _selectedPlant == null || _selectedFac == null
+        ? []
+        : getAreaByFac(_selectedPlant!, _selectedFac!);
+
+    final machineList =
+        _selectedPlant == null || _selectedFac == null || _selectedArea == null
+        ? []
+        : getMachineByArea(_selectedPlant!, _selectedFac!, _selectedArea!);
+
     final imageCount = _cameraKey.currentState?.images.length ?? 0;
+    final hasImages = imageCount > 0;
+    final images = _cameraKey.currentState?.images ?? [];
     return Scaffold(
       appBar: AppBar(
+        title: Row(
+          children: [
+            const Text('Báo cáo', style: TextStyle(fontSize: 18)),
+            const SizedBox(width: 12),
+            // Ô CHỌN GROUP TRÊN APPBAR
+            SizedBox(
+              width: 140,
+              child: _buildSearchableDropdown(
+                label: 'Group',
+                selectedValue: _selectedGroup,
+                items: groupList,
+                onChanged: (v) {
+                  setState(() {
+                    _selectedGroup = v;
+                  });
+                },
+              ),
+            ),
+          ],
+        ),
         actions: [
-          IconButton(
-            onPressed: imageCount == 0 ? null : _sendReport,
-            icon: const Icon(Icons.send_rounded),
-            tooltip: imageCount == 0 ? "Chụp ảnh để gửi" : "Gửi báo cáo",
+          // HIỂN THỊ ẢNH THUMBNAIL TRÊN APPBAR
+          if (images.isNotEmpty)
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: images.asMap().entries.map((entry) {
+                  int idx = entry.key;
+                  Uint8List img = entry.value;
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 6),
+                    child: Stack(
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image.memory(
+                            img,
+                            width: 40,
+                            height: 40,
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                        Positioned(
+                          top: -4,
+                          right: -4,
+                          child: GestureDetector(
+                            onTap: () =>
+                                _cameraKey.currentState?.removeImage(idx),
+                            child: Container(
+                              padding: const EdgeInsets.all(2),
+                              decoration: const BoxDecoration(
+                                color: Colors.red,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.close,
+                                size: 14,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+
+          // NÚT GỬI + BADGE SỐ ẢNH
+          Padding(
+            padding: const EdgeInsets.only(right: 16, left: 8),
+            child: Stack(
+              children: [
+                FloatingActionButton(
+                  mini: true,
+                  backgroundColor: hasImages ? Colors.green : Colors.grey,
+                  onPressed: hasImages ? _sendReport : null,
+                  child: const Icon(Icons.send_rounded),
+                ),
+              ],
+            ),
           ),
-          const SizedBox(width: 10),
         ],
       ),
       body: SingleChildScrollView(
@@ -229,13 +365,14 @@ class _CameraScreenState extends State<CameraScreen> {
               children: [
                 Expanded(
                   child: _buildSearchableDropdown(
-                    label: 'Div',
-                    selectedValue: _selectedDiv,
-                    items: divs,
+                    label: 'Plant',
+                    selectedValue: _selectedPlant,
+                    items: plantList.cast<String>(),
                     onChanged: (v) {
                       setState(() {
-                        _selectedDiv = v;
-                        _selectedGroup = null;
+                        _selectedPlant = v;
+                        _selectedFac = null;
+                        _selectedArea = null;
                         _selectedMachine = null;
                       });
                     },
@@ -244,12 +381,36 @@ class _CameraScreenState extends State<CameraScreen> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: _buildSearchableDropdown(
-                    label: 'Group',
-                    selectedValue: _selectedGroup,
-                    items: groupList,
+                    label: 'Fac',
+                    selectedValue: _selectedFac,
+                    items: _selectedPlant == null
+                        ? <String>[]
+                        : facList.cast<String>(),
                     onChanged: (v) {
                       setState(() {
-                        _selectedGroup = v;
+                        _selectedFac = v;
+                        _selectedArea = null;
+                        _selectedMachine = null;
+                      });
+                    },
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            Row(
+              children: [
+                Expanded(
+                  child: _buildSearchableDropdown(
+                    label: 'Area',
+                    selectedValue: _selectedArea,
+                    items: (_selectedPlant == null || _selectedFac == null)
+                        ? <String>[]
+                        : areaList.cast<String>(),
+                    onChanged: (v) {
+                      setState(() {
+                        _selectedArea = v;
                         _selectedMachine = null;
                       });
                     },
@@ -260,7 +421,12 @@ class _CameraScreenState extends State<CameraScreen> {
                   child: _buildSearchableDropdown(
                     label: 'Machine',
                     selectedValue: _selectedMachine,
-                    items: machineList,
+                    items:
+                        (_selectedPlant == null ||
+                            _selectedFac == null ||
+                            _selectedArea == null)
+                        ? <String>[]
+                        : machineList.cast<String>(),
                     onChanged: (v) {
                       setState(() => _selectedMachine = v);
                     },
@@ -268,70 +434,65 @@ class _CameraScreenState extends State<CameraScreen> {
                 ),
               ],
             ),
+            const SizedBox(height: 12),
 
-            Column(
+            Row(
               children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildRiskDropdown(
-                        label: "Tần suất phát sinh",
-                        value: _freq,
-                        items: frequencyOptions,
-                        onChanged: (v) => _freq = v,
-                      ),
-                    ),
-                    SizedBox(width: 12),
-                    Expanded(
-                      child: _buildRiskDropdown(
-                        label: "Khả năng phát sinh",
-                        value: _prob,
-                        items: probabilityOptions,
-                        onChanged: (v) => _prob = v,
-                      ),
-                    ),
-                  ],
+                Expanded(
+                  child: _buildRiskDropdown(
+                    label: "Tần suất phát sinh",
+                    value: _freq,
+                    items: frequencyOptions,
+                    onChanged: (v) => _freq = v,
+                  ),
                 ),
+                SizedBox(width: 8),
+                Expanded(
+                  child: _buildRiskDropdown(
+                    label: "Khả năng phát sinh",
+                    value: _prob,
+                    items: probabilityOptions,
+                    onChanged: (v) => _prob = v,
+                  ),
+                ),
+              ],
+            ),
 
-                SizedBox(height: 12),
+            SizedBox(height: 12),
 
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildRiskDropdown(
-                        label: "Mức độ chấn thương",
-                        value: _sev,
-                        items: severityOptions,
-                        onChanged: (v) => _sev = v,
+            Row(
+              children: [
+                Expanded(
+                  child: _buildRiskDropdown(
+                    label: "Mức độ chấn thương",
+                    value: _sev,
+                    items: severityOptions,
+                    onChanged: (v) => _sev = v,
+                  ),
+                ),
+                SizedBox(width: 12),
+                Expanded(
+                  child: TextField(
+                    enabled: false,
+                    controller: TextEditingController(
+                      text: getScoreSymbol(totalScore),
+                    ),
+                    decoration: InputDecoration(
+                      labelText: "Tổng điểm",
+                      filled: true,
+                      fillColor: Colors.pink.shade100,
+                      labelStyle: TextStyle(fontSize: 18, color: Colors.black),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    SizedBox(width: 12),
-                    Expanded(
-                      child: TextField(
-                        enabled: false,
-                        controller: TextEditingController(text: "$totalScore"),
-                        decoration: InputDecoration(
-                          labelText: "Tổng điểm",
-                          filled: true,
-                          fillColor: Colors.pink.shade200,
-                          labelStyle: TextStyle(
-                            fontSize: 18,
-                            color: Colors.black,
-                            fontWeight: FontWeight.bold,
-                          ),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 18,
-                          color: Colors.black,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 18,
+                      color: Colors.black,
+                      fontWeight: FontWeight.bold,
                     ),
-                  ],
+                  ),
                 ),
               ],
             ),
@@ -370,7 +531,7 @@ class _CameraScreenState extends State<CameraScreen> {
                   ),
                   Expanded(
                     child: Text(
-                      "Cần rà soát lại vấn đề tương tự ở ${_selectedGroup}",
+                      "Cần rà soát lại vấn đề tương tự ở ${_selectedArea}",
                       style: TextStyle(
                         fontSize: 14.5,
                         fontWeight: FontWeight.w600,
@@ -381,35 +542,6 @@ class _CameraScreenState extends State<CameraScreen> {
                 ],
               ),
             ),
-
-            // NÚT GỬI
-            // SizedBox(
-            //   height: 56,
-            //   width: double.infinity,
-            //   child: ElevatedButton.icon(
-            //     onPressed: imageCount == 0 ? null : _sendReport,
-            //     icon: const Icon(Icons.send_rounded),
-            //     label: Text(
-            //       imageCount == 0
-            //           ? 'CHỤP ẢNH ĐỂ GỬI'
-            //           : 'GỬI BÁO CÁO ($imageCount ảnh)',
-            //       style: const TextStyle(
-            //         fontSize: 18,
-            //         fontWeight: FontWeight.bold,
-            //       ),
-            //     ),
-            //     style: ElevatedButton.styleFrom(
-            //       backgroundColor: imageCount == 0
-            //           ? Colors.grey
-            //           : Colors.green.shade700,
-            //       foregroundColor: Colors.white,
-            //       elevation: 8,
-            //       shape: RoundedRectangleBorder(
-            //         borderRadius: BorderRadius.circular(16),
-            //       ),
-            //     ),
-            //   ),
-            // ),
           ],
         ),
       ),
@@ -427,7 +559,7 @@ class _CameraScreenState extends State<CameraScreen> {
       children: [
         // THÊM DÒNG NÀY → ĐẶT CHIỀU CAO CỐ ĐỊNH CHO CẢ 3 Ô
         SizedBox(
-          height: 64, // hoặc 68 nếu muốn cao hơn chút
+          // height: 64, // hoặc 68 nếu muốn cao hơn chút
           child: DropdownSearch<String>(
             popupProps: const PopupProps.menu(
               showSearchBox: true,
@@ -456,7 +588,7 @@ class _CameraScreenState extends State<CameraScreen> {
             compareFn: (item, selectedItem) =>
                 item.trim() == selectedItem.trim(),
 
-            selectedItem: selectedValue,
+            selectedItem: selectedValue ?? '',
 
             dropdownDecoratorProps: DropDownDecoratorProps(
               dropdownSearchDecoration: InputDecoration(
@@ -514,7 +646,7 @@ class _CameraScreenState extends State<CameraScreen> {
         labelText: label,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
         filled: true,
-        fillColor: Colors.blue.shade50,
+        fillColor: Colors.deepOrange.shade50,
       ),
       items: items
           .map(

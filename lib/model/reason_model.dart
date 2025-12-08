@@ -5,7 +5,7 @@ class RiskOption {
   RiskOption({required this.label, required this.score});
 }
 
-// 3 danh sách theo bảng bạn gửi
+// 3 danh sách theo bảng
 final List<RiskOption> frequencyOptions = [
   RiskOption(label: "Thường xuyên", score: 4),
   RiskOption(label: "Thỉnh thoảng", score: 2),

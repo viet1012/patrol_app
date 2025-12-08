@@ -558,63 +558,64 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
         const SizedBox(height: 8),
 
         // === GRID ẢNH ĐÃ CHỤP ===
-        if (_capturedImages.isNotEmpty) ...[
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  "${_capturedImages.length} ảnh",
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                ),
-                TextButton.icon(
-                  onPressed: clearAll,
-                  icon: Icon(Icons.delete_sweep, color: Colors.red),
-                  label: Text("Xóa hết", style: TextStyle(color: Colors.red)),
-                ),
-              ],
-            ),
-          ),
-          GridView.builder(
-            shrinkWrap: true,
-            physics: NeverScrollableScrollPhysics(),
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 5,
-              crossAxisSpacing: 8,
-              mainAxisSpacing: 8,
-              childAspectRatio: 1,
-            ),
-            itemCount: _capturedImages.length,
-            itemBuilder: (context, index) {
-              return Stack(
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: Image.memory(
-                      _capturedImages[index],
-                      fit: BoxFit.cover,
-                      width: double.infinity,
-                    ),
-                  ),
-                  Positioned(
-                    top: -8,
-                    right: -8,
-                    child: IconButton(
-                      icon: Icon(
-                        Icons.cancel,
-                        color: Colors.redAccent,
-                        size: 28,
-                        shadows: [Shadow(blurRadius: 6)],
-                      ),
-                      onPressed: () => removeImage(index),
-                    ),
-                  ),
-                ],
-              );
-            },
-          ),
-        ],
+
+        // if (_capturedImages.isNotEmpty) ...[
+        //   Padding(
+        //     padding: const EdgeInsets.symmetric(horizontal: 8),
+        //     child: Row(
+        //       mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        //       children: [
+        //         Text(
+        //           "${_capturedImages.length} ảnh",
+        //           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+        //         ),
+        //         TextButton.icon(
+        //           onPressed: clearAll,
+        //           icon: Icon(Icons.delete_sweep, color: Colors.red),
+        //           label: Text("Xóa hết", style: TextStyle(color: Colors.red)),
+        //         ),
+        //       ],
+        //     ),
+        //   ),
+        //   GridView.builder(
+        //     shrinkWrap: true,
+        //     physics: NeverScrollableScrollPhysics(),
+        //     gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        //       crossAxisCount: 5,
+        //       crossAxisSpacing: 8,
+        //       mainAxisSpacing: 8,
+        //       childAspectRatio: 1,
+        //     ),
+        //     itemCount: _capturedImages.length,
+        //     itemBuilder: (context, index) {
+        //       return Stack(
+        //         children: [
+        //           ClipRRect(
+        //             borderRadius: BorderRadius.circular(12),
+        //             child: Image.memory(
+        //               _capturedImages[index],
+        //               fit: BoxFit.cover,
+        //               width: double.infinity,
+        //             ),
+        //           ),
+        //           Positioned(
+        //             top: -8,
+        //             right: -8,
+        //             child: IconButton(
+        //               icon: Icon(
+        //                 Icons.cancel,
+        //                 color: Colors.redAccent,
+        //                 size: 28,
+        //                 shadows: [Shadow(blurRadius: 6)],
+        //               ),
+        //               onPressed: () => removeImage(index),
+        //             ),
+        //           ),
+        //         ],
+        //       );
+        //     },
+        //   ),
+        // ],
       ],
     );
   }
