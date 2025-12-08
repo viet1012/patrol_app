@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 import 'package:dropdown_search/dropdown_search.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:shimmer/shimmer.dart';
 import 'model/machine_model.dart';
 import 'model/reason_model.dart';
 
@@ -203,8 +204,8 @@ class _CameraScreenState extends State<CameraScreen> {
       dio.options.headers['ngrok-skip-browser-warning'] = 'true';
 
       final response = await dio.post(
-        "http://localhost:9299/api/report",
-        // "https://doctrinally-preambitious-evia.ngrok-free.dev/api/report",
+        // "http://localhost:9299/api/report",
+        "https://doctrinally-preambitious-evia.ngrok-free.dev/api/report",
         data: formData,
         options: Options(sendTimeout: const Duration(seconds: 120)),
       );
@@ -265,11 +266,9 @@ class _CameraScreenState extends State<CameraScreen> {
       appBar: AppBar(
         title: Row(
           children: [
-            const Text('Báo cáo', style: TextStyle(fontSize: 18)),
-            const SizedBox(width: 12),
             // Ô CHỌN GROUP TRÊN APPBAR
             SizedBox(
-              width: 140,
+              width: 130,
               child: _buildSearchableDropdown(
                 label: 'Group',
                 selectedValue: _selectedGroup,
@@ -512,7 +511,6 @@ class _CameraScreenState extends State<CameraScreen> {
               ),
             ),
 
-            const SizedBox(height: 12),
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 12),
               child: Row(
@@ -531,7 +529,9 @@ class _CameraScreenState extends State<CameraScreen> {
                   ),
                   Expanded(
                     child: Text(
-                      "Cần rà soát lại vấn đề tương tự ở ${_selectedArea}",
+                      _selectedArea != null
+                          ? "Cần rà soát lại vấn đề tương tự ở $_selectedArea"
+                          : "Chưa chọn khu vực",
                       style: TextStyle(
                         fontSize: 14.5,
                         fontWeight: FontWeight.w600,
