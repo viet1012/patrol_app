@@ -1,14 +1,5 @@
-import 'dart:io';
-import 'dart:ui_web' as ui;
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
-
-// import 'camera_screen.dart';
 import 'test.dart';
-import 'machine_model.dart';
-
-import 'dart:ui' show platformViewRegistry;
-import 'dart:html' as html;
 
 void main() {
   runApp(const MyApp());
@@ -23,6 +14,7 @@ class MyApp extends StatelessWidget {
       title: 'Camera App',
       theme: ThemeData(primarySwatch: Colors.blue),
       home: const CameraScreen(),
+      debugShowCheckedModeBanner: false,
     );
   }
 }

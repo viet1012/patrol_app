@@ -1,10 +1,11 @@
 import 'dart:typed_data';
 import 'package:chuphinh/take_picture_screen.dart';
 import 'package:dio/dio.dart';
+import 'package:dropdown_search/dropdown_search.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'machine_model.dart';
-import 'reason_model.dart';
+import 'model/machine_model.dart';
+import 'model/reason_model.dart';
 
 class CameraScreen extends StatefulWidget {
   const CameraScreen({super.key});
@@ -21,6 +22,33 @@ class _CameraScreenState extends State<CameraScreen> {
   String? _selectedReason1;
   String? _selectedReason2 = '';
   bool _needRecheck = false;
+
+  String? _freq;
+  String? _prob;
+  String? _sev;
+
+  int get totalScore {
+    int f = frequencyOptions
+        .firstWhere(
+          (e) => e.label == _freq,
+          orElse: () => RiskOption(label: "", score: 0),
+        )
+        .score;
+    int p = probabilityOptions
+        .firstWhere(
+          (e) => e.label == _prob,
+          orElse: () => RiskOption(label: "", score: 0),
+        )
+        .score;
+    int s = severityOptions
+        .firstWhere(
+          (e) => e.label == _sev,
+          orElse: () => RiskOption(label: "", score: 0),
+        )
+        .score;
+
+    return f + p + s; // 👉 Có thể đổi thành f + p + s tuỳ yêu cầu
+  }
 
   final GlobalKey<CameraPreviewBoxState> _cameraKey =
       GlobalKey<CameraPreviewBoxState>();
@@ -174,8 +202,18 @@ class _CameraScreenState extends State<CameraScreen> {
         : <String>[];
     final imageCount = _cameraKey.currentState?.images.length ?? 0;
     return Scaffold(
+      appBar: AppBar(
+        actions: [
+          IconButton(
+            onPressed: imageCount == 0 ? null : _sendReport,
+            icon: const Icon(Icons.send_rounded),
+            tooltip: imageCount == 0 ? "Chụp ảnh để gửi" : "Gửi báo cáo",
+          ),
+          const SizedBox(width: 10),
+        ],
+      ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(8),
         child: Column(
           children: [
             // CAMERA + GRID ẢNH
@@ -187,36 +225,43 @@ class _CameraScreenState extends State<CameraScreen> {
 
             const SizedBox(height: 8),
 
-            // FORM
             Row(
               children: [
                 Expanded(
-                  child: _buildDropdown('Div', _selectedDiv, divs, (v) {
-                    setState(() {
-                      _selectedDiv = v;
-                      _selectedGroup = null;
-                      _selectedMachine = null;
-                    });
-                  }),
+                  child: _buildSearchableDropdown(
+                    label: 'Div',
+                    selectedValue: _selectedDiv,
+                    items: divs,
+                    onChanged: (v) {
+                      setState(() {
+                        _selectedDiv = v;
+                        _selectedGroup = null;
+                        _selectedMachine = null;
+                      });
+                    },
+                  ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: _buildDropdown('Group', _selectedGroup, groupList, (
-                    v,
-                  ) {
-                    setState(() {
-                      _selectedGroup = v;
-                      _selectedMachine = null;
-                    });
-                  }),
+                  child: _buildSearchableDropdown(
+                    label: 'Group',
+                    selectedValue: _selectedGroup,
+                    items: groupList,
+                    onChanged: (v) {
+                      setState(() {
+                        _selectedGroup = v;
+                        _selectedMachine = null;
+                      });
+                    },
+                  ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: _buildDropdown(
-                    'Machine',
-                    _selectedMachine,
-                    machineList,
-                    (v) {
+                  child: _buildSearchableDropdown(
+                    label: 'Machine',
+                    selectedValue: _selectedMachine,
+                    items: machineList,
+                    onChanged: (v) {
                       setState(() => _selectedMachine = v);
                     },
                   ),
@@ -224,11 +269,78 @@ class _CameraScreenState extends State<CameraScreen> {
               ],
             ),
 
+            Column(
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildRiskDropdown(
+                        label: "Tần suất phát sinh",
+                        value: _freq,
+                        items: frequencyOptions,
+                        onChanged: (v) => _freq = v,
+                      ),
+                    ),
+                    SizedBox(width: 12),
+                    Expanded(
+                      child: _buildRiskDropdown(
+                        label: "Khả năng phát sinh",
+                        value: _prob,
+                        items: probabilityOptions,
+                        onChanged: (v) => _prob = v,
+                      ),
+                    ),
+                  ],
+                ),
+
+                SizedBox(height: 12),
+
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildRiskDropdown(
+                        label: "Mức độ chấn thương",
+                        value: _sev,
+                        items: severityOptions,
+                        onChanged: (v) => _sev = v,
+                      ),
+                    ),
+                    SizedBox(width: 12),
+                    Expanded(
+                      child: TextField(
+                        enabled: false,
+                        controller: TextEditingController(text: "$totalScore"),
+                        decoration: InputDecoration(
+                          labelText: "Tổng điểm",
+                          filled: true,
+                          fillColor: Colors.pink.shade200,
+                          labelStyle: TextStyle(
+                            fontSize: 18,
+                            color: Colors.black,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 18,
+                          color: Colors.black,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+
             const SizedBox(height: 12),
-            _buildLabel('Comment'),
+
             TextField(
               onChanged: (v) => _comment = v,
-              maxLines: 4,
+              maxLines: 2,
               decoration: InputDecoration(
                 hintText: 'Ghi chú...',
                 filled: true,
@@ -240,30 +352,6 @@ class _CameraScreenState extends State<CameraScreen> {
             ),
 
             const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildReasonDropdown(
-                    'Tiêu chuẩn 1',
-                    _selectedReason1,
-                    (v) {
-                      setState(() => _selectedReason1 = v);
-                    },
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _buildReasonDropdown(
-                    'Tiêu chuẩn 2',
-                    _selectedReason2,
-                    (v) => setState(() => _selectedReason2 = v),
-                  ),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 12),
-
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 12),
               child: Row(
@@ -280,10 +368,9 @@ class _CameraScreenState extends State<CameraScreen> {
                       visualDensity: VisualDensity.compact,
                     ),
                   ),
-                  const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      "Cần rà soát lại vấn đề tương tự",
+                      "Cần rà soát lại vấn đề tương tự ở ${_selectedGroup}",
                       style: TextStyle(
                         fontSize: 14.5,
                         fontWeight: FontWeight.w600,
@@ -294,126 +381,119 @@ class _CameraScreenState extends State<CameraScreen> {
                 ],
               ),
             ),
-            const SizedBox(height: 12),
 
             // NÚT GỬI
-            SizedBox(
-              height: 56,
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: imageCount == 0 ? null : _sendReport,
-                icon: const Icon(Icons.send_rounded),
-                label: Text(
-                  imageCount == 0
-                      ? 'CHỤP ẢNH ĐỂ GỬI'
-                      : 'GỬI BÁO CÁO ($imageCount ảnh)',
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: imageCount == 0
-                      ? Colors.grey
-                      : Colors.green.shade700,
-                  foregroundColor: Colors.white,
-                  elevation: 8,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 40),
+            // SizedBox(
+            //   height: 56,
+            //   width: double.infinity,
+            //   child: ElevatedButton.icon(
+            //     onPressed: imageCount == 0 ? null : _sendReport,
+            //     icon: const Icon(Icons.send_rounded),
+            //     label: Text(
+            //       imageCount == 0
+            //           ? 'CHỤP ẢNH ĐỂ GỬI'
+            //           : 'GỬI BÁO CÁO ($imageCount ảnh)',
+            //       style: const TextStyle(
+            //         fontSize: 18,
+            //         fontWeight: FontWeight.bold,
+            //       ),
+            //     ),
+            //     style: ElevatedButton.styleFrom(
+            //       backgroundColor: imageCount == 0
+            //           ? Colors.grey
+            //           : Colors.green.shade700,
+            //       foregroundColor: Colors.white,
+            //       elevation: 8,
+            //       shape: RoundedRectangleBorder(
+            //         borderRadius: BorderRadius.circular(16),
+            //       ),
+            //     ),
+            //   ),
+            // ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildDropdown(
-    String label,
-    String? value,
-    List<String> items,
-    Function(String?) onChanged,
-  ) {
-    // Fix: Nếu value không nằm trong items → tự động reset về null (tránh assert)
-    final String? safeValue = value != null && items.contains(value)
-        ? value
-        : null;
-
+  Widget _buildSearchableDropdown({
+    required String label,
+    required String? selectedValue,
+    required List<String> items,
+    required Function(String?) onChanged,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildLabel(label),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-          decoration: BoxDecoration(
-            color: Colors.blue.shade50,
-            border: Border.all(color: Colors.blue.shade300, width: 1.5),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: DropdownButton<String>(
-            value: safeValue,
-            isExpanded: true,
-            underline: const SizedBox(),
-            hint: Text(
-              "Chọn $label",
-              style: TextStyle(color: Colors.grey[600]),
+        // THÊM DÒNG NÀY → ĐẶT CHIỀU CAO CỐ ĐỊNH CHO CẢ 3 Ô
+        SizedBox(
+          height: 64, // hoặc 68 nếu muốn cao hơn chút
+          child: DropdownSearch<String>(
+            popupProps: const PopupProps.menu(
+              showSearchBox: true,
+              isFilterOnline: true,
+              searchFieldProps: TextFieldProps(
+                decoration: InputDecoration(
+                  hintText: "Tìm kiếm hoặc nhập mới...",
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.all(Radius.circular(12)),
+                  ),
+                ),
+              ),
             ),
-            items: items
-                .map((e) => DropdownMenuItem(value: e, child: Text(e)))
-                .toList(),
-            onChanged: (newValue) {
-              onChanged(newValue);
+
+            asyncItems: (String filter) async {
+              var result = items
+                  .where((e) => e.toLowerCase().contains(filter.toLowerCase()))
+                  .toList();
+
+              if (filter.isNotEmpty && !items.contains(filter.trim())) {
+                result.insert(0, filter.trim());
+              }
+              return result;
             },
-          ),
-        ),
-      ],
-    );
-  }
 
-  Widget _buildReasonDropdown(
-    String label,
-    String? value,
-    Function(String?) onChanged,
-  ) {
-    // LẤY CẢ reason1 VÀ reason2 để tránh lỗi khi chọn Tiêu chuẩn 2
-    final Set<String> reasonSet = {};
-    for (var r in reasonList) {
-      if (r.reason1?.isNotEmpty == true) reasonSet.add(r.reason1!);
-      if (r.reason2?.isNotEmpty == true) reasonSet.add(r.reason2!);
-    }
-    final List<String> reasonItems = reasonSet.toList()..sort();
+            compareFn: (item, selectedItem) =>
+                item.trim() == selectedItem.trim(),
 
-    // Fix assert: nếu value không có trong danh sách → reset về null
-    final String? safeValue = value != null && reasonItems.contains(value)
-        ? value
-        : null;
+            selectedItem: selectedValue,
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildLabel(label),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-          decoration: BoxDecoration(
-            color: Colors.green.shade50,
-            border: Border.all(color: Colors.green.shade400, width: 2),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: DropdownButton<String>(
-            value: safeValue,
-            isExpanded: true,
-            underline: const SizedBox(),
-            hint: const Text(
-              "Chọn mức độ",
-              style: TextStyle(color: Colors.grey),
+            dropdownDecoratorProps: DropDownDecoratorProps(
+              dropdownSearchDecoration: InputDecoration(
+                hintText: label, // hint vẫn giữ nhưng giới hạn 1 dòng
+                hintMaxLines: 1,
+                floatingLabelBehavior: FloatingLabelBehavior
+                    .never, // không đổi vị trí hint khi focus
+                isDense: true, // giảm chiều cao mặc định
+                filled: true,
+                fillColor: Colors.blue.shade50,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(
+                    color: Colors.blue.shade300,
+                    width: 1.5,
+                  ),
+                ),
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 12,
+                ), // height cố định
+              ),
             ),
-            items: reasonItems
-                .map((r) => DropdownMenuItem(value: r, child: Text(r)))
-                .toList(),
+
+            dropdownBuilder: (context, selectedItem) {
+              return Text(
+                selectedItem?.isNotEmpty == true ? selectedItem! : "$label",
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 15,
+                  color: selectedItem?.isNotEmpty == true
+                      ? Colors.black87
+                      : Colors.grey[600],
+                ),
+              );
+            },
             onChanged: onChanged,
           ),
         ),
@@ -421,17 +501,49 @@ class _CameraScreenState extends State<CameraScreen> {
     );
   }
 
-  Widget _buildLabel(String text) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Text(
-        text,
-        style: const TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.bold,
-          color: Colors.black87,
-        ),
+  Widget _buildRiskDropdown({
+    required String label,
+    required String? value,
+    required List<RiskOption> items,
+    required Function(String?) onChanged,
+  }) {
+    return DropdownButtonFormField<String>(
+      value: value,
+      isExpanded: true,
+      decoration: InputDecoration(
+        labelText: label,
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        filled: true,
+        fillColor: Colors.blue.shade50,
       ),
+      items: items
+          .map(
+            (e) => DropdownMenuItem(
+              value: e.label,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      e.label,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    "(${e.score})",
+                    style: TextStyle(color: Colors.blueGrey),
+                  ),
+                ],
+              ),
+            ),
+          )
+          .toList(),
+      onChanged: (v) {
+        setState(() {
+          onChanged(v);
+        });
+      },
     );
   }
 }
