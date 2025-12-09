@@ -26,3 +26,11 @@ final List<RiskOption> severityOptions = [
   RiskOption(label: "Chấn thương nhẹ", score: 3),
   RiskOption(label: "Không đáng kể", score: 1),
 ];
+
+final List<RiskOption> totalRiskOptions = [
+  RiskOption(label: "I - Rủi ro thấp", score: 1),
+  RiskOption(label: "II - Rủi ro trung bình", score: 2),
+  RiskOption(label: "III - Rủi ro cao", score: 3),
+  RiskOption(label: "IV - Rủi ro rất cao", score: 4),
+  RiskOption(label: "V - Rủi ro cực kỳ cao", score: 5),
+];
