@@ -128,7 +128,7 @@ class _CameraScreenState extends State<CameraScreen> {
   void _showSnackBar(
     String message,
     Color color, {
-    Duration duration = const Duration(seconds: 4),
+    Duration duration = const Duration(seconds: 10),
   }) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).removeCurrentSnackBar();
@@ -203,8 +203,8 @@ class _CameraScreenState extends State<CameraScreen> {
       dio.options.headers['ngrok-skip-browser-warning'] = 'true';
 
       final response = await dio.post(
-        // "http://localhost:9299/api/report",
-        "https://doctrinally-preambitious-evia.ngrok-free.dev/api/report",
+        "http://localhost:9299/api/report",
+        // "https://doctrinally-preambitious-evia.ngrok-free.dev/api/report",
         data: formData,
         options: Options(sendTimeout: const Duration(seconds: 120)),
       );
@@ -352,222 +352,212 @@ class _CameraScreenState extends State<CameraScreen> {
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(8),
-        child: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Color(0xFF1D1E26), Color(0xFF23242F)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+        child: Column(
+          children: [
+            // CAMERA + GRID ẢNH
+            CameraPreviewBox(
+              key: _cameraKey,
+              size: 340,
+              onImagesChanged: (_) => setState(() {}), // cập nhật số lượng ảnh
             ),
-          ),
-          child: Column(
-            children: [
-              // CAMERA + GRID ẢNH
-              CameraPreviewBox(
-                key: _cameraKey,
-                size: 340,
-                onImagesChanged: (_) =>
-                    setState(() {}), // cập nhật số lượng ảnh
-              ),
 
-              const SizedBox(height: 8),
+            const SizedBox(height: 8),
 
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildSearchableDropdown(
-                      label: 'Plant',
-                      selectedValue: _selectedPlant,
-                      items: plantList.cast<String>(),
-                      onChanged: (v) {
-                        setState(() {
-                          _selectedPlant = v;
-                          _selectedFac = null;
-                          _selectedArea = null;
-                          _selectedMachine = null;
-                        });
-                      },
-                    ),
+            Row(
+              children: [
+                Expanded(
+                  child: _buildSearchableDropdown(
+                    label: 'Plant',
+                    selectedValue: _selectedPlant,
+                    items: plantList.cast<String>(),
+                    onChanged: (v) {
+                      setState(() {
+                        _selectedPlant = v;
+                        _selectedFac = null;
+                        _selectedArea = null;
+                        _selectedMachine = null;
+                      });
+                    },
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: _buildSearchableDropdown(
-                      label: 'Fac',
-                      selectedValue: _selectedFac,
-                      items: _selectedPlant == null
-                          ? <String>[]
-                          : facList.cast<String>(),
-                      onChanged: (v) {
-                        setState(() {
-                          _selectedFac = v;
-                          _selectedArea = null;
-                          _selectedMachine = null;
-                        });
-                      },
-                    ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _buildSearchableDropdown(
+                    label: 'Fac',
+                    selectedValue: _selectedFac,
+                    items: _selectedPlant == null
+                        ? <String>[]
+                        : facList.cast<String>(),
+                    onChanged: (v) {
+                      setState(() {
+                        _selectedFac = v;
+                        _selectedArea = null;
+                        _selectedMachine = null;
+                      });
+                    },
                   ),
-                ],
-              ),
-              const SizedBox(height: 12),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
 
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildSearchableDropdown(
-                      label: 'Area',
-                      selectedValue: _selectedArea,
-                      items: (_selectedPlant == null || _selectedFac == null)
-                          ? <String>[]
-                          : areaList.cast<String>(),
-                      onChanged: (v) {
-                        setState(() {
-                          _selectedArea = v;
-                          _selectedMachine = null;
-                        });
-                      },
-                    ),
+            Row(
+              children: [
+                Expanded(
+                  child: _buildSearchableDropdown(
+                    label: 'Area',
+                    selectedValue: _selectedArea,
+                    items: (_selectedPlant == null || _selectedFac == null)
+                        ? <String>[]
+                        : areaList.cast<String>(),
+                    onChanged: (v) {
+                      setState(() {
+                        _selectedArea = v;
+                        _selectedMachine = null;
+                      });
+                    },
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: _buildSearchableDropdown(
-                      label: 'Machine',
-                      selectedValue: _selectedMachine,
-                      items:
-                          (_selectedPlant == null ||
-                              _selectedFac == null ||
-                              _selectedArea == null)
-                          ? <String>[]
-                          : machineList.cast<String>(),
-                      onChanged: (v) {
-                        setState(() => _selectedMachine = v);
-                      },
-                    ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _buildSearchableDropdown(
+                    label: 'Machine',
+                    selectedValue: _selectedMachine,
+                    items:
+                        (_selectedPlant == null ||
+                            _selectedFac == null ||
+                            _selectedArea == null)
+                        ? <String>[]
+                        : machineList.cast<String>(),
+                    onChanged: (v) {
+                      setState(() => _selectedMachine = v);
+                    },
                   ),
-                ],
-              ),
-              const SizedBox(height: 16),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
 
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: _buildRiskDropdown(
+                    label: "Tần suất phát sinh",
+                    value: _freq,
+                    items: frequencyOptions,
+                    onChanged: (v) => _freq = v,
+                  ),
+                ),
+                SizedBox(width: 8),
+                Expanded(
+                  child: SizedBox(
+                    // height: 76,
                     child: _buildRiskDropdown(
-                      label: "Tần suất phát sinh",
-                      value: _freq,
-                      items: frequencyOptions,
-                      onChanged: (v) => _freq = v,
+                      label: "Khả năng phát sinh",
+                      value: _prob,
+                      items: probabilityOptions,
+                      onChanged: (v) => _prob = v,
                     ),
                   ),
-                  SizedBox(width: 8),
-                  Expanded(
-                    child: SizedBox(
-                      // height: 76,
-                      child: _buildRiskDropdown(
-                        label: "Khả năng phát sinh",
-                        value: _prob,
-                        items: probabilityOptions,
-                        onChanged: (v) => _prob = v,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
 
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: _buildRiskDropdown(
-                      label: "Mức độ chấn thương",
-                      value: _sev,
-                      items: severityOptions,
-                      onChanged: (v) => _sev = v,
-                    ),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: _buildRiskDropdown(
+                    label: "Mức độ chấn thương",
+                    value: _sev,
+                    items: severityOptions,
+                    onChanged: (v) => _sev = v,
                   ),
-                  SizedBox(width: 12),
-                  Expanded(
-                    child: SizedBox(
-                      height: 76,
-                      child: TextField(
-                        enabled: false,
-                        controller: TextEditingController(text: displayScore),
-                        decoration: InputDecoration(
-                          labelText: "Mức độ rủi ro",
-                          filled: true,
-                          fillColor: Colors.deepOrange.shade100,
-                          labelStyle: TextStyle(
-                            fontSize: 16,
-                            color: Colors.black,
-                          ),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          contentPadding: EdgeInsets.fromLTRB(
-                            16,
-                            12,
-                            16,
-                            12,
-                          ), // giữ đều padding
-                        ),
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
+                ),
+                SizedBox(width: 12),
+                Expanded(
+                  child: SizedBox(
+                    height: 76,
+                    child: TextField(
+                      enabled: false,
+                      controller: TextEditingController(text: displayScore),
+                      decoration: InputDecoration(
+                        labelText: "Mức độ rủi ro",
+                        filled: true,
+                        fillColor: Colors.deepOrange.shade100,
+                        labelStyle: TextStyle(
                           fontSize: 16,
                           color: Colors.black,
-                          fontWeight: FontWeight.bold,
                         ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        contentPadding: EdgeInsets.fromLTRB(
+                          16,
+                          12,
+                          16,
+                          12,
+                        ), // giữ đều padding
+                      ),
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        color: Colors.black,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+
+            TextField(
+              onChanged: (v) => _comment = v,
+              maxLines: 2,
+              decoration: InputDecoration(
+                hintText: 'Ghi chú...',
+                filled: true,
+                fillColor: Colors.grey[100],
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 28,
+                    height: 28,
+                    child: Checkbox(
+                      value: _needRecheck,
+                      onChanged: (v) =>
+                          setState(() => _needRecheck = v ?? false),
+                      activeColor: Colors.orange.shade700,
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ),
+                  Expanded(
+                    child: Text(
+                      _selectedArea != null
+                          ? "Cần rà soát lại vấn đề tương tự ở $_selectedArea"
+                          : "Chưa chọn khu vực",
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.orange.shade900,
                       ),
                     ),
                   ),
                 ],
               ),
-
-              TextField(
-                onChanged: (v) => _comment = v,
-                maxLines: 2,
-                decoration: InputDecoration(
-                  hintText: 'Ghi chú...',
-                  filled: true,
-                  fillColor: Colors.grey[100],
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                child: Row(
-                  children: [
-                    SizedBox(
-                      width: 28,
-                      height: 28,
-                      child: Checkbox(
-                        value: _needRecheck,
-                        onChanged: (v) =>
-                            setState(() => _needRecheck = v ?? false),
-                        activeColor: Colors.orange.shade700,
-                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        visualDensity: VisualDensity.compact,
-                      ),
-                    ),
-                    Expanded(
-                      child: Text(
-                        _selectedArea != null
-                            ? "Cần rà soát lại vấn đề tương tự ở $_selectedArea"
-                            : "Chưa chọn khu vực",
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.orange.shade900,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -664,145 +654,62 @@ class _CameraScreenState extends State<CameraScreen> {
     required List<RiskOption> items,
     required Function(String?) onChanged,
   }) {
-    return SizedBox(
-      // height: 50, // ← CHÌA KHÓA VÀNG: cố định chiều cao 3 ô bằng nhau
-      child: DropdownButtonFormField<String>(
-        value: value,
-        isExpanded: true,
-        decoration: InputDecoration(
-          labelText: label,
-          filled: true,
-          fillColor: Colors.deepOrange.shade50,
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: Colors.grey.shade400),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: Colors.blue, width: 2),
-          ),
-          contentPadding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-        ),
-
-        selectedItemBuilder: (context) {
-          return items.map((e) {
-            return Container(
-              alignment: Alignment.centerLeft,
-              child: RichText(
-                text: TextSpan(
-                  style: const TextStyle(fontSize: 13.5, color: Colors.black87),
-                  children: [
-                    TextSpan(
-                      text: e.label,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w600,
-                        height: 1.3,
-                      ),
-                    ),
-                  ],
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.visible,
-              ),
-            );
-          }).toList();
-        },
-
-        items: items.map((e) {
-          return DropdownMenuItem<String>(
-            value: e.label,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 6),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      e.label,
-                      style: const TextStyle(fontWeight: FontWeight.w500),
-                    ),
-                  ),
-                  Text(
-                    "(${e.score})",
-                    style: TextStyle(
-                      color: Colors.blueGrey.shade700,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        }).toList(),
-
-        onChanged: (v) {
-          setState(() {
-            onChanged(v);
-          });
-        },
-        isDense: false,
-      ),
-    );
-  }
-
-  Widget _buildRiskDropdown12({
-    required String label,
-    required String? value,
-    required List<RiskOption> items,
-    required Function(String?) onChanged,
-  }) {
     return DropdownButtonFormField<String>(
       value: value,
       isExpanded: true,
       decoration: InputDecoration(
         labelText: label,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
         filled: true,
         fillColor: Colors.deepOrange.shade50,
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        contentPadding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
       ),
 
+      // 🔥 QUAN TRỌNG NHẤT: Hiển thị selected item 2 dòng FULL
       selectedItemBuilder: (context) {
         return items.map((e) {
-          return Align(
+          return Container(
             alignment: Alignment.centerLeft,
             child: Text(
-              "${e.label}",
+              e.label,
               maxLines: 2,
+              softWrap: true,
               overflow: TextOverflow.visible,
-              style: const TextStyle(fontSize: 12),
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                height: 1.3,
+                color: Colors.black,
+              ),
             ),
           );
         }).toList();
       },
 
-      items: items
-          .map(
-            (e) => DropdownMenuItem(
-              value: e.label,
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      e.label,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
+      items: items.map((e) {
+        return DropdownMenuItem<String>(
+          value: e.label,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    e.label,
+                    style: const TextStyle(fontWeight: FontWeight.w500),
                   ),
-                  const SizedBox(width: 8),
-                  Text(
-                    "(${e.score})",
-                    style: TextStyle(color: Colors.blueGrey),
-                  ),
-                ],
-              ),
+                ),
+                Text(
+                  "(${e.score})",
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ],
             ),
-          )
-          .toList(),
-      onChanged: (v) {
-        setState(() {
-          onChanged(v);
-        });
-      },
+          ),
+        );
+      }).toList(),
+
+      onChanged: (v) => setState(() => onChanged(v)),
     );
   }
 }
