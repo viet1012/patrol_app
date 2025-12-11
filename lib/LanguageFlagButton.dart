@@ -31,71 +31,75 @@ class _LanguageToggleSwitchState extends State<LanguageToggleSwitch> {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: _toggleLanguage,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
-        width: 60,
+      child: Container(
+        width: 70,
         height: 40,
-        padding: const EdgeInsets.symmetric(horizontal: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: isVietnamese
-                ? const [Color(0xFFCA4141), Color(0xFFEFD187)] // VN: đỏ vàng
-                : const [
-                    Color(0xFFE53935),
-                    Color(0xFFF5F5F5),
-                  ], // JP: đỏ + trắng sáng
-          ),
-          borderRadius: BorderRadius.circular(30),
+          // gradient: LinearGradient(colors: Colors.white),
+          color: Colors.blueGrey.shade100,
+          borderRadius: BorderRadius.circular(8),
         ),
-        child: Stack(
-          children: [
-            isVietnamese
-                ? Align(
-                    alignment: Alignment.centerRight,
-                    child: Padding(
-                      padding: const EdgeInsets.only(right: 6),
-                      child: Text(
-                        "VI",
-                        style: TextStyle(
-                          color: Colors.white70,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 300),
+          width: 50,
+          height: 40,
+          padding: const EdgeInsets.symmetric(horizontal: 6),
+          decoration: BoxDecoration(
+            // gradient: LinearGradient(colors: Colors.white),
+            color: Colors.blueGrey.shade300,
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: Stack(
+            children: [
+              isVietnamese
+                  ? Align(
+                      alignment: Alignment.centerRight,
+                      child: Padding(
+                        padding: const EdgeInsets.only(right: 6),
+                        child: Text(
+                          "VI",
+                          style: TextStyle(
+                            color: Colors.black87,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                    )
+                  : Align(
+                      alignment: Alignment.centerLeft,
+                      child: Padding(
+                        padding: const EdgeInsets.only(left: 6),
+                        child: Text(
+                          "JP",
+                          style: TextStyle(
+                            color: Colors.black87,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
                         ),
                       ),
                     ),
-                  )
-                : Align(
-                    alignment: Alignment.centerLeft,
-                    child: Padding(
-                      padding: const EdgeInsets.only(left: 6),
-                      child: Text(
-                        "JP",
-                        style: TextStyle(
-                          color: Colors.white70,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                        ),
-                      ),
-                    ),
-                  ),
 
-            AnimatedAlign(
-              duration: const Duration(milliseconds: 300),
-              alignment: isVietnamese
-                  ? Alignment.centerLeft
-                  : Alignment.centerRight,
-              child: Container(
-                width: 30,
-                height: 30,
-                child: Center(
-                  child: Text(
-                    isVietnamese ? "🇻🇳" : "🇯🇵",
-                    style: const TextStyle(fontSize: 18),
+              AnimatedAlign(
+                duration: const Duration(milliseconds: 300),
+                alignment: isVietnamese
+                    ? Alignment.centerLeft
+                    : Alignment.centerRight,
+                child: SizedBox(
+                  width: 30,
+                  height: 30,
+                  child: Center(
+                    child: Text(
+                      isVietnamese ? "🇻🇳" : "🇯🇵",
+                      style: const TextStyle(fontSize: 18),
+                    ),
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

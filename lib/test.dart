@@ -1,11 +1,15 @@
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:chuphinh/take_picture_screen.dart';
+import 'package:chuphinh/translator.dart';
 import 'package:dio/dio.dart';
 import 'package:dropdown_search/dropdown_search.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shimmer/shimmer.dart';
+import 'LanguageFlagButton.dart';
+import 'l10n/app_localizations.dart';
+import 'main.dart';
 import 'model/machine_model.dart';
 import 'model/reason_model.dart';
 
@@ -25,28 +29,34 @@ class _CameraScreenState extends State<CameraScreen> {
   int numbersGroup = 7;
 
   String _comment = '';
+  String _counterMeasure = '';
   bool _needRecheck = false;
   String? _freq;
   String? _prob;
   String? _sev;
 
+  final TextEditingController commentController = TextEditingController();
+  final TextEditingController counterController = TextEditingController();
+
   int get totalScore {
     int f = frequencyOptions
         .firstWhere(
-          (e) => e.label == _freq,
-          orElse: () => RiskOption(label: "", score: 0),
+          (e) => e.labelKey == _freq,
+          orElse: () => const RiskOption(labelKey: "", score: 0),
         )
         .score;
+
     int p = probabilityOptions
         .firstWhere(
-          (e) => e.label == _prob,
-          orElse: () => RiskOption(label: "", score: 0),
+          (e) => e.labelKey == _prob,
+          orElse: () => const RiskOption(labelKey: "", score: 0),
         )
         .score;
+
     int s = severityOptions
         .firstWhere(
-          (e) => e.label == _sev,
-          orElse: () => RiskOption(label: "", score: 0),
+          (e) => e.labelKey == _sev,
+          orElse: () => const RiskOption(labelKey: "", score: 0),
         )
         .score;
 
@@ -179,10 +189,34 @@ class _CameraScreenState extends State<CameraScreen> {
         'group': _selectedGroup ?? '',
         'machine': _selectedMachine ?? '',
         'comment': _comment,
-        'check': _needRecheck ? 'Kiểm tra lỗi tương tự' : '',
-        'riskFreq': _freq ?? '',
-        'riskProb': _prob ?? '',
-        'riskSev': _sev ?? '',
+        'countermeasure': _counterMeasure,
+        'check': _needRecheck
+            ? (_selectedArea != null
+                  ? ''.combinedViJa(context, 'needRecheck')
+                  : ''.combinedViJa(context, 'needSelectArea'))
+            : '',
+
+        'riskFreq': frequencyOptions
+            .firstWhere(
+              (e) => e.labelKey == _freq,
+              orElse: () => RiskOption(labelKey: '', score: 0),
+            )
+            .labelKey
+            .tr(context),
+        'riskProb': probabilityOptions
+            .firstWhere(
+              (e) => e.labelKey == _prob,
+              orElse: () => RiskOption(labelKey: '', score: 0),
+            )
+            .labelKey
+            .tr(context),
+        'riskSev': severityOptions
+            .firstWhere(
+              (e) => e.labelKey == _sev,
+              orElse: () => RiskOption(labelKey: '', score: 0),
+            )
+            .labelKey
+            .tr(context),
         'riskTotal': getScoreSymbol(),
       };
 
@@ -203,20 +237,23 @@ class _CameraScreenState extends State<CameraScreen> {
       dio.options.headers['ngrok-skip-browser-warning'] = 'true';
 
       final response = await dio.post(
-        "http://localhost:9299/api/report",
-        // "https://doctrinally-preambitious-evia.ngrok-free.dev/api/report",
+        // "http://localhost:9299/api/report",
+        "https://doctrinally-preambitious-evia.ngrok-free.dev/api/report",
         data: formData,
         options: Options(sendTimeout: const Duration(seconds: 120)),
       );
 
       if (response.statusCode! >= 200 && response.statusCode! < 300) {
-        _showSnackBar('Gửi thành công ${images.length} ảnh!', Colors.green);
+        _showSnackBar(
+          'Successfully sent ${images.length} images!',
+          Colors.green,
+        );
         _resetForm();
       } else {
-        _showSnackBar('Lỗi server: ${response.statusCode}', Colors.red);
+        _showSnackBar('Server error: ${response.statusCode}', Colors.red);
       }
     } on DioException catch (e) {
-      String msg = 'Lỗi: ';
+      String msg = 'Error: ';
       if (e.response != null) {
         msg += '${e.response?.statusCode} - ${e.response?.data}';
       } else {
@@ -224,7 +261,7 @@ class _CameraScreenState extends State<CameraScreen> {
       }
       _showSnackBar(msg, Colors.red);
     } catch (e) {
-      _showSnackBar('Lỗi: $e', Colors.red);
+      _showSnackBar('Error: $e', Colors.red);
     }
   }
 
@@ -233,6 +270,9 @@ class _CameraScreenState extends State<CameraScreen> {
       _selectedPlant = '612K';
       _selectedMachine = null;
       _comment = '';
+      _counterMeasure = '';
+      commentController.clear();
+      counterController.clear();
       _freq = null;
       _prob = null;
       _sev = null;
@@ -269,20 +309,24 @@ class _CameraScreenState extends State<CameraScreen> {
       appBar: AppBar(
         title: Row(
           children: [
-            // Ô CHỌN GROUP TRÊN APPBAR
             SizedBox(
-              width: 130,
+              width: 100,
               child: _buildSearchableDropdown(
-                label: 'Group',
-                selectedValue: _selectedGroup,
-                items: groupList,
+                label: 'plant'.tr(context),
+                selectedValue: _selectedPlant,
+                items: plantList.cast<String>(),
                 onChanged: (v) {
                   setState(() {
-                    _selectedGroup = v;
+                    _selectedPlant = v;
+                    _selectedFac = null;
+                    _selectedArea = null;
+                    _selectedMachine = null;
                   });
                 },
               ),
             ),
+            SizedBox(width: 4),
+            const LanguageToggleSwitch(),
           ],
         ),
         actions: [
@@ -295,7 +339,7 @@ class _CameraScreenState extends State<CameraScreen> {
                   int idx = entry.key;
                   Uint8List img = entry.value;
                   return Padding(
-                    padding: const EdgeInsets.only(right: 6),
+                    padding: const EdgeInsets.only(right: 4),
                     child: Stack(
                       children: [
                         ClipRRect(
@@ -336,7 +380,7 @@ class _CameraScreenState extends State<CameraScreen> {
 
           // NÚT GỬI + BADGE SỐ ẢNH
           Padding(
-            padding: const EdgeInsets.only(right: 16, left: 8),
+            padding: const EdgeInsets.only(right: 4, left: 4),
             child: Stack(
               children: [
                 FloatingActionButton(
@@ -367,15 +411,12 @@ class _CameraScreenState extends State<CameraScreen> {
               children: [
                 Expanded(
                   child: _buildSearchableDropdown(
-                    label: 'Plant',
-                    selectedValue: _selectedPlant,
-                    items: plantList.cast<String>(),
+                    label: "group".tr(context),
+                    selectedValue: _selectedGroup,
+                    items: groupList,
                     onChanged: (v) {
                       setState(() {
-                        _selectedPlant = v;
-                        _selectedFac = null;
-                        _selectedArea = null;
-                        _selectedMachine = null;
+                        _selectedGroup = v;
                       });
                     },
                   ),
@@ -383,7 +424,7 @@ class _CameraScreenState extends State<CameraScreen> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: _buildSearchableDropdown(
-                    label: 'Fac',
+                    label: "fac".tr(context),
                     selectedValue: _selectedFac,
                     items: _selectedPlant == null
                         ? <String>[]
@@ -405,7 +446,7 @@ class _CameraScreenState extends State<CameraScreen> {
               children: [
                 Expanded(
                   child: _buildSearchableDropdown(
-                    label: 'Area',
+                    label: "area".tr(context),
                     selectedValue: _selectedArea,
                     items: (_selectedPlant == null || _selectedFac == null)
                         ? <String>[]
@@ -421,7 +462,7 @@ class _CameraScreenState extends State<CameraScreen> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: _buildSearchableDropdown(
-                    label: 'Machine',
+                    label: "machine".tr(context),
                     selectedValue: _selectedMachine,
                     items:
                         (_selectedPlant == null ||
@@ -439,30 +480,27 @@ class _CameraScreenState extends State<CameraScreen> {
             const SizedBox(height: 16),
 
             Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
                   child: _buildRiskDropdown(
-                    label: "Tần suất phát sinh",
-                    value: _freq,
+                    labelKey: "label_freq",
+                    valueKey: _freq,
                     items: frequencyOptions,
                     onChanged: (v) => _freq = v,
                   ),
                 ),
-                SizedBox(width: 8),
+                const SizedBox(width: 8),
                 Expanded(
-                  child: SizedBox(
-                    // height: 76,
-                    child: _buildRiskDropdown(
-                      label: "Khả năng phát sinh",
-                      value: _prob,
-                      items: probabilityOptions,
-                      onChanged: (v) => _prob = v,
-                    ),
+                  child: _buildRiskDropdown(
+                    labelKey: "label_prob",
+                    valueKey: _prob,
+                    items: probabilityOptions,
+                    onChanged: (v) => _prob = v,
                   ),
                 ),
               ],
             ),
+
             const SizedBox(height: 16),
 
             Row(
@@ -470,13 +508,13 @@ class _CameraScreenState extends State<CameraScreen> {
               children: [
                 Expanded(
                   child: _buildRiskDropdown(
-                    label: "Mức độ chấn thương",
-                    value: _sev,
+                    labelKey: "label_sev", // 🔹Dùng key trong arb
+                    valueKey: _sev,
                     items: severityOptions,
                     onChanged: (v) => _sev = v,
                   ),
                 ),
-                SizedBox(width: 12),
+                const SizedBox(width: 12),
                 Expanded(
                   child: SizedBox(
                     height: 76,
@@ -484,27 +522,29 @@ class _CameraScreenState extends State<CameraScreen> {
                       enabled: false,
                       controller: TextEditingController(text: displayScore),
                       decoration: InputDecoration(
-                        labelText: "Mức độ rủi ro",
+                        labelText: "label_risk".tr(context), // 🔹Dịch từ .arb
                         filled: true,
                         fillColor: Colors.deepOrange.shade100,
-                        labelStyle: TextStyle(
+                        labelStyle: const TextStyle(
                           fontSize: 16,
                           color: Colors.black,
                         ),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        contentPadding: EdgeInsets.fromLTRB(
+                        contentPadding: const EdgeInsets.fromLTRB(
                           16,
                           12,
                           16,
                           12,
-                        ), // giữ đều padding
+                        ),
                       ),
                       textAlign: TextAlign.center,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 16,
-                        color: Colors.black,
+                        color: (displayScore == "V" || displayScore == "IV")
+                            ? Colors.red
+                            : Colors.black,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -512,18 +552,40 @@ class _CameraScreenState extends State<CameraScreen> {
                 ),
               ],
             ),
-
-            TextField(
-              onChanged: (v) => _comment = v,
-              maxLines: 2,
-              decoration: InputDecoration(
-                hintText: 'Ghi chú...',
-                filled: true,
-                fillColor: Colors.grey[100],
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: commentController,
+                    onChanged: (v) => _comment = v,
+                    maxLines: 2,
+                    decoration: InputDecoration(
+                      hintText: "commentHint".tr(context),
+                      filled: true,
+                      fillColor: Colors.grey[100],
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
                 ),
-              ),
+                SizedBox(width: 8),
+                Expanded(
+                  child: TextField(
+                    controller: counterController,
+                    onChanged: (v) => _counterMeasure = v,
+                    maxLines: 2,
+                    decoration: InputDecoration(
+                      hintText: "counterMeasureHint".tr(context),
+                      filled: true,
+                      fillColor: Colors.blue[100],
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
 
             Padding(
@@ -544,9 +606,7 @@ class _CameraScreenState extends State<CameraScreen> {
                   ),
                   Expanded(
                     child: Text(
-                      _selectedArea != null
-                          ? "Cần rà soát lại vấn đề tương tự ở $_selectedArea"
-                          : "Chưa chọn khu vực",
+                      "needRecheck".tr(context),
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
@@ -576,12 +636,12 @@ class _CameraScreenState extends State<CameraScreen> {
         SizedBox(
           // height: 50, // hoặc 68 nếu muốn cao hơn chút
           child: DropdownSearch<String>(
-            popupProps: const PopupProps.menu(
+            popupProps: PopupProps.menu(
               showSearchBox: true,
               isFilterOnline: true,
               searchFieldProps: TextFieldProps(
                 decoration: InputDecoration(
-                  hintText: "Tìm kiếm hoặc nhập mới...",
+                  hintText: "search_or_add_new".tr(context),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.all(Radius.circular(12)),
                   ),
@@ -622,8 +682,7 @@ class _CameraScreenState extends State<CameraScreen> {
                   ),
                 ),
                 contentPadding: EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 12,
+                  vertical: 8,
                 ), // height cố định
               ),
             ),
@@ -631,10 +690,10 @@ class _CameraScreenState extends State<CameraScreen> {
             dropdownBuilder: (context, selectedItem) {
               return Text(
                 selectedItem?.isNotEmpty == true ? selectedItem! : "$label",
-                maxLines: 1,
+                maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  fontSize: 15,
+                  fontSize: 14,
                   color: selectedItem?.isNotEmpty == true
                       ? Colors.black87
                       : Colors.grey[600],
@@ -649,34 +708,32 @@ class _CameraScreenState extends State<CameraScreen> {
   }
 
   Widget _buildRiskDropdown({
-    required String label,
-    required String? value,
+    required String labelKey,
+    required String? valueKey,
     required List<RiskOption> items,
     required Function(String?) onChanged,
   }) {
     return DropdownButtonFormField<String>(
-      value: value,
+      value: valueKey,
       isExpanded: true,
       decoration: InputDecoration(
-        labelText: label,
+        labelText: labelKey.tr(context),
         filled: true,
         fillColor: Colors.deepOrange.shade50,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-        contentPadding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+        contentPadding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
       ),
-
-      // 🔥 QUAN TRỌNG NHẤT: Hiển thị selected item 2 dòng FULL
       selectedItemBuilder: (context) {
         return items.map((e) {
           return Container(
             alignment: Alignment.centerLeft,
             child: Text(
-              e.label,
+              e.labelKey.tr(context), // ✔ Dịch được
               maxLines: 2,
               softWrap: true,
               overflow: TextOverflow.visible,
               style: const TextStyle(
-                fontSize: 14,
+                fontSize: 13,
                 fontWeight: FontWeight.w600,
                 height: 1.3,
                 color: Colors.black,
@@ -688,16 +745,20 @@ class _CameraScreenState extends State<CameraScreen> {
 
       items: items.map((e) {
         return DropdownMenuItem<String>(
-          value: e.label,
+          value: e.labelKey,
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 6),
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: Text(
-                    e.label,
-                    style: const TextStyle(fontWeight: FontWeight.w500),
+                Text(
+                  e.labelKey.tr(context),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w500,
+                    fontSize: 14,
                   ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
                 Text(
                   "(${e.score})",
@@ -712,4 +773,69 @@ class _CameraScreenState extends State<CameraScreen> {
       onChanged: (v) => setState(() => onChanged(v)),
     );
   }
+
+  // Widget _buildRiskDropdown1({
+  //   required String label,
+  //   required String? value,
+  //   required List<RiskOption> items,
+  //   required Function(String?) onChanged,
+  // }) {
+  //   return DropdownButtonFormField<String>(
+  //     value: value,
+  //     isExpanded: true,
+  //     decoration: InputDecoration(
+  //       labelText: label,
+  //       filled: true,
+  //       fillColor: Colors.deepOrange.shade50,
+  //       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+  //       contentPadding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+  //     ),
+  //
+  //     // 🔥 QUAN TRỌNG NHẤT: Hiển thị selected item 2 dòng FULL
+  //     selectedItemBuilder: (context) {
+  //       return items.map((e) {
+  //         return Container(
+  //           alignment: Alignment.centerLeft,
+  //           child: Text(
+  //             e.label,
+  //             maxLines: 2,
+  //             softWrap: true,
+  //             overflow: TextOverflow.visible,
+  //             style: const TextStyle(
+  //               fontSize: 14,
+  //               fontWeight: FontWeight.w600,
+  //               height: 1.3,
+  //               color: Colors.black,
+  //             ),
+  //           ),
+  //         );
+  //       }).toList();
+  //     },
+  //
+  //     items: items.map((e) {
+  //       return DropdownMenuItem<String>(
+  //         value: e.label,
+  //         child: Padding(
+  //           padding: const EdgeInsets.symmetric(vertical: 6),
+  //           child: Row(
+  //             children: [
+  //               Expanded(
+  //                 child: Text(
+  //                   e.label,
+  //                   style: const TextStyle(fontWeight: FontWeight.w500),
+  //                 ),
+  //               ),
+  //               Text(
+  //                 "(${e.score})",
+  //                 style: const TextStyle(fontWeight: FontWeight.bold),
+  //               ),
+  //             ],
+  //           ),
+  //         ),
+  //       );
+  //     }).toList(),
+  //
+  //     onChanged: (v) => setState(() => onChanged(v)),
+  //   );
+  // }
 }

@@ -1,0 +1,50 @@
+{
+  "@@locale": "vi",
+
+  "plant": "Nhà máy",
+  "group": "Nhóm",
+  "fac": "Phân xưởng",
+  "area": "Khu vực",
+  "machine": "Máy móc",
+  "search_or_add_new": "Tìm kiếm hoặc nhập mới...",
+
+  "label_freq": "Tần suất phát sinh",
+  "label_prob": "Khả năng phát sinh",
+  "label_sev": "Mức độ chấn thương",
+  "label_risk": "Mức độ rủi ro",
+
+  "frequency_often": "Thường xuyên",
+  "frequency_sometimes": "Thỉnh thoảng",
+  "frequency_rare": "Hầu như không",
+
+  "probability_certain": "Chắc chắn",
+  "probability_high": "Khả năng cao",
+  "probability_possible": "Có khả năng",
+  "probability_rare": "Hầu như không",
+
+  "severity_critical": "Vết thương chí mạng",
+  "severity_severe": "Chấn thương nghiêm trọng",
+  "severity_moderate": "Chấn thương vừa phải",
+  "severity_minor": "Chấn thương nhẹ",
+  "severity_negligible": "Không đáng kể",
+
+  "risk_low": "I - Rủi ro thấp",
+  "risk_medium": "II - Rủi ro trung bình",
+  "risk_high": "III - Rủi ro cao",
+  "risk_very_high": "IV - Rủi ro rất cao",
+  "risk_extreme": "V - Rủi ro cực kỳ cao",
+
+  "needRecheck": "Cần rà soát lại vấn đề tương tự",
+
+
+  "needRecheckWithArea": "Cần rà soát lại vấn đề tương tự ở {area}",
+  "@needRecheckWithArea": {
+    "placeholders": {
+      "area": {}
+    }
+  },
+
+  "needSelectArea": "Chưa chọn khu vực",
+  "commentHint": "Ghi chú...",
+  "counterMeasureHint": "Đối sách..."
+}
