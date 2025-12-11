@@ -195,28 +195,35 @@ class _CameraScreenState extends State<CameraScreen> {
                   ? ''.combinedViJa(context, 'needRecheck')
                   : ''.combinedViJa(context, 'needSelectArea'))
             : '',
+        'riskFreq': ''.combinedViJa(
+          context,
+          frequencyOptions
+              .firstWhere(
+                (e) => e.labelKey == _freq,
+                orElse: () => RiskOption(labelKey: '', score: 0),
+              )
+              .labelKey,
+        ),
+        'riskProb': ''.combinedViJa(
+          context,
+          probabilityOptions
+              .firstWhere(
+                (e) => e.labelKey == _prob,
+                orElse: () => RiskOption(labelKey: '', score: 0),
+              )
+              .labelKey,
+        ),
 
-        'riskFreq': frequencyOptions
-            .firstWhere(
-              (e) => e.labelKey == _freq,
-              orElse: () => RiskOption(labelKey: '', score: 0),
-            )
-            .labelKey
-            .tr(context),
-        'riskProb': probabilityOptions
-            .firstWhere(
-              (e) => e.labelKey == _prob,
-              orElse: () => RiskOption(labelKey: '', score: 0),
-            )
-            .labelKey
-            .tr(context),
-        'riskSev': severityOptions
-            .firstWhere(
-              (e) => e.labelKey == _sev,
-              orElse: () => RiskOption(labelKey: '', score: 0),
-            )
-            .labelKey
-            .tr(context),
+        'riskSev': ''.combinedViJa(
+          context,
+          severityOptions
+              .firstWhere(
+                (e) => e.labelKey == _sev,
+                orElse: () => RiskOption(labelKey: '', score: 0),
+              )
+              .labelKey,
+        ),
+
         'riskTotal': getScoreSymbol(),
       };
 
