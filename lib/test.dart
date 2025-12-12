@@ -160,7 +160,12 @@ class _CameraScreenState extends State<CameraScreen> {
       return;
     }
     if (_selectedArea == null) {
-      _showSnackBar('Vui lòng chọn máy!', Colors.orange);
+      _showSnackBar('Vui lòng chọn đủ thông tin!', Colors.orange);
+      return;
+    }
+
+    if (_comment.trim().isEmpty) {
+      _showSnackBar('Vui lòng nhập comment!', Colors.orange);
       return;
     }
 
@@ -244,8 +249,8 @@ class _CameraScreenState extends State<CameraScreen> {
       dio.options.headers['ngrok-skip-browser-warning'] = 'true';
 
       final response = await dio.post(
-        // "http://localhost:9299/api/report",
-        "https://doctrinally-preambitious-evia.ngrok-free.dev/api/report",
+        "http://localhost:9299/api/report",
+        // "https://doctrinally-preambitious-evia.ngrok-free.dev/api/report",
         data: formData,
         options: Options(sendTimeout: const Duration(seconds: 120)),
       );
