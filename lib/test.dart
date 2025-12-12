@@ -521,7 +521,7 @@ class _CameraScreenState extends State<CameraScreen> {
                     onChanged: (v) => _sev = v,
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 8),
                 Expanded(
                   child: SizedBox(
                     height: 76,
@@ -569,7 +569,7 @@ class _CameraScreenState extends State<CameraScreen> {
                     decoration: InputDecoration(
                       hintText: "commentHint".tr(context),
                       filled: true,
-                      fillColor: Colors.grey[100],
+                      fillColor: Colors.yellow.shade50,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
@@ -585,7 +585,7 @@ class _CameraScreenState extends State<CameraScreen> {
                     decoration: InputDecoration(
                       hintText: "counterMeasureHint".tr(context),
                       filled: true,
-                      fillColor: Colors.blue[100],
+                      fillColor: Colors.yellow.shade50,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
