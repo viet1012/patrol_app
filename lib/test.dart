@@ -12,6 +12,8 @@ import 'l10n/app_localizations.dart';
 import 'main.dart';
 import 'model/machine_model.dart';
 import 'model/reason_model.dart';
+import 'api/auto_cmp_api.dart';
+import 'model/auto_cmp.dart';
 
 class CameraScreen extends StatefulWidget {
   final String selectedPlant;
@@ -580,21 +582,101 @@ class _CameraScreenState extends State<CameraScreen> {
             ),
             Row(
               children: [
+                // Expanded(
+                //   child: TextField(
+                //     controller: commentController,
+                //     onChanged: (v) => _comment = v,
+                //     maxLines: 2,
+                //     decoration: InputDecoration(
+                //       hintText: "commentHint".tr(context),
+                //       filled: true,
+                //       fillColor: Colors.yellow.shade50,
+                //       border: OutlineInputBorder(
+                //         borderRadius: BorderRadius.circular(12),
+                //       ),
+                //     ),
+                //   ),
+                // ),
+
+                //AUTO COMPLETE
                 Expanded(
-                  child: TextField(
-                    controller: commentController,
-                    onChanged: (v) => _comment = v,
-                    maxLines: 2,
-                    decoration: InputDecoration(
-                      hintText: "commentHint".tr(context),
-                      filled: true,
-                      fillColor: Colors.yellow.shade50,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
+                  child: Autocomplete<AutoCmp>(
+                    optionsBuilder: (TextEditingValue value) async {
+                      if (value.text.length < 2) {
+                        return const Iterable<AutoCmp>.empty();
+                      }
+                      return await AutoCmpApi.search(value.text);
+                    },
+
+                    displayStringForOption: (AutoCmp option) => option.inputText,
+
+                    onSelected: (AutoCmp selection) {
+                      setState(() {
+                        _comment = selection.inputText;
+                        commentController.text = selection.inputText;
+
+                        _counterMeasure = selection.countermeasure;
+                        counterController.text = selection.countermeasure;
+                      });
+                    },
+
+                    fieldViewBuilder: (
+                        context,
+                        textEditingController,
+                        focusNode,
+                        onFieldSubmitted,
+                        ) {
+                      return TextField(
+                        controller: textEditingController,
+                        focusNode: focusNode,
+                        maxLines: 2,
+                        decoration: InputDecoration(
+                          hintText: "commentHint".tr(context),
+                          filled: true,
+                          fillColor: Colors.yellow.shade50,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        onChanged: (v) {
+                          _comment = v;
+                          commentController.text = v;
+                        },
+                      );
+                    },
+
+                    optionsViewBuilder: (context, onSelected, options) {
+                      return Align(
+                        alignment: Alignment.topLeft,
+                        child: Material(
+                          elevation: 6,
+                          borderRadius: BorderRadius.circular(12),
+                          child: ListView.builder(
+                            padding: EdgeInsets.zero,
+                            shrinkWrap: true,
+                            itemCount: options.length,
+                            itemBuilder: (context, index) {
+                              final opt = options.elementAt(index);
+                              return ListTile(
+                                title: Text(
+                                  opt.inputText,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                onTap: () => onSelected(opt),
+                              );
+                            },
+                          ),
+                        ),
+                      );
+                    },
                   ),
                 ),
+
                 SizedBox(width: 8),
                 Expanded(
                   child: TextField(
