@@ -50,6 +50,8 @@ dependencies:
     sdk: flutter
   intl: ^0.20.2
   google_fonts: ^6.3.3
+  stomp_dart_client: ^3.0.1
+  web_socket_channel: ^3.0.3
 dev_dependencies:
   flutter_test:
     sdk: flutter
