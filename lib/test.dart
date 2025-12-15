@@ -155,6 +155,10 @@ class _CameraScreenState extends State<CameraScreen> {
     );
   }
 
+  String normalizeGroup(String? group) {
+    return group == null ? '' : group.replaceAll(' ', '').trim();
+  }
+
   Future<void> _sendReport() async {
     final images = _cameraKey.currentState?.images ?? [];
     if (images.isEmpty) {
@@ -193,7 +197,7 @@ class _CameraScreenState extends State<CameraScreen> {
         'plant': _selectedPlant ?? '',
         'division': _selectedFac ?? '',
         'area': _selectedArea ?? '',
-        'group': _selectedGroup ?? '',
+        'group': normalizeGroup(_selectedGroup) ?? '',
         'machine': _selectedMachine ?? '',
         'comment': _comment,
         'countermeasure': _counterMeasure,
@@ -296,6 +300,12 @@ class _CameraScreenState extends State<CameraScreen> {
   }
 
   @override
+  void initState() {
+    _selectedPlant = widget.selectedPlant;
+    super.initState();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final plantList = getPlants();
 
@@ -323,22 +333,22 @@ class _CameraScreenState extends State<CameraScreen> {
       appBar: AppBar(
         title: Row(
           children: [
-            SizedBox(
-              width: 100,
-              child: _buildSearchableDropdown(
-                label: 'plant'.tr(context),
-                selectedValue: _selectedPlant,
-                items: plantList.cast<String>(),
-                onChanged: (v) {
-                  setState(() {
-                    _selectedPlant = v;
-                    _selectedFac = null;
-                    _selectedArea = null;
-                    _selectedMachine = null;
-                  });
-                },
-              ),
-            ),
+            // SizedBox(
+            //   width: 100,
+            //   child: _buildSearchableDropdown(
+            //     label: 'plant'.tr(context),
+            //     selectedValue: _selectedPlant,
+            //     items: plantList.cast<String>(),
+            //     onChanged: (v) {
+            //       setState(() {
+            //         _selectedPlant = v;
+            //         _selectedFac = null;
+            //         _selectedArea = null;
+            //         _selectedMachine = null;
+            //       });
+            //     },
+            //   ),
+            // ),
             SizedBox(width: 4),
             const LanguageToggleSwitch(),
           ],
@@ -416,6 +426,8 @@ class _CameraScreenState extends State<CameraScreen> {
             CameraPreviewBox(
               key: _cameraKey,
               size: 340,
+              plant: _selectedPlant,
+              group: _selectedGroup,
               onImagesChanged: (_) => setState(() {}), // cập nhật số lượng ảnh
             ),
 

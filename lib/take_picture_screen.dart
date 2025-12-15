@@ -627,7 +627,7 @@ class CameraPreviewBox extends StatefulWidget {
   final double size;
   final Function(List<Uint8List> images)? onImagesChanged;
 
-  final String? fac; // ✅ THÊM
+  final String? plant; // ✅ THÊM
   final String? group; // ✅ BẮT BUỘC
   final String? wsUrl;
 
@@ -636,7 +636,7 @@ class CameraPreviewBox extends StatefulWidget {
     this.size = 320,
     this.onImagesChanged,
     this.group,
-    this.fac,
+    this.plant,
 
     this.wsUrl,
   });
@@ -656,9 +656,9 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
   final List<Uint8List> _capturedImages = [];
 
   // internal api (use widget.sttCtrl if provided)
-  late final String _fac;
-  late final String _group;
-  late final String _wsUrl;
+  late String _fac;
+  late String _group;
+  late String _wsUrl;
 
   int stt = 0;
   late SttWebSocket sttSocket;
@@ -667,8 +667,8 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
   void initState() {
     super.initState();
 
-    _fac = widget.fac ?? "PlantA";
-    _group = widget.group ?? "Group1";
+    _fac = widget.plant ?? "";
+    _group = widget.group ?? "";
     _wsUrl = widget.wsUrl ?? "ws://localhost:9299/ws-stt/websocket";
 
     _flashController = AnimationController(
@@ -679,21 +679,21 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
     _startCamera();
 
     /// ✅ 1. LẤY STT HIỆN TẠI TỪ DB
-    SttApi.getCurrentStt(fac: _fac, group: _group).then((value) {
-      if (mounted) setState(() => stt = value);
-    });
-
-    /// ✅ 2. LISTEN REALTIME
-    sttSocket = SttWebSocket(
-      serverUrl: _wsUrl,
-      fac: _fac,
-      group: _group,
-      onSttUpdate: (value) {
-        if (mounted) setState(() => stt = value);
-      },
-    );
-
-    sttSocket.connect();
+    // SttApi.getCurrentStt(fac: _fac, group: _group).then((value) {
+    //   if (mounted) setState(() => stt = value);
+    // });
+    //
+    // /// ✅ 2. LISTEN REALTIME
+    // sttSocket = SttWebSocket(
+    //   serverUrl: _wsUrl,
+    //   fac: _fac,
+    //   group: _group,
+    //   onSttUpdate: (value) {
+    //     if (mounted) setState(() => stt = value);
+    //   },
+    // );
+    //
+    // sttSocket.connect();
   }
 
   @override
@@ -704,6 +704,20 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
       sttSocket.dispose();
     } catch (_) {}
     super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(covariant CameraPreviewBox oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (oldWidget.group != widget.group || oldWidget.plant != widget.plant) {
+      setState(() {
+        _fac = widget.plant ?? "PlantA";
+        _group = widget.group ?? "Group2";
+      });
+
+      debugPrint("🔁 CameraPreviewBox update: fac=$_fac, group=$_group");
+    }
   }
 
   void _stopCamera() {
@@ -752,6 +766,23 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
     if (_isCapturing || _videoElement == null) return;
     setState(() => _isCapturing = true);
 
+    // lấy STT theo Fac + Group
+    SttApi.getCurrentStt(fac: _fac, group: _group).then((value) {
+      if (mounted) setState(() => stt = value);
+    });
+
+    /// ✅ 2. LISTEN REALTIME
+    sttSocket = SttWebSocket(
+      serverUrl: _wsUrl,
+      fac: _fac,
+      group: _group,
+      onSttUpdate: (value) {
+        if (mounted) setState(() => stt = value);
+      },
+    );
+
+    sttSocket.connect();
+    ///////////////////////////////////////////////////
     _flashController.forward().then((_) => _flashController.reverse());
 
     try {
@@ -897,24 +928,48 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
               left: 0,
               right: 0,
               child: Center(
-                child: GestureDetector(
-                  onTap: _isCapturing ? null : _takePhoto,
-                  child: Container(
-                    width: 76,
-                    height: 76,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.white,
-                      border: Border.all(color: Colors.blue.shade600, width: 5),
-                    ),
-                    child: _isCapturing
-                        ? Padding(
-                            padding: EdgeInsets.all(16),
-                            child: CircularProgressIndicator(strokeWidth: 4),
-                          )
-                        : null,
-                  ),
-                ),
+                child: (widget.group == null || widget.group!.isEmpty)
+                    ? Container(
+                        width: 76,
+                        height: 76,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.grey.shade300,
+                          border: Border.all(
+                            color: Colors.grey.shade400,
+                            width: 5,
+                          ),
+                        ),
+                        child: Icon(
+                          Icons.lock,
+                          color: Colors.grey.shade600,
+                          size: 32,
+                        ),
+                      )
+                    : GestureDetector(
+                        onTap: _isCapturing ? null : _takePhoto,
+                        child: Container(
+                          width: 76,
+                          height: 76,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Colors.white,
+                            border: Border.all(
+                              color: Colors.blue.shade600,
+                              width: 5,
+                            ),
+                          ),
+                          child: _isCapturing
+                              ? Padding(
+                                  padding: EdgeInsets.all(16),
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 4,
+                                  ),
+                                )
+                              : null,
+                        ),
+                      ),
               ),
             ),
           ],

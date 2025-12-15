@@ -2,13 +2,17 @@ import 'package:http/http.dart' as http;
 import 'dart:developer';
 
 class SttApi {
+  String normalizeGroup(String? group) {
+    return group == null ? '' : group.replaceAll(' ', '').trim();
+  }
+
   static Future<int> getCurrentStt({
     required String fac,
     required String group,
   }) async {
     final uri = Uri.parse(
       "http://localhost:9299/api/stt/crt"
-      "?fac=$fac&grp=$group",
+      "?fac=$fac&grp=${group.replaceAll(' ', '').trim()}",
     );
 
     // 🔹 LOG REQUEST

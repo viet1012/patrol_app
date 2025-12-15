@@ -116,30 +116,40 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
               Expanded(
                 child: ListView(
                   children: [
+                    // 1) Patrol_Before → vẫn bật
                     _buildPatrolButton(
                       number: '1)',
                       title: 'Patrol_Before',
+                      isEnabled: true,
                       onTap: () {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (_) => const CameraScreen(),
+                            builder: (_) =>
+                                CameraScreen(selectedPlant: selectedFactory),
                           ),
                         );
                       },
                     ),
 
                     const SizedBox(height: 20),
+
+                    // 2) Patrol_After → tạm tắt
                     _buildPatrolButton(
                       number: '2)',
                       title: 'Patrol_After',
-                      onTap: () => _navigateTo(context, 'Patrol After'),
+                      isEnabled: false, // ← tắt
+                      onTap: null,
                     ),
+
                     const SizedBox(height: 20),
+
+                    // 3) Patrol_HSE check → tạm tắt
                     _buildPatrolButton(
                       number: '3)',
                       title: 'Patrol_HSE check',
-                      onTap: () => _navigateTo(context, 'Patrol HSE Check'),
+                      isEnabled: false, // ← tắt
+                      onTap: null,
                     ),
                   ],
                 ),
@@ -154,45 +164,78 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
   Widget _buildPatrolButton({
     required String number,
     required String title,
-    required VoidCallback onTap,
+    VoidCallback? onTap, // có thể null → không click được
+    bool isEnabled = true, // mặc định bật
   }) {
+    final bool isComingSoon = !isEnabled;
+
     return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.green, width: 3),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.grey.withOpacity(0.2),
-              spreadRadius: 2,
-              blurRadius: 8,
-              offset: const Offset(0, 4),
+      onTap: isEnabled ? onTap : null, // nếu tắt thì không phản hồi tap
+      child: Opacity(
+        opacity: isComingSoon ? 0.5 : 1.0, // làm mờ nhẹ khi disabled
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isComingSoon ? Colors.grey.shade400 : Colors.green,
+              width: 3,
             ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Text(
-              number,
-              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(width: 20),
-            Expanded(
-              child: Text(
-                title,
-                style: const TextStyle(
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.withOpacity(0.2),
+                spreadRadius: 2,
+                blurRadius: 8,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Text(
+                number,
+                style: TextStyle(
                   fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black87,
+                  fontWeight: FontWeight.w600,
+                  color: isComingSoon ? Colors.grey.shade600 : Colors.black87,
                 ),
               ),
-            ),
-            const Icon(Icons.arrow_forward_ios, color: Colors.green, size: 28),
-          ],
+              const SizedBox(width: 20),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: isComingSoon
+                            ? Colors.grey.shade700
+                            : Colors.black87,
+                      ),
+                    ),
+                    if (isComingSoon)
+                      const Text(
+                        'Coming soon...',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.arrow_forward_ios,
+                color: isComingSoon ? Colors.grey.shade400 : Colors.green,
+                size: 28,
+              ),
+            ],
+          ),
         ),
       ),
     );
