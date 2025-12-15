@@ -581,7 +581,6 @@ class _CameraScreenState extends State<CameraScreen> {
             ),
 
             const SizedBox(height: 16),
-            // Thêm khoảng cách cho đẹp
 
             // ---------------------------------------------------------
             // PHẦN AUTO COMPLETE ĐÃ TỐI ƯU CHO MOBILE
