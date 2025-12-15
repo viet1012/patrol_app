@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shimmer/shimmer.dart';
 import 'LanguageFlagButton.dart';
+import 'api/api_config.dart';
 import 'l10n/app_localizations.dart';
 import 'main.dart';
 import 'model/machine_model.dart';
@@ -255,7 +256,7 @@ class _CameraScreenState extends State<CameraScreen> {
       dio.options.headers['ngrok-skip-browser-warning'] = 'true';
 
       final response = await dio.post(
-        "http://localhost:9299/api/report",
+        "${ApiConfig.baseUrl}/api/report",
         // "https://doctrinally-preambitious-evia.ngrok-free.dev/api/report",
         data: formData,
         options: Options(sendTimeout: const Duration(seconds: 120)),

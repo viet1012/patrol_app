@@ -1,6 +1,8 @@
 import 'package:http/http.dart' as http;
 import 'dart:developer';
 
+import 'api_config.dart';
+
 class SttApi {
   String normalizeGroup(String? group) {
     return group == null ? '' : group.replaceAll(' ', '').trim();
@@ -11,7 +13,7 @@ class SttApi {
     required String group,
   }) async {
     final uri = Uri.parse(
-      "http://localhost:9299/api/stt/crt"
+      "${ApiConfig.baseUrl}/api/stt/crt"
       "?fac=$fac&grp=${group.replaceAll(' ', '').trim()}",
     );
 

@@ -1,5 +1,9 @@
+import 'dart:math';
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 
+import '../animate/christmas_title.dart';
 import '../test.dart';
 
 class PatrolHomeScreen extends StatefulWidget {
@@ -38,123 +42,171 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(20.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Tiêu đề lớn
-              const Center(
-                child: Text(
-                  'SAFETY CROSS PATROL',
-                  style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black87,
+      // Background gradient nhẹ nhàng
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              Colors.blueGrey.shade900,
+              Colors.blueGrey.shade700,
+              Colors.blueGrey.shade600,
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Tiêu đề lớn kiểu glass
+                Center(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(24),
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 16,
+                          horizontal: 32,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(24),
+                          border: Border.all(
+                            color: Colors.white.withOpacity(0.3),
+                            width: 1.5,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.3),
+                              blurRadius: 8,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: const Text(
+                          'SAFETY CROSS PATROL',
+                          style: TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white,
+                            letterSpacing: 2,
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 40),
+                // ChristmasTitle(),
+                const SizedBox(height: 40),
 
-              // Dòng chọn Nhà máy
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(
-                  vertical: 16,
-                  horizontal: 20,
-                ),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE3F2FD), // xanh nhạt
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Nhà máy',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w600,
+                // Dòng chọn Nhà máy kiểu glass
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 16,
+                        horizontal: 24,
                       ),
-                    ),
-                    DropdownButton<String>(
-                      value: selectedFactory,
-                      underline: const SizedBox(), // ẩn gạch chân mặc định
-                      icon: const Icon(
-                        Icons.arrow_drop_down,
-                        color: Colors.black87,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.25),
+                          width: 1.2,
+                        ),
                       ),
-                      style: const TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black87,
-                      ),
-                      dropdownColor: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      items: factories.map((String factory) {
-                        return DropdownMenuItem<String>(
-                          value: factory,
-                          child: Text(factory),
-                        );
-                      }).toList(),
-                      onChanged: (String? newValue) {
-                        if (newValue != null) {
-                          setState(() {
-                            selectedFactory = newValue;
-                          });
-                        }
-                      },
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 50),
-
-              // 3 nút lớn
-              Expanded(
-                child: ListView(
-                  children: [
-                    // 1) Patrol_Before → vẫn bật
-                    _buildPatrolButton(
-                      number: '1)',
-                      title: 'Patrol_Before',
-                      isEnabled: true,
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) =>
-                                CameraScreen(selectedPlant: selectedFactory),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Nhà máy',
+                            style: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white70,
+                            ),
                           ),
-                        );
-                      },
+                          DropdownButton<String>(
+                            value: selectedFactory,
+                            dropdownColor: Colors.blueGrey.shade900.withOpacity(
+                              0.9,
+                            ),
+                            underline: const SizedBox(),
+                            icon: const Icon(
+                              Icons.arrow_drop_down,
+                              color: Colors.white70,
+                              size: 30,
+                            ),
+                            style: const TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                            borderRadius: BorderRadius.circular(12),
+                            items: factories.map((String factory) {
+                              return DropdownMenuItem<String>(
+                                value: factory,
+                                child: Text(factory),
+                              );
+                            }).toList(),
+                            onChanged: (String? newValue) {
+                              if (newValue != null) {
+                                setState(() {
+                                  selectedFactory = newValue;
+                                });
+                              }
+                            },
+                          ),
+                        ],
+                      ),
                     ),
-
-                    const SizedBox(height: 20),
-
-                    // 2) Patrol_After → tạm tắt
-                    _buildPatrolButton(
-                      number: '2)',
-                      title: 'Patrol_After',
-                      isEnabled: false, // ← tắt
-                      onTap: null,
-                    ),
-
-                    const SizedBox(height: 20),
-
-                    // 3) Patrol_HSE check → tạm tắt
-                    _buildPatrolButton(
-                      number: '3)',
-                      title: 'Patrol_HSE check',
-                      isEnabled: false, // ← tắt
-                      onTap: null,
-                    ),
-                  ],
+                  ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 50),
+
+                // 3 nút lớn kiểu glass
+                Expanded(
+                  child: ListView(
+                    children: [
+                      _buildPatrolButton(
+                        number: '1)',
+                        title: 'Patrol Before',
+                        isEnabled: true,
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  CameraScreen(selectedPlant: selectedFactory),
+                            ),
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 20),
+                      _buildPatrolButton(
+                        number: '2)',
+                        title: 'Patrol After',
+                        isEnabled: false,
+                        onTap: null,
+                      ),
+                      const SizedBox(height: 20),
+                      _buildPatrolButton(
+                        number: '3)',
+                        title: 'Patrol HSE check',
+                        isEnabled: false,
+                        onTap: null,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -164,77 +216,88 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
   Widget _buildPatrolButton({
     required String number,
     required String title,
-    VoidCallback? onTap, // có thể null → không click được
-    bool isEnabled = true, // mặc định bật
+    VoidCallback? onTap,
+    bool isEnabled = true,
   }) {
-    final bool isComingSoon = !isEnabled;
+    final bool isDisabled = !isEnabled;
 
-    return GestureDetector(
-      onTap: isEnabled ? onTap : null, // nếu tắt thì không phản hồi tap
-      child: Opacity(
-        opacity: isComingSoon ? 0.5 : 1.0, // làm mờ nhẹ khi disabled
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: isComingSoon ? Colors.grey.shade400 : Colors.green,
-              width: 3,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.grey.withOpacity(0.2),
-                spreadRadius: 2,
-                blurRadius: 8,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Row(
-            children: [
-              Text(
-                number,
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w600,
-                  color: isComingSoon ? Colors.grey.shade600 : Colors.black87,
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(20),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+        child: GestureDetector(
+          onTap: isDisabled ? null : onTap,
+          child: AnimatedOpacity(
+            duration: const Duration(milliseconds: 400),
+            opacity: isDisabled ? 0.5 : 1.0,
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 24),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.13),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: isDisabled
+                      ? Colors.white.withOpacity(0.3)
+                      : Colors.lightGreenAccent.shade400,
+                  width: 2,
                 ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.15),
+                    blurRadius: 12,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
               ),
-              const SizedBox(width: 20),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                        color: isComingSoon
-                            ? Colors.grey.shade700
-                            : Colors.black87,
-                      ),
+              child: Row(
+                children: [
+                  Text(
+                    number,
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w700,
+                      color: isDisabled
+                          ? Colors.white54
+                          : Colors.lightGreenAccent.shade400,
                     ),
-                    if (isComingSoon)
-                      const Text(
-                        'Coming soon...',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey,
-                          fontStyle: FontStyle.italic,
+                  ),
+                  const SizedBox(width: 18),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: isDisabled
+                                ? Colors.white60
+                                : Colors.lightGreenAccent.shade400,
+                          ),
                         ),
-                      ),
-                  ],
-                ),
+                        if (isDisabled)
+                          const Text(
+                            'Coming soon...',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.white54,
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  Icon(
+                    Icons.arrow_forward_ios,
+                    color: isDisabled
+                        ? Colors.white38
+                        : Colors.lightGreenAccent.shade400,
+                    size: 30,
+                  ),
+                ],
               ),
-              Icon(
-                Icons.arrow_forward_ios,
-                color: isComingSoon ? Colors.grey.shade400 : Colors.green,
-                size: 28,
-              ),
-            ],
+            ),
           ),
         ),
       ),
