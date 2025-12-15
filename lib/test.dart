@@ -14,7 +14,9 @@ import 'model/machine_model.dart';
 import 'model/reason_model.dart';
 
 class CameraScreen extends StatefulWidget {
-  const CameraScreen({super.key});
+  final String selectedPlant;
+
+  CameraScreen({super.key, required this.selectedPlant});
 
   @override
   State<CameraScreen> createState() => _CameraScreenState();

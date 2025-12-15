@@ -307,7 +307,7 @@
 // import 'package:chuphinh/socket/SttWebSocket.dart';
 // import 'package:flutter/material.dart';
 //
-// import 'controller/SttController.dart';
+// import 'api/SttApi.dart';
 //
 // class CameraPreviewBox extends StatefulWidget {
 //   final double size;
@@ -621,23 +621,23 @@ import 'dart:ui_web' as ui_web;
 import 'package:chuphinh/socket/SttWebSocket.dart';
 import 'package:flutter/material.dart';
 
-import 'controller/SttController.dart';
+import 'api/SttApi.dart';
 
 class CameraPreviewBox extends StatefulWidget {
   final double size;
   final Function(List<Uint8List> images)? onImagesChanged;
 
-  // optional: nếu không truyền thì sẽ dùng default internal (dễ test)
-  final SttController? sttCtrl;
-  final String? group;
-  final String? wsUrl; // optional websocket url override
+  final String? fac; // ✅ THÊM
+  final String? group; // ✅ BẮT BUỘC
+  final String? wsUrl;
 
   const CameraPreviewBox({
     super.key,
     this.size = 320,
     this.onImagesChanged,
-    this.sttCtrl,
     this.group,
+    this.fac,
+
     this.wsUrl,
   });
 
@@ -655,8 +655,8 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
 
   final List<Uint8List> _capturedImages = [];
 
-  // internal controller (use widget.sttCtrl if provided)
-  late final SttController _sttCtrl;
+  // internal api (use widget.sttCtrl if provided)
+  late final String _fac;
   late final String _group;
   late final String _wsUrl;
 
@@ -667,11 +667,9 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
   void initState() {
     super.initState();
 
-    // nếu widget truyền vào sttCtrl/group thì dùng, không thì tạo default cho test
-    _sttCtrl = widget.sttCtrl ?? SttController();
+    _fac = widget.fac ?? "PlantA";
     _group = widget.group ?? "Group1";
     _wsUrl = widget.wsUrl ?? "ws://localhost:9299/ws-stt/websocket";
-    print(">>> WS URL = $_wsUrl");
 
     _flashController = AnimationController(
       vsync: this,
@@ -680,14 +678,21 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
 
     _startCamera();
 
-    // Khởi động WebSocket để nhận STT realtime
+    /// ✅ 1. LẤY STT HIỆN TẠI TỪ DB
+    SttApi.getCurrentStt(fac: _fac, group: _group).then((value) {
+      if (mounted) setState(() => stt = value);
+    });
+
+    /// ✅ 2. LISTEN REALTIME
     sttSocket = SttWebSocket(
       serverUrl: _wsUrl,
+      fac: _fac,
       group: _group,
       onSttUpdate: (value) {
         if (mounted) setState(() => stt = value);
       },
     );
+
     sttSocket.connect();
   }
 
@@ -746,15 +751,8 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
   Future<void> _takePhoto() async {
     if (_isCapturing || _videoElement == null) return;
     setState(() => _isCapturing = true);
-    _flashController.forward().then((_) => _flashController.reverse());
 
-    // gọi API tăng STT; server sẽ broadcast STT mới qua WebSocket
-    try {
-      await _sttCtrl.nextStt(_group);
-    } catch (e) {
-      debugPrint("Failed to next STT: $e");
-      // bạn có thể vẫn tiếp tục chụp hoặc show lỗi
-    }
+    _flashController.forward().then((_) => _flashController.reverse());
 
     try {
       final video = _videoElement!;
