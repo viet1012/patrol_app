@@ -345,28 +345,11 @@ class _CameraScreenState extends State<CameraScreen> {
     final displayScore = symbol.isEmpty ? "" : symbol;
 
     return Scaffold(
+      // ✅ QUAN TRỌNG: Giúp giao diện tự co lên khi bàn phím hiện
+      resizeToAvoidBottomInset: true,
       appBar: AppBar(
         title: Row(
-          children: [
-            // SizedBox(
-            //   width: 100,
-            //   child: _buildSearchableDropdown(
-            //     label: 'plant'.tr(context),
-            //     selectedValue: _selectedPlant,
-            //     items: plantList.cast<String>(),
-            //     onChanged: (v) {
-            //       setState(() {
-            //         _selectedPlant = v;
-            //         _selectedFac = null;
-            //         _selectedArea = null;
-            //         _selectedMachine = null;
-            //       });
-            //     },
-            //   ),
-            // ),
-            SizedBox(width: 4),
-            const LanguageToggleSwitch(),
-          ],
+          children: [const SizedBox(width: 4), const LanguageToggleSwitch()],
         ),
         actions: [
           // HIỂN THỊ ẢNH THUMBNAIL TRÊN APPBAR
@@ -443,11 +426,13 @@ class _CameraScreenState extends State<CameraScreen> {
               size: 340,
               plant: _selectedPlant,
               group: _selectedGroup,
-              onImagesChanged: (_) => setState(() {}), // cập nhật số lượng ảnh
+              onImagesChanged: (_) => setState(() {}),
             ),
 
             const SizedBox(height: 8),
 
+            // CÁC DROPDOWN PHÍA TRÊN
+            // ... (Giữ nguyên code Dropdown của bạn)
             Row(
               children: [
                 Expanded(
@@ -520,6 +505,7 @@ class _CameraScreenState extends State<CameraScreen> {
             ),
             const SizedBox(height: 16),
 
+            // CÁC DROPDOWN RISK
             Row(
               children: [
                 Expanded(
@@ -549,7 +535,7 @@ class _CameraScreenState extends State<CameraScreen> {
               children: [
                 Expanded(
                   child: _buildRiskDropdown(
-                    labelKey: "label_sev", // 🔹Dùng key trong arb
+                    labelKey: "label_sev",
                     valueKey: _sev,
                     items: severityOptions,
                     onChanged: (v) => _sev = v,
@@ -563,7 +549,7 @@ class _CameraScreenState extends State<CameraScreen> {
                       enabled: false,
                       controller: TextEditingController(text: displayScore),
                       decoration: InputDecoration(
-                        labelText: "label_risk".tr(context), // 🔹Dịch từ .arb
+                        labelText: "label_risk".tr(context),
                         filled: true,
                         fillColor: Colors.deepOrange.shade100,
                         labelStyle: const TextStyle(
@@ -593,84 +579,74 @@ class _CameraScreenState extends State<CameraScreen> {
                 ),
               ],
             ),
+
+            const SizedBox(height: 16),
+            // Thêm khoảng cách cho đẹp
+
+            // ---------------------------------------------------------
+            // PHẦN AUTO COMPLETE ĐÃ TỐI ƯU CHO MOBILE
+            // ---------------------------------------------------------
             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-
-                //AUTO COMPLETE
-// ---------------------------------------------
-                // Ô 1: COMMENT (Dùng RawAutocomplete)
-                // ---------------------------------------------
+                // Ô 1: COMMENT
                 Expanded(
-                  child: RawAutocomplete<AutoCmp>(
-                    // 🔴 QUAN TRỌNG: Truyền Controller của mình vào
-                    textEditingController: _commentController,
-                    focusNode: _commentFocusNode,
-
-                    optionsBuilder: (TextEditingValue value) async {
-                      if (value.text.length < 2) return const Iterable<AutoCmp>.empty();
-                      return await AutoCmpApi.search(value.text);
-                    },
-
-                    displayStringForOption: (AutoCmp option) => option.inputText,
-
-                    // 🟢 Xử lý logic khi CHỌN item
-                    onSelected: (AutoCmp selection) {
-                      // Cập nhật giá trị ô Comment (thường RawAutocomplete tự làm, nhưng gán lại cho chắc)
-                      _commentController.text = selection.inputText;
-                      _comment = selection.inputText;
-
-                      // 🟢 LINKING: Tự động điền sang ô Countermeasure
-                      // Vì ô Countermeasure đang dùng _counterController, nên khi gán ở đây, giao diện bên kia sẽ nhảy theo
-                      _counterController.text = selection.countermeasure; // <-- MẤU CHỐT LÀ ĐÂY
-                      _counterMeasure = selection.countermeasure;
-                    },
-
-                    fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
-                      return TextField(
-                        controller: controller, // Đây chính là _commentController
-                        focusNode: focusNode,
-                        maxLines: 2,
-                        decoration: InputDecoration(
-                          hintText: "Nhập Comment...", // "commentHint".tr(context)
-                          filled: true,
-                          fillColor: Colors.yellow.shade50,
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
-                        onChanged: (v) {
-                          _comment = v;
-                          // 🟢 CLEARING: Nếu xóa hết comment thì xóa luôn countermeasure
-                          if (v.trim().isEmpty) {
-                            _counterController.clear(); // <-- MẤU CHỐT LÀ ĐÂY
-                            _counterMeasure = '';
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      return RawAutocomplete<AutoCmp>(
+                        textEditingController: _commentController,
+                        focusNode: _commentFocusNode,
+                        optionsBuilder: (TextEditingValue value) async {
+                          if (value.text.length < 2)
+                            return const Iterable<AutoCmp>.empty();
+                          return await AutoCmpApi.search(value.text);
+                        },
+                        displayStringForOption: (AutoCmp option) =>
+                            option.inputText,
+                        onSelected: (AutoCmp selection) {
+                          _commentController.text = selection.inputText;
+                          _comment = selection.inputText;
+                          // LINKING: Tự động điền sang ô Countermeasure
+                          if (selection.countermeasure.isNotEmpty) {
+                            _counterController.text = selection.countermeasure;
+                            _counterMeasure = selection.countermeasure;
                           }
                         },
-                      );
-                    },
-
-                    // Copy lại giao diện list của bạn
-                    optionsViewBuilder: (context, onSelected, options) {
-                      return Align(
-                        alignment: Alignment.topLeft,
-                        child: Material(
-                          elevation: 6,
-                          borderRadius: BorderRadius.circular(12),
-                          child: SizedBox(
-                            // Giới hạn chiều rộng/cao để không bị lỗi layout
-                            width: MediaQuery.of(context).size.width * 0.45,
-                            child: ListView.builder(
-                              padding: EdgeInsets.zero,
-                              shrinkWrap: true,
-                              itemCount: options.length,
-                              itemBuilder: (context, index) {
-                                final opt = options.elementAt(index);
-                                return ListTile(
-                                  title: Text(opt.inputText, maxLines: 2, overflow: TextOverflow.ellipsis),
-                                  onTap: () => onSelected(opt),
-                                );
-                              },
+                        fieldViewBuilder:
+                            (context, controller, focusNode, onFieldSubmitted) {
+                              return TextField(
+                                controller: controller,
+                                focusNode: focusNode,
+                                maxLines: 2,
+                                decoration: InputDecoration(
+                                  hintText: "commentHint".tr(context),
+                                  filled: true,
+                                  fillColor: Colors.yellow.shade50,
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  contentPadding: const EdgeInsets.all(
+                                    12,
+                                  ), // ✅ Tối ưu padding
+                                ),
+                                onChanged: (v) {
+                                  _comment = v;
+                                  // CLEARING: Xóa comment thì xóa luôn countermeasure
+                                  if (v.trim().isEmpty) {
+                                    _counterController.clear();
+                                    _counterMeasure = '';
+                                  }
+                                },
+                              );
+                            },
+                        // ✅ Dùng hàm custom builder tối ưu cho mobile, truyền chiều rộng vào
+                        optionsViewBuilder: (context, onSelected, options) =>
+                            _customOptionsViewBuilder(
+                              context,
+                              onSelected,
+                              options,
+                              constraints.maxWidth,
                             ),
-                          ),
-                        ),
                       );
                     },
                   ),
@@ -678,78 +654,63 @@ class _CameraScreenState extends State<CameraScreen> {
 
                 const SizedBox(width: 8),
 
-                // ---------------------------------------------
-                // Ô 2: COUNTERMEASURE (Cũng phải dùng RawAutocomplete)
-                // ---------------------------------------------
+                // Ô 2: COUNTERMEASURE
                 Expanded(
-                  child: RawAutocomplete<AutoCmp>(
-                    // 🔴 QUAN TRỌNG: Truyền Controller của mình vào để ô Comment có thể điều khiển nó
-                    textEditingController: _counterController,
-                    focusNode: _counterFocusNode,
-
-                    optionsBuilder: (TextEditingValue value) async {
-                      // Logic: Nếu đang trống (do ô Comment vừa clear) thì không search
-                      if (value.text.isEmpty) return const Iterable<AutoCmp>.empty();
-                      if (value.text.length < 2) return const Iterable<AutoCmp>.empty();
-
-                      return await AutoCmpApi.searchCounter(value.text); // Giả sử bạn có hàm này
-                    },
-
-                    displayStringForOption: (opt) => opt.inputText,
-
-                    onSelected: (AutoCmp selection) {
-                      _counterController.text = selection.inputText;
-                      _counterMeasure = selection.inputText;
-                    },
-
-                    fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
-                      return TextField(
-                        controller: controller, // Đây chính là _counterController
-                        focusNode: focusNode,
-                        maxLines: 2,
-                        decoration: InputDecoration(
-                          hintText: "Nhập đối sách...", // "counterMeasureHint".tr(context)
-                          filled: true,
-                          fillColor: Colors.yellow.shade50,
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
-                        onChanged: (v) {
-                          _counterMeasure = v;
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      return RawAutocomplete<AutoCmp>(
+                        textEditingController: _counterController,
+                        focusNode: _counterFocusNode,
+                        optionsBuilder: (TextEditingValue value) async {
+                          if (value.text.isEmpty)
+                            return const Iterable<AutoCmp>.empty();
+                          if (value.text.length < 2)
+                            return const Iterable<AutoCmp>.empty();
+                          return await AutoCmpApi.searchCounter(value.text);
                         },
-                      );
-                    },
-
-                    optionsViewBuilder: (context, onSelected, options) {
-                      return Align(
-                        alignment: Alignment.topLeft,
-                        child: Material(
-                          elevation: 6,
-                          borderRadius: BorderRadius.circular(12),
-                          child: SizedBox(
-                            width: MediaQuery.of(context).size.width * 0.45,
-                            child: ListView.builder(
-                              padding: EdgeInsets.zero,
-                              shrinkWrap: true,
-                              itemCount: options.length,
-                              itemBuilder: (context, index) {
-                                final opt = options.elementAt(index);
-                                return ListTile(
-                                  title: Text(opt.inputText, maxLines: 2, overflow: TextOverflow.ellipsis),
-                                  onTap: () => onSelected(opt),
-                                );
-                              },
+                        displayStringForOption: (opt) => opt.inputText,
+                        onSelected: (AutoCmp selection) {
+                          _counterController.text = selection.inputText;
+                          _counterMeasure = selection.inputText;
+                        },
+                        fieldViewBuilder:
+                            (context, controller, focusNode, onFieldSubmitted) {
+                              return TextField(
+                                controller: controller,
+                                focusNode: focusNode,
+                                maxLines: 2,
+                                decoration: InputDecoration(
+                                  hintText: "counterMeasureHint".tr(context),
+                                  filled: true,
+                                  fillColor: Colors.yellow.shade50,
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  contentPadding: const EdgeInsets.all(
+                                    12,
+                                  ), // ✅ Tối ưu padding
+                                ),
+                                onChanged: (v) {
+                                  _counterMeasure = v;
+                                },
+                              );
+                            },
+                        // ✅ Dùng hàm custom builder tối ưu cho mobile
+                        optionsViewBuilder: (context, onSelected, options) =>
+                            _customOptionsViewBuilder(
+                              context,
+                              onSelected,
+                              options,
+                              constraints.maxWidth,
                             ),
-                          ),
-                        ),
                       );
                     },
                   ),
                 ),
-
-                //AUTO COMPLETE END
               ],
             ),
 
+            // Checkbox và phần cuối
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 12),
               child: Row(
@@ -779,12 +740,87 @@ class _CameraScreenState extends State<CameraScreen> {
                 ],
               ),
             ),
+
+            const SizedBox(height: 200),
+            // ✅ Thêm khoảng trắng lớn để đẩy nội dung lên khi bàn phím hiện
           ],
         ),
       ),
     );
   }
 
+  // --- BẮT ĐẦU CÁC HÀM PHỤ TRỢ (Cần được đặt ngoài hàm build) ---
+
+  // 🔴 HÀM MỚI: Xây dựng giao diện Dropdown tối ưu cho Mobile
+  Widget _customOptionsViewBuilder(
+    BuildContext context,
+    AutocompleteOnSelected<AutoCmp> onSelected,
+    Iterable<AutoCmp> options,
+    double width, // Chiều rộng chính xác từ LayoutBuilder
+  ) {
+    return Align(
+      alignment: Alignment.topLeft,
+      child: Material(
+        elevation: 8.0, // Đổ bóng
+        borderRadius: BorderRadius.circular(12),
+        color: Colors.white,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: width, // Rộng bằng đúng ô input
+            maxHeight: 200, // ✅ Giới hạn chiều cao quan trọng
+          ),
+          child: ListView.separated(
+            padding: EdgeInsets.zero,
+            shrinkWrap: true,
+            itemCount: options.length,
+            separatorBuilder: (context, index) =>
+                const Divider(height: 1, thickness: 0.5),
+            itemBuilder: (BuildContext context, int index) {
+              final AutoCmp option = options.elementAt(index);
+              return InkWell(
+                onTap: () => onSelected(option),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ), // Tăng vùng chạm
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        option.inputText,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      // Có thể hiển thị thêm thông tin liên quan
+                      // if (option.note?.isNotEmpty == true) ...[
+                      //   const SizedBox(height: 4),
+                      //   Text(
+                      //     option.note!,
+                      //     style: TextStyle(
+                      //       fontSize: 12,
+                      //       color: Colors.grey[600],
+                      //     ),
+                      //     maxLines: 1,
+                      //     overflow: TextOverflow.ellipsis,
+                      //   ),
+                      // ],
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
+  // 🔴 HÀM PHỤ TRỢ: _buildSearchableDropdown (Giữ nguyên)
   Widget _buildSearchableDropdown({
     required String label,
     required String? selectedValue,
@@ -794,9 +830,7 @@ class _CameraScreenState extends State<CameraScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // THÊM DÒNG NÀY → ĐẶT CHIỀU CAO CỐ ĐỊNH CHO CẢ 3 Ô
         SizedBox(
-          // height: 50, // hoặc 68 nếu muốn cao hơn chút
           child: DropdownSearch<String>(
             popupProps: PopupProps.menu(
               showSearchBox: true,
@@ -810,7 +844,7 @@ class _CameraScreenState extends State<CameraScreen> {
                 ),
               ),
             ),
-
+            // ... (các logic asyncItems, compareFn, v.v. giữ nguyên)
             asyncItems: (String filter) async {
               var result = items
                   .where((e) => e.toLowerCase().contains(filter.toLowerCase()))
@@ -829,11 +863,10 @@ class _CameraScreenState extends State<CameraScreen> {
 
             dropdownDecoratorProps: DropDownDecoratorProps(
               dropdownSearchDecoration: InputDecoration(
-                hintText: label, // hint vẫn giữ nhưng giới hạn 1 dòng
+                hintText: label,
                 hintMaxLines: 1,
-                floatingLabelBehavior: FloatingLabelBehavior
-                    .never, // không đổi vị trí hint khi focus
-                isDense: true, // giảm chiều cao mặc định
+                floatingLabelBehavior: FloatingLabelBehavior.never,
+                isDense: true,
                 filled: true,
                 fillColor: Colors.blue.shade50,
                 border: OutlineInputBorder(
@@ -843,9 +876,7 @@ class _CameraScreenState extends State<CameraScreen> {
                     width: 1.5,
                   ),
                 ),
-                contentPadding: EdgeInsets.symmetric(
-                  vertical: 8,
-                ), // height cố định
+                contentPadding: EdgeInsets.symmetric(vertical: 8),
               ),
             ),
 
@@ -869,6 +900,7 @@ class _CameraScreenState extends State<CameraScreen> {
     );
   }
 
+  // 🔴 HÀM PHỤ TRỢ: _buildRiskDropdown (Giữ nguyên)
   Widget _buildRiskDropdown({
     required String labelKey,
     required String? valueKey,
@@ -890,7 +922,7 @@ class _CameraScreenState extends State<CameraScreen> {
           return Container(
             alignment: Alignment.centerLeft,
             child: Text(
-              e.labelKey.tr(context), // ✔ Dịch được
+              e.labelKey.tr(context),
               maxLines: 2,
               softWrap: true,
               overflow: TextOverflow.visible,
@@ -935,69 +967,4 @@ class _CameraScreenState extends State<CameraScreen> {
       onChanged: (v) => setState(() => onChanged(v)),
     );
   }
-
-  // Widget _buildRiskDropdown1({
-  //   required String label,
-  //   required String? value,
-  //   required List<RiskOption> items,
-  //   required Function(String?) onChanged,
-  // }) {
-  //   return DropdownButtonFormField<String>(
-  //     value: value,
-  //     isExpanded: true,
-  //     decoration: InputDecoration(
-  //       labelText: label,
-  //       filled: true,
-  //       fillColor: Colors.deepOrange.shade50,
-  //       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-  //       contentPadding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-  //     ),
-  //
-  //     // 🔥 QUAN TRỌNG NHẤT: Hiển thị selected item 2 dòng FULL
-  //     selectedItemBuilder: (context) {
-  //       return items.map((e) {
-  //         return Container(
-  //           alignment: Alignment.centerLeft,
-  //           child: Text(
-  //             e.label,
-  //             maxLines: 2,
-  //             softWrap: true,
-  //             overflow: TextOverflow.visible,
-  //             style: const TextStyle(
-  //               fontSize: 14,
-  //               fontWeight: FontWeight.w600,
-  //               height: 1.3,
-  //               color: Colors.black,
-  //             ),
-  //           ),
-  //         );
-  //       }).toList();
-  //     },
-  //
-  //     items: items.map((e) {
-  //       return DropdownMenuItem<String>(
-  //         value: e.label,
-  //         child: Padding(
-  //           padding: const EdgeInsets.symmetric(vertical: 6),
-  //           child: Row(
-  //             children: [
-  //               Expanded(
-  //                 child: Text(
-  //                   e.label,
-  //                   style: const TextStyle(fontWeight: FontWeight.w500),
-  //                 ),
-  //               ),
-  //               Text(
-  //                 "(${e.score})",
-  //                 style: const TextStyle(fontWeight: FontWeight.bold),
-  //               ),
-  //             ],
-  //           ),
-  //         ),
-  //       );
-  //     }).toList(),
-  //
-  //     onChanged: (v) => setState(() => onChanged(v)),
-  //   );
-  // }
 }
