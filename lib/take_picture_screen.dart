@@ -331,11 +331,6 @@
 //   // DANH SÁCH ẢNH ĐÃ CHỤP
 //   final List<Uint8List> _capturedImages = [];
 //
-//   // STT realtime nhận từ WebSocket
-//   final SttController sttCtrl;
-//   int stt = 0;
-//   String group = "Group1";
-//
 //   late SttWebSocket sttSocket;
 //
 //   @override
@@ -348,20 +343,6 @@
 //     );
 //
 //     _startCamera();
-//
-//     // 👉 Khởi động WebSocket nhận STT realtime
-//     sttSocket = SttWebSocket(
-//       serverUrl: "http://localhost:9299/ws-stt",
-//       group: group,
-//       onSttUpdate: (value) {
-//         print("🔥 Received STT realtime: $value");
-//         if (mounted) {
-//           setState(() => stt = value);
-//         }
-//       },
-//     );
-//
-//     sttSocket.connect(); // kết nối WebSocket
 //   }
 //
 //   @override
@@ -419,9 +400,6 @@
 //     setState(() => _isCapturing = true);
 //
 //     _flashController.forward().then((_) => _flashController.reverse());
-//
-//     // 👉 Gọi API tăng STT (server gửi lại STT qua WebSocket)
-//     await sttCtrl.nextStt(group);
 //
 //     try {
 //       final video = _videoElement!;
@@ -505,23 +483,6 @@
 //                         viewType: _viewType,
 //                       )
 //                     : Center(child: CircularProgressIndicator()),
-//               ),
-//             ),
-//
-//             // 🔥 Hiển thị STT realtime
-//             Positioned(
-//               top: 12,
-//               right: 12,
-//               child: Container(
-//                 padding: EdgeInsets.all(8),
-//                 decoration: BoxDecoration(
-//                   color: Colors.black54,
-//                   borderRadius: BorderRadius.circular(8),
-//                 ),
-//                 child: Text(
-//                   "STT: $stt",
-//                   style: TextStyle(color: Colors.white, fontSize: 20),
-//                 ),
 //               ),
 //             ),
 //
@@ -612,6 +573,7 @@
 //     );
 //   }
 // }
+
 import 'dart:async';
 import 'dart:typed_data';
 import 'dart:html' as html;
@@ -622,6 +584,7 @@ import 'package:chuphinh/socket/SttWebSocket.dart';
 import 'package:flutter/material.dart';
 
 import 'api/SttApi.dart';
+import 'api/api_config.dart';
 
 class CameraPreviewBox extends StatefulWidget {
   final double size;
@@ -669,7 +632,7 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
 
     _fac = widget.plant ?? "";
     _group = widget.group ?? "";
-    _wsUrl = widget.wsUrl ?? "ws://localhost:9299/ws-stt/websocket";
+    _wsUrl = widget.wsUrl ?? "ws://${ApiConfig.baseUrl}/ws-stt/websocket";
 
     _flashController = AnimationController(
       vsync: this,

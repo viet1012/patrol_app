@@ -9,19 +9,19 @@ class AppLocalizationsJa extends AppLocalizations {
   AppLocalizationsJa([String locale = 'ja']) : super(locale);
 
   @override
-  String get plant => '工場';
+  String get plant => '工場(*)';
 
   @override
-  String get group => 'グループ';
+  String get group => 'グループ(*)';
 
   @override
-  String get fac => '工場';
+  String get fac => '工場(*)';
 
   @override
-  String get area => 'エリア';
+  String get area => 'エリア(*)';
 
   @override
-  String get machine => '機械';
+  String get machine => '機械(*)';
 
   @override
   String get search_or_add_new => '検索または新規入力...';
@@ -101,7 +101,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get needSelectArea => 'エリアが選択されていません';
 
   @override
-  String get commentHint => 'コンテンツ...';
+  String get commentHint => 'コンテンツ...(*)';
 
   @override
   String get counterMeasureHint => '対策...';
