@@ -32,7 +32,7 @@ class _LanguageToggleSwitchState extends State<LanguageToggleSwitch> {
     return GestureDetector(
       onTap: _toggleLanguage,
       child: Container(
-        width: 70,
+        width: 80,
         height: 40,
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
         decoration: BoxDecoration(
@@ -42,12 +42,12 @@ class _LanguageToggleSwitchState extends State<LanguageToggleSwitch> {
         ),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 300),
-          width: 50,
+          width: 60,
           height: 40,
           padding: const EdgeInsets.symmetric(horizontal: 6),
           decoration: BoxDecoration(
             // gradient: LinearGradient(colors: Colors.white),
-            color: Colors.blueGrey.shade300,
+            color: Colors.blueGrey.shade400,
             borderRadius: BorderRadius.circular(4),
           ),
           child: Stack(
@@ -60,9 +60,9 @@ class _LanguageToggleSwitchState extends State<LanguageToggleSwitch> {
                         child: Text(
                           "VI",
                           style: TextStyle(
-                            color: Colors.black87,
+                            color: Colors.white,
                             fontWeight: FontWeight.bold,
-                            fontSize: 14,
+                            fontSize: 16,
                           ),
                         ),
                       ),
@@ -74,9 +74,9 @@ class _LanguageToggleSwitchState extends State<LanguageToggleSwitch> {
                         child: Text(
                           "JP",
                           style: TextStyle(
-                            color: Colors.black87,
+                            color: Colors.white,
                             fontWeight: FontWeight.bold,
-                            fontSize: 14,
+                            fontSize: 16,
                           ),
                         ),
                       ),

@@ -1,10 +1,11 @@
-import 'dart:math';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
 
+import '../LanguageFlagButton.dart';
 import '../animate/christmas_title.dart';
 import '../test.dart';
+import '../translator.dart';
 
 class PatrolHomeScreen extends StatefulWidget {
   const PatrolHomeScreen({super.key});
@@ -14,18 +15,14 @@ class PatrolHomeScreen extends StatefulWidget {
 }
 
 class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
-  // Danh sách nhà máy
-  final List<String> factories = ['612K', '611T', '613F', '614F', 'Meivy'];
-
-  // Nhà máy hiện tại được chọn (mặc định là 612K)
+  final List<String> factories = ['612K', '611T', '613F', '614F', 'meivy'];
   String selectedFactory = '612K';
 
-  // Hàm chuyển screen
   void _navigateTo(BuildContext context, String title) {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => Scaffold(
+        builder: (_) => Scaffold(
           appBar: AppBar(title: Text(title)),
           body: Center(
             child: Text(
@@ -39,10 +36,36 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
     );
   }
 
+  // Common decoration for glass containers
+  final BoxDecoration glassDecoration = BoxDecoration(
+    color: Colors.white.withOpacity(0.15),
+    borderRadius: BorderRadius.circular(24),
+    border: Border.all(color: Colors.white.withOpacity(0.3), width: 1.5),
+    boxShadow: [
+      BoxShadow(
+        color: Colors.black.withOpacity(0.3),
+        blurRadius: 8,
+        offset: const Offset(0, 4),
+      ),
+    ],
+  );
+
+  final BoxDecoration glassDecorationSmall = BoxDecoration(
+    color: Colors.white.withOpacity(0.12),
+    borderRadius: BorderRadius.circular(16),
+    border: Border.all(color: Colors.white.withOpacity(0.25), width: 1.2),
+  );
+
+  final TextStyle titleTextStyle = const TextStyle(
+    fontSize: 22,
+    fontWeight: FontWeight.w900,
+    color: Colors.white,
+    letterSpacing: 2,
+  );
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // Background gradient nhẹ nhàng
       body: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
@@ -61,7 +84,6 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Tiêu đề lớn kiểu glass
                 Center(
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(24),
@@ -72,21 +94,7 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
                           vertical: 16,
                           horizontal: 32,
                         ),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.15),
-                          borderRadius: BorderRadius.circular(24),
-                          border: Border.all(
-                            color: Colors.white.withOpacity(0.3),
-                            width: 1.5,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.3),
-                              blurRadius: 8,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
+                        decoration: glassDecoration,
                         child: const Text(
                           'SAFETY CROSS PATROL',
                           style: TextStyle(
@@ -100,33 +108,29 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
                     ),
                   ),
                 ),
-                // ChristmasTitle(),
-                const SizedBox(height: 40),
 
-                // Dòng chọn Nhà máy kiểu glass
+                const SizedBox(height: 30),
+
+                const LanguageToggleSwitch(),
+
+                const SizedBox(height: 16),
+
                 ClipRRect(
                   borderRadius: BorderRadius.circular(16),
                   child: BackdropFilter(
                     filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
                     child: Container(
                       padding: const EdgeInsets.symmetric(
-                        vertical: 16,
-                        horizontal: 24,
+                        vertical: 8,
+                        horizontal: 12,
                       ),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.12),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: Colors.white.withOpacity(0.25),
-                          width: 1.2,
-                        ),
-                      ),
+                      decoration: glassDecorationSmall,
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text(
-                            'Nhà máy',
-                            style: TextStyle(
+                          Text(
+                            "plant".tr(context),
+                            style: const TextStyle(
                               fontSize: 22,
                               fontWeight: FontWeight.w600,
                               color: Colors.white70,
@@ -149,16 +153,18 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
                               color: Colors.white,
                             ),
                             borderRadius: BorderRadius.circular(12),
-                            items: factories.map((String factory) {
-                              return DropdownMenuItem<String>(
-                                value: factory,
-                                child: Text(factory),
-                              );
-                            }).toList(),
-                            onChanged: (String? newValue) {
-                              if (newValue != null) {
+                            items: factories
+                                .map(
+                                  (f) => DropdownMenuItem(
+                                    value: f,
+                                    child: Text(f),
+                                  ),
+                                )
+                                .toList(),
+                            onChanged: (val) {
+                              if (val != null) {
                                 setState(() {
-                                  selectedFactory = newValue;
+                                  selectedFactory = val;
                                 });
                               }
                             },
@@ -168,16 +174,16 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
                     ),
                   ),
                 ),
+
                 const SizedBox(height: 50),
 
-                // 3 nút lớn kiểu glass
                 Expanded(
                   child: ListView(
                     children: [
-                      _buildPatrolButton(
+                      _patrolButton(
                         number: '1)',
                         title: 'Patrol Before',
-                        isEnabled: true,
+                        enabled: true,
                         onTap: () {
                           Navigator.push(
                             context,
@@ -189,18 +195,16 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
                         },
                       ),
                       const SizedBox(height: 20),
-                      _buildPatrolButton(
+                      _patrolButton(
                         number: '2)',
                         title: 'Patrol After',
-                        isEnabled: false,
-                        onTap: null,
+                        enabled: false,
                       ),
                       const SizedBox(height: 20),
-                      _buildPatrolButton(
+                      _patrolButton(
                         number: '3)',
                         title: 'Patrol HSE check',
-                        isEnabled: false,
-                        onTap: null,
+                        enabled: false,
                       ),
                     ],
                   ),
@@ -213,34 +217,32 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
     );
   }
 
-  Widget _buildPatrolButton({
+  Widget _patrolButton({
     required String number,
     required String title,
     VoidCallback? onTap,
-    bool isEnabled = true,
+    bool enabled = true,
   }) {
-    final bool isDisabled = !isEnabled;
+    final color = enabled
+        ? Colors.lightBlueAccent.shade400
+        : Colors.white.withOpacity(0.5);
+    final opacity = enabled ? 1.0 : 0.5;
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(20),
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
         child: GestureDetector(
-          onTap: isDisabled ? null : onTap,
+          onTap: enabled ? onTap : null,
           child: AnimatedOpacity(
             duration: const Duration(milliseconds: 400),
-            opacity: isDisabled ? 0.5 : 1.0,
+            opacity: opacity,
             child: Container(
               padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 24),
               decoration: BoxDecoration(
                 color: Colors.white.withOpacity(0.13),
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: isDisabled
-                      ? Colors.white.withOpacity(0.3)
-                      : Colors.lightGreenAccent.shade400,
-                  width: 2,
-                ),
+                border: Border.all(color: color, width: 2),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withOpacity(0.15),
@@ -254,11 +256,9 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
                   Text(
                     number,
                     style: TextStyle(
-                      fontSize: 24,
+                      fontSize: 22,
                       fontWeight: FontWeight.w700,
-                      color: isDisabled
-                          ? Colors.white54
-                          : Colors.lightGreenAccent.shade400,
+                      color: color,
                     ),
                   ),
                   const SizedBox(width: 18),
@@ -269,14 +269,12 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
                         Text(
                           title,
                           style: TextStyle(
-                            fontSize: 24,
+                            fontSize: 22,
                             fontWeight: FontWeight.bold,
-                            color: isDisabled
-                                ? Colors.white60
-                                : Colors.lightGreenAccent.shade400,
+                            color: color,
                           ),
                         ),
-                        if (isDisabled)
+                        if (!enabled)
                           const Text(
                             'Coming soon...',
                             style: TextStyle(
@@ -288,13 +286,7 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
                       ],
                     ),
                   ),
-                  Icon(
-                    Icons.arrow_forward_ios,
-                    color: isDisabled
-                        ? Colors.white38
-                        : Colors.lightGreenAccent.shade400,
-                    size: 30,
-                  ),
+                  Icon(Icons.arrow_forward_ios, color: color, size: 30),
                 ],
               ),
             ),

@@ -29,11 +29,18 @@ class SttWebSocket {
             destination: topic,
             callback: (msg) {
               final body = msg.body?.toString();
-              debugPrint("WS MSG: $body");
+              debugPrint("WS MSG from $topic: $body");
 
               if (body != null) {
                 final v = int.tryParse(body);
-                if (v != null) onSttUpdate(v);
+                if (v != null) {
+                  debugPrint("Parsed STT value: $v");
+                  onSttUpdate(v);
+                } else {
+                  debugPrint("Failed to parse STT int from body");
+                }
+              } else {
+                debugPrint("Message body is null");
               }
             },
           );

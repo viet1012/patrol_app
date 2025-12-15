@@ -1,36 +1,64 @@
 import 'dart:convert';
-import 'package:http/http.dart' as http;
+
+import 'package:dio/dio.dart';
+
 import '../model/auto_cmp.dart';
+import 'api_config.dart';
 
 class AutoCmpApi {
-  static const String baseUrl =
-      "http://127.0.0.1:9299/api/suggest";
+  static final Dio _dio = Dio()
+    ..options.headers['ngrok-skip-browser-warning'] =
+        'true'; // thêm header vào dây
+
+  static final String baseUrl = "${ApiConfig.baseUrl}/api/suggest";
 
   static Future<List<AutoCmp>> search(String keyword) async {
     if (keyword.isEmpty) return [];
 
-    final uri = Uri.parse("$baseUrl/search?q=$keyword");
-    final response = await http.get(uri);
+    final url = "$baseUrl/search";
+    try {
+      final response = await _dio.get(url, queryParameters: {'q': keyword});
 
-    if (response.statusCode == 200) {
-      final List data = json.decode(utf8.decode(response.bodyBytes));
-      return data.map((e) => AutoCmp.fromJson(e)).toList();
-    } else {
-      throw Exception("API error");
+      if (response.statusCode == 200) {
+        final data = response.data;
+        if (data is List) {
+          return data.map((e) => AutoCmp.fromJson(e)).toList();
+        } else if (data is String) {
+          final List<dynamic> decoded = json.decode(data);
+          return decoded.map((e) => AutoCmp.fromJson(e)).toList();
+        } else {
+          throw Exception("Unexpected data format");
+        }
+      } else {
+        throw Exception("API error, status code: ${response.statusCode}");
+      }
+    } on DioError catch (e) {
+      throw Exception("Dio error: ${e.message}");
     }
   }
 
   static Future<List<AutoCmp>> searchCounter(String keyword) async {
     if (keyword.isEmpty) return [];
 
-    final uri = Uri.parse("$baseUrl/searchCounter?q=$keyword");
-    final response = await http.get(uri);
+    final url = "$baseUrl/searchCounter";
+    try {
+      final response = await _dio.get(url, queryParameters: {'q': keyword});
 
-    if (response.statusCode == 200) {
-      final List data = json.decode(utf8.decode(response.bodyBytes));
-      return data.map((e) => AutoCmp.fromJson(e)).toList();
-    } else {
-      throw Exception("API error");
+      if (response.statusCode == 200) {
+        final data = response.data;
+        if (data is List) {
+          return data.map((e) => AutoCmp.fromJson(e)).toList();
+        } else if (data is String) {
+          final List<dynamic> decoded = json.decode(data);
+          return decoded.map((e) => AutoCmp.fromJson(e)).toList();
+        } else {
+          throw Exception("Unexpected data format");
+        }
+      } else {
+        throw Exception("API error, status code: ${response.statusCode}");
+      }
+    } on DioError catch (e) {
+      throw Exception("Dio error: ${e.message}");
     }
   }
 }

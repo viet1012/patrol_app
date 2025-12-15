@@ -9,7 +9,7 @@ class AppLocalizationsVi extends AppLocalizations {
   AppLocalizationsVi([String locale = 'vi']) : super(locale);
 
   @override
-  String get plant => 'Nhà máy(*)';
+  String get plant => 'Nhà máy';
 
   @override
   String get group => 'Nhóm(*)';
