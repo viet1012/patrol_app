@@ -9,7 +9,7 @@ class AppLocalizationsJa extends AppLocalizations {
   AppLocalizationsJa([String locale = 'ja']) : super(locale);
 
   @override
-  String get plant => '工場(*)';
+  String get plant => '工場';
 
   @override
   String get group => 'グループ(*)';

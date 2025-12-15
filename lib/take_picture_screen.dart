@@ -624,15 +624,34 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
   late String _wsUrl;
 
   int stt = 0;
-  late SttWebSocket sttSocket;
+  SttWebSocket? sttSocket;
+
+  void _connectSocket() {
+    if (sttSocket != null) {
+      try {
+        sttSocket!.dispose();
+      } catch (_) {}
+    }
+
+    sttSocket = SttWebSocket(
+      serverUrl: _wsUrl,
+      fac: _fac,
+      group: _group,
+      onSttUpdate: (value) {
+        if (mounted) setState(() => stt = value);
+      },
+    );
+
+    sttSocket!.connect();
+  }
 
   @override
   void initState() {
     super.initState();
 
-    _fac = widget.plant ?? "";
-    _group = widget.group ?? "";
-    _wsUrl = widget.wsUrl ?? "ws://${ApiConfig.baseUrl}/ws-stt/websocket";
+    _fac = (widget.plant ?? "").trim();
+    _group = (widget.group ?? "").trim();
+    _wsUrl = widget.wsUrl ?? "${ApiConfig.wsBaseUrl}/ws-stt/websocket";
 
     _flashController = AnimationController(
       vsync: this,
@@ -641,22 +660,30 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
 
     _startCamera();
 
-    /// ✅ 1. LẤY STT HIỆN TẠI TỪ DB
-    // SttApi.getCurrentStt(fac: _fac, group: _group).then((value) {
-    //   if (mounted) setState(() => stt = value);
-    // });
-    //
-    // /// ✅ 2. LISTEN REALTIME
-    // sttSocket = SttWebSocket(
-    //   serverUrl: _wsUrl,
-    //   fac: _fac,
-    //   group: _group,
-    //   onSttUpdate: (value) {
-    //     if (mounted) setState(() => stt = value);
-    //   },
-    // );
-    //
-    // sttSocket.connect();
+    SttApi.getCurrentStt(fac: _fac, group: _group).then((value) {
+      if (mounted) setState(() => stt = value);
+    });
+
+    _connectSocket();
+  }
+
+  @override
+  void didUpdateWidget(covariant CameraPreviewBox oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    final newFac = (widget.plant ?? "").trim();
+    final newGroup = (widget.group ?? "").trim();
+
+    if (oldWidget.group != widget.group || oldWidget.plant != widget.plant) {
+      setState(() {
+        _fac = newFac;
+        _group = newGroup;
+      });
+
+      _connectSocket();
+
+      debugPrint("CameraPreviewBox updated: fac=$_fac, group=$_group");
+    }
   }
 
   @override
@@ -664,23 +691,9 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
     _flashController.dispose();
     _stopCamera();
     try {
-      sttSocket.dispose();
+      sttSocket?.dispose();
     } catch (_) {}
     super.dispose();
-  }
-
-  @override
-  void didUpdateWidget(covariant CameraPreviewBox oldWidget) {
-    super.didUpdateWidget(oldWidget);
-
-    if (oldWidget.group != widget.group || oldWidget.plant != widget.plant) {
-      setState(() {
-        _fac = widget.plant ?? "PlantA";
-        _group = widget.group ?? "Group2";
-      });
-
-      debugPrint("🔁 CameraPreviewBox update: fac=$_fac, group=$_group");
-    }
   }
 
   void _stopCamera() {
@@ -729,22 +742,10 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
     if (_isCapturing || _videoElement == null) return;
     setState(() => _isCapturing = true);
 
-    // lấy STT theo Fac + Group
+    // // lấy STT theo Fac + Group
     SttApi.getCurrentStt(fac: _fac, group: _group).then((value) {
       if (mounted) setState(() => stt = value);
     });
-
-    /// ✅ 2. LISTEN REALTIME
-    sttSocket = SttWebSocket(
-      serverUrl: _wsUrl,
-      fac: _fac,
-      group: _group,
-      onSttUpdate: (value) {
-        if (mounted) setState(() => stt = value);
-      },
-    );
-
-    sttSocket.connect();
     ///////////////////////////////////////////////////
     _flashController.forward().then((_) => _flashController.reverse());
 
