@@ -19,4 +19,18 @@ class AutoCmpApi {
       throw Exception("API error");
     }
   }
+
+  static Future<List<AutoCmp>> searchCounter(String keyword) async {
+    if (keyword.isEmpty) return [];
+
+    final uri = Uri.parse("$baseUrl/searchCounter?q=$keyword");
+    final response = await http.get(uri);
+
+    if (response.statusCode == 200) {
+      final List data = json.decode(utf8.decode(response.bodyBytes));
+      return data.map((e) => AutoCmp.fromJson(e)).toList();
+    } else {
+      throw Exception("API error");
+    }
+  }
 }

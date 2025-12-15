@@ -40,8 +40,20 @@ class _CameraScreenState extends State<CameraScreen> {
   String? _prob;
   String? _sev;
 
-  final TextEditingController commentController = TextEditingController();
-  final TextEditingController counterController = TextEditingController();
+  final TextEditingController _commentController = TextEditingController();
+  final FocusNode _commentFocusNode = FocusNode();
+
+  final TextEditingController _counterController = TextEditingController();
+  final FocusNode _counterFocusNode = FocusNode();
+
+  @override
+  void dispose() {
+    _commentController.dispose();
+    _commentFocusNode.dispose();
+    _counterController.dispose();
+    _counterFocusNode.dispose();
+    super.dispose();
+  }
 
   int get totalScore {
     int f = frequencyOptions
@@ -292,8 +304,8 @@ class _CameraScreenState extends State<CameraScreen> {
       _selectedMachine = null;
       _comment = '';
       _counterMeasure = '';
-      commentController.clear();
-      counterController.clear();
+      _commentController.clear();
+      _counterController.clear();
       _freq = null;
       _prob = null;
       _sev = null;
@@ -583,65 +595,126 @@ class _CameraScreenState extends State<CameraScreen> {
             ),
             Row(
               children: [
-                // Expanded(
-                //   child: TextField(
-                //     controller: commentController,
-                //     onChanged: (v) => _comment = v,
-                //     maxLines: 2,
-                //     decoration: InputDecoration(
-                //       hintText: "commentHint".tr(context),
-                //       filled: true,
-                //       fillColor: Colors.yellow.shade50,
-                //       border: OutlineInputBorder(
-                //         borderRadius: BorderRadius.circular(12),
-                //       ),
-                //     ),
-                //   ),
-                // ),
 
                 //AUTO COMPLETE
+// ---------------------------------------------
+                // Ô 1: COMMENT (Dùng RawAutocomplete)
+                // ---------------------------------------------
                 Expanded(
-                  child: Autocomplete<AutoCmp>(
+                  child: RawAutocomplete<AutoCmp>(
+                    // 🔴 QUAN TRỌNG: Truyền Controller của mình vào
+                    textEditingController: _commentController,
+                    focusNode: _commentFocusNode,
+
                     optionsBuilder: (TextEditingValue value) async {
-                      if (value.text.length < 2) {
-                        return const Iterable<AutoCmp>.empty();
-                      }
+                      if (value.text.length < 2) return const Iterable<AutoCmp>.empty();
                       return await AutoCmpApi.search(value.text);
                     },
 
                     displayStringForOption: (AutoCmp option) => option.inputText,
 
+                    // 🟢 Xử lý logic khi CHỌN item
                     onSelected: (AutoCmp selection) {
-                      setState(() {
-                        _comment = selection.inputText;
-                        commentController.text = selection.inputText;
+                      // Cập nhật giá trị ô Comment (thường RawAutocomplete tự làm, nhưng gán lại cho chắc)
+                      _commentController.text = selection.inputText;
+                      _comment = selection.inputText;
 
-                        _counterMeasure = selection.countermeasure;
-                        counterController.text = selection.countermeasure;
-                      });
+                      // 🟢 LINKING: Tự động điền sang ô Countermeasure
+                      // Vì ô Countermeasure đang dùng _counterController, nên khi gán ở đây, giao diện bên kia sẽ nhảy theo
+                      _counterController.text = selection.countermeasure; // <-- MẤU CHỐT LÀ ĐÂY
+                      _counterMeasure = selection.countermeasure;
                     },
 
-                    fieldViewBuilder: (
-                        context,
-                        textEditingController,
-                        focusNode,
-                        onFieldSubmitted,
-                        ) {
+                    fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
                       return TextField(
-                        controller: textEditingController,
+                        controller: controller, // Đây chính là _commentController
                         focusNode: focusNode,
                         maxLines: 2,
                         decoration: InputDecoration(
-                          hintText: "commentHint".tr(context),
+                          hintText: "Nhập Comment...", // "commentHint".tr(context)
                           filled: true,
                           fillColor: Colors.yellow.shade50,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                         ),
                         onChanged: (v) {
                           _comment = v;
-                          commentController.text = v;
+                          // 🟢 CLEARING: Nếu xóa hết comment thì xóa luôn countermeasure
+                          if (v.trim().isEmpty) {
+                            _counterController.clear(); // <-- MẤU CHỐT LÀ ĐÂY
+                            _counterMeasure = '';
+                          }
+                        },
+                      );
+                    },
+
+                    // Copy lại giao diện list của bạn
+                    optionsViewBuilder: (context, onSelected, options) {
+                      return Align(
+                        alignment: Alignment.topLeft,
+                        child: Material(
+                          elevation: 6,
+                          borderRadius: BorderRadius.circular(12),
+                          child: SizedBox(
+                            // Giới hạn chiều rộng/cao để không bị lỗi layout
+                            width: MediaQuery.of(context).size.width * 0.45,
+                            child: ListView.builder(
+                              padding: EdgeInsets.zero,
+                              shrinkWrap: true,
+                              itemCount: options.length,
+                              itemBuilder: (context, index) {
+                                final opt = options.elementAt(index);
+                                return ListTile(
+                                  title: Text(opt.inputText, maxLines: 2, overflow: TextOverflow.ellipsis),
+                                  onTap: () => onSelected(opt),
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+
+                const SizedBox(width: 8),
+
+                // ---------------------------------------------
+                // Ô 2: COUNTERMEASURE (Cũng phải dùng RawAutocomplete)
+                // ---------------------------------------------
+                Expanded(
+                  child: RawAutocomplete<AutoCmp>(
+                    // 🔴 QUAN TRỌNG: Truyền Controller của mình vào để ô Comment có thể điều khiển nó
+                    textEditingController: _counterController,
+                    focusNode: _counterFocusNode,
+
+                    optionsBuilder: (TextEditingValue value) async {
+                      // Logic: Nếu đang trống (do ô Comment vừa clear) thì không search
+                      if (value.text.isEmpty) return const Iterable<AutoCmp>.empty();
+                      if (value.text.length < 2) return const Iterable<AutoCmp>.empty();
+
+                      return await AutoCmpApi.searchCounter(value.text); // Giả sử bạn có hàm này
+                    },
+
+                    displayStringForOption: (opt) => opt.inputText,
+
+                    onSelected: (AutoCmp selection) {
+                      _counterController.text = selection.inputText;
+                      _counterMeasure = selection.inputText;
+                    },
+
+                    fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
+                      return TextField(
+                        controller: controller, // Đây chính là _counterController
+                        focusNode: focusNode,
+                        maxLines: 2,
+                        decoration: InputDecoration(
+                          hintText: "Nhập đối sách...", // "counterMeasureHint".tr(context)
+                          filled: true,
+                          fillColor: Colors.yellow.shade50,
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        onChanged: (v) {
+                          _counterMeasure = v;
                         },
                       );
                     },
@@ -652,25 +725,20 @@ class _CameraScreenState extends State<CameraScreen> {
                         child: Material(
                           elevation: 6,
                           borderRadius: BorderRadius.circular(12),
-                          child: ListView.builder(
-                            padding: EdgeInsets.zero,
-                            shrinkWrap: true,
-                            itemCount: options.length,
-                            itemBuilder: (context, index) {
-                              final opt = options.elementAt(index);
-                              return ListTile(
-                                title: Text(
-                                  opt.inputText,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                                onTap: () => onSelected(opt),
-                              );
-                            },
+                          child: SizedBox(
+                            width: MediaQuery.of(context).size.width * 0.45,
+                            child: ListView.builder(
+                              padding: EdgeInsets.zero,
+                              shrinkWrap: true,
+                              itemCount: options.length,
+                              itemBuilder: (context, index) {
+                                final opt = options.elementAt(index);
+                                return ListTile(
+                                  title: Text(opt.inputText, maxLines: 2, overflow: TextOverflow.ellipsis),
+                                  onTap: () => onSelected(opt),
+                                );
+                              },
+                            ),
                           ),
                         ),
                       );
@@ -678,22 +746,7 @@ class _CameraScreenState extends State<CameraScreen> {
                   ),
                 ),
 
-                SizedBox(width: 8),
-                Expanded(
-                  child: TextField(
-                    controller: counterController,
-                    onChanged: (v) => _counterMeasure = v,
-                    maxLines: 2,
-                    decoration: InputDecoration(
-                      hintText: "counterMeasureHint".tr(context),
-                      filled: true,
-                      fillColor: Colors.yellow.shade50,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-                ),
+                //AUTO COMPLETE END
               ],
             ),
 
