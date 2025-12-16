@@ -351,9 +351,6 @@ class _CameraScreenState extends State<CameraScreen> {
       resizeToAvoidBottomInset: true,
       appBar: AppBar(
         backgroundColor: Colors.blueGrey.shade300,
-        title: Row(
-          children: [const SizedBox(width: 4), const LanguageToggleSwitch()],
-        ),
         actions: [
           // HIỂN THỊ ẢNH THUMBNAIL TRÊN APPBAR
           if (images.isNotEmpty)

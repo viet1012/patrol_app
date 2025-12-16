@@ -307,7 +307,7 @@
 // import 'package:chuphinh/socket/SttWebSocket.dart';
 // import 'package:flutter/material.dart';
 //
-// import 'api/SttApi.dart';
+// import 'api/stt_api.dart';
 //
 // class CameraPreviewBox extends StatefulWidget {
 //   final double size;
@@ -586,7 +586,7 @@ import 'package:chuphinh/widget/glass_circle_button.dart';
 import 'package:chuphinh/widget/glass_zoom_control.dart';
 import 'package:flutter/material.dart';
 
-import 'api/SttApi.dart';
+import 'api/stt_api.dart';
 import 'api/api_config.dart';
 
 class CameraPreviewBox extends StatefulWidget {
