@@ -578,9 +578,11 @@ import 'dart:async';
 import 'dart:typed_data';
 import 'dart:html' as html;
 import 'dart:math' as math;
+import 'dart:ui';
 import 'dart:ui_web' as ui_web;
 
 import 'package:chuphinh/socket/SttWebSocket.dart';
+import 'package:chuphinh/widget/glass_circle_button.dart';
 import 'package:flutter/material.dart';
 
 import 'api/SttApi.dart';
@@ -846,114 +848,133 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
               width: widget.size,
               height: widget.size,
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.blue.shade400, width: 3),
+                borderRadius: BorderRadius.circular(20),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black26,
-                    blurRadius: 10,
-                    offset: Offset(0, 4),
+                    color: Colors.black.withOpacity(0.30),
+                    blurRadius: 18,
+                    offset: const Offset(0, 10),
                   ),
                 ],
               ),
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(13),
-                child: _videoElement != null
-                    ? Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          HtmlElementView(
+                borderRadius: BorderRadius.circular(20),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    // 🎥 CAMERA
+                    _videoElement != null
+                        ? HtmlElementView(
                             key: ValueKey(_viewType),
                             viewType: _viewType,
-                          ),
-                          IgnorePointer(
-                            child: Container(
-                              decoration: BoxDecoration(
-                                border: Border.all(
-                                  color: Colors.white.withOpacity(0.7),
-                                  width: 30,
-                                ),
-                              ),
+                          )
+                        : Container(
+                            color: Colors.grey[300],
+                            child: const Center(
+                              child: CircularProgressIndicator(),
                             ),
                           ),
-                          AnimatedBuilder(
-                            animation: _flashController,
-                            builder: (context, child) => Container(
-                              color: Colors.white.withOpacity(
-                                0.8 * _flashController.value,
-                              ),
-                            ),
-                          ),
-                        ],
-                      )
-                    : Container(
-                        color: Colors.grey[300],
-                        child: Center(child: CircularProgressIndicator()),
+
+                    // 🧊 GLASS OVERLAY (NHẸ)
+                    BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
+                      child: Container(color: Colors.white.withOpacity(0.08)),
+                    ),
+
+                    // ⚡ FLASH EFFECT
+                    AnimatedBuilder(
+                      animation: _flashController,
+                      builder: (context, child) => Container(
+                        color: Colors.white.withOpacity(
+                          0.85 * _flashController.value,
+                        ),
                       ),
+                    ),
+                  ],
+                ),
               ),
             ),
 
             Positioned(
               top: 12,
               right: 12,
-              child: Container(
-                padding: EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.black54,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  "STT: $stt",
-                  style: TextStyle(color: Colors.white, fontSize: 20),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.18), // nền kính
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: Colors.white.withOpacity(0.35), // viền kính
+                        width: 1,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.25),
+                          blurRadius: 10,
+                          offset: Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.confirmation_number_outlined,
+                          size: 18,
+                          color: Colors.white.withOpacity(0.9),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          "No. $stt",
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.6,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
             ),
 
             Positioned(
-              bottom: -15,
+              bottom: -18,
               left: 0,
               right: 0,
               child: Center(
                 child: (widget.group == null || widget.group!.isEmpty)
-                    ? Container(
-                        width: 76,
-                        height: 76,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Colors.grey.shade300,
-                          border: Border.all(
-                            color: Colors.grey.shade400,
-                            width: 5,
-                          ),
-                        ),
+                    // 🔒 NÚT KHÓA (khi chưa chọn Group)
+                    ? GlassCircleButton(
+                        size: 80,
                         child: Icon(
-                          Icons.lock,
-                          color: Colors.grey.shade600,
-                          size: 32,
+                          Icons.lock_rounded,
+                          color: Colors.red[300],
+                          size: 36,
                         ),
                       )
+                    // 📸 NÚT CHỤP ẢNH (khi đã chọn Group)
                     : GestureDetector(
                         onTap: _isCapturing ? null : _takePhoto,
-                        child: Container(
-                          width: 76,
-                          height: 76,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: Colors.white,
-                            border: Border.all(
-                              color: Colors.blue.shade600,
-                              width: 5,
-                            ),
-                          ),
+                        child: GlassCircleButton(
+                          size: 80,
+                          showProgress: _isCapturing,
                           child: _isCapturing
-                              ? Padding(
-                                  padding: EdgeInsets.all(16),
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 4,
-                                  ),
-                                )
-                              : null,
+                              ? null // showProgress sẽ hiển thị loading
+                              : const Icon(
+                                  Icons.camera_alt_rounded,
+                                  color: Colors.white,
+                                  size: 36,
+                                ),
                         ),
                       ),
               ),

@@ -345,9 +345,12 @@ class _CameraScreenState extends State<CameraScreen> {
     final displayScore = symbol.isEmpty ? "" : symbol;
 
     return Scaffold(
+      backgroundColor: Colors.blueGrey.shade200,
+
       // ✅ QUAN TRỌNG: Giúp giao diện tự co lên khi bàn phím hiện
       resizeToAvoidBottomInset: true,
       appBar: AppBar(
+        backgroundColor: Colors.blueGrey.shade300,
         title: Row(
           children: [const SizedBox(width: 4), const LanguageToggleSwitch()],
         ),
@@ -400,7 +403,7 @@ class _CameraScreenState extends State<CameraScreen> {
               ),
             ),
 
-          // NÚT GỬI + BADGE SỐ ẢNH
+          // NÚT GỬI
           Padding(
             padding: const EdgeInsets.only(right: 4, left: 4),
             child: Stack(
