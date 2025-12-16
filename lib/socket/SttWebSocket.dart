@@ -2,7 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:stomp_dart_client/stomp_dart_client.dart';
 
 class SttWebSocket {
-  late StompClient stomp;
+  StompClient? _stomp;
+
   final String serverUrl;
   final String fac;
   final String group;
@@ -15,52 +16,69 @@ class SttWebSocket {
     required this.onSttUpdate,
   });
 
+  // ✅ normalize giống BE
+  String _normalize(String v) => v.replaceAll(' ', '').trim();
+
   void connect() {
-    stomp = StompClient(
+    // 🔥 đảm bảo không có socket cũ
+    dispose();
+
+    final facClean = _normalize(fac);
+    final grpClean = _normalize(group);
+    final topic = "/topic/stt/$facClean/$grpClean";
+
+    debugPrint("🔌 WS CONNECTING...");
+    debugPrint("📌 SUBSCRIBE TOPIC: $topic");
+
+    _stomp = StompClient(
       config: StompConfig(
         url: serverUrl,
+        reconnectDelay: const Duration(seconds: 5),
+
         onConnect: (frame) {
-          debugPrint("WS CONNECTED");
+          debugPrint("✅ WS CONNECTED");
 
-          final topic = "/topic/stt/$fac/$group";
-          debugPrint("SUBSCRIBE: $topic");
-
-          stomp.subscribe(
+          _stomp!.subscribe(
             destination: topic,
             callback: (msg) {
-              final body = msg.body?.toString();
-              debugPrint("WS MSG from $topic: $body");
+              final body = msg.body;
+              debugPrint("📥 WS MSG [$topic]: $body");
 
-              if (body != null) {
-                final v = int.tryParse(body);
-                if (v != null) {
-                  debugPrint("Parsed STT value: $v");
-                  onSttUpdate(v);
-                } else {
-                  debugPrint("Failed to parse STT int from body");
-                }
+              if (body == null) return;
+
+              final value = int.tryParse(body);
+              if (value != null) {
+                debugPrint("✅ Parsed STT = $value");
+                onSttUpdate(value);
               } else {
-                debugPrint("Message body is null");
+                debugPrint("❌ Cannot parse STT from body");
               }
             },
           );
         },
 
-        // 🔥 FIX CHÍNH
         onWebSocketError: (err) {
-          debugPrint("WS ERROR: ${err.toString()}");
+          debugPrint("❌ WS ERROR: $err");
         },
 
-        onStompError: (f) {
-          debugPrint("STOMP ERROR: ${f.body?.toString()}");
+        onStompError: (frame) {
+          debugPrint("❌ STOMP ERROR: ${frame.body}");
+        },
+
+        onDisconnect: (_) {
+          debugPrint("🔌 WS DISCONNECTED");
         },
       ),
     );
 
-    stomp.activate();
+    _stomp!.activate();
   }
 
   void dispose() {
-    stomp.deactivate();
+    if (_stomp != null) {
+      debugPrint("🧹 WS DISPOSE");
+      _stomp!.deactivate();
+      _stomp = null;
+    }
   }
 }

@@ -6,7 +6,7 @@ import 'api_config.dart';
 class SttApi {
   static final Dio _dio = Dio();
 
-  static String normalizeGroup(String? group) {
+  static String normalize(String? group) {
     return group == null ? '' : group.replaceAll(' ', '').trim();
   }
 
@@ -14,14 +14,14 @@ class SttApi {
     required String fac,
     required String group,
   }) async {
-    final normalizedGroup = normalizeGroup(group);
+    final facClean = normalize(fac);
+    final grpClean = normalize(group);
 
     final url = "${ApiConfig.baseUrl}/api/stt/crt";
-
-    final params = {'fac': fac, 'grp': normalizedGroup};
+    final params = {'fac': facClean, 'grp': grpClean};
 
     try {
-      log("?? GET STT API");
+      log("🚀 GET STT API");
       log("URL: $url");
       log("Params: $params");
 
@@ -31,29 +31,24 @@ class SttApi {
         options: Options(headers: {'ngrok-skip-browser-warning': 'true'}),
       );
 
-      log("?? RESPONSE");
+      log("📥 RESPONSE");
       log("StatusCode: ${response.statusCode}");
       log("Body: ${response.data}");
 
       if (response.statusCode == 200) {
-        // response.data là dynamic, n?u tr? v? text, c?n parse thành int
-        if (response.data is String) {
-          return int.parse(response.data);
-        } else if (response.data is int) {
+        if (response.data is int) {
           return response.data;
-        } else {
-          throw Exception("Unexpected response data format: ${response.data}");
         }
-      } else {
-        throw Exception(
-          "Cannot get current STT | status=${response.statusCode} body=${response.data}",
-        );
+        if (response.data is String) {
+          return int.tryParse(response.data) ?? 0;
+        }
+        throw Exception("Unexpected response: ${response.data}");
       }
+
+      throw Exception("Cannot get STT | ${response.statusCode}");
     } on DioError catch (e) {
-      log("DioError: ${e.message}");
-      if (e.response != null) {
-        log("DioError response data: ${e.response?.data}");
-      }
+      log("❌ DioError: ${e.message}");
+      log("❌ Response: ${e.response?.data}");
       rethrow;
     }
   }

@@ -626,6 +626,23 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
   int stt = 0;
   SttWebSocket? sttSocket;
 
+  Future<void> _loadStt() async {
+    if (_fac.isEmpty || _group.isEmpty) {
+      debugPrint("Skip load STT (fac/group empty)");
+      return;
+    }
+
+    try {
+      final value = await SttApi.getCurrentStt(fac: _fac, group: _group);
+      if (mounted) {
+        setState(() => stt = value);
+        debugPrint("Load STT: $stt");
+      }
+    } catch (e) {
+      debugPrint("Load STT error: $e");
+    }
+  }
+
   void _connectSocket() {
     if (sttSocket != null) {
       try {
@@ -660,11 +677,10 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
 
     _startCamera();
 
-    SttApi.getCurrentStt(fac: _fac, group: _group).then((value) {
-      if (mounted) setState(() => stt = value);
-    });
-
-    _connectSocket();
+    if (_group.isNotEmpty) {
+      _loadStt();
+      _connectSocket();
+    }
   }
 
   @override
@@ -674,13 +690,19 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
     final newFac = (widget.plant ?? "").trim();
     final newGroup = (widget.group ?? "").trim();
 
-    if (oldWidget.group != widget.group || oldWidget.plant != widget.plant) {
+    final groupChanged = oldWidget.group != widget.group;
+    final facChanged = oldWidget.plant != widget.plant;
+
+    if (groupChanged || facChanged) {
       setState(() {
         _fac = newFac;
         _group = newGroup;
       });
 
-      _connectSocket();
+      if (_group.isNotEmpty) {
+        _loadStt(); // ✅ LẤY STT NGAY
+        _connectSocket(); // ✅ MỞ SOCKET
+      }
 
       debugPrint("CameraPreviewBox updated: fac=$_fac, group=$_group");
     }
@@ -743,9 +765,9 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
     setState(() => _isCapturing = true);
 
     // // lấy STT theo Fac + Group
-    SttApi.getCurrentStt(fac: _fac, group: _group).then((value) {
-      if (mounted) setState(() => stt = value);
-    });
+    // SttApi.getCurrentStt(fac: _fac, group: _group).then((value) {
+    //   if (mounted) setState(() => stt = value);
+    // });
     ///////////////////////////////////////////////////
     _flashController.forward().then((_) => _flashController.reverse());
 
