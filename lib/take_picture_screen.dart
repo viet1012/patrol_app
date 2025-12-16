@@ -583,6 +583,7 @@ import 'dart:ui_web' as ui_web;
 
 import 'package:chuphinh/socket/SttWebSocket.dart';
 import 'package:chuphinh/widget/glass_circle_button.dart';
+import 'package:chuphinh/widget/glass_zoom_control.dart';
 import 'package:flutter/material.dart';
 
 import 'api/SttApi.dart';
@@ -762,14 +763,15 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
     }
   }
 
+  // Digital Zoom
+  double _zoom = 1.0;
+  static const double _minZoom = 1.0;
+  static const double _maxZoom = 5.0;
+
   Future<void> _takePhoto() async {
     if (_isCapturing || _videoElement == null) return;
     setState(() => _isCapturing = true);
 
-    // // lấy STT theo Fac + Group
-    // SttApi.getCurrentStt(fac: _fac, group: _group).then((value) {
-    //   if (mounted) setState(() => stt = value);
-    // });
     ///////////////////////////////////////////////////
     _flashController.forward().then((_) => _flashController.reverse());
 
@@ -787,7 +789,8 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
       final canvas = html.CanvasElement(width: outputSize, height: outputSize);
       final ctx = canvas.context2D;
 
-      final srcSize = math.min(videoWidth, videoHeight);
+      final srcSize = math.min(videoWidth, videoHeight) / _zoom;
+
       final sx = (videoWidth - srcSize) / 2;
       final sy = (videoHeight - srcSize) / 2;
 
@@ -803,7 +806,7 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
         outputSize,
       );
 
-      final blob = await canvas.toBlob('image/jpeg', 0.88);
+      final blob = await canvas.toBlob('image/jpeg', 0.89);
       final reader = html.FileReader();
       reader.readAsArrayBuffer(blob!);
       await reader.onLoadEnd.first;
@@ -864,9 +867,12 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
                   children: [
                     // 🎥 CAMERA
                     _videoElement != null
-                        ? HtmlElementView(
-                            key: ValueKey(_viewType),
-                            viewType: _viewType,
+                        ? Transform.scale(
+                            scale: _zoom,
+                            child: HtmlElementView(
+                              key: ValueKey(_viewType),
+                              viewType: _viewType,
+                            ),
                           )
                         : Container(
                             color: Colors.grey[300],
@@ -944,6 +950,16 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
                     ),
                   ),
                 ),
+              ),
+            ),
+            Positioned(
+              bottom: 14,
+              right: 14,
+              child: GlassZoomControl(
+                zoom: _zoom,
+                minZoom: _minZoom,
+                maxZoom: _maxZoom,
+                onChanged: (v) => setState(() => _zoom = v),
               ),
             ),
 
