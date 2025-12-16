@@ -661,10 +661,12 @@ class _CameraScreenState extends State<CameraScreen> {
                         textEditingController: _counterController,
                         focusNode: _counterFocusNode,
                         optionsBuilder: (TextEditingValue value) async {
-                          if (value.text.isEmpty)
+                          if (value.text.isEmpty) {
                             return const Iterable<AutoCmp>.empty();
-                          if (value.text.length < 2)
+                          }
+                          if (value.text.length < 2) {
                             return const Iterable<AutoCmp>.empty();
+                          }
                           return await AutoCmpApi.searchCounter(value.text);
                         },
                         displayStringForOption: (opt) => opt.inputText,
@@ -875,7 +877,7 @@ class _CameraScreenState extends State<CameraScreen> {
                     width: 1.5,
                   ),
                 ),
-                contentPadding: EdgeInsets.symmetric(vertical: 8),
+                contentPadding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
               ),
             ),
 
