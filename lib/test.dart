@@ -466,7 +466,7 @@ class _CameraScreenState extends State<CameraScreen> {
                 ),
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
 
             Row(
               children: [
@@ -528,7 +528,7 @@ class _CameraScreenState extends State<CameraScreen> {
               ],
             ),
 
-            const SizedBox(height: 16),
+            const SizedBox(height: 8),
 
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -544,7 +544,6 @@ class _CameraScreenState extends State<CameraScreen> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: SizedBox(
-                    height: 76,
                     child: TextField(
                       enabled: false,
                       controller: TextEditingController(text: displayScore),
@@ -559,12 +558,7 @@ class _CameraScreenState extends State<CameraScreen> {
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        contentPadding: const EdgeInsets.fromLTRB(
-                          16,
-                          12,
-                          16,
-                          12,
-                        ),
+                        contentPadding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
                       ),
                       textAlign: TextAlign.center,
                       style: TextStyle(
@@ -579,8 +573,7 @@ class _CameraScreenState extends State<CameraScreen> {
                 ),
               ],
             ),
-
-            const SizedBox(height: 16),
+            const SizedBox(height: 8),
 
             // ---------------------------------------------------------
             // PHẦN AUTO COMPLETE ĐÃ TỐI ƯU CHO MOBILE
@@ -596,8 +589,9 @@ class _CameraScreenState extends State<CameraScreen> {
                         textEditingController: _commentController,
                         focusNode: _commentFocusNode,
                         optionsBuilder: (TextEditingValue value) async {
-                          if (value.text.length < 2)
+                          if (value.text.length < 2) {
                             return const Iterable<AutoCmp>.empty();
+                          }
                           return await AutoCmpApi.search(value.text);
                         },
                         displayStringForOption: (AutoCmp option) =>
@@ -742,7 +736,7 @@ class _CameraScreenState extends State<CameraScreen> {
               ),
             ),
 
-            const SizedBox(height: 200),
+            const SizedBox(height: 300),
             // ✅ Thêm khoảng trắng lớn để đẩy nội dung lên khi bàn phím hiện
           ],
         ),
@@ -927,12 +921,7 @@ class _CameraScreenState extends State<CameraScreen> {
               maxLines: 2,
               softWrap: true,
               overflow: TextOverflow.visible,
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                height: 1.3,
-                color: Colors.black,
-              ),
+              style: TextStyle(fontSize: 14, color: Colors.grey[600]),
             ),
           );
         }).toList();

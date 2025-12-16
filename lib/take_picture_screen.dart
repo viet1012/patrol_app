@@ -806,7 +806,7 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
         outputSize,
       );
 
-      final blob = await canvas.toBlob('image/jpeg', 0.89);
+      final blob = await canvas.toBlob('image/jpeg', 0.8);
       final reader = html.FileReader();
       reader.readAsArrayBuffer(blob!);
       await reader.onLoadEnd.first;
@@ -931,18 +931,12 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(
-                          Icons.confirmation_number_outlined,
-                          size: 18,
-                          color: Colors.white.withOpacity(0.9),
-                        ),
-                        const SizedBox(width: 8),
                         Text(
                           "No. $stt",
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 18,
-                            fontWeight: FontWeight.w700,
+                            fontWeight: FontWeight.bold,
                             letterSpacing: 0.6,
                           ),
                         ),
