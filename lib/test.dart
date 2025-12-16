@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:typed_data';
+import 'dart:ui';
 import 'package:chuphinh/take_picture_screen.dart';
 import 'package:chuphinh/translator.dart';
 import 'package:dio/dio.dart';
@@ -407,7 +408,9 @@ class _CameraScreenState extends State<CameraScreen> {
               children: [
                 FloatingActionButton(
                   mini: true,
-                  backgroundColor: hasImages ? Colors.green : Colors.grey,
+                  backgroundColor: hasImages
+                      ? Colors.greenAccent[100]
+                      : Colors.grey,
                   onPressed: hasImages ? _sendReport : null,
                   child: const Icon(Icons.send_rounded),
                 ),
@@ -736,7 +739,7 @@ class _CameraScreenState extends State<CameraScreen> {
               ),
             ),
 
-            const SizedBox(height: 300),
+            const SizedBox(height: 700),
             // ✅ Thêm khoảng trắng lớn để đẩy nội dung lên khi bàn phím hiện
           ],
         ),
@@ -930,26 +933,23 @@ class _CameraScreenState extends State<CameraScreen> {
       items: items.map((e) {
         return DropdownMenuItem<String>(
           value: e.labelKey,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 6),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  e.labelKey.tr(context),
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w500,
-                    fontSize: 14,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                e.labelKey.tr(context),
+                style: const TextStyle(
+                  fontWeight: FontWeight.w500,
+                  fontSize: 14,
                 ),
-                Text(
-                  "(${e.score})",
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
-              ],
-            ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              Text(
+                "(${e.score})",
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ],
           ),
         );
       }).toList(),

@@ -83,7 +83,14 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+
               children: [
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: const LanguageToggleSwitch(),
+                ),
+                const SizedBox(height: 16),
+
                 Center(
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(24),
@@ -95,14 +102,18 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
                           horizontal: 32,
                         ),
                         decoration: glassDecoration,
-                        child: const Text(
-                          'SAFETY CROSS PATROL',
-                          style: TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.w900,
-                            color: Colors.white,
-                            letterSpacing: 2,
-                          ),
+                        child: Column(
+                          children: [
+                            const Text(
+                              'SAFETY CROSS PATROL',
+                              style: TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.w900,
+                                color: Colors.white,
+                                letterSpacing: 2,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
@@ -110,10 +121,6 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
                 ),
 
                 const SizedBox(height: 30),
-
-                const LanguageToggleSwitch(),
-
-                const SizedBox(height: 16),
 
                 ClipRRect(
                   borderRadius: BorderRadius.circular(16),
