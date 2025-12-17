@@ -16,7 +16,7 @@ import 'model/auto_cmp.dart';
 class CameraScreen extends StatefulWidget {
   final String selectedPlant;
   final String lang;
-  CameraScreen({super.key, required this.selectedPlant, required this.lang });
+  CameraScreen({super.key, required this.selectedPlant, required this.lang});
 
   @override
   State<CameraScreen> createState() => _CameraScreenState();
@@ -320,6 +320,7 @@ class _CameraScreenState extends State<CameraScreen> {
 
   @override
   Widget build(BuildContext context) {
+    print('Lang: ${widget.lang}');
     final plantList = getPlants();
 
     final facList = _selectedPlant == null
@@ -592,7 +593,10 @@ class _CameraScreenState extends State<CameraScreen> {
                           if (value.text.length < 2) {
                             return const Iterable<AutoCmp>.empty();
                           }
-                          return await AutoCmpApi.search(widget.lang, value.text); //@@
+                          return await AutoCmpApi.search(
+                            widget.lang,
+                            value.text,
+                          ); //@@
                         },
                         displayStringForOption: (AutoCmp option) =>
                             option.inputText,
@@ -661,7 +665,10 @@ class _CameraScreenState extends State<CameraScreen> {
                           if (value.text.length < 2) {
                             return const Iterable<AutoCmp>.empty();
                           }
-                          return await AutoCmpApi.searchCounter(widget.lang, value.text);
+                          return await AutoCmpApi.searchCounter(
+                            widget.lang,
+                            value.text,
+                          );
                         },
                         displayStringForOption: (opt) => opt.inputText,
                         onSelected: (AutoCmp selection) {

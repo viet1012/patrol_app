@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'main.dart';
 
 class LanguageToggleSwitch extends StatefulWidget {
-  const LanguageToggleSwitch({super.key});
+  final Function(String langCode)? onLanguageChanged; // 👈 callback
+
+  const LanguageToggleSwitch({super.key, this.onLanguageChanged});
 
   @override
   State<LanguageToggleSwitch> createState() => _LanguageToggleSwitchState();
@@ -11,13 +13,33 @@ class LanguageToggleSwitch extends StatefulWidget {
 class _LanguageToggleSwitchState extends State<LanguageToggleSwitch> {
   bool isVietnamese = true;
 
+  // @override
+  // void didChangeDependencies() {
+  //   super.didChangeDependencies();
+  //   final lang = Localizations.localeOf(context).languageCode;
+  //   final newIsVi = lang == 'vi';
+  //
+  //   if (isVietnamese != (lang == 'vi')) {
+  //     setState(() {
+  //       isVietnamese = lang == 'vi';
+  //     });
+  //
+  //     // 🔁 sync lại cho cha
+  //     widget.onLanguageChanged?.call(newIsVi ? "VI" : "JP");
+  //   }
+  // }
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+
     final lang = Localizations.localeOf(context).languageCode;
-    if (isVietnamese != (lang == 'vi')) {
-      setState(() {
-        isVietnamese = lang == 'vi';
+    final newIsVi = lang == 'vi';
+
+    if (isVietnamese != newIsVi) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        setState(() => isVietnamese = newIsVi);
       });
     }
   }
@@ -25,6 +47,10 @@ class _LanguageToggleSwitchState extends State<LanguageToggleSwitch> {
   void _toggleLanguage() {
     final newLocale = isVietnamese ? const Locale('ja') : const Locale('vi');
     MyApp.of(context)!.setLocale(newLocale);
+
+    final newLangCode = isVietnamese ? "JP" : "VI";
+    // bắn ngược cho cha
+    widget.onLanguageChanged?.call(newLangCode);
   }
 
   @override

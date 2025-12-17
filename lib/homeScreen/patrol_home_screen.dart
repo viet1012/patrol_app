@@ -18,6 +18,8 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
   final List<String> factories = ['612K', '611T', '613F', '614F', 'meivy'];
   String selectedFactory = '612K';
 
+  String currentLang = "VI";
+
   void _navigateTo(BuildContext context, String title) {
     Navigator.push(
       context,
@@ -87,7 +89,15 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
               children: [
                 Align(
                   alignment: Alignment.centerRight,
-                  child: const LanguageToggleSwitch(),
+                  child: LanguageToggleSwitch(
+                    onLanguageChanged: (lang) {
+                      setState(() {
+                        currentLang = lang;
+                      });
+
+                      debugPrint("📢 Language from child: $lang");
+                    },
+                  ),
                 ),
                 const SizedBox(height: 16),
 
@@ -195,8 +205,10 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) =>
-                                  CameraScreen(lang: "VI",selectedPlant: selectedFactory),
+                              builder: (_) => CameraScreen(
+                                lang: currentLang,
+                                selectedPlant: selectedFactory,
+                              ),
                             ),
                           );
                         },
