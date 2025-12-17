@@ -174,16 +174,17 @@ class _CameraScreenState extends State<CameraScreen> {
   Future<void> _sendReport() async {
     final images = _cameraKey.currentState?.images ?? [];
     if (images.isEmpty) {
-      _showSnackBar('Vui lòng chụp ít nhất 1 ảnh!', Colors.orange);
+      _showSnackBar('Please take at least one photo.', Colors.orange);
       return;
     }
-    if (_selectedArea == null) {
-      _showSnackBar('Vui lòng chọn đủ thông tin!', Colors.orange);
+
+    if (_selectedMachine == null) {
+      _showSnackBar('Please select all required information.', Colors.orange);
       return;
     }
 
     if (_comment.trim().isEmpty) {
-      _showSnackBar('Vui lòng nhập comment!', Colors.orange);
+      _showSnackBar('Please enter a comment.', Colors.orange);
       return;
     }
 
