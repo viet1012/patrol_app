@@ -18,7 +18,7 @@ class AutoCmpApi {
 
     final url = "$baseUrl/search";
     try {
-      final response = await _dio.get(url, queryParameters: {'q': keyword});
+      final response = await _dio.get(url, queryParameters: {'l': lang,'q': keyword});
 
       if (response.statusCode == 200) {
         final data = response.data;
@@ -46,7 +46,7 @@ class AutoCmpApi {
 
     final url = "$baseUrl/searchCounter";
     try {
-      final response = await _dio.get(url, queryParameters: {'q': keyword});
+      final response = await _dio.get(url, queryParameters: {'l': lang,'q': keyword});
 
       if (response.statusCode == 200) {
         final data = response.data;
