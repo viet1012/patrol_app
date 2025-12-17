@@ -7,11 +7,7 @@ import 'package:dio/dio.dart';
 import 'package:dropdown_search/dropdown_search.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:shimmer/shimmer.dart';
-import 'LanguageFlagButton.dart';
 import 'api/api_config.dart';
-import 'l10n/app_localizations.dart';
-import 'main.dart';
 import 'model/machine_model.dart';
 import 'model/reason_model.dart';
 import 'api/auto_cmp_api.dart';
@@ -747,8 +743,6 @@ class _CameraScreenState extends State<CameraScreen> {
     );
   }
 
-  // --- BẮT ĐẦU CÁC HÀM PHỤ TRỢ (Cần được đặt ngoài hàm build) ---
-
   // 🔴 HÀM MỚI: Xây dựng giao diện Dropdown tối ưu cho Mobile
   Widget _customOptionsViewBuilder(
     BuildContext context,
@@ -924,7 +918,7 @@ class _CameraScreenState extends State<CameraScreen> {
               maxLines: 2,
               softWrap: true,
               overflow: TextOverflow.visible,
-              style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+              style: TextStyle(fontSize: 14, color: Colors.black87),
             ),
           );
         }).toList();

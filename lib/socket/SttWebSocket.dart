@@ -25,7 +25,7 @@ class SttWebSocket {
 
     final facClean = _normalize(fac);
     final grpClean = _normalize(group);
-    final topic = "/topic/stt/$facClean/$grpClean";
+    final topic = "/topic/stt/$facClean";
 
     debugPrint("🔌 WS CONNECTING...");
     debugPrint("📌 SUBSCRIBE TOPIC: $topic");

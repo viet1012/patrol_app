@@ -630,13 +630,13 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
   SttWebSocket? sttSocket;
 
   Future<void> _loadStt() async {
-    if (_fac.isEmpty || _group.isEmpty) {
+    if (_fac.isEmpty) {
       debugPrint("Skip load STT (fac/group empty)");
       return;
     }
 
     try {
-      final value = await SttApi.getCurrentStt(fac: _fac, group: _group);
+      final value = await SttApi.getCurrentStt(fac: _fac, group: '');
       if (mounted) {
         setState(() => stt = value);
         debugPrint("Load STT: $stt");
@@ -680,10 +680,10 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
 
     _startCamera();
 
-    if (_group.isNotEmpty) {
-      _loadStt();
-      _connectSocket();
-    }
+    // if (_group.isNotEmpty) {
+    _loadStt();
+    _connectSocket();
+    // }
   }
 
   @override
@@ -702,10 +702,10 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
         _group = newGroup;
       });
 
-      if (_group.isNotEmpty) {
-        _loadStt(); // ✅ LẤY STT NGAY
-        _connectSocket(); // ✅ MỞ SOCKET
-      }
+      // if (_group.isNotEmpty) {
+      //   _loadStt(); // ✅ LẤY STT NGAY
+      //   _connectSocket(); // ✅ MỞ SOCKET
+      // }
 
       debugPrint("CameraPreviewBox updated: fac=$_fac, group=$_group");
     }
