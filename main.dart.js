@@ -45872,11 +45872,11 @@ var $async$yT=A.P(function(b3,b4){if(b3===1){o.push(b4)
 s=p}while(true)switch(s){case 0:a9=n.cy.gN()
 b0=a9==null?null:A.v4(a9.x,t.F)
 b1=b0==null?A.b([],t.XE):b0
-if(J.bX(b1)===0){n.og("Vui l\xf2ng ch\u1ee5p \xedt nh\u1ea5t 1 \u1ea3nh!",B.mn)
+if(J.bX(b1)===0){n.og("Please take at least one photo.",B.mn)
 s=1
-break}if(n.f==null){n.og("Vui l\xf2ng ch\u1ecdn \u0111\u1ee7 th\xf4ng tin!",B.mn)
+break}if(n.r==null){n.og("Please select all required information.",B.mn)
 s=1
-break}if(B.c.dR(n.y).length===0){n.og("Vui l\xf2ng nh\u1eadp comment!",B.mn)
+break}if(B.c.dR(n.y).length===0){n.og("Please enter a comment.",B.mn)
 s=1
 break}n.TF("\u0110ang g\u1eedi "+J.bX(b1)+" \u1ea3nh...",B.fJ,B.Nw)
 p=4
