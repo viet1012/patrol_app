@@ -14,9 +14,15 @@ import 'api/auto_cmp_api.dart';
 import 'model/auto_cmp.dart';
 
 class CameraScreen extends StatefulWidget {
-  final String selectedPlant;
+  final List<MachineModel> machines;
+  final String? selectedPlant;
   final String lang;
-  CameraScreen({super.key, required this.selectedPlant, required this.lang});
+  CameraScreen({
+    super.key,
+    required this.machines,
+    required this.selectedPlant,
+    required this.lang,
+  });
 
   @override
   State<CameraScreen> createState() => _CameraScreenState();
@@ -109,7 +115,7 @@ class _CameraScreenState extends State<CameraScreen> {
 
   List<String> getPlants() {
     final Set<String> unique = {};
-    return machines
+    return widget.machines
         .map((m) => m.plant.toString())
         .where((p) => p.isNotEmpty)
         .where((p) => unique.add(p))
@@ -118,7 +124,7 @@ class _CameraScreenState extends State<CameraScreen> {
 
   List<String> getFacByPlant(String plant) {
     final Set<String> unique = {};
-    return machines
+    return widget.machines
         .where((m) => m.plant.toString() == plant)
         .map((m) => m.fac.toString())
         .where((f) => f.isNotEmpty)
@@ -128,7 +134,7 @@ class _CameraScreenState extends State<CameraScreen> {
 
   List<String> getAreaByFac(String plant, String fac) {
     final Set<String> unique = {};
-    return machines
+    return widget.machines
         .where((m) => m.plant.toString() == plant)
         .where((m) => m.fac.toString() == fac)
         .map((m) => m.area.toString())
@@ -139,7 +145,7 @@ class _CameraScreenState extends State<CameraScreen> {
 
   List<String> getMachineByArea(String plant, String fac, String area) {
     final Set<String> unique = {};
-    return machines
+    return widget.machines
         .where((m) => m.plant.toString() == plant)
         .where((m) => m.fac.toString() == fac)
         .where((m) => m.area.toString() == area)
@@ -342,7 +348,7 @@ class _CameraScreenState extends State<CameraScreen> {
 
     final symbol = getScoreSymbol();
     final displayScore = symbol.isEmpty ? "" : symbol;
-    final minLength = (widget.lang == 'JP') ? 1: 2;
+    final minLength = (widget.lang == 'JP') ? 1 : 2;
 
     return Scaffold(
       backgroundColor: Colors.blueGrey.shade200,
@@ -580,7 +586,6 @@ class _CameraScreenState extends State<CameraScreen> {
             // ---------------------------------------------------------
             // PHẦN AUTO COMPLETE ĐÃ TỐI ƯU CHO MOBILE
             // ---------------------------------------------------------
-
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -592,7 +597,8 @@ class _CameraScreenState extends State<CameraScreen> {
                         textEditingController: _commentController,
                         focusNode: _commentFocusNode,
                         optionsBuilder: (TextEditingValue value) async {
-                          if (value.text.length < minLength) { //JP 1, VI 2
+                          if (value.text.length < minLength) {
+                            //JP 1, VI 2
                             return const Iterable<AutoCmp>.empty();
                           }
                           return await AutoCmpApi.search(

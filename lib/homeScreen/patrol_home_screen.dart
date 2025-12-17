@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 
 import '../LanguageFlagButton.dart';
 import '../animate/christmas_title.dart';
+import '../api/hse_master_service.dart';
+import '../model/machine_model.dart';
 import '../test.dart';
 import '../translator.dart';
 
@@ -15,27 +17,45 @@ class PatrolHomeScreen extends StatefulWidget {
 }
 
 class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
-  final List<String> factories = ['612K', '611T', '613F', '614F', 'meivy'];
-  String selectedFactory = '612K';
+  // final List<String> factories = ['612K', '611T', '613F', '614F', 'meivy'];
+
+  List<String> getPlantList(List<MachineModel> machines) {
+    return machines
+        .map((e) => e.plant?.toString().trim() ?? '')
+        .where((e) => e.isNotEmpty)
+        .toSet() // 🔥 remove duplicate
+        .toList();
+  }
+
+  // String selectedFactory = '612K';
+  String? selectedFactory;
 
   String currentLang = "VI";
 
-  void _navigateTo(BuildContext context, String title) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => Scaffold(
-          appBar: AppBar(title: Text(title)),
-          body: Center(
-            child: Text(
-              'Đây là màn hình $title\nNhà máy đang chọn: $selectedFactory',
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 20),
-            ),
-          ),
-        ),
-      ),
-    );
+  List<MachineModel> machines = [];
+  bool isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadHseMaster();
+  }
+
+  Future<void> _loadHseMaster() async {
+    try {
+      final data = await HseMasterService.fetchMachines();
+
+      final plants = getPlantList(data);
+
+      setState(() {
+        machines = data;
+        selectedFactory = plants.isNotEmpty ? plants.first : null;
+        isLoading = false;
+      });
+    } catch (e) {
+      debugPrint('Load HSE master error: $e');
+      setState(() => isLoading = false);
+    }
   }
 
   // Common decoration for glass containers
@@ -67,6 +87,9 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final List<String> factories = getPlantList(machines);
+    ;
+
     return Scaffold(
       body: Container(
         decoration: BoxDecoration(
@@ -206,6 +229,7 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
                             context,
                             MaterialPageRoute(
                               builder: (_) => CameraScreen(
+                                machines: machines,
                                 lang: currentLang,
                                 selectedPlant: selectedFactory,
                               ),

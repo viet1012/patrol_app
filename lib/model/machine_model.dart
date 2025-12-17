@@ -7,14 +7,14 @@ class MachineModel {
   MachineModel({this.plant, this.fac, this.area, this.macId});
 
   factory MachineModel.fromJson(Map<String, dynamic> json) => MachineModel(
-    plant: json['Plant'],
-    fac: json['Fac'],
-    area: json['Area'],
+    plant: json['plant'],
+    fac: json['fac'],
+    area: json['area'],
     macId: json['macId'],
   );
 }
 
-final List<MachineModel> machines = [
+final List<MachineModel> mocckMachines = [
   MachineModel(plant: "612K", fac: "Fac A", area: "Drill", macId: "A-002"),
   MachineModel(plant: "612K", fac: "Fac A", area: "Fine", macId: "A-005"),
   MachineModel(plant: "612K", fac: "Fac A", area: "Fine", macId: "A-006"),

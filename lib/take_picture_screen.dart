@@ -766,7 +766,7 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
   // Digital Zoom
   double _zoom = 1.0;
   static const double _minZoom = 1.0;
-  static const double _maxZoom = 5.0;
+  static const double _maxZoom = 10.0;
 
   Future<void> _takePhoto() async {
     if (_isCapturing || _videoElement == null) return;
@@ -808,7 +808,7 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
 
       final blob = await canvas.toBlob('image/jpeg', 0.8);
       final reader = html.FileReader();
-      reader.readAsArrayBuffer(blob!);
+      reader.readAsArrayBuffer(blob);
       await reader.onLoadEnd.first;
 
       final bytes = reader.result as Uint8List;
