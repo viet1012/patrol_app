@@ -12,7 +12,8 @@ class AutoCmpApi {
 
   static final String baseUrl = "${ApiConfig.baseUrl}/api/suggest";
 
-  static Future<List<AutoCmp>> search(String keyword) async {
+  static Future<List<AutoCmp>> search(String lang, String keyword) async {
+    print('lang: $lang');
     if (keyword.isEmpty) return [];
 
     final url = "$baseUrl/search";
@@ -37,7 +38,7 @@ class AutoCmpApi {
     }
   }
 
-  static Future<List<AutoCmp>> searchCounter(String keyword) async {
+  static Future<List<AutoCmp>> searchCounter(String lang, String keyword) async {
     if (keyword.isEmpty) return [];
 
     final url = "$baseUrl/searchCounter";

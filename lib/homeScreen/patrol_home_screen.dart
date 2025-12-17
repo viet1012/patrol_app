@@ -196,7 +196,7 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
                             context,
                             MaterialPageRoute(
                               builder: (_) =>
-                                  CameraScreen(selectedPlant: selectedFactory),
+                                  CameraScreen(lang: "VI",selectedPlant: selectedFactory),
                             ),
                           );
                         },
