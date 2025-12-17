@@ -7958,7 +7958,7 @@ break}n=$.aKe()+"/search"
 p=4
 i=t.z
 s=7
-return A.R($.aKd().LW(0,n,A.aD(["q",b],t.N,i),i),$async$a7M)
+return A.R($.aKd().LW(0,n,A.aD(["l",a,"q",b],t.N,i),i),$async$a7M)
 case 7:m=d
 if(m.c===200){l=m.a
 if(t.j.b(l)){i=J.j8(l,new A.a7Q(),t.dP)
@@ -7996,7 +7996,7 @@ break}n=$.aKe()+"/searchCounter"
 p=4
 i=t.z
 s=7
-return A.R($.aKd().LW(0,n,A.aD(["q",b],t.N,i),i),$async$a7N)
+return A.R($.aKd().LW(0,n,A.aD(["l",a,"q",b],t.N,i),i),$async$a7N)
 case 7:m=d
 if(m.c===200){l=m.a
 if(t.j.b(l)){i=J.j8(l,new A.a7O(),t.dP)
