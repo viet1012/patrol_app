@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../LanguageFlagButton.dart';
 import '../animate/christmas_title.dart';
 import '../api/hse_master_service.dart';
+import '../model/hse_patrol_team_model.dart';
 import '../model/machine_model.dart';
 import '../test.dart';
 import '../translator.dart';
@@ -34,11 +35,25 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
 
   List<MachineModel> machines = [];
   bool isLoading = true;
-
+  List<HsePatrolTeamModel> teams = [];
   @override
   void initState() {
     super.initState();
     _loadHseMaster();
+    _loadTeams();
+  }
+
+  Future<void> _loadTeams() async {
+    try {
+      final data = await HseMasterService.fetchAll();
+      setState(() {
+        teams = data;
+        isLoading = false;
+      });
+    } catch (e) {
+      debugPrint('❌ Load patrol teams error: $e');
+      setState(() => isLoading = false);
+    }
   }
 
   Future<void> _loadHseMaster() async {
@@ -230,6 +245,7 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
                             MaterialPageRoute(
                               builder: (_) => CameraScreen(
                                 machines: machines,
+                                patrolTeams: teams,
                                 lang: currentLang,
                                 selectedPlant: selectedFactory,
                               ),

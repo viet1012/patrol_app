@@ -8,6 +8,7 @@ import 'package:dropdown_search/dropdown_search.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'api/api_config.dart';
+import 'model/hse_patrol_team_model.dart';
 import 'model/machine_model.dart';
 import 'model/reason_model.dart';
 import 'api/auto_cmp_api.dart';
@@ -15,11 +16,14 @@ import 'model/auto_cmp.dart';
 
 class CameraScreen extends StatefulWidget {
   final List<MachineModel> machines;
+  final List<HsePatrolTeamModel> patrolTeams;
+
   final String? selectedPlant;
   final String lang;
   CameraScreen({
     super.key,
     required this.machines,
+    required this.patrolTeams,
     required this.selectedPlant,
     required this.lang,
   });
@@ -112,6 +116,15 @@ class _CameraScreenState extends State<CameraScreen> {
 
   List<String> get groupList =>
       List.generate(numbersGroup, (index) => 'Group ${index + 1}');
+
+  List<String> getGroupsByPlant() {
+    return widget.patrolTeams
+        .where((e) => e.plant == widget.selectedPlant)
+        .map((e) => e.grp)
+        .whereType<String>()
+        .toSet() // tránh trùng
+        .toList();
+  }
 
   List<String> getPlants() {
     final Set<String> unique = {};
@@ -328,6 +341,7 @@ class _CameraScreenState extends State<CameraScreen> {
   Widget build(BuildContext context) {
     print('Lang: ${widget.lang}');
     final plantList = getPlants();
+    final groupList = getGroupsByPlant();
 
     final facList = _selectedPlant == null
         ? []
@@ -440,7 +454,6 @@ class _CameraScreenState extends State<CameraScreen> {
             const SizedBox(height: 8),
 
             // CÁC DROPDOWN PHÍA TRÊN
-            // ... (Giữ nguyên code Dropdown của bạn)
             Row(
               children: [
                 Expanded(
@@ -468,6 +481,20 @@ class _CameraScreenState extends State<CameraScreen> {
                         _selectedFac = v;
                         _selectedArea = null;
                         _selectedMachine = null;
+
+                        final areas = getAreaByFac(_selectedPlant!, v!);
+                        if (areas.length == 1) {
+                          _selectedArea = areas.first;
+
+                          final machines = getMachineByArea(
+                            _selectedPlant!,
+                            v,
+                            areas.first,
+                          );
+                          if (machines.length == 1) {
+                            _selectedMachine = machines.first;
+                          }
+                        }
                       });
                     },
                   ),
@@ -489,6 +516,15 @@ class _CameraScreenState extends State<CameraScreen> {
                       setState(() {
                         _selectedArea = v;
                         _selectedMachine = null;
+
+                        final machines = getMachineByArea(
+                          _selectedPlant!,
+                          _selectedFac!,
+                          v!,
+                        );
+                        if (machines.length == 1) {
+                          _selectedMachine = machines.first;
+                        }
                       });
                     },
                   ),
@@ -890,11 +926,14 @@ class _CameraScreenState extends State<CameraScreen> {
 
             dropdownBuilder: (context, selectedItem) {
               return Text(
-                selectedItem?.isNotEmpty == true ? selectedItem! : "$label",
+                selectedItem?.isNotEmpty == true ? selectedItem! : label,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   fontSize: 14,
+                  fontWeight: selectedItem?.isNotEmpty == true
+                      ? FontWeight.bold
+                      : FontWeight.w500,
                   color: selectedItem?.isNotEmpty == true
                       ? Colors.black87
                       : Colors.grey[600],
@@ -934,7 +973,11 @@ class _CameraScreenState extends State<CameraScreen> {
               maxLines: 2,
               softWrap: true,
               overflow: TextOverflow.visible,
-              style: TextStyle(fontSize: 14, color: Colors.black87),
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.black,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           );
         }).toList();
