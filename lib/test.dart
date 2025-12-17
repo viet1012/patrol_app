@@ -342,6 +342,7 @@ class _CameraScreenState extends State<CameraScreen> {
 
     final symbol = getScoreSymbol();
     final displayScore = symbol.isEmpty ? "" : symbol;
+    final minLength = (widget.lang == 'JP') ? 1: 2;
 
     return Scaffold(
       backgroundColor: Colors.blueGrey.shade200,
@@ -579,6 +580,7 @@ class _CameraScreenState extends State<CameraScreen> {
             // ---------------------------------------------------------
             // PHẦN AUTO COMPLETE ĐÃ TỐI ƯU CHO MOBILE
             // ---------------------------------------------------------
+
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -590,7 +592,7 @@ class _CameraScreenState extends State<CameraScreen> {
                         textEditingController: _commentController,
                         focusNode: _commentFocusNode,
                         optionsBuilder: (TextEditingValue value) async {
-                          if (value.text.length < 2) {
+                          if (value.text.length < minLength) { //JP 1, VI 2
                             return const Iterable<AutoCmp>.empty();
                           }
                           return await AutoCmpApi.search(
@@ -662,7 +664,7 @@ class _CameraScreenState extends State<CameraScreen> {
                           if (value.text.isEmpty) {
                             return const Iterable<AutoCmp>.empty();
                           }
-                          if (value.text.length < 2) {
+                          if (value.text.length < minLength) {
                             return const Iterable<AutoCmp>.empty();
                           }
                           return await AutoCmpApi.searchCounter(
