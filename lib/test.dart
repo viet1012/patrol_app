@@ -13,6 +13,7 @@ import 'model/machine_model.dart';
 import 'model/reason_model.dart';
 import 'api/auto_cmp_api.dart';
 import 'model/auto_cmp.dart';
+import 'dart:async';
 
 class CameraScreen extends StatefulWidget {
   final List<MachineModel> machines;
@@ -20,6 +21,7 @@ class CameraScreen extends StatefulWidget {
 
   final String? selectedPlant;
   final String lang;
+
   CameraScreen({
     super.key,
     required this.machines,
@@ -53,8 +55,19 @@ class _CameraScreenState extends State<CameraScreen> {
   final TextEditingController _counterController = TextEditingController();
   final FocusNode _counterFocusNode = FocusNode();
 
+  final LayerLink _commentLayerLink = LayerLink();
+  final LayerLink _counterLayerLink = LayerLink();
+
+  List<AutoCmp> _commentOptions = [];
+  List<AutoCmp> _counterOptions = [];
+
+  Timer? _commentDebounce;
+  Timer? _counterDebounce;
+
   @override
   void dispose() {
+    _commentDebounce?.cancel();
+    _counterDebounce?.cancel();
     _commentController.dispose();
     _commentFocusNode.dispose();
     _counterController.dispose();
@@ -629,65 +642,108 @@ class _CameraScreenState extends State<CameraScreen> {
                 Expanded(
                   child: LayoutBuilder(
                     builder: (context, constraints) {
-                      return RawAutocomplete<AutoCmp>(
-                        textEditingController: _commentController,
-                        focusNode: _commentFocusNode,
-                        optionsBuilder: (TextEditingValue value) async {
+                      return Autocomplete<AutoCmp>(
+                        optionsViewOpenDirection: OptionsViewOpenDirection.up,
+                        optionsBuilder: (TextEditingValue value) {
                           if (value.text.length < minLength) {
-                            //JP 1, VI 2
                             return const Iterable<AutoCmp>.empty();
                           }
-                          return await AutoCmpApi.search(
-                            widget.lang,
-                            value.text,
-                          ); //@@
+                          return AutoCmpApi.search(widget.lang, value.text);
                         },
-                        displayStringForOption: (AutoCmp option) =>
-                            option.inputText,
+                        displayStringForOption: (option) => option.inputText,
                         onSelected: (AutoCmp selection) {
+                          // Khi CHỌN gợi ý → điền vào comment
                           _commentController.text = selection.inputText;
+                          _commentController.selection = TextSelection.fromPosition(
+                            TextPosition(offset: selection.inputText.length),
+                          ); // Đưa con trỏ ra cuối
                           _comment = selection.inputText;
-                          // LINKING: Tự động điền sang ô Countermeasure
+
+                          // === TỰ ĐỘNG ĐIỀN COUNTERMEASURE NẾU CÓ ===
                           if (selection.countermeasure.isNotEmpty) {
                             _counterController.text = selection.countermeasure;
                             _counterMeasure = selection.countermeasure;
+                          } else {
+                            // Nếu không có countermeasure → để trống (tùy yêu cầu)
+                            _counterController.clear();
+                            _counterMeasure = '';
                           }
                         },
-                        fieldViewBuilder:
-                            (context, controller, focusNode, onFieldSubmitted) {
-                              return TextField(
-                                controller: controller,
-                                focusNode: focusNode,
-                                maxLines: 2,
-                                decoration: InputDecoration(
-                                  hintText: "commentHint".tr(context),
-                                  filled: true,
-                                  fillColor: Colors.yellow.shade50,
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  contentPadding: const EdgeInsets.all(
-                                    12,
-                                  ), // ✅ Tối ưu padding
-                                ),
-                                onChanged: (v) {
-                                  _comment = v;
-                                  // CLEARING: Xóa comment thì xóa luôn countermeasure
-                                  if (v.trim().isEmpty) {
-                                    _counterController.clear();
-                                    _counterMeasure = '';
-                                  }
-                                },
-                              );
-                            },
-                        // ✅ Dùng hàm custom builder tối ưu cho mobile, truyền chiều rộng vào
-                        optionsViewBuilder: (context, onSelected, options) =>
-                            _customOptionsViewBuilder(
-                              context,
-                              onSelected,
-                              options,
-                              constraints.maxWidth,
+                        fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
+                          return TextField(
+                            controller: controller,
+                            focusNode: focusNode,
+                            maxLines: 2,
+                            decoration: InputDecoration(
+                              hintText: "commentHint".tr(context),
+                              filled: true,
+                              fillColor: Colors.yellow.shade50,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              contentPadding: const EdgeInsets.all(12),
                             ),
+                            onChanged: (v) {
+                              _comment = v;
+
+                              // Debounce search
+                              if (_commentDebounce?.isActive ?? false) {
+                                _commentDebounce!.cancel();
+                              }
+                              _commentDebounce = Timer(const Duration(milliseconds: 300), () async {
+                                if (v.length < minLength) return;
+                                final result = await AutoCmpApi.search(widget.lang, v);
+                                setState(() => _commentOptions = result);
+                              });
+
+                              // === KHI XÓA HẾT COMMENT → XÓA LUÔN COUNTERMEASURE ===
+                              if (v.trim().isEmpty) {
+                                _counterController.clear();
+                                _counterMeasure = '';
+                              }
+                            },
+                          );
+                        },
+                        optionsViewBuilder: (context, onSelected, options) {
+                          return Align(
+                            alignment: Alignment.topLeft,
+                            child: Transform.translate(
+                              offset: const Offset(0, 8), // Sát ô, đẹp đều
+                              child: Material(
+                                elevation: 8,
+                                borderRadius: BorderRadius.circular(12),
+                                color: Colors.white,
+                                child: ConstrainedBox(
+                                  constraints: BoxConstraints(
+                                    maxWidth: constraints.maxWidth,
+                                    maxHeight: 220,
+                                  ),
+                                  child: ListView.separated(
+                                    padding: EdgeInsets.zero,
+                                    shrinkWrap: true,
+                                    itemCount: options.length,
+                                    separatorBuilder: (_, __) => const Divider(height: 1, thickness: 0.5),
+                                    itemBuilder: (context, index) {
+                                      final option = options.elementAt(index);
+                                      return InkWell(
+                                        onTap: () => onSelected(option),
+                                        child: Padding(
+                                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                                          child: Text(
+                                            option.inputText,
+                                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                                            maxLines: 3,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        },
                       );
                     },
                   ),
@@ -695,60 +751,93 @@ class _CameraScreenState extends State<CameraScreen> {
 
                 const SizedBox(width: 8),
 
-                // Ô 2: COUNTERMEASURE
+                // Ô 2: COUNTERMEASURE (giữ nguyên, không cần linking ngược)
                 Expanded(
                   child: LayoutBuilder(
                     builder: (context, constraints) {
-                      return RawAutocomplete<AutoCmp>(
-                        textEditingController: _counterController,
-                        focusNode: _counterFocusNode,
-                        optionsBuilder: (TextEditingValue value) async {
-                          if (value.text.isEmpty) {
-                            return const Iterable<AutoCmp>.empty();
-                          }
+                      return Autocomplete<AutoCmp>(
+                        optionsViewOpenDirection: OptionsViewOpenDirection.up,
+                        optionsBuilder: (TextEditingValue value) {
                           if (value.text.length < minLength) {
                             return const Iterable<AutoCmp>.empty();
                           }
-                          return await AutoCmpApi.searchCounter(
-                            widget.lang,
-                            value.text,
-                          );
+                          return AutoCmpApi.searchCounter(widget.lang, value.text);
                         },
-                        displayStringForOption: (opt) => opt.inputText,
+                        displayStringForOption: (option) => option.inputText,
                         onSelected: (AutoCmp selection) {
                           _counterController.text = selection.inputText;
+                          _counterController.selection = TextSelection.fromPosition(
+                            TextPosition(offset: selection.inputText.length),
+                          );
                           _counterMeasure = selection.inputText;
                         },
-                        fieldViewBuilder:
-                            (context, controller, focusNode, onFieldSubmitted) {
-                              return TextField(
-                                controller: controller,
-                                focusNode: focusNode,
-                                maxLines: 2,
-                                decoration: InputDecoration(
-                                  hintText: "counterMeasureHint".tr(context),
-                                  filled: true,
-                                  fillColor: Colors.yellow.shade50,
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  contentPadding: const EdgeInsets.all(
-                                    12,
-                                  ), // ✅ Tối ưu padding
-                                ),
-                                onChanged: (v) {
-                                  _counterMeasure = v;
-                                },
-                              );
-                            },
-                        // ✅ Dùng hàm custom builder tối ưu cho mobile
-                        optionsViewBuilder: (context, onSelected, options) =>
-                            _customOptionsViewBuilder(
-                              context,
-                              onSelected,
-                              options,
-                              constraints.maxWidth,
+                        fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
+                          return TextField(
+                            controller: controller,
+                            focusNode: focusNode,
+                            maxLines: 2,
+                            decoration: InputDecoration(
+                              hintText: "counterMeasureHint".tr(context),
+                              filled: true,
+                              fillColor: Colors.yellow.shade50,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              contentPadding: const EdgeInsets.all(12),
                             ),
+                            onChanged: (v) {
+                              _counterMeasure = v;
+                              if (_counterDebounce?.isActive ?? false) {
+                                _counterDebounce!.cancel();
+                              }
+                              _counterDebounce = Timer(const Duration(milliseconds: 300), () async {
+                                if (v.length < minLength) return;
+                                final result = await AutoCmpApi.searchCounter(widget.lang, v);
+                                setState(() => _counterOptions = result);
+                              });
+                            },
+                          );
+                        },
+                        optionsViewBuilder: (context, onSelected, options) {
+                          return Align(
+                            alignment: Alignment.topLeft,
+                            child: Transform.translate(
+                              offset: const Offset(0, 8),
+                              child: Material(
+                                elevation: 8,
+                                borderRadius: BorderRadius.circular(12),
+                                color: Colors.white,
+                                child: ConstrainedBox(
+                                  constraints: BoxConstraints(
+                                    maxWidth: constraints.maxWidth,
+                                    maxHeight: 220,
+                                  ),
+                                  child: ListView.separated(
+                                    padding: EdgeInsets.zero,
+                                    shrinkWrap: true,
+                                    itemCount: options.length,
+                                    separatorBuilder: (_, __) => const Divider(height: 1, thickness: 0.5),
+                                    itemBuilder: (context, index) {
+                                      final option = options.elementAt(index);
+                                      return InkWell(
+                                        onTap: () => onSelected(option),
+                                        child: Padding(
+                                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                                          child: Text(
+                                            option.inputText,
+                                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                                            maxLines: 3,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        },
                       );
                     },
                   ),
@@ -796,64 +885,102 @@ class _CameraScreenState extends State<CameraScreen> {
   }
 
   // 🔴 HÀM MỚI: Xây dựng giao diện Dropdown tối ưu cho Mobile
+  // Widget _customOptionsViewBuilder(
+  //   BuildContext context,
+  //   AutocompleteOnSelected<AutoCmp> onSelected,
+  //   Iterable<AutoCmp> options,
+  //   double width, // Chiều rộng chính xác từ LayoutBuilder
+  // ) {
+  //   return Align(
+  //     alignment: Alignment.topLeft,
+  //     child: Material(
+  //       elevation: 8.0, // Đổ bóng
+  //       borderRadius: BorderRadius.circular(12),
+  //       color: Colors.white,
+  //       child: ConstrainedBox(
+  //         constraints: BoxConstraints(
+  //           maxWidth: width, // Rộng bằng đúng ô input
+  //           maxHeight: 200, // ✅ Giới hạn chiều cao quan trọng
+  //         ),
+  //         child: ListView.separated(
+  //           padding: EdgeInsets.zero,
+  //           shrinkWrap: true,
+  //           itemCount: options.length,
+  //           separatorBuilder: (context, index) =>
+  //               const Divider(height: 1, thickness: 0.5),
+  //           itemBuilder: (BuildContext context, int index) {
+  //             final AutoCmp option = options.elementAt(index);
+  //             return InkWell(
+  //               onTap: () => onSelected(option),
+  //               child: Padding(
+  //                 padding: const EdgeInsets.symmetric(
+  //                   horizontal: 16,
+  //                   vertical: 12,
+  //                 ), // Tăng vùng chạm
+  //                 child: Column(
+  //                   crossAxisAlignment: CrossAxisAlignment.start,
+  //                   children: [
+  //                     Text(
+  //                       option.inputText,
+  //                       style: const TextStyle(
+  //                         fontWeight: FontWeight.w600,
+  //                         fontSize: 14,
+  //                       ),
+  //                       maxLines: 2,
+  //                       overflow: TextOverflow.ellipsis,
+  //                     ),
+  //                   ],
+  //                 ),
+  //               ),
+  //             );
+  //           },
+  //         ),
+  //       ),
+  //     ),
+  //   );
+  // }
+
   Widget _customOptionsViewBuilder(
     BuildContext context,
     AutocompleteOnSelected<AutoCmp> onSelected,
     Iterable<AutoCmp> options,
-    double width, // Chiều rộng chính xác từ LayoutBuilder
+    double width,
+    LayerLink layerLink,
   ) {
-    return Align(
-      alignment: Alignment.topLeft,
+    const double popupHeight = 200;
+
+    return CompositedTransformFollower(
+      link: layerLink, // ✅ đúng target
+      showWhenUnlinked: false,
+      offset: const Offset(0, -popupHeight - 12),
       child: Material(
-        elevation: 8.0, // Đổ bóng
+        elevation: 8,
         borderRadius: BorderRadius.circular(12),
-        color: Colors.white,
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            maxWidth: width, // Rộng bằng đúng ô input
-            maxHeight: 200, // ✅ Giới hạn chiều cao quan trọng
-          ),
+        child: SizedBox(
+          width: width,
+          height: popupHeight,
           child: ListView.separated(
             padding: EdgeInsets.zero,
-            shrinkWrap: true,
             itemCount: options.length,
-            separatorBuilder: (context, index) =>
+            separatorBuilder: (_, __) =>
                 const Divider(height: 1, thickness: 0.5),
-            itemBuilder: (BuildContext context, int index) {
-              final AutoCmp option = options.elementAt(index);
+            itemBuilder: (context, index) {
+              final option = options.elementAt(index);
               return InkWell(
                 onTap: () => onSelected(option),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 16,
                     vertical: 12,
-                  ), // Tăng vùng chạm
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        option.inputText,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      // Có thể hiển thị thêm thông tin liên quan
-                      // if (option.note?.isNotEmpty == true) ...[
-                      //   const SizedBox(height: 4),
-                      //   Text(
-                      //     option.note!,
-                      //     style: TextStyle(
-                      //       fontSize: 12,
-                      //       color: Colors.grey[600],
-                      //     ),
-                      //     maxLines: 1,
-                      //     overflow: TextOverflow.ellipsis,
-                      //   ),
-                      // ],
-                    ],
+                  ),
+                  child: Text(
+                    option.inputText,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
               );
