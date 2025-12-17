@@ -9,6 +9,7 @@ import '../model/hse_patrol_team_model.dart';
 import '../model/machine_model.dart';
 import '../test.dart';
 import '../translator.dart';
+import '../widget/error_display.dart';
 
 class PatrolHomeScreen extends StatefulWidget {
   const PatrolHomeScreen({super.key});
@@ -35,7 +36,9 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
 
   List<MachineModel> machines = [];
   bool isLoading = true;
+  String? errorMessage;
   List<HsePatrolTeamModel> teams = [];
+
   @override
   void initState() {
     super.initState();
@@ -44,6 +47,11 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
   }
 
   Future<void> _loadTeams() async {
+    setState(() {
+      isLoading = true;
+      errorMessage = null;
+    });
+
     try {
       final data = await HseMasterService.fetchAll();
       setState(() {
@@ -52,7 +60,10 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
       });
     } catch (e) {
       debugPrint('❌ Load patrol teams error: $e');
-      setState(() => isLoading = false);
+      setState(() {
+        errorMessage = e.toString();
+        isLoading = false;
+      });
     }
   }
 
@@ -63,13 +74,21 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
       final plants = getPlantList(data);
 
       setState(() {
+        isLoading = true;
+        errorMessage = null;
+      });
+
+      setState(() {
         machines = data;
         selectedFactory = plants.isNotEmpty ? plants.first : null;
         isLoading = false;
       });
     } catch (e) {
       debugPrint('Load HSE master error: $e');
-      setState(() => isLoading = false);
+      setState(() {
+        errorMessage = e.toString();
+        isLoading = false;
+      });
     }
   }
 
@@ -119,158 +138,174 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
           ),
         ),
         child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-
-              children: [
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: LanguageToggleSwitch(
-                    onLanguageChanged: (lang) {
-                      setState(() {
-                        currentLang = lang;
-                      });
-
-                      debugPrint("📢 Language from child: $lang");
-                    },
+          child: isLoading
+              ? Center(
+                  child: CircularProgressIndicator(
+                    color: Colors.lightBlueAccent.shade400,
                   ),
-                ),
-                const SizedBox(height: 16),
+                )
+              : errorMessage != null && errorMessage!.isNotEmpty
+              ? ErrorDisplay(
+                  errorMessage: errorMessage!,
+                  onRetry: () {
+                    _loadHseMaster();
+                    _loadTeams();
+                  },
+                )
+              : Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 20,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
 
-                Center(
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(24),
-                    child: BackdropFilter(
-                      filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          vertical: 16,
-                          horizontal: 32,
+                    children: [
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: LanguageToggleSwitch(
+                          onLanguageChanged: (lang) {
+                            setState(() {
+                              currentLang = lang;
+                            });
+
+                            debugPrint("📢 Language from child: $lang");
+                          },
                         ),
-                        decoration: glassDecoration,
-                        child: Column(
-                          children: [
-                            const Text(
-                              'SAFETY CROSS PATROL',
-                              style: TextStyle(
-                                fontSize: 22,
-                                fontWeight: FontWeight.w900,
-                                color: Colors.white,
-                                letterSpacing: 2,
+                      ),
+                      const SizedBox(height: 16),
+
+                      Center(
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(24),
+                          child: BackdropFilter(
+                            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                vertical: 16,
+                                horizontal: 32,
                               ),
+                              decoration: glassDecoration,
+                              child: Column(
+                                children: [
+                                  const Text(
+                                    'SAFETY CROSS PATROL',
+                                    style: TextStyle(
+                                      fontSize: 22,
+                                      fontWeight: FontWeight.w900,
+                                      color: Colors.white,
+                                      letterSpacing: 2,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 30),
+
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(16),
+                        child: BackdropFilter(
+                          filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              vertical: 8,
+                              horizontal: 12,
+                            ),
+                            decoration: glassDecorationSmall,
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  "plant".tr(context),
+                                  style: const TextStyle(
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white70,
+                                  ),
+                                ),
+                                DropdownButton<String>(
+                                  value: selectedFactory,
+                                  dropdownColor: Colors.blueGrey.shade900
+                                      .withOpacity(0.9),
+                                  underline: const SizedBox(),
+                                  icon: const Icon(
+                                    Icons.arrow_drop_down,
+                                    color: Colors.white70,
+                                    size: 30,
+                                  ),
+                                  style: const TextStyle(
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                  borderRadius: BorderRadius.circular(12),
+                                  items: factories
+                                      .map(
+                                        (f) => DropdownMenuItem(
+                                          value: f,
+                                          child: Text(f),
+                                        ),
+                                      )
+                                      .toList(),
+                                  onChanged: (val) {
+                                    if (val != null) {
+                                      setState(() {
+                                        selectedFactory = val;
+                                      });
+                                    }
+                                  },
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 50),
+
+                      Expanded(
+                        child: ListView(
+                          children: [
+                            _patrolButton(
+                              number: '1)',
+                              title: 'Patrol Before',
+                              enabled: true,
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => CameraScreen(
+                                      machines: machines,
+                                      patrolTeams: teams,
+                                      lang: currentLang,
+                                      selectedPlant: selectedFactory,
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                            const SizedBox(height: 20),
+                            _patrolButton(
+                              number: '2)',
+                              title: 'Patrol After',
+                              enabled: false,
+                            ),
+                            const SizedBox(height: 20),
+                            _patrolButton(
+                              number: '3)',
+                              title: 'Patrol HSE check',
+                              enabled: false,
                             ),
                           ],
                         ),
                       ),
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 30),
-
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(16),
-                  child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        vertical: 8,
-                        horizontal: 12,
-                      ),
-                      decoration: glassDecorationSmall,
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            "plant".tr(context),
-                            style: const TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white70,
-                            ),
-                          ),
-                          DropdownButton<String>(
-                            value: selectedFactory,
-                            dropdownColor: Colors.blueGrey.shade900.withOpacity(
-                              0.9,
-                            ),
-                            underline: const SizedBox(),
-                            icon: const Icon(
-                              Icons.arrow_drop_down,
-                              color: Colors.white70,
-                              size: 30,
-                            ),
-                            style: const TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                            borderRadius: BorderRadius.circular(12),
-                            items: factories
-                                .map(
-                                  (f) => DropdownMenuItem(
-                                    value: f,
-                                    child: Text(f),
-                                  ),
-                                )
-                                .toList(),
-                            onChanged: (val) {
-                              if (val != null) {
-                                setState(() {
-                                  selectedFactory = val;
-                                });
-                              }
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 50),
-
-                Expanded(
-                  child: ListView(
-                    children: [
-                      _patrolButton(
-                        number: '1)',
-                        title: 'Patrol Before',
-                        enabled: true,
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => CameraScreen(
-                                machines: machines,
-                                patrolTeams: teams,
-                                lang: currentLang,
-                                selectedPlant: selectedFactory,
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                      const SizedBox(height: 20),
-                      _patrolButton(
-                        number: '2)',
-                        title: 'Patrol After',
-                        enabled: false,
-                      ),
-                      const SizedBox(height: 20),
-                      _patrolButton(
-                        number: '3)',
-                        title: 'Patrol HSE check',
-                        enabled: false,
-                      ),
                     ],
                   ),
                 ),
-              ],
-            ),
-          ),
         ),
       ),
     );

@@ -1,38 +1,50 @@
-import 'dart:convert';
-import 'package:http/http.dart' as http;
+import 'package:dio/dio.dart';
 
 import '../model/hse_patrol_team_model.dart';
 import '../model/machine_model.dart';
-import 'api_config.dart';
+import 'dio_client.dart';
 
 class HseMasterService {
-  static String baseUrl = ApiConfig.baseUrl;
-
+  /// GET /api/hse_master
   static Future<List<MachineModel>> fetchMachines() async {
-    final res = await http.get(
-      Uri.parse('$baseUrl/api/hse_master'),
-      headers: {'Content-Type': 'application/json'},
-    );
+    try {
+      final Response res = await DioClient.dio.get('/api/hse_master');
 
-    if (res.statusCode == 200) {
-      final List data = jsonDecode(res.body);
+      final List data = res.data;
       return data.map((e) => MachineModel.fromJson(e)).toList();
-    } else {
-      throw Exception('Failed to load HSE master');
+    } on DioException catch (e) {
+      throw Exception(_handleDioError(e));
     }
   }
 
+  /// GET /api/hse/patrol-teams
   static Future<List<HsePatrolTeamModel>> fetchAll() async {
-    final res = await http.get(
-      Uri.parse('$baseUrl/api/hse/patrol-teams'),
-      headers: {'Content-Type': 'application/json'},
-    );
+    try {
+      final Response res = await DioClient.dio.get('/api/hse/patrol-teams');
 
-    if (res.statusCode == 200) {
-      final List data = jsonDecode(res.body);
+      final List data = res.data;
       return data.map((e) => HsePatrolTeamModel.fromJson(e)).toList();
-    } else {
-      throw Exception('Failed to load patrol teams');
+    } on DioException catch (e) {
+      throw Exception(_handleDioError(e));
     }
+  }
+
+  /// X? lý l?i Dio chu?n
+  static String _handleDioError(DioException e) {
+    if (e.type == DioExceptionType.connectionTimeout ||
+        e.type == DioExceptionType.receiveTimeout) {
+      return 'Connection to server timed out';
+    }
+
+    if (e.type == DioExceptionType.connectionError) {
+      return 'Unable to connect to the server';
+    }
+
+    if (e.response != null) {
+      return 'Server error ${e.response?.statusCode}: '
+          '${e.response?.data ?? 'Unknown error'}';
+    }
+
+    return 'Unknown error occurred';
   }
 }
