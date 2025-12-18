@@ -665,6 +665,67 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
     sttSocket!.connect();
   }
 
+  static const int maxImages = 5;
+
+  Future<void> pickImagesFromDevice(BuildContext context) async {
+    final remain = maxImages - _capturedImages.length;
+
+    // ❌ Đã đủ ảnh → báo ngay
+    if (remain <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("You can upload up to 5 images only."),
+          backgroundColor: Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    final uploadInput = html.FileUploadInputElement()
+      ..accept = 'image/*'
+      ..multiple = true;
+
+    uploadInput.click();
+
+    uploadInput.onChange.listen((event) async {
+      final files = uploadInput.files;
+      if (files == null || files.isEmpty) return;
+
+      // ⚠️ Nếu chọn vượt quá số còn lại → báo
+      if (files.length > remain) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              "You can select only $remain more image${remain > 1 ? 's' : ''} "
+              "(maximum $maxImages images).",
+            ),
+            backgroundColor: Colors.orange,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+
+      final selectedFiles = files.take(remain);
+
+      for (final file in selectedFiles) {
+        final reader = html.FileReader();
+        reader.readAsArrayBuffer(file);
+        await reader.onLoadEnd.first;
+
+        final bytes = reader.result as Uint8List;
+
+        setState(() {
+          _capturedImages.add(bytes);
+        });
+      }
+
+      widget.onImagesChanged?.call(_capturedImages);
+    });
+  }
+
+  bool get canUpload => _capturedImages.length < maxImages;
+
   @override
   void initState() {
     super.initState();
@@ -701,11 +762,6 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
         _fac = newFac;
         _group = newGroup;
       });
-
-      // if (_group.isNotEmpty) {
-      //   _loadStt(); // ✅ LẤY STT NGAY
-      //   _connectSocket(); // ✅ MỞ SOCKET
-      // }
 
       debugPrint("CameraPreviewBox updated: fac=$_fac, group=$_group");
     }
@@ -890,6 +946,22 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
                       ),
                     ),
                   ],
+                ),
+              ),
+            ),
+
+            Positioned(
+              bottom: 14,
+              left: 14,
+              child: GestureDetector(
+                onTap: canUpload ? () => pickImagesFromDevice(context) : null,
+                child: GlassCircleButton(
+                  size: 50,
+                  child: Icon(
+                    Icons.upload_rounded,
+                    color: canUpload ? Colors.white : Colors.grey,
+                    size: 30,
+                  ),
                 ),
               ),
             ),

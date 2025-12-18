@@ -1,9 +1,12 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:shimmer/shimmer.dart';
 
 import '../LanguageFlagButton.dart';
+import '../animate/call_to_action_arrow.dart';
 import '../animate/christmas_title.dart';
+import '../animate/glow_title.dart';
 import '../api/hse_master_service.dart';
 import '../model/hse_patrol_team_model.dart';
 import '../model/machine_model.dart';
@@ -174,7 +177,6 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
                         ),
                       ),
                       const SizedBox(height: 16),
-
                       Center(
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(24),
@@ -186,24 +188,13 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
                                 horizontal: 32,
                               ),
                               decoration: glassDecoration,
-                              child: Column(
-                                children: [
-                                  const Text(
-                                    'SAFETY CROSS PATROL',
-                                    style: TextStyle(
-                                      fontSize: 22,
-                                      fontWeight: FontWeight.w900,
-                                      color: Colors.white,
-                                      letterSpacing: 2,
-                                    ),
-                                  ),
-                                ],
+                              child: EmbossGlowTitle(
+                                text: 'SAFETY CROSS PATROL',
                               ),
                             ),
                           ),
                         ),
                       ),
-
                       const SizedBox(height: 30),
 
                       ClipRRect(
@@ -265,7 +256,7 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
                         ),
                       ),
 
-                      const SizedBox(height: 50),
+                      const SizedBox(height: 30),
 
                       Expanded(
                         child: ListView(
@@ -380,7 +371,10 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
                       ],
                     ),
                   ),
-                  Icon(Icons.arrow_forward_ios, color: color, size: 30),
+                  if (enabled)
+                    CallToActionArrow(color: color)
+                  else
+                    Icon(Icons.lock_outline, color: color, size: 26),
                 ],
               ),
             ),

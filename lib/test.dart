@@ -1043,16 +1043,60 @@ class _CameraScreenState extends State<CameraScreen> {
           child: DropdownSearch<String>(
             popupProps: PopupProps.menu(
               showSearchBox: true,
-              isFilterOnline: true,
+              fit: FlexFit.loose,
+              menuProps: MenuProps(
+                backgroundColor: Colors.white,
+                elevation: 8,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+              ),
               searchFieldProps: TextFieldProps(
                 decoration: InputDecoration(
                   hintText: "search_or_add_new".tr(context),
+                  filled: true,
+                  fillColor: Colors.blueGrey.shade50,
+                  prefixIcon: const Icon(Icons.search_rounded),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 12,
+                  ),
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.all(Radius.circular(12)),
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
                   ),
                 ),
               ),
+              // itemBuilder: (context, item, isSelected) {
+              //   return Container(
+              //     margin: const EdgeInsets.symmetric(
+              //       horizontal: 6,
+              //       vertical: 2,
+              //     ),
+              //     padding: const EdgeInsets.symmetric(
+              //       horizontal: 14,
+              //       vertical: 12,
+              //     ),
+              //     decoration: BoxDecoration(
+              //       borderRadius: BorderRadius.circular(12),
+              //       color: isSelected
+              //           ? Colors.blueGrey.shade100
+              //           : Colors.transparent,
+              //     ),
+              //     child: Text(
+              //       item,
+              //       style: TextStyle(
+              //         fontSize: 14,
+              //         fontWeight: isSelected
+              //             ? FontWeight.w600
+              //             : FontWeight.w500,
+              //         color: Colors.blueGrey.shade900,
+              //       ),
+              //     ),
+              //   );
+              // },
             ),
+
             // ... (các logic asyncItems, compareFn, v.v. giữ nguyên)
             asyncItems: (String filter) async {
               var result = items
