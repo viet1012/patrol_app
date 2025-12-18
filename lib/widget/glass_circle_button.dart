@@ -1,73 +1,101 @@
 import 'dart:ui';
-
 import 'package:flutter/material.dart';
 
 class GlassCircleButton extends StatelessWidget {
   final double size;
   final Widget? child;
   final bool showProgress;
+  final VoidCallback? onTap;
 
   const GlassCircleButton({
-    Key? key,
+    super.key,
     required this.size,
     this.child,
     this.showProgress = false,
-  }) : super(key: key);
+    this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.blueGrey.withOpacity(0.35),
-            blurRadius: 16,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: ClipOval(
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            // 🧊 GLASS BLUR
-            BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-              child: Container(
+    return GestureDetector(
+      onTap: showProgress ? null : onTap,
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          boxShadow: [
+            // 🌫 Outer soft shadow
+            BoxShadow(
+              color: Colors.black.withOpacity(0.25),
+              blurRadius: 20,
+              offset: const Offset(0, 12),
+            ),
+          ],
+        ),
+        child: ClipOval(
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              // 🧊 BACKDROP BLUR
+              BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+                child: Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    // 🌈 Glass gradient
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        Colors.white.withOpacity(0.35),
+                        Colors.white.withOpacity(0.10),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+
+              // ✨ INNER HIGHLIGHT
+              Container(
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.white.withOpacity(0.15),
+                  gradient: RadialGradient(
+                    center: const Alignment(-0.4, -0.4),
+                    radius: 1.1,
+                    colors: [
+                      Colors.white.withOpacity(0.35),
+                      Colors.transparent,
+                    ],
+                  ),
                 ),
               ),
-            ),
 
-            // ✨ SUBTLE BORDER
-            Container(
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: Colors.white.withOpacity(0.45),
-                  width: 2,
+              // 🪟 GLASS BORDER
+              Container(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: Colors.white.withOpacity(0.55),
+                    width: 1.5,
+                  ),
                 ),
               ),
-            ),
 
-            // 🔄 LOADING OR CONTENT
-            if (showProgress)
-              const SizedBox(
-                width: 28,
-                height: 28,
-                child: CircularProgressIndicator(
-                  strokeWidth: 3,
-                  color: Colors.white,
-                ),
-              )
-            else
-              child ?? const SizedBox.shrink(),
-          ],
+              // 🔄 LOADING OR CONTENT
+              if (showProgress)
+                const SizedBox(
+                  width: 28,
+                  height: 28,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 3,
+                    color: Colors.white,
+                  ),
+                )
+              else
+                child ?? const SizedBox.shrink(),
+            ],
+          ),
         ),
       ),
     );

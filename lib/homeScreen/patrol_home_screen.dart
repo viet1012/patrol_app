@@ -127,11 +127,11 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
     return Scaffold(
       body: Container(
         decoration: BoxDecoration(
-          gradient: LinearGradient(
+          gradient: const LinearGradient(
             colors: [
-              Colors.blueGrey.shade900,
-              Colors.blueGrey.shade700,
-              Colors.blueGrey.shade600,
+              Color(0xFF0F2027), // deep blue-black
+              Color(0xFF203A43), // tech blue
+              Color(0xFF2C5364), // cyan blue
             ],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,

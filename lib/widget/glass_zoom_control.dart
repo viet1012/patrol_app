@@ -22,14 +22,14 @@ class GlassZoomControl extends StatelessWidget {
     return ClipRRect(
       borderRadius: BorderRadius.circular(14),
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
         child: Container(
           width: 96,
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.16),
+            color: Colors.white.withOpacity(0.04),
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: Colors.white.withOpacity(0.30), width: 1),
+            border: Border.all(color: Colors.white.withOpacity(0.5), width: 1),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -39,7 +39,7 @@ class GlassZoomControl extends StatelessWidget {
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 12,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
               SizedBox(

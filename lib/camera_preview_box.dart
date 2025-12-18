@@ -852,13 +852,6 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
               height: widget.size,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.30),
-                    blurRadius: 18,
-                    offset: const Offset(0, 10),
-                  ),
-                ],
               ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(20),
@@ -917,7 +910,7 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
                       color: Colors.white.withOpacity(0.18), // nền kính
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
-                        color: Colors.white.withOpacity(0.35), // viền kính
+                        color: Colors.white.withOpacity(0.5), // viền kính
                         width: 1,
                       ),
                       boxShadow: [

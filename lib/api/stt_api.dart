@@ -1,55 +1,34 @@
-import 'package:dio/dio.dart';
 import 'dart:developer';
+import 'package:dio/dio.dart';
 
-import 'api_config.dart';
+import '../network/dio_error_handler.dart';
+import 'dio_client.dart';
 
 class SttApi {
-  static final Dio _dio = Dio();
+  static final Dio _dio = DioClient.dio;
 
-  static String normalize(String? group) {
-    return group == null ? '' : group.replaceAll(' ', '').trim();
-  }
+  static String normalize(String? v) =>
+      v == null ? '' : v.replaceAll(' ', '').trim();
 
   static Future<int> getCurrentStt({
     required String fac,
     required String group,
   }) async {
-    final facClean = normalize(fac);
-    final grpClean = normalize(group);
-
-    final url = "${ApiConfig.baseUrl}/api/stt/crt";
-    final params = {'fac': facClean, 'grp': grpClean};
-
     try {
-      log("🚀 GET STT API");
-      log("URL: $url");
-      log("Params: $params");
-
-      final response = await _dio.get(
-        url,
-        queryParameters: params,
-        options: Options(headers: {'ngrok-skip-browser-warning': 'true'}),
+      final res = await _dio.get(
+        '/api/stt/crt',
+        queryParameters: {'fac': normalize(fac), 'grp': normalize(group)},
       );
 
-      log("📥 RESPONSE");
-      log("StatusCode: ${response.statusCode}");
-      log("Body: ${response.data}");
-
-      if (response.statusCode == 200) {
-        if (response.data is int) {
-          return response.data;
-        }
-        if (response.data is String) {
-          return int.tryParse(response.data) ?? 0;
-        }
-        throw Exception("Unexpected response: ${response.data}");
+      if (res.statusCode == 200) {
+        final data = res.data;
+        if (data is int) return data;
+        if (data is String) return int.tryParse(data) ?? 0;
       }
 
-      throw Exception("Cannot get STT | ${response.statusCode}");
-    } on DioError catch (e) {
-      log("❌ DioError: ${e.message}");
-      log("❌ Response: ${e.response?.data}");
-      rethrow;
+      throw Exception('Invalid response');
+    } on DioException catch (e) {
+      throw Exception(DioErrorHandler.handle(e));
     }
   }
 }

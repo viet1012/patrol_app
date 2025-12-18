@@ -1,8 +1,9 @@
 import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:ui';
-import 'package:chuphinh/take_picture_screen.dart';
+import 'package:chuphinh/camera_preview_box.dart';
 import 'package:chuphinh/translator.dart';
+import 'package:chuphinh/widget/glass_action_button.dart';
 import 'package:dio/dio.dart';
 import 'package:dropdown_search/dropdown_search.dart';
 import 'package:flutter/material.dart';
@@ -49,17 +50,11 @@ class _CameraScreenState extends State<CameraScreen> {
   String? _prob;
   String? _sev;
 
-  final TextEditingController _commentController = TextEditingController();
+  TextEditingController _commentController = TextEditingController();
   final FocusNode _commentFocusNode = FocusNode();
 
-  final TextEditingController _counterController = TextEditingController();
+  TextEditingController _counterController = TextEditingController();
   final FocusNode _counterFocusNode = FocusNode();
-
-  final LayerLink _commentLayerLink = LayerLink();
-  final LayerLink _counterLayerLink = LayerLink();
-
-  List<AutoCmp> _commentOptions = [];
-  List<AutoCmp> _counterOptions = [];
 
   Timer? _commentDebounce;
   Timer? _counterDebounce;
@@ -378,12 +373,17 @@ class _CameraScreenState extends State<CameraScreen> {
     final minLength = (widget.lang == 'JP') ? 1 : 2;
 
     return Scaffold(
-      backgroundColor: Colors.blueGrey.shade200,
+      // backgroundColor: Colors.blueGrey.shade200,
 
       // ✅ QUAN TRỌNG: Giúp giao diện tự co lên khi bàn phím hiện
       resizeToAvoidBottomInset: true,
       appBar: AppBar(
-        backgroundColor: Colors.blueGrey.shade300,
+        backgroundColor: Color(0xFF121826), // soft dark blue
+        leading: GlassActionButton(
+          icon: Icons.arrow_back_rounded,
+          onTap: () => Navigator.pop(context),
+        ),
+
         actions: [
           // HIỂN THỊ ẢNH THUMBNAIL TRÊN APPBAR
           if (images.isNotEmpty)
@@ -401,8 +401,8 @@ class _CameraScreenState extends State<CameraScreen> {
                           borderRadius: BorderRadius.circular(8),
                           child: Image.memory(
                             img,
-                            width: 40,
-                            height: 40,
+                            width: 50,
+                            height: 50,
                             fit: BoxFit.cover,
                           ),
                         ),
@@ -432,453 +432,491 @@ class _CameraScreenState extends State<CameraScreen> {
                 }).toList(),
               ),
             ),
-
-          // NÚT GỬI
-          Padding(
-            padding: const EdgeInsets.only(right: 4, left: 4),
-            child: Stack(
-              children: [
-                FloatingActionButton(
-                  mini: true,
-                  backgroundColor: hasImages
-                      ? Colors.greenAccent[100]
-                      : Colors.grey,
-                  onPressed: hasImages ? _sendReport : null,
-                  child: const Icon(Icons.send_rounded),
-                ),
-              ],
-            ),
+          GlassActionButton(
+            icon: Icons.send_rounded,
+            enabled: hasImages,
+            onTap: hasImages ? _sendReport : null,
+            backgroundColor: hasImages ? const Color(0xFF22C55E) : null,
+            iconColor: hasImages ? Colors.black : Colors.white,
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(8),
-        child: Column(
-          children: [
-            // CAMERA + GRID ẢNH
-            CameraPreviewBox(
-              key: _cameraKey,
-              size: 340,
-              plant: _selectedPlant,
-              group: _selectedGroup,
-              onImagesChanged: (_) => setState(() {}),
-            ),
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [
+              Color(0xFF121826), // soft dark blue
+              Color(0xFF1F2937), // slate blue
+              Color(0xFF374151), // soft steel
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(8),
+          child: Column(
+            children: [
+              // CAMERA + GRID ẢNH
+              CameraPreviewBox(
+                key: _cameraKey,
+                size: 340,
+                plant: _selectedPlant,
+                group: _selectedGroup,
+                onImagesChanged: (_) => setState(() {}),
+              ),
 
-            const SizedBox(height: 8),
+              const SizedBox(height: 8),
 
-            // CÁC DROPDOWN PHÍA TRÊN
-            Row(
-              children: [
-                Expanded(
-                  child: _buildSearchableDropdown(
-                    label: "group".tr(context),
-                    selectedValue: _selectedGroup,
-                    items: groupList,
-                    onChanged: (v) {
-                      setState(() {
-                        _selectedGroup = v;
-                      });
-                    },
+              // CÁC DROPDOWN PHÍA TRÊN
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildSearchableDropdown(
+                      label: "group".tr(context),
+                      selectedValue: _selectedGroup,
+                      items: groupList,
+                      onChanged: (v) {
+                        setState(() {
+                          _selectedGroup = v;
+                        });
+                      },
+                    ),
                   ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _buildSearchableDropdown(
-                    label: "fac".tr(context),
-                    selectedValue: _selectedFac,
-                    items: _selectedPlant == null
-                        ? <String>[]
-                        : facList.cast<String>(),
-                    onChanged: (v) {
-                      setState(() {
-                        _selectedFac = v;
-                        _selectedArea = null;
-                        _selectedMachine = null;
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _buildSearchableDropdown(
+                      label: "fac".tr(context),
+                      selectedValue: _selectedFac,
+                      items: _selectedPlant == null
+                          ? <String>[]
+                          : facList.cast<String>(),
+                      onChanged: (v) {
+                        setState(() {
+                          _selectedFac = v;
+                          _selectedArea = null;
+                          _selectedMachine = null;
 
-                        final areas = getAreaByFac(_selectedPlant!, v!);
-                        if (areas.length == 1) {
-                          _selectedArea = areas.first;
+                          final areas = getAreaByFac(_selectedPlant!, v!);
+                          if (areas.length == 1) {
+                            _selectedArea = areas.first;
+
+                            final machines = getMachineByArea(
+                              _selectedPlant!,
+                              v,
+                              areas.first,
+                            );
+                            if (machines.length == 1) {
+                              _selectedMachine = machines.first;
+                            }
+                          }
+                        });
+                      },
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildSearchableDropdown(
+                      label: "area".tr(context),
+                      selectedValue: _selectedArea,
+                      items: (_selectedPlant == null || _selectedFac == null)
+                          ? <String>[]
+                          : areaList.cast<String>(),
+                      onChanged: (v) {
+                        setState(() {
+                          _selectedArea = v;
+                          _selectedMachine = null;
 
                           final machines = getMachineByArea(
                             _selectedPlant!,
-                            v,
-                            areas.first,
+                            _selectedFac!,
+                            v!,
                           );
                           if (machines.length == 1) {
                             _selectedMachine = machines.first;
                           }
-                        }
-                      });
-                    },
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-
-            Row(
-              children: [
-                Expanded(
-                  child: _buildSearchableDropdown(
-                    label: "area".tr(context),
-                    selectedValue: _selectedArea,
-                    items: (_selectedPlant == null || _selectedFac == null)
-                        ? <String>[]
-                        : areaList.cast<String>(),
-                    onChanged: (v) {
-                      setState(() {
-                        _selectedArea = v;
-                        _selectedMachine = null;
-
-                        final machines = getMachineByArea(
-                          _selectedPlant!,
-                          _selectedFac!,
-                          v!,
-                        );
-                        if (machines.length == 1) {
-                          _selectedMachine = machines.first;
-                        }
-                      });
-                    },
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _buildSearchableDropdown(
-                    label: "machine".tr(context),
-                    selectedValue: _selectedMachine,
-                    items:
-                        (_selectedPlant == null ||
-                            _selectedFac == null ||
-                            _selectedArea == null)
-                        ? <String>[]
-                        : machineList.cast<String>(),
-                    onChanged: (v) {
-                      setState(() => _selectedMachine = v);
-                    },
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            // CÁC DROPDOWN RISK
-            Row(
-              children: [
-                Expanded(
-                  child: _buildRiskDropdown(
-                    labelKey: "label_freq",
-                    valueKey: _freq,
-                    items: frequencyOptions,
-                    onChanged: (v) => _freq = v,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _buildRiskDropdown(
-                    labelKey: "label_prob",
-                    valueKey: _prob,
-                    items: probabilityOptions,
-                    onChanged: (v) => _prob = v,
-                  ),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 8),
-
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: _buildRiskDropdown(
-                    labelKey: "label_sev",
-                    valueKey: _sev,
-                    items: severityOptions,
-                    onChanged: (v) => _sev = v,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: SizedBox(
-                    child: TextField(
-                      enabled: false,
-                      controller: TextEditingController(text: displayScore),
-                      decoration: InputDecoration(
-                        labelText: "label_risk".tr(context),
-                        filled: true,
-                        fillColor: Colors.deepOrange.shade100,
-                        labelStyle: const TextStyle(
-                          fontSize: 16,
-                          color: Colors.black,
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        contentPadding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
-                      ),
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: (displayScore == "V" || displayScore == "IV")
-                            ? Colors.red
-                            : Colors.black,
-                        fontWeight: FontWeight.bold,
-                      ),
+                        });
+                      },
                     ),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-
-            // ---------------------------------------------------------
-            // PHẦN AUTO COMPLETE ĐÃ TỐI ƯU CHO MOBILE
-            // ---------------------------------------------------------
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Ô 1: COMMENT
-                Expanded(
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      return Autocomplete<AutoCmp>(
-                        optionsViewOpenDirection: OptionsViewOpenDirection.up,
-                        optionsBuilder: (TextEditingValue value) {
-                          if (value.text.length < minLength) {
-                            return const Iterable<AutoCmp>.empty();
-                          }
-                          return AutoCmpApi.search(widget.lang, value.text);
-                        },
-                        displayStringForOption: (option) => option.inputText,
-                        onSelected: (AutoCmp selection) {
-                          // Khi CHỌN gợi ý → điền vào comment
-                          _commentController.text = selection.inputText;
-                          _commentController.selection = TextSelection.fromPosition(
-                            TextPosition(offset: selection.inputText.length),
-                          ); // Đưa con trỏ ra cuối
-                          _comment = selection.inputText;
-
-                          // === TỰ ĐỘNG ĐIỀN COUNTERMEASURE NẾU CÓ ===
-                          if (selection.countermeasure.isNotEmpty) {
-                            _counterController.text = selection.countermeasure;
-                            _counterMeasure = selection.countermeasure;
-                          } else {
-                            // Nếu không có countermeasure → để trống (tùy yêu cầu)
-                            _counterController.clear();
-                            _counterMeasure = '';
-                          }
-                        },
-                        fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
-                          return TextField(
-                            controller: controller,
-                            focusNode: focusNode,
-                            maxLines: 2,
-                            decoration: InputDecoration(
-                              hintText: "commentHint".tr(context),
-                              filled: true,
-                              fillColor: Colors.yellow.shade50,
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              contentPadding: const EdgeInsets.all(12),
-                            ),
-                            onChanged: (v) {
-                              _comment = v;
-
-                              // Debounce search
-                              if (_commentDebounce?.isActive ?? false) {
-                                _commentDebounce!.cancel();
-                              }
-                              _commentDebounce = Timer(const Duration(milliseconds: 300), () async {
-                                if (v.length < minLength) return;
-                                final result = await AutoCmpApi.search(widget.lang, v);
-                                setState(() => _commentOptions = result);
-                              });
-
-                              // === KHI XÓA HẾT COMMENT → XÓA LUÔN COUNTERMEASURE ===
-                              if (v.trim().isEmpty) {
-                                _counterController.clear();
-                                _counterMeasure = '';
-                              }
-                            },
-                          );
-                        },
-                        optionsViewBuilder: (context, onSelected, options) {
-                          return Align(
-                            alignment: Alignment.topLeft,
-                            child: Transform.translate(
-                              offset: const Offset(0, 8), // Sát ô, đẹp đều
-                              child: Material(
-                                elevation: 8,
-                                borderRadius: BorderRadius.circular(12),
-                                color: Colors.white,
-                                child: ConstrainedBox(
-                                  constraints: BoxConstraints(
-                                    maxWidth: constraints.maxWidth,
-                                    maxHeight: 220,
-                                  ),
-                                  child: ListView.separated(
-                                    padding: EdgeInsets.zero,
-                                    shrinkWrap: true,
-                                    itemCount: options.length,
-                                    separatorBuilder: (_, __) => const Divider(height: 1, thickness: 0.5),
-                                    itemBuilder: (context, index) {
-                                      final option = options.elementAt(index);
-                                      return InkWell(
-                                        onTap: () => onSelected(option),
-                                        child: Padding(
-                                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                                          child: Text(
-                                            option.inputText,
-                                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-                                            maxLines: 3,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ),
-                                      );
-                                    },
-                                  ),
-                                ),
-                              ),
-                            ),
-                          );
-                        },
-                      );
-                    },
-                  ),
-                ),
-
-                const SizedBox(width: 8),
-
-                // Ô 2: COUNTERMEASURE (giữ nguyên, không cần linking ngược)
-                Expanded(
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      return Autocomplete<AutoCmp>(
-                        optionsViewOpenDirection: OptionsViewOpenDirection.up,
-                        optionsBuilder: (TextEditingValue value) {
-                          if (value.text.length < minLength) {
-                            return const Iterable<AutoCmp>.empty();
-                          }
-                          return AutoCmpApi.searchCounter(widget.lang, value.text);
-                        },
-                        displayStringForOption: (option) => option.inputText,
-                        onSelected: (AutoCmp selection) {
-                          _counterController.text = selection.inputText;
-                          _counterController.selection = TextSelection.fromPosition(
-                            TextPosition(offset: selection.inputText.length),
-                          );
-                          _counterMeasure = selection.inputText;
-                        },
-                        fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
-                          return TextField(
-                            controller: controller,
-                            focusNode: focusNode,
-                            maxLines: 2,
-                            decoration: InputDecoration(
-                              hintText: "counterMeasureHint".tr(context),
-                              filled: true,
-                              fillColor: Colors.yellow.shade50,
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              contentPadding: const EdgeInsets.all(12),
-                            ),
-                            onChanged: (v) {
-                              _counterMeasure = v;
-                              if (_counterDebounce?.isActive ?? false) {
-                                _counterDebounce!.cancel();
-                              }
-                              _counterDebounce = Timer(const Duration(milliseconds: 300), () async {
-                                if (v.length < minLength) return;
-                                final result = await AutoCmpApi.searchCounter(widget.lang, v);
-                                setState(() => _counterOptions = result);
-                              });
-                            },
-                          );
-                        },
-                        optionsViewBuilder: (context, onSelected, options) {
-                          return Align(
-                            alignment: Alignment.topLeft,
-                            child: Transform.translate(
-                              offset: const Offset(0, 8),
-                              child: Material(
-                                elevation: 8,
-                                borderRadius: BorderRadius.circular(12),
-                                color: Colors.white,
-                                child: ConstrainedBox(
-                                  constraints: BoxConstraints(
-                                    maxWidth: constraints.maxWidth,
-                                    maxHeight: 220,
-                                  ),
-                                  child: ListView.separated(
-                                    padding: EdgeInsets.zero,
-                                    shrinkWrap: true,
-                                    itemCount: options.length,
-                                    separatorBuilder: (_, __) => const Divider(height: 1, thickness: 0.5),
-                                    itemBuilder: (context, index) {
-                                      final option = options.elementAt(index);
-                                      return InkWell(
-                                        onTap: () => onSelected(option),
-                                        child: Padding(
-                                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                                          child: Text(
-                                            option.inputText,
-                                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-                                            maxLines: 3,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ),
-                                      );
-                                    },
-                                  ),
-                                ),
-                              ),
-                            ),
-                          );
-                        },
-                      );
-                    },
-                  ),
-                ),
-              ],
-            ),
-
-            // Checkbox và phần cuối
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              child: Row(
-                children: [
-                  SizedBox(
-                    width: 28,
-                    height: 28,
-                    child: Checkbox(
-                      value: _needRecheck,
-                      onChanged: (v) =>
-                          setState(() => _needRecheck = v ?? false),
-                      activeColor: Colors.orange.shade700,
-                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      visualDensity: VisualDensity.compact,
-                    ),
-                  ),
+                  const SizedBox(width: 8),
                   Expanded(
-                    child: Text(
-                      "needRecheck".tr(context),
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.orange.shade900,
+                    child: _buildSearchableDropdown(
+                      label: "machine".tr(context),
+                      selectedValue: _selectedMachine,
+                      items:
+                          (_selectedPlant == null ||
+                              _selectedFac == null ||
+                              _selectedArea == null)
+                          ? <String>[]
+                          : machineList.cast<String>(),
+                      onChanged: (v) {
+                        setState(() => _selectedMachine = v);
+                      },
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              // CÁC DROPDOWN RISK
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildRiskDropdown(
+                      labelKey: "label_freq",
+                      valueKey: _freq,
+                      items: frequencyOptions,
+                      onChanged: (v) => _freq = v,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _buildRiskDropdown(
+                      labelKey: "label_prob",
+                      valueKey: _prob,
+                      items: probabilityOptions,
+                      onChanged: (v) => _prob = v,
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 8),
+
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: _buildRiskDropdown(
+                      labelKey: "label_sev",
+                      valueKey: _sev,
+                      items: severityOptions,
+                      onChanged: (v) => _sev = v,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: SizedBox(
+                      child: TextField(
+                        enabled: false,
+                        controller: TextEditingController(text: displayScore),
+                        decoration: InputDecoration(
+                          labelText: "label_risk".tr(context),
+                          filled: true,
+                          fillColor: Colors.deepOrange.shade100,
+                          labelStyle: const TextStyle(
+                            fontSize: 16,
+                            color: Colors.black,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          contentPadding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
+                        ),
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: (displayScore == "V" || displayScore == "IV")
+                              ? Colors.red
+                              : Colors.black,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                   ),
                 ],
               ),
-            ),
+              const SizedBox(height: 8),
 
-            const SizedBox(height: 700),
-            // ✅ Thêm khoảng trắng lớn để đẩy nội dung lên khi bàn phím hiện
-          ],
+              // ---------------------------------------------------------
+              // PHẦN AUTO COMPLETE ĐÃ TỐI ƯU CHO MOBILE
+              // ---------------------------------------------------------
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Ô 1: COMMENT
+                  Expanded(
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        return Autocomplete<AutoCmp>(
+                          optionsViewOpenDirection: OptionsViewOpenDirection.up,
+                          optionsBuilder: (TextEditingValue value) {
+                            if (value.text.length < minLength) {
+                              return const Iterable<AutoCmp>.empty();
+                            }
+                            return AutoCmpApi.search(widget.lang, value.text);
+                          },
+                          displayStringForOption: (option) => option.inputText,
+                          onSelected: (AutoCmp selection) {
+                            // Khi CHỌN gợi ý → điền vào comment
+                            _commentController.text = selection.inputText;
+                            _commentController
+                                .selection = TextSelection.fromPosition(
+                              TextPosition(offset: selection.inputText.length),
+                            ); // Đưa con trỏ ra cuối
+                            _comment = selection.inputText;
+
+                            // === TỰ ĐỘNG ĐIỀN COUNTERMEASURE NẾU CÓ ===
+                            if (selection.countermeasure.isNotEmpty) {
+                              print(
+                                "selection.countermeasure: ${selection.countermeasure}!",
+                              );
+
+                              _counterController.text =
+                                  selection.countermeasure;
+                              _counterMeasure = selection.countermeasure;
+                            } else {
+                              print("Hahaha!");
+                              // Nếu không có countermeasure → để trống (tùy yêu cầu)
+                              _counterController.clear();
+                              _counterMeasure = '';
+                            }
+                          },
+                          fieldViewBuilder:
+                              (
+                                context,
+                                controller,
+                                focusNode,
+                                onFieldSubmitted,
+                              ) {
+                                _commentController = controller;
+                                return TextField(
+                                  controller: controller,
+                                  focusNode: focusNode,
+                                  maxLines: 2,
+                                  decoration: InputDecoration(
+                                    hintText: "commentHint".tr(context),
+                                    filled: true,
+                                    fillColor: Colors.yellow.shade50,
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    contentPadding: const EdgeInsets.all(12),
+                                  ),
+                                  onChanged: (v) {
+                                    _comment = v;
+
+                                    // Debounce search
+                                    if (_commentDebounce?.isActive ?? false) {
+                                      _commentDebounce!.cancel();
+                                    }
+
+                                    // === KHI XÓA HẾT COMMENT → XÓA LUÔN COUNTERMEASURE ===
+                                    if (v.trim().isEmpty) {
+                                      _counterController.clear();
+                                      _counterMeasure = '';
+                                    }
+                                  },
+                                );
+                              },
+                          optionsViewBuilder: (context, onSelected, options) {
+                            return Align(
+                              alignment: Alignment.topLeft,
+                              child: Transform.translate(
+                                offset: const Offset(0, 8), // Sát ô, đẹp đều
+                                child: Material(
+                                  elevation: 8,
+                                  borderRadius: BorderRadius.circular(12),
+                                  color: Colors.white,
+                                  child: ConstrainedBox(
+                                    constraints: BoxConstraints(
+                                      maxWidth: constraints.maxWidth,
+                                      maxHeight: 220,
+                                    ),
+                                    child: ListView.separated(
+                                      padding: EdgeInsets.zero,
+                                      shrinkWrap: true,
+                                      itemCount: options.length,
+                                      separatorBuilder: (_, __) =>
+                                          const Divider(
+                                            height: 1,
+                                            thickness: 0.5,
+                                          ),
+                                      itemBuilder: (context, index) {
+                                        final option = options.elementAt(index);
+                                        return InkWell(
+                                          onTap: () => onSelected(option),
+                                          child: Padding(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 16,
+                                              vertical: 14,
+                                            ),
+                                            child: Text(
+                                              option.inputText,
+                                              style: const TextStyle(
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                              maxLines: 3,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        );
+                      },
+                    ),
+                  ),
+
+                  const SizedBox(width: 8),
+
+                  // Ô 2: COUNTERMEASURE (giữ nguyên, không cần linking ngược)
+                  Expanded(
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        return Autocomplete<AutoCmp>(
+                          optionsViewOpenDirection: OptionsViewOpenDirection.up,
+                          optionsBuilder: (TextEditingValue value) {
+                            if (value.text.length < minLength) {
+                              return const Iterable<AutoCmp>.empty();
+                            }
+                            return AutoCmpApi.searchCounter(
+                              widget.lang,
+                              value.text,
+                            );
+                          },
+                          displayStringForOption: (option) => option.inputText,
+                          onSelected: (AutoCmp selection) {
+                            _counterController.text = selection.inputText;
+                            _counterController
+                                .selection = TextSelection.fromPosition(
+                              TextPosition(offset: selection.inputText.length),
+                            );
+                            _counterMeasure = selection.inputText;
+                          },
+                          fieldViewBuilder:
+                              (
+                                context,
+                                controller,
+                                focusNode,
+                                onFieldSubmitted,
+                              ) {
+                                _counterController = controller;
+                                return TextField(
+                                  controller: controller,
+                                  focusNode: focusNode,
+                                  maxLines: 2,
+                                  decoration: InputDecoration(
+                                    hintText: "counterMeasureHint".tr(context),
+                                    filled: true,
+                                    fillColor: Colors.yellow.shade50,
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    contentPadding: const EdgeInsets.all(12),
+                                  ),
+                                  onChanged: (v) {
+                                    _counterMeasure = v;
+                                    if (_counterDebounce?.isActive ?? false) {
+                                      _counterDebounce!.cancel();
+                                    }
+                                  },
+                                );
+                              },
+                          optionsViewBuilder: (context, onSelected, options) {
+                            return Align(
+                              alignment: Alignment.topLeft,
+                              child: Transform.translate(
+                                offset: const Offset(0, 8),
+                                child: Material(
+                                  elevation: 8,
+                                  borderRadius: BorderRadius.circular(12),
+                                  color: Colors.white,
+                                  child: ConstrainedBox(
+                                    constraints: BoxConstraints(
+                                      maxWidth: constraints.maxWidth,
+                                      maxHeight: 220,
+                                    ),
+                                    child: ListView.separated(
+                                      padding: EdgeInsets.zero,
+                                      shrinkWrap: true,
+                                      itemCount: options.length,
+                                      separatorBuilder: (_, __) =>
+                                          const Divider(
+                                            height: 1,
+                                            thickness: 0.5,
+                                          ),
+                                      itemBuilder: (context, index) {
+                                        final option = options.elementAt(index);
+                                        return InkWell(
+                                          onTap: () => onSelected(option),
+                                          child: Padding(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 16,
+                                              vertical: 14,
+                                            ),
+                                            child: Text(
+                                              option.inputText,
+                                              style: const TextStyle(
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                              maxLines: 3,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+
+              // Checkbox và phần cuối
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: Row(
+                  children: [
+                    SizedBox(
+                      width: 28,
+                      height: 28,
+                      child: Checkbox(
+                        value: _needRecheck,
+                        onChanged: (v) =>
+                            setState(() => _needRecheck = v ?? false),
+                        activeColor: Colors.orange.shade700,
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    ),
+                    Expanded(
+                      child: Text(
+                        "needRecheck".tr(context),
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.orange.shade900,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 200),
+              // ✅ Thêm khoảng trắng lớn để đẩy nội dung lên khi bàn phím hiện
+            ],
+          ),
         ),
       ),
     );
