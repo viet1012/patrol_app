@@ -5,6 +5,30 @@ import '../network/dio_error_handler.dart';
 import 'dio_client.dart';
 
 class AutoCmpApi {
+  /// Get All data 1 time
+  static Future<List<AutoCmp>> getAllComment(String lang) async {
+    try {
+      final Response res = await DioClient.dio.get(
+        '/api/suggest/comment', // Giả sử bạn có endpoint lấy hết theo ngôn ngữ
+        queryParameters: {'l': lang},
+      );
+      return _parseList(res.data);
+    } on DioException catch (e) {
+      throw Exception(DioErrorHandler.handle(e));
+    }
+  }
+  static Future<List<AutoCmp>> getAllCounter(String lang) async {
+    try {
+      final Response res = await DioClient.dio.get(
+        '/api/suggest/counter', // Giả sử bạn có endpoint lấy hết theo ngôn ngữ
+        queryParameters: {'l': lang},
+      );
+      return _parseList(res.data);
+    } on DioException catch (e) {
+      throw Exception(DioErrorHandler.handle(e));
+    }
+  }
+
   /// GET /api/suggest/search
   static Future<List<AutoCmp>> search(String lang, String keyword) async {
     if (keyword.trim().isEmpty) return [];

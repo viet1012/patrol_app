@@ -343,6 +343,8 @@ class _CameraScreenState extends State<CameraScreen> {
   void initState() {
     _selectedPlant = widget.selectedPlant;
     super.initState();
+    _loadInitialDataComment();
+    _loadInitialDataCounter();
   }
 
   @override
@@ -647,10 +649,16 @@ class _CameraScreenState extends State<CameraScreen> {
                         return Autocomplete<AutoCmp>(
                           optionsViewOpenDirection: OptionsViewOpenDirection.up,
                           optionsBuilder: (TextEditingValue value) {
-                            if (value.text.length < minLength) {
+                            if (value.text.length < minLength || isLoading) {
                               return const Iterable<AutoCmp>.empty();
                             }
-                            return AutoCmpApi.search(widget.lang, value.text);
+                            // return AutoCmpApi.search(widget.lang, value.text);
+                            // FILTER TRỰC TIẾP TẠI ĐÂY
+                            return allOptionsComment.where((AutoCmp option) {
+                              return option.inputText
+                                  .toLowerCase()
+                                  .contains(value.text.toLowerCase()); // Tìm kiếm không phân biệt hoa thường
+                            }).take(5); // Chỉ lấy 5 kết quả đầu tiên giống như logic cũ của BE
                           },
                           displayStringForOption: (option) => option.inputText,
                           onSelected: (AutoCmp selection) {
@@ -779,13 +787,19 @@ class _CameraScreenState extends State<CameraScreen> {
                         return Autocomplete<AutoCmp>(
                           optionsViewOpenDirection: OptionsViewOpenDirection.up,
                           optionsBuilder: (TextEditingValue value) {
-                            if (value.text.length < minLength) {
+                            if (value.text.length < minLength || isLoading) {
                               return const Iterable<AutoCmp>.empty();
                             }
-                            return AutoCmpApi.searchCounter(
-                              widget.lang,
-                              value.text,
-                            );
+                            // return AutoCmpApi.searchCounter(
+                            //   widget.lang,
+                            //   value.text,
+                            // );
+                            // FILTER TRỰC TIẾP TẠI ĐÂY
+                            return allOptionsCounter.where((AutoCmp option) {
+                              return option.inputText
+                                  .toLowerCase()
+                                  .contains(value.text.toLowerCase()); // Tìm kiếm không phân biệt hoa thường
+                            }).take(5); // Chỉ lấy 5 kết quả đầu tiên giống như logic cũ của BE
                           },
                           displayStringForOption: (option) => option.inputText,
                           onSelected: (AutoCmp selection) {
@@ -920,6 +934,36 @@ class _CameraScreenState extends State<CameraScreen> {
         ),
       ),
     );
+  }
+
+  List<AutoCmp> allOptionsComment = []; // Biến lưu trữ dữ liệu
+  List<AutoCmp> allOptionsCounter = []; // Biến lưu trữ dữ liệu
+  bool isLoading = true;
+
+  Future<void> _loadInitialDataComment() async {
+    try {
+      final data = await AutoCmpApi.getAllComment(widget.lang);
+      setState(() {
+        allOptionsComment = data;
+        isLoading = false;
+      });
+    } catch (e) {
+      // Xử lý lỗi
+      setState(() => isLoading = false);
+    }
+  }
+
+  Future<void> _loadInitialDataCounter() async {
+    try {
+      final data = await AutoCmpApi.getAllCounter(widget.lang);
+      setState(() {
+        allOptionsCounter = data;
+        isLoading = false;
+      });
+    } catch (e) {
+      // Xử lý lỗi
+      setState(() => isLoading = false);
+    }
   }
 
   // 🔴 HÀM MỚI: Xây dựng giao diện Dropdown tối ưu cho Mobile
