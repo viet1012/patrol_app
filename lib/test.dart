@@ -466,7 +466,7 @@ class _CameraScreenState extends State<CameraScreen> {
                 onImagesChanged: (_) => setState(() {}),
               ),
 
-              const SizedBox(height: 8),
+              const SizedBox(height: 16),
 
               // CÁC DROPDOWN PHÍA TRÊN
               Row(
@@ -1067,34 +1067,34 @@ class _CameraScreenState extends State<CameraScreen> {
                   ),
                 ),
               ),
-              // itemBuilder: (context, item, isSelected) {
-              //   return Container(
-              //     margin: const EdgeInsets.symmetric(
-              //       horizontal: 6,
-              //       vertical: 2,
-              //     ),
-              //     padding: const EdgeInsets.symmetric(
-              //       horizontal: 14,
-              //       vertical: 12,
-              //     ),
-              //     decoration: BoxDecoration(
-              //       borderRadius: BorderRadius.circular(12),
-              //       color: isSelected
-              //           ? Colors.blueGrey.shade100
-              //           : Colors.transparent,
-              //     ),
-              //     child: Text(
-              //       item,
-              //       style: TextStyle(
-              //         fontSize: 14,
-              //         fontWeight: isSelected
-              //             ? FontWeight.w600
-              //             : FontWeight.w500,
-              //         color: Colors.blueGrey.shade900,
-              //       ),
-              //     ),
-              //   );
-              // },
+              itemBuilder: (context, item, isSelected) {
+                return Container(
+                  margin: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 12,
+                  ),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    color: isSelected
+                        ? Colors.blueGrey.shade100
+                        : Colors.transparent,
+                  ),
+                  child: Text(
+                    item,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: isSelected
+                          ? FontWeight.w600
+                          : FontWeight.w500,
+                      color: Colors.blueGrey.shade900,
+                    ),
+                  ),
+                );
+              },
             ),
 
             // ... (các logic asyncItems, compareFn, v.v. giữ nguyên)
