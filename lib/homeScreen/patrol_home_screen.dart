@@ -262,32 +262,30 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
                       const SizedBox(height: 30),
 
                       Expanded(
-                        child: Expanded(
-                          child: ListView(
-                            children: [
-                              _patrolGroupCard(
-                                group: PatrolGroup.Patrol,
-                                title: 'Weekly Safety Patrol',
-                                icon: Icons.security,
-                                prefix: 'Patrol',
-                              ),
+                        child: ListView(
+                          children: [
+                            _patrolGroupCard(
+                              group: PatrolGroup.Patrol,
+                              title: 'Weekly Safety Patrol',
+                              icon: Icons.security,
+                              prefix: 'Patrol',
+                            ),
 
-                              _patrolGroupCard(
-                                group: PatrolGroup.Audit,
-                                title: 'SRG Safety Audit',
-                                icon: Icons.groups,
-                                prefix: 'Audit',
-                              ),
+                            _patrolGroupCard(
+                              group: PatrolGroup.Audit,
+                              title: 'SRG Safety Audit',
+                              icon: Icons.groups,
+                              prefix: 'Audit',
+                            ),
 
-                              _patrolGroupCard(
-                                group: PatrolGroup.QualityPatrol,
-                                title: 'QA Quality Audit',
-                                icon: Icons.verified,
-                                prefix: 'QA Audit',
-                                enabled: false,
-                              ),
-                            ],
-                          ),
+                            _patrolGroupCard(
+                              group: PatrolGroup.QualityPatrol,
+                              title: 'QA Quality Audit',
+                              icon: Icons.verified,
+                              prefix: 'QA Audit',
+                              enabled: false,
+                            ),
+                          ],
                         ),
                       ),
                     ],

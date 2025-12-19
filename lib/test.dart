@@ -67,9 +67,7 @@ class _CameraScreenState extends State<CameraScreen> {
   void dispose() {
     _commentDebounce?.cancel();
     _counterDebounce?.cancel();
-    _commentController.dispose();
     _commentFocusNode.dispose();
-    _counterController.dispose();
     _counterFocusNode.dispose();
     super.dispose();
   }
