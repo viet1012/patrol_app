@@ -133,6 +133,23 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
     ;
 
     return Scaffold(
+      appBar: PreferredSize(
+        preferredSize: const Size.fromHeight(50),
+        child: AppBar(
+          centerTitle: true,
+          title: Center(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(24),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                child: EmbossGlowTitle(text: 'AUDIT WEB'),
+              ),
+            ),
+          ),
+          backgroundColor: Color(0xFF0F2027),
+          elevation: 0,
+        ),
+      ),
       body: Container(
         decoration: BoxDecoration(
           gradient: const LinearGradient(
@@ -167,91 +184,74 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-
                     children: [
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: LanguageToggleSwitch(
-                          onLanguageChanged: (lang) {
-                            setState(() {
-                              currentLang = lang;
-                            });
-
-                            debugPrint("📢 Language from child: $lang");
-                          },
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Center(
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(24),
-                          child: BackdropFilter(
-                            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                vertical: 16,
-                                horizontal: 32,
-                              ),
-                              decoration: glassDecoration,
-                              child: EmbossGlowTitle(text: 'AUDIT WEB'),
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 30),
-
                       ClipRRect(
                         borderRadius: BorderRadius.circular(16),
                         child: BackdropFilter(
                           filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
                           child: Container(
                             padding: const EdgeInsets.symmetric(
-                              vertical: 8,
-                              horizontal: 12,
+                              horizontal: 8,
+                              vertical: 6,
                             ),
                             decoration: glassDecorationSmall,
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                Text(
-                                  "plant".tr(context),
-                                  style: const TextStyle(
-                                    fontSize: 22,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.white70,
-                                  ),
-                                ),
-                                DropdownButton<String>(
-                                  value: selectedFactory,
-                                  dropdownColor: Colors.blueGrey.shade900
-                                      .withOpacity(0.9),
-                                  underline: const SizedBox(),
-                                  icon: const Icon(
-                                    Icons.arrow_drop_down,
-                                    color: Colors.white70,
-                                    size: 30,
-                                  ),
-                                  style: const TextStyle(
-                                    fontSize: 22,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
-                                  ),
-                                  borderRadius: BorderRadius.circular(12),
-                                  items: factories
-                                      .map(
-                                        (f) => DropdownMenuItem(
-                                          value: f,
-                                          child: Text(f),
-                                        ),
-                                      )
-                                      .toList(),
-                                  onChanged: (val) {
-                                    if (val != null) {
-                                      setState(() {
-                                        selectedFactory = val;
-                                      });
-                                    }
+                                /// 🌐 LANGUAGE
+                                LanguageToggleSwitch(
+                                  onLanguageChanged: (lang) {
+                                    setState(() {
+                                      currentLang = lang;
+                                    });
                                   },
+                                ),
+
+                                /// 🏭 FACTORY
+                                Row(
+                                  children: [
+                                    Text(
+                                      "plant".tr(context),
+                                      style: const TextStyle(
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.white70,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    DropdownButton<String>(
+                                      value: selectedFactory,
+                                      dropdownColor: Colors.blueGrey.shade900
+                                          .withOpacity(0.9),
+                                      underline: const SizedBox(),
+                                      icon: const Icon(
+                                        Icons.arrow_drop_down,
+                                        color: Colors.white70,
+                                        size: 30,
+                                      ),
+                                      style: const TextStyle(
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                      ),
+                                      borderRadius: BorderRadius.circular(12),
+                                      items: factories
+                                          .map(
+                                            (f) => DropdownMenuItem(
+                                              value: f,
+                                              child: Text(f),
+                                            ),
+                                          )
+                                          .toList(),
+                                      onChanged: (val) {
+                                        if (val != null) {
+                                          setState(() {
+                                            selectedFactory = val;
+                                          });
+                                        }
+                                      },
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),
@@ -265,85 +265,27 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
                         child: Expanded(
                           child: ListView(
                             children: [
-                              _parentPatrolButton(
+                              _patrolGroupCard(
                                 group: PatrolGroup.weekly,
                                 title: 'Weekly Safety Patrol',
                                 icon: Icons.security,
-                              ),
-                              _childPatrolOptions(
-                                group: PatrolGroup.weekly,
                                 prefix: 'Patrol',
                               ),
 
-                              const SizedBox(height: 24),
-
-                              _parentPatrolButton(
+                              _patrolGroupCard(
                                 group: PatrolGroup.srg,
                                 title: 'SRG Safety Audit',
                                 icon: Icons.groups,
-                                enabled: true,
-                              ),
-                              _childPatrolOptions(
-                                group: PatrolGroup.srg,
                                 prefix: 'Audit',
                               ),
 
-                              const SizedBox(height: 24),
-
-                              _parentPatrolButton(
+                              _patrolGroupCard(
                                 group: PatrolGroup.qa,
                                 title: 'QA Quality Audit',
                                 icon: Icons.verified,
-                                enabled: false, // ✅ enable ô cuối
-                              ),
-                              _childPatrolOptions(
-                                group: PatrolGroup.qa,
                                 prefix: 'QA Audit',
+                                enabled: false,
                               ),
-
-                              // _weeklyPatrolButton(),
-                              // AnimatedSize(
-                              //   duration: const Duration(milliseconds: 400),
-                              //   curve: Curves.easeInOut,
-                              //   child: showWeeklyOptions
-                              //       ? Column(
-                              //           children: [
-                              //             const SizedBox(height: 20),
-                              //             _patrolButton(
-                              //               number: '1)',
-                              //               title: 'Patrol Before',
-                              //               enabled: true,
-                              //               onTap: () {
-                              //                 Navigator.push(
-                              //                   context,
-                              //                   MaterialPageRoute(
-                              //                     builder: (_) => CameraScreen(
-                              //                       machines: machines,
-                              //                       patrolTeams: teams,
-                              //                       lang: currentLang,
-                              //                       selectedPlant:
-                              //                           selectedFactory,
-                              //                     ),
-                              //                   ),
-                              //                 );
-                              //               },
-                              //             ),
-                              //             const SizedBox(height: 20),
-                              //             _patrolButton(
-                              //               number: '2)',
-                              //               title: 'Patrol After',
-                              //               enabled: false,
-                              //             ),
-                              //             const SizedBox(height: 20),
-                              //             _patrolButton(
-                              //               number: '3)',
-                              //               title: 'Patrol HSE check',
-                              //               enabled: false,
-                              //             ),
-                              //           ],
-                              //         )
-                              //       : const SizedBox(),
-                              // ),
                             ],
                           ),
                         ),
@@ -363,10 +305,153 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
       case PatrolGroup.weekly:
         return Colors.lightBlueAccent.shade400; // Weekly Safety Patrol
       case PatrolGroup.srg:
-        return Colors.orangeAccent.shade400; // SRG Safety Audit
+        return Colors.green.shade400; // SRG Safety Audit
       case PatrolGroup.qa:
         return Colors.purpleAccent.shade400; // QA Quality Audit
     }
+  }
+
+  Widget _patrolGroupCard({
+    required PatrolGroup group,
+    required String title,
+    required IconData icon,
+    required String prefix,
+    bool enabled = true,
+  }) {
+    final isExpanded = expandedGroup == group;
+    final color = _groupColor(group, enabled);
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(26),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 24),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.12),
+            borderRadius: BorderRadius.circular(26),
+            border: Border.all(color: color, width: 2),
+          ),
+          child: Column(
+            children: [
+              /// 🔹 PARENT HEADER
+              InkWell(
+                onTap: enabled
+                    ? () {
+                        setState(() {
+                          expandedGroup = isExpanded ? null : group;
+                        });
+                      }
+                    : null,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 20,
+                    horizontal: 22,
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(icon, color: color, size: 26),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          title,
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w900,
+                            color: color,
+                            letterSpacing: 1.2,
+                          ),
+                        ),
+                      ),
+                      enabled
+                          ? AnimatedRotation(
+                              turns: isExpanded ? 0.5 : 0,
+                              duration: const Duration(milliseconds: 300),
+                              child: Icon(
+                                Icons.expand_more,
+                                size: 34,
+                                color: color,
+                              ),
+                            )
+                          : Icon(Icons.lock_outline, color: color, size: 26),
+                    ],
+                  ),
+                ),
+              ),
+
+              /// 🔹 CHILD BODY
+              AnimatedCrossFade(
+                duration: const Duration(milliseconds: 350),
+                crossFadeState: isExpanded
+                    ? CrossFadeState.showFirst
+                    : CrossFadeState.showSecond,
+                firstChild: _childPatrolContainer(
+                  group: group,
+                  prefix: prefix,
+                  color: color,
+                ),
+                secondChild: const SizedBox(),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _childPatrolContainer({
+    required PatrolGroup group,
+    required String prefix,
+    required Color color,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
+      child: Container(
+        padding: const EdgeInsets.all(18),
+        // decoration: BoxDecoration(
+        //   color: Colors.black.withOpacity(0.25), // ⬅ khác parent
+        //   borderRadius: BorderRadius.circular(20),
+        //   border: Border.all(color: color.withOpacity(0.6), width: 1.5),
+        // ),
+        child: Column(
+          children: [
+            _patrolButton(
+              number: '1)',
+              title: '$prefix Before',
+              color: color,
+              enabled: true,
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => CameraScreen(
+                      machines: machines,
+                      patrolTeams: teams,
+                      lang: currentLang,
+                      selectedPlant: selectedFactory,
+                    ),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 16),
+            _patrolButton(
+              number: '2)',
+              title: '$prefix After',
+              color: color,
+              enabled: false,
+            ),
+            const SizedBox(height: 16),
+            _patrolButton(
+              number: '3)',
+              title: '$prefix ReCheck',
+              color: color,
+              enabled: false,
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _parentPatrolButton({
@@ -440,112 +525,68 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
   }) {
     if (expandedGroup != group) return const SizedBox();
 
+    final color = _groupColor(group, true);
+    final isWeekly = true;
+    // group == PatrolGroup.weekly;
+
     return AnimatedSize(
       duration: const Duration(milliseconds: 400),
       curve: Curves.easeInOut,
       child: Column(
         children: [
           const SizedBox(height: 20),
+
           _patrolButton(
             number: '1)',
             title: '$prefix Before',
-            enabled: true,
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => CameraScreen(
-                    machines: machines,
-                    patrolTeams: teams,
-                    lang: currentLang,
-                    selectedPlant: selectedFactory,
-                  ),
-                ),
-              );
-            },
+            color: color,
+            enabled: isWeekly,
+            onTap: isWeekly
+                ? () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => CameraScreen(
+                          machines: machines,
+                          patrolTeams: teams,
+                          lang: currentLang,
+                          selectedPlant: selectedFactory,
+                        ),
+                      ),
+                    );
+                  }
+                : null,
           ),
+
           const SizedBox(height: 20),
-          _patrolButton(number: '2)', title: '$prefix After', enabled: false),
+
+          _patrolButton(
+            number: '2)',
+            title: '$prefix After',
+            color: color,
+            enabled: false,
+          ),
+
           const SizedBox(height: 20),
-          _patrolButton(number: '3)', title: '$prefix Check', enabled: false),
+
+          _patrolButton(
+            number: '3)',
+            title: '$prefix Check',
+            color: color,
+            enabled: false,
+          ),
         ],
       ),
     );
   }
 
-  // Widget _weeklyPatrolButton() {
-  //   return ClipRRect(
-  //     borderRadius: BorderRadius.circular(22),
-  //     child: BackdropFilter(
-  //       filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-  //       child: GestureDetector(
-  //         onTap: () {
-  //           setState(() {
-  //             showWeeklyOptions = !showWeeklyOptions;
-  //           });
-  //         },
-  //         child: Container(
-  //           padding: const EdgeInsets.symmetric(vertical: 30, horizontal: 24),
-  //           decoration: BoxDecoration(
-  //             color: Colors.white.withOpacity(0.18),
-  //             borderRadius: BorderRadius.circular(22),
-  //             border: Border.all(
-  //               color: Colors.lightBlueAccent.shade400,
-  //               width: 2.5,
-  //             ),
-  //             boxShadow: [
-  //               BoxShadow(
-  //                 color: Colors.black.withOpacity(0.2),
-  //                 blurRadius: 14,
-  //                 offset: const Offset(0, 6),
-  //               ),
-  //             ],
-  //           ),
-  //           child: Row(
-  //             children: [
-  //               Icon(
-  //                 Icons.security,
-  //                 size: 32,
-  //                 color: Colors.lightBlueAccent.shade400,
-  //               ),
-  //               const SizedBox(width: 16),
-  //               Expanded(
-  //                 child: Text(
-  //                   'Weekly Safety Patrol',
-  //                   style: TextStyle(
-  //                     fontSize: 24,
-  //                     fontWeight: FontWeight.w900,
-  //                     color: Colors.lightBlueAccent.shade400,
-  //                     letterSpacing: 1.2,
-  //                   ),
-  //                 ),
-  //               ),
-  //               AnimatedRotation(
-  //                 turns: showWeeklyOptions ? 0.5 : 0,
-  //                 duration: const Duration(milliseconds: 300),
-  //                 child: Icon(
-  //                   Icons.expand_more,
-  //                   size: 34,
-  //                   color: Colors.lightBlueAccent.shade400,
-  //                 ),
-  //               ),
-  //             ],
-  //           ),
-  //         ),
-  //       ),
-  //     ),
-  //   );
-  // }
-
   Widget _patrolButton({
     required String number,
     required String title,
+    required Color color,
     VoidCallback? onTap,
     bool enabled = true,
   }) {
-    final color = enabled
-        ? Colors.lightBlueAccent.shade400
-        : Colors.white.withOpacity(0.5);
     final opacity = enabled ? 1.0 : 0.5;
 
     return ClipRRect(
@@ -560,9 +601,9 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
             child: Container(
               padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 24),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.13),
+                color: color.withOpacity(0.13),
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: color, width: 2),
+                border: Border.all(color: color, width: 1),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withOpacity(0.15),
@@ -606,10 +647,9 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
                       ],
                     ),
                   ),
-                  if (enabled)
-                    CallToActionArrow(color: color)
-                  else
-                    Icon(Icons.lock_outline, color: color, size: 26),
+                  enabled
+                      ? CallToActionArrow(color: color)
+                      : Icon(Icons.lock_outline, color: color, size: 26),
                 ],
               ),
             ),
