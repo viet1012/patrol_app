@@ -6,13 +6,13 @@ class SttWebSocket {
 
   final String serverUrl;
   final String fac;
-  final String group;
+  final String type;
   final Function(int) onSttUpdate;
 
   SttWebSocket({
     required this.serverUrl,
     required this.fac,
-    required this.group,
+    required this.type,
     required this.onSttUpdate,
   });
 
@@ -24,8 +24,8 @@ class SttWebSocket {
     dispose();
 
     final facClean = _normalize(fac);
-    final grpClean = _normalize(group);
-    final topic = "/topic/stt/$facClean";
+    final typeClean = _normalize(type);
+    final topic = "/topic/stt/$facClean/$typeClean";
 
     debugPrint("🔌 WS CONNECTING...");
     debugPrint("📌 SUBSCRIBE TOPIC: $topic");

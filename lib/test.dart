@@ -9,6 +9,7 @@ import 'package:dropdown_search/dropdown_search.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'api/api_config.dart';
+import 'homeScreen/patrol_home_screen.dart';
 import 'model/hse_patrol_team_model.dart';
 import 'model/machine_model.dart';
 import 'model/reason_model.dart';
@@ -23,12 +24,15 @@ class CameraScreen extends StatefulWidget {
   final String? selectedPlant;
   final String lang;
 
+  final PatrolGroup patrolGroup;
+
   CameraScreen({
     super.key,
     required this.machines,
     required this.patrolTeams,
     required this.selectedPlant,
     required this.lang,
+    required this.patrolGroup,
   });
 
   @override
@@ -235,6 +239,7 @@ class _CameraScreenState extends State<CameraScreen> {
       }
       final reportMap = {
         'plant': _selectedPlant ?? '',
+        'type': widget.patrolGroup.name,
         'division': _selectedFac ?? '',
         'area': _selectedArea ?? '',
         'group': normalizeGroup(_selectedGroup) ?? '',
@@ -349,7 +354,7 @@ class _CameraScreenState extends State<CameraScreen> {
 
   @override
   Widget build(BuildContext context) {
-    print('Lang: ${widget.lang}');
+    print('Lang: ${widget.patrolGroup.name}');
     final plantList = getPlants();
     final groupList = getGroupsByPlant();
 
@@ -464,8 +469,10 @@ class _CameraScreenState extends State<CameraScreen> {
                 key: _cameraKey,
                 size: 340,
                 plant: _selectedPlant,
+                type: widget.patrolGroup.name,
                 group: _selectedGroup,
                 onImagesChanged: (_) => setState(() {}),
+                patrolGroup: widget.patrolGroup,
               ),
 
               const SizedBox(height: 16),
@@ -939,7 +946,7 @@ class _CameraScreenState extends State<CameraScreen> {
                 ),
               ),
 
-              const SizedBox(height: 200),
+              // const SizedBox(height: 200),
               // ✅ Thêm khoảng trắng lớn để đẩy nội dung lên khi bàn phím hiện
             ],
           ),

@@ -14,7 +14,7 @@ import '../test.dart';
 import '../translator.dart';
 import '../widget/error_display.dart';
 
-enum PatrolGroup { weekly, srg, qa }
+enum PatrolGroup { Patrol, Audit, QualityPatrol }
 
 class PatrolHomeScreen extends StatefulWidget {
   const PatrolHomeScreen({super.key});
@@ -266,21 +266,21 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
                           child: ListView(
                             children: [
                               _patrolGroupCard(
-                                group: PatrolGroup.weekly,
+                                group: PatrolGroup.Patrol,
                                 title: 'Weekly Safety Patrol',
                                 icon: Icons.security,
                                 prefix: 'Patrol',
                               ),
 
                               _patrolGroupCard(
-                                group: PatrolGroup.srg,
+                                group: PatrolGroup.Audit,
                                 title: 'SRG Safety Audit',
                                 icon: Icons.groups,
                                 prefix: 'Audit',
                               ),
 
                               _patrolGroupCard(
-                                group: PatrolGroup.qa,
+                                group: PatrolGroup.QualityPatrol,
                                 title: 'QA Quality Audit',
                                 icon: Icons.verified,
                                 prefix: 'QA Audit',
@@ -302,11 +302,11 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
     if (!enabled) return Colors.white.withOpacity(0.5);
 
     switch (group) {
-      case PatrolGroup.weekly:
+      case PatrolGroup.Patrol:
         return Colors.lightBlueAccent.shade400; // Weekly Safety Patrol
-      case PatrolGroup.srg:
+      case PatrolGroup.Audit:
         return Colors.green.shade400; // SRG Safety Audit
-      case PatrolGroup.qa:
+      case PatrolGroup.QualityPatrol:
         return Colors.purpleAccent.shade400; // QA Quality Audit
     }
   }
@@ -429,6 +429,7 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
                       patrolTeams: teams,
                       lang: currentLang,
                       selectedPlant: selectedFactory,
+                      patrolGroup: group,
                     ),
                   ),
                 );
@@ -515,67 +516,6 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
             ),
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _childPatrolOptions({
-    required PatrolGroup group,
-    required String prefix,
-  }) {
-    if (expandedGroup != group) return const SizedBox();
-
-    final color = _groupColor(group, true);
-    final isWeekly = true;
-    // group == PatrolGroup.weekly;
-
-    return AnimatedSize(
-      duration: const Duration(milliseconds: 400),
-      curve: Curves.easeInOut,
-      child: Column(
-        children: [
-          const SizedBox(height: 20),
-
-          _patrolButton(
-            number: '1)',
-            title: '$prefix Before',
-            color: color,
-            enabled: isWeekly,
-            onTap: isWeekly
-                ? () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => CameraScreen(
-                          machines: machines,
-                          patrolTeams: teams,
-                          lang: currentLang,
-                          selectedPlant: selectedFactory,
-                        ),
-                      ),
-                    );
-                  }
-                : null,
-          ),
-
-          const SizedBox(height: 20),
-
-          _patrolButton(
-            number: '2)',
-            title: '$prefix After',
-            color: color,
-            enabled: false,
-          ),
-
-          const SizedBox(height: 20),
-
-          _patrolButton(
-            number: '3)',
-            title: '$prefix Check',
-            color: color,
-            enabled: false,
-          ),
-        ],
       ),
     );
   }

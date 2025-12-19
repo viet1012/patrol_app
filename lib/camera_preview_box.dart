@@ -588,6 +588,7 @@ import 'package:flutter/material.dart';
 
 import 'api/stt_api.dart';
 import 'api/api_config.dart';
+import 'homeScreen/patrol_home_screen.dart';
 
 class CameraPreviewBox extends StatefulWidget {
   final double size;
@@ -595,16 +596,21 @@ class CameraPreviewBox extends StatefulWidget {
 
   final String? plant; // ✅ THÊM
   final String? group; // ✅ BẮT BUỘC
+  final String type;
   final String? wsUrl;
+  final PatrolGroup patrolGroup;
 
   const CameraPreviewBox({
     super.key,
     this.size = 320,
     this.onImagesChanged,
     this.group,
+    required this.type,
     this.plant,
 
     this.wsUrl,
+
+    required this.patrolGroup,
   });
 
   @override
@@ -629,36 +635,52 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
   int stt = 0;
   SttWebSocket? sttSocket;
 
+  bool _sttLoading = true;
+
   Future<void> _loadStt() async {
     if (_fac.isEmpty) {
-      debugPrint("Skip load STT (fac/group empty)");
+      debugPrint("Skip load STT (fac empty)");
       return;
     }
 
     try {
-      final value = await SttApi.getCurrentStt(fac: _fac, group: '');
-      if (mounted) {
-        setState(() => stt = value);
-        debugPrint("Load STT: $stt");
-      }
+      setState(() => _sttLoading = true);
+
+      final value = await SttApi.getCurrentStt(
+        fac: _fac,
+        type: widget.patrolGroup.name,
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        stt = value;
+        _sttLoading = false;
+      });
+
+      debugPrint("? Initial STT loaded: $stt");
     } catch (e) {
-      debugPrint("Load STT error: $e");
+      debugPrint("? Load STT error: $e");
+      if (mounted) setState(() => _sttLoading = false);
     }
   }
 
   void _connectSocket() {
-    if (sttSocket != null) {
-      try {
-        sttSocket!.dispose();
-      } catch (_) {}
-    }
+    sttSocket?.dispose();
 
     sttSocket = SttWebSocket(
       serverUrl: _wsUrl,
       fac: _fac,
-      group: _group,
+      type: widget.patrolGroup.name,
       onSttUpdate: (value) {
-        if (mounted) setState(() => stt = value);
+        if (!mounted) return;
+
+        setState(() {
+          stt = value;
+          _sttLoading = false; // n?u socket v? tru?c API
+        });
+
+        debugPrint("?? STT updated via WS: $value");
       },
     );
 
@@ -993,20 +1015,24 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
                         ),
                       ],
                     ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          "No. ${stt + 1}",
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 0.6,
+                    child: _sttLoading
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : Text(
+                            "No. ${stt + 1}",
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.6,
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
                   ),
                 ),
               ),

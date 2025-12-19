@@ -12,12 +12,12 @@ class SttApi {
 
   static Future<int> getCurrentStt({
     required String fac,
-    required String group,
+    required String type,
   }) async {
     try {
       final res = await _dio.get(
         '/api/stt/crt',
-        queryParameters: {'fac': normalize(fac), 'grp': normalize(group)},
+        queryParameters: {'fac': normalize(fac), 'type': normalize(type)},
       );
 
       if (res.statusCode == 200) {
