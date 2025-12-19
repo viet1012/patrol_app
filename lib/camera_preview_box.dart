@@ -997,7 +997,7 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          "No. $stt",
+                          "No. ${stt + 1}",
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 18,
