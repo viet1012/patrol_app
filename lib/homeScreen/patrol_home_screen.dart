@@ -14,6 +14,8 @@ import '../test.dart';
 import '../translator.dart';
 import '../widget/error_display.dart';
 
+enum PatrolGroup { weekly, srg, qa }
+
 class PatrolHomeScreen extends StatefulWidget {
   const PatrolHomeScreen({super.key});
 
@@ -41,6 +43,9 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
   bool isLoading = true;
   String? errorMessage;
   List<HsePatrolTeamModel> teams = [];
+
+  // bool showWeeklyOptions = false;
+  PatrolGroup? expandedGroup;
 
   @override
   void initState() {
@@ -188,9 +193,7 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
                                 horizontal: 32,
                               ),
                               decoration: glassDecoration,
-                              child: EmbossGlowTitle(
-                                text: 'SAFETY CROSS PATROL',
-                              ),
+                              child: EmbossGlowTitle(text: 'AUDIT WEB'),
                             ),
                           ),
                         ),
@@ -259,39 +262,90 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
                       const SizedBox(height: 30),
 
                       Expanded(
-                        child: ListView(
-                          children: [
-                            _patrolButton(
-                              number: '1)',
-                              title: 'Patrol Before',
-                              enabled: true,
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => CameraScreen(
-                                      machines: machines,
-                                      patrolTeams: teams,
-                                      lang: currentLang,
-                                      selectedPlant: selectedFactory,
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                            const SizedBox(height: 20),
-                            _patrolButton(
-                              number: '2)',
-                              title: 'Patrol After',
-                              enabled: false,
-                            ),
-                            const SizedBox(height: 20),
-                            _patrolButton(
-                              number: '3)',
-                              title: 'Patrol HSE check',
-                              enabled: false,
-                            ),
-                          ],
+                        child: Expanded(
+                          child: ListView(
+                            children: [
+                              _parentPatrolButton(
+                                group: PatrolGroup.weekly,
+                                title: 'Weekly Safety Patrol',
+                                icon: Icons.security,
+                              ),
+                              _childPatrolOptions(
+                                group: PatrolGroup.weekly,
+                                prefix: 'Patrol',
+                              ),
+
+                              const SizedBox(height: 24),
+
+                              _parentPatrolButton(
+                                group: PatrolGroup.srg,
+                                title: 'SRG Safety Audit',
+                                icon: Icons.groups,
+                                enabled: true,
+                              ),
+                              _childPatrolOptions(
+                                group: PatrolGroup.srg,
+                                prefix: 'Audit',
+                              ),
+
+                              const SizedBox(height: 24),
+
+                              _parentPatrolButton(
+                                group: PatrolGroup.qa,
+                                title: 'QA Quality Audit',
+                                icon: Icons.verified,
+                                enabled: false, // ✅ enable ô cuối
+                              ),
+                              _childPatrolOptions(
+                                group: PatrolGroup.qa,
+                                prefix: 'QA Audit',
+                              ),
+
+                              // _weeklyPatrolButton(),
+                              // AnimatedSize(
+                              //   duration: const Duration(milliseconds: 400),
+                              //   curve: Curves.easeInOut,
+                              //   child: showWeeklyOptions
+                              //       ? Column(
+                              //           children: [
+                              //             const SizedBox(height: 20),
+                              //             _patrolButton(
+                              //               number: '1)',
+                              //               title: 'Patrol Before',
+                              //               enabled: true,
+                              //               onTap: () {
+                              //                 Navigator.push(
+                              //                   context,
+                              //                   MaterialPageRoute(
+                              //                     builder: (_) => CameraScreen(
+                              //                       machines: machines,
+                              //                       patrolTeams: teams,
+                              //                       lang: currentLang,
+                              //                       selectedPlant:
+                              //                           selectedFactory,
+                              //                     ),
+                              //                   ),
+                              //                 );
+                              //               },
+                              //             ),
+                              //             const SizedBox(height: 20),
+                              //             _patrolButton(
+                              //               number: '2)',
+                              //               title: 'Patrol After',
+                              //               enabled: false,
+                              //             ),
+                              //             const SizedBox(height: 20),
+                              //             _patrolButton(
+                              //               number: '3)',
+                              //               title: 'Patrol HSE check',
+                              //               enabled: false,
+                              //             ),
+                              //           ],
+                              //         )
+                              //       : const SizedBox(),
+                              // ),
+                            ],
+                          ),
                         ),
                       ),
                     ],
@@ -301,6 +355,187 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
       ),
     );
   }
+
+  Color _groupColor(PatrolGroup group, bool enabled) {
+    if (!enabled) return Colors.white.withOpacity(0.5);
+
+    switch (group) {
+      case PatrolGroup.weekly:
+        return Colors.lightBlueAccent.shade400; // Weekly Safety Patrol
+      case PatrolGroup.srg:
+        return Colors.orangeAccent.shade400; // SRG Safety Audit
+      case PatrolGroup.qa:
+        return Colors.purpleAccent.shade400; // QA Quality Audit
+    }
+  }
+
+  Widget _parentPatrolButton({
+    required PatrolGroup group,
+    required String title,
+    required IconData icon,
+    bool enabled = true,
+  }) {
+    final isExpanded = expandedGroup == group;
+    final color = _groupColor(group, enabled);
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(22),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+        child: GestureDetector(
+          onTap: enabled
+              ? () {
+                  setState(() {
+                    expandedGroup = isExpanded ? null : group;
+                  });
+                }
+              : null,
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 30, horizontal: 24),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.18),
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(color: color, width: 2.5),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.2),
+                  blurRadius: 14,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Icon(icon, size: 26, color: color),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                      color: color,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                ),
+                enabled
+                    ? AnimatedRotation(
+                        turns: isExpanded ? 0.5 : 0,
+                        duration: const Duration(milliseconds: 300),
+                        child: Icon(Icons.expand_more, size: 34, color: color),
+                      )
+                    : Icon(Icons.lock_outline, color: color, size: 26),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _childPatrolOptions({
+    required PatrolGroup group,
+    required String prefix,
+  }) {
+    if (expandedGroup != group) return const SizedBox();
+
+    return AnimatedSize(
+      duration: const Duration(milliseconds: 400),
+      curve: Curves.easeInOut,
+      child: Column(
+        children: [
+          const SizedBox(height: 20),
+          _patrolButton(
+            number: '1)',
+            title: '$prefix Before',
+            enabled: true,
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => CameraScreen(
+                    machines: machines,
+                    patrolTeams: teams,
+                    lang: currentLang,
+                    selectedPlant: selectedFactory,
+                  ),
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 20),
+          _patrolButton(number: '2)', title: '$prefix After', enabled: false),
+          const SizedBox(height: 20),
+          _patrolButton(number: '3)', title: '$prefix Check', enabled: false),
+        ],
+      ),
+    );
+  }
+
+  // Widget _weeklyPatrolButton() {
+  //   return ClipRRect(
+  //     borderRadius: BorderRadius.circular(22),
+  //     child: BackdropFilter(
+  //       filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+  //       child: GestureDetector(
+  //         onTap: () {
+  //           setState(() {
+  //             showWeeklyOptions = !showWeeklyOptions;
+  //           });
+  //         },
+  //         child: Container(
+  //           padding: const EdgeInsets.symmetric(vertical: 30, horizontal: 24),
+  //           decoration: BoxDecoration(
+  //             color: Colors.white.withOpacity(0.18),
+  //             borderRadius: BorderRadius.circular(22),
+  //             border: Border.all(
+  //               color: Colors.lightBlueAccent.shade400,
+  //               width: 2.5,
+  //             ),
+  //             boxShadow: [
+  //               BoxShadow(
+  //                 color: Colors.black.withOpacity(0.2),
+  //                 blurRadius: 14,
+  //                 offset: const Offset(0, 6),
+  //               ),
+  //             ],
+  //           ),
+  //           child: Row(
+  //             children: [
+  //               Icon(
+  //                 Icons.security,
+  //                 size: 32,
+  //                 color: Colors.lightBlueAccent.shade400,
+  //               ),
+  //               const SizedBox(width: 16),
+  //               Expanded(
+  //                 child: Text(
+  //                   'Weekly Safety Patrol',
+  //                   style: TextStyle(
+  //                     fontSize: 24,
+  //                     fontWeight: FontWeight.w900,
+  //                     color: Colors.lightBlueAccent.shade400,
+  //                     letterSpacing: 1.2,
+  //                   ),
+  //                 ),
+  //               ),
+  //               AnimatedRotation(
+  //                 turns: showWeeklyOptions ? 0.5 : 0,
+  //                 duration: const Duration(milliseconds: 300),
+  //                 child: Icon(
+  //                   Icons.expand_more,
+  //                   size: 34,
+  //                   color: Colors.lightBlueAccent.shade400,
+  //                 ),
+  //               ),
+  //             ],
+  //           ),
+  //         ),
+  //       ),
+  //     ),
+  //   );
+  // }
 
   Widget _patrolButton({
     required String number,
@@ -341,7 +576,7 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
                   Text(
                     number,
                     style: TextStyle(
-                      fontSize: 22,
+                      fontSize: 18,
                       fontWeight: FontWeight.w700,
                       color: color,
                     ),
@@ -354,7 +589,7 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
                         Text(
                           title,
                           style: TextStyle(
-                            fontSize: 22,
+                            fontSize: 18,
                             fontWeight: FontWeight.bold,
                             color: color,
                           ),
