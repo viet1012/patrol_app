@@ -654,11 +654,17 @@ class _CameraScreenState extends State<CameraScreen> {
                             }
                             // return AutoCmpApi.search(widget.lang, value.text);
                             // FILTER TRỰC TIẾP TẠI ĐÂY
-                            return allOptionsComment.where((AutoCmp option) {
-                              return option.inputText
-                                  .toLowerCase()
-                                  .contains(value.text.toLowerCase()); // Tìm kiếm không phân biệt hoa thường
-                            }).take(5); // Chỉ lấy 5 kết quả đầu tiên giống như logic cũ của BE
+                            return allOptionsComment
+                                .where((AutoCmp option) {
+                                  return option.inputText
+                                      .toLowerCase()
+                                      .contains(
+                                        value.text.toLowerCase(),
+                                      ); // Tìm kiếm không phân biệt hoa thường
+                                })
+                                .take(
+                                  5,
+                                ); // Chỉ lấy 5 kết quả đầu tiên giống như logic cũ của BE
                           },
                           displayStringForOption: (option) => option.inputText,
                           onSelected: (AutoCmp selection) {
@@ -795,11 +801,17 @@ class _CameraScreenState extends State<CameraScreen> {
                             //   value.text,
                             // );
                             // FILTER TRỰC TIẾP TẠI ĐÂY
-                            return allOptionsCounter.where((AutoCmp option) {
-                              return option.inputText
-                                  .toLowerCase()
-                                  .contains(value.text.toLowerCase()); // Tìm kiếm không phân biệt hoa thường
-                            }).take(5); // Chỉ lấy 5 kết quả đầu tiên giống như logic cũ của BE
+                            return allOptionsCounter
+                                .where((AutoCmp option) {
+                                  return option.inputText
+                                      .toLowerCase()
+                                      .contains(
+                                        value.text.toLowerCase(),
+                                      ); // Tìm kiếm không phân biệt hoa thường
+                                })
+                                .take(
+                                  5,
+                                ); // Chỉ lấy 5 kết quả đầu tiên giống như logic cũ của BE
                           },
                           displayStringForOption: (option) => option.inputText,
                           onSelected: (AutoCmp selection) {
