@@ -327,6 +327,22 @@ class _CameraScreenState extends State<CameraScreen> {
     }
   }
 
+  double _fontSize = 14;
+
+  void _autoFont(String text) {
+    setState(() {
+      if (text.length > 120) {
+        _fontSize = 11;
+      } else if (text.length > 80)
+        _fontSize = 12;
+      else if (text.length > 40)
+        _fontSize = 13;
+      else
+        _fontSize = 14;
+    });
+    print("length: ${text.length} +_fontSize: ${_fontSize}");
+  }
+
   void _resetForm() {
     setState(() {
       _selectedPlant = '612K';
@@ -680,7 +696,7 @@ class _CameraScreenState extends State<CameraScreen> {
                             if (value.text.length < minLength || isLoading) {
                               return const Iterable<AutoCmp>.empty();
                             }
-                            // return AutoCmpApi.search(widget.lang, value.text);
+
                             // FILTER TRỰC TIẾP TẠI ĐÂY
                             return allOptionsComment
                                 .where((AutoCmp option) {
@@ -697,12 +713,14 @@ class _CameraScreenState extends State<CameraScreen> {
                           displayStringForOption: (option) => option.inputText,
                           onSelected: (AutoCmp selection) {
                             // Khi CHỌN gợi ý → điền vào comment
+
                             _commentController.text = selection.inputText;
                             _commentController
                                 .selection = TextSelection.fromPosition(
                               TextPosition(offset: selection.inputText.length),
                             ); // Đưa con trỏ ra cuối
                             _comment = selection.inputText;
+                            _autoFont(_comment);
 
                             // === TỰ ĐỘNG ĐIỀN COUNTERMEASURE NẾU CÓ ===
                             if (selection.countermeasure.isNotEmpty) {
@@ -710,7 +728,6 @@ class _CameraScreenState extends State<CameraScreen> {
                                   selection.countermeasure;
                               _counterMeasure = selection.countermeasure;
                             } else {
-                              print("Hahaha!");
                               // Nếu không có countermeasure → để trống (tùy yêu cầu)
                               _counterController.clear();
                               _counterMeasure = '';
@@ -728,9 +745,9 @@ class _CameraScreenState extends State<CameraScreen> {
                                   controller: controller,
                                   focusNode: focusNode,
                                   maxLines: 3,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 14,
+                                  style: TextStyle(
+                                    color: Colors.red,
+                                    fontSize: _fontSize,
                                   ),
                                   decoration: InputDecoration(
                                     hintText: "commentHint".tr(context),
@@ -749,14 +766,17 @@ class _CameraScreenState extends State<CameraScreen> {
                                     enabledBorder: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(14),
                                       borderSide: BorderSide(
-                                        color: Colors.white.withOpacity(0.25),
+                                        color: Color(
+                                          0xFF90E14D,
+                                        ).withOpacity(0.25),
                                       ),
                                     ),
                                     focusedBorder: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(14),
-                                      borderSide: const BorderSide(
-                                        color: Color(0xFF90E14D), // cyan
-                                        width: 1.6,
+                                      borderSide: BorderSide(
+                                        color: Color(
+                                          0xFF90E14D,
+                                        ).withOpacity(.45), // cyan
                                       ),
                                     ),
 
@@ -764,6 +784,7 @@ class _CameraScreenState extends State<CameraScreen> {
                                   ),
                                   onChanged: (v) {
                                     _comment = v;
+                                    _autoFont(v);
 
                                     // Debounce search
                                     if (_commentDebounce?.isActive ?? false) {
@@ -862,11 +883,13 @@ class _CameraScreenState extends State<CameraScreen> {
                           displayStringForOption: (option) => option.inputText,
                           onSelected: (AutoCmp selection) {
                             _counterController.text = selection.inputText;
+
                             _counterController
                                 .selection = TextSelection.fromPosition(
                               TextPosition(offset: selection.inputText.length),
                             );
                             _counterMeasure = selection.inputText;
+                            _autoFont(_counterMeasure);
                           },
                           fieldViewBuilder:
                               (
@@ -880,12 +903,12 @@ class _CameraScreenState extends State<CameraScreen> {
                                   controller: controller,
                                   focusNode: focusNode,
                                   maxLines: 3,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     color: Colors.white,
-                                    fontSize: 14,
+                                    fontSize: _fontSize,
                                   ),
                                   decoration: InputDecoration(
-                                    hintText: "commentHint".tr(context),
+                                    hintText: "counterMeasureHint".tr(context),
                                     filled: true,
                                     fillColor: Colors.green.withOpacity(0.08),
                                     hintStyle: TextStyle(
@@ -901,14 +924,17 @@ class _CameraScreenState extends State<CameraScreen> {
                                     enabledBorder: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(14),
                                       borderSide: BorderSide(
-                                        color: Colors.white.withOpacity(0.25),
+                                        color: Color(
+                                          0xFF90E14D,
+                                        ).withOpacity(0.25),
                                       ),
                                     ),
                                     focusedBorder: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(14),
-                                      borderSide: const BorderSide(
-                                        color: Color(0xFF90E14D), // cyan
-                                        width: 1.6,
+                                      borderSide: BorderSide(
+                                        color: Color(
+                                          0xFF90E14D,
+                                        ).withOpacity(.45), // cyan
                                       ),
                                     ),
 
@@ -916,6 +942,8 @@ class _CameraScreenState extends State<CameraScreen> {
                                   ),
                                   onChanged: (v) {
                                     _counterMeasure = v;
+                                    _autoFont(v);
+
                                     if (_counterDebounce?.isActive ?? false) {
                                       _counterDebounce!.cancel();
                                     }
