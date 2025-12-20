@@ -340,7 +340,7 @@ class _CameraScreenState extends State<CameraScreen> {
       else
         _fontSize = 14;
     });
-    print("length: ${text.length} +_fontSize: ${_fontSize}");
+    // print("length: ${text.length} +_fontSize: ${_fontSize}");
   }
 
   void _resetForm() {
@@ -369,7 +369,7 @@ class _CameraScreenState extends State<CameraScreen> {
 
   @override
   Widget build(BuildContext context) {
-    print('Lang: ${widget.patrolGroup.name}');
+    // print('Lang: ${widget.patrolGroup.name}');
     final plantList = getPlants();
     final groupList = getGroupsByPlant();
 
@@ -746,7 +746,7 @@ class _CameraScreenState extends State<CameraScreen> {
                                   focusNode: focusNode,
                                   maxLines: 3,
                                   style: TextStyle(
-                                    color: Colors.red,
+                                    color: Colors.white,
                                     fontSize: _fontSize,
                                   ),
                                   decoration: InputDecoration(
@@ -807,7 +807,7 @@ class _CameraScreenState extends State<CameraScreen> {
                                 child: Material(
                                   elevation: 8,
                                   borderRadius: BorderRadius.circular(12),
-                                  color: Colors.black87.withOpacity(.3),
+                                  color: Colors.black.withOpacity(.5),
                                   child: ConstrainedBox(
                                     constraints: BoxConstraints(
                                       maxWidth: constraints.maxWidth,
@@ -958,7 +958,7 @@ class _CameraScreenState extends State<CameraScreen> {
                                 child: Material(
                                   elevation: 8,
                                   borderRadius: BorderRadius.circular(12),
-                                  color: Colors.black87.withOpacity(.3),
+                                  color: Colors.black.withOpacity(.5),
 
                                   child: ConstrainedBox(
                                     constraints: BoxConstraints(
