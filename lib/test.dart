@@ -706,10 +706,6 @@ class _CameraScreenState extends State<CameraScreen> {
 
                             // === TỰ ĐỘNG ĐIỀN COUNTERMEASURE NẾU CÓ ===
                             if (selection.countermeasure.isNotEmpty) {
-                              print(
-                                "selection.countermeasure: ${selection.countermeasure}!",
-                              );
-
                               _counterController.text =
                                   selection.countermeasure;
                               _counterMeasure = selection.countermeasure;
@@ -731,14 +727,39 @@ class _CameraScreenState extends State<CameraScreen> {
                                 return TextField(
                                   controller: controller,
                                   focusNode: focusNode,
-                                  maxLines: 2,
+                                  maxLines: 3,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 14,
+                                  ),
                                   decoration: InputDecoration(
                                     hintText: "commentHint".tr(context),
                                     filled: true,
-                                    fillColor: Colors.yellow.shade50,
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(12),
+                                    fillColor: Colors.green.withOpacity(0.08),
+                                    hintStyle: TextStyle(
+                                      color: Colors.white.withOpacity(.6),
+                                      fontSize: 14,
                                     ),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(14),
+                                      borderSide: BorderSide(
+                                        color: Colors.white.withOpacity(0.35),
+                                      ),
+                                    ),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(14),
+                                      borderSide: BorderSide(
+                                        color: Colors.white.withOpacity(0.25),
+                                      ),
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(14),
+                                      borderSide: const BorderSide(
+                                        color: Color(0xFF90E14D), // cyan
+                                        width: 1.6,
+                                      ),
+                                    ),
+
                                     contentPadding: const EdgeInsets.all(12),
                                   ),
                                   onChanged: (v) {
@@ -765,7 +786,7 @@ class _CameraScreenState extends State<CameraScreen> {
                                 child: Material(
                                   elevation: 8,
                                   borderRadius: BorderRadius.circular(12),
-                                  color: Colors.white,
+                                  color: Colors.black87.withOpacity(.3),
                                   child: ConstrainedBox(
                                     constraints: BoxConstraints(
                                       maxWidth: constraints.maxWidth,
@@ -794,6 +815,7 @@ class _CameraScreenState extends State<CameraScreen> {
                                               style: const TextStyle(
                                                 fontSize: 14,
                                                 fontWeight: FontWeight.w600,
+                                                color: Colors.white,
                                               ),
                                               maxLines: 3,
                                               overflow: TextOverflow.ellipsis,
@@ -824,11 +846,7 @@ class _CameraScreenState extends State<CameraScreen> {
                             if (value.text.length < minLength || isLoading) {
                               return const Iterable<AutoCmp>.empty();
                             }
-                            // return AutoCmpApi.searchCounter(
-                            //   widget.lang,
-                            //   value.text,
-                            // );
-                            // FILTER TRỰC TIẾP TẠI ĐÂY
+
                             return allOptionsCounter
                                 .where((AutoCmp option) {
                                   return option.inputText
@@ -861,14 +879,39 @@ class _CameraScreenState extends State<CameraScreen> {
                                 return TextField(
                                   controller: controller,
                                   focusNode: focusNode,
-                                  maxLines: 2,
+                                  maxLines: 3,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 14,
+                                  ),
                                   decoration: InputDecoration(
-                                    hintText: "counterMeasureHint".tr(context),
+                                    hintText: "commentHint".tr(context),
                                     filled: true,
-                                    fillColor: Colors.yellow.shade50,
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(12),
+                                    fillColor: Colors.green.withOpacity(0.08),
+                                    hintStyle: TextStyle(
+                                      color: Colors.white.withOpacity(.6),
+                                      fontSize: 14,
                                     ),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(14),
+                                      borderSide: BorderSide(
+                                        color: Colors.white.withOpacity(0.35),
+                                      ),
+                                    ),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(14),
+                                      borderSide: BorderSide(
+                                        color: Colors.white.withOpacity(0.25),
+                                      ),
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(14),
+                                      borderSide: const BorderSide(
+                                        color: Color(0xFF90E14D), // cyan
+                                        width: 1.6,
+                                      ),
+                                    ),
+
                                     contentPadding: const EdgeInsets.all(12),
                                   ),
                                   onChanged: (v) {
@@ -887,7 +930,8 @@ class _CameraScreenState extends State<CameraScreen> {
                                 child: Material(
                                   elevation: 8,
                                   borderRadius: BorderRadius.circular(12),
-                                  color: Colors.white,
+                                  color: Colors.black87.withOpacity(.3),
+
                                   child: ConstrainedBox(
                                     constraints: BoxConstraints(
                                       maxWidth: constraints.maxWidth,
@@ -916,6 +960,7 @@ class _CameraScreenState extends State<CameraScreen> {
                                               style: const TextStyle(
                                                 fontSize: 14,
                                                 fontWeight: FontWeight.w600,
+                                                color: Colors.white,
                                               ),
                                               maxLines: 3,
                                               overflow: TextOverflow.ellipsis,
@@ -1006,113 +1051,6 @@ class _CameraScreenState extends State<CameraScreen> {
     }
   }
 
-  // 🔴 HÀM MỚI: Xây dựng giao diện Dropdown tối ưu cho Mobile
-  // Widget _customOptionsViewBuilder(
-  //   BuildContext context,
-  //   AutocompleteOnSelected<AutoCmp> onSelected,
-  //   Iterable<AutoCmp> options,
-  //   double width, // Chiều rộng chính xác từ LayoutBuilder
-  // ) {
-  //   return Align(
-  //     alignment: Alignment.topLeft,
-  //     child: Material(
-  //       elevation: 8.0, // Đổ bóng
-  //       borderRadius: BorderRadius.circular(12),
-  //       color: Colors.white,
-  //       child: ConstrainedBox(
-  //         constraints: BoxConstraints(
-  //           maxWidth: width, // Rộng bằng đúng ô input
-  //           maxHeight: 200, // ✅ Giới hạn chiều cao quan trọng
-  //         ),
-  //         child: ListView.separated(
-  //           padding: EdgeInsets.zero,
-  //           shrinkWrap: true,
-  //           itemCount: options.length,
-  //           separatorBuilder: (context, index) =>
-  //               const Divider(height: 1, thickness: 0.5),
-  //           itemBuilder: (BuildContext context, int index) {
-  //             final AutoCmp option = options.elementAt(index);
-  //             return InkWell(
-  //               onTap: () => onSelected(option),
-  //               child: Padding(
-  //                 padding: const EdgeInsets.symmetric(
-  //                   horizontal: 16,
-  //                   vertical: 12,
-  //                 ), // Tăng vùng chạm
-  //                 child: Column(
-  //                   crossAxisAlignment: CrossAxisAlignment.start,
-  //                   children: [
-  //                     Text(
-  //                       option.inputText,
-  //                       style: const TextStyle(
-  //                         fontWeight: FontWeight.w600,
-  //                         fontSize: 14,
-  //                       ),
-  //                       maxLines: 2,
-  //                       overflow: TextOverflow.ellipsis,
-  //                     ),
-  //                   ],
-  //                 ),
-  //               ),
-  //             );
-  //           },
-  //         ),
-  //       ),
-  //     ),
-  //   );
-  // }
-
-  Widget _customOptionsViewBuilder(
-    BuildContext context,
-    AutocompleteOnSelected<AutoCmp> onSelected,
-    Iterable<AutoCmp> options,
-    double width,
-    LayerLink layerLink,
-  ) {
-    const double popupHeight = 200;
-
-    return CompositedTransformFollower(
-      link: layerLink, // ✅ đúng target
-      showWhenUnlinked: false,
-      offset: const Offset(0, -popupHeight - 12),
-      child: Material(
-        elevation: 8,
-        borderRadius: BorderRadius.circular(12),
-        child: SizedBox(
-          width: width,
-          height: popupHeight,
-          child: ListView.separated(
-            padding: EdgeInsets.zero,
-            itemCount: options.length,
-            separatorBuilder: (_, __) =>
-                const Divider(height: 1, thickness: 0.5),
-            itemBuilder: (context, index) {
-              final option = options.elementAt(index);
-              return InkWell(
-                onTap: () => onSelected(option),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
-                  ),
-                  child: Text(
-                    option.inputText,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-      ),
-    );
-  }
-
   // 🔴 HÀM PHỤ TRỢ: _buildSearchableDropdown (Giữ nguyên)
   Widget _buildSearchableDropdown({
     required String label,
@@ -1129,7 +1067,7 @@ class _CameraScreenState extends State<CameraScreen> {
               showSearchBox: true,
               fit: FlexFit.loose,
               menuProps: MenuProps(
-                backgroundColor: const Color(0xFF203A43),
+                backgroundColor: const Color(0xFF161D23),
                 elevation: 12,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(18),
@@ -1248,7 +1186,9 @@ class _CameraScreenState extends State<CameraScreen> {
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(14),
-                  borderSide: BorderSide(color: Colors.white.withOpacity(0.25)),
+                  borderSide: BorderSide(
+                    color: const Color(0xFF4DD0E1).withOpacity(0.45),
+                  ),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(14),
