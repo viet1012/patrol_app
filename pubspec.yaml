@@ -52,6 +52,7 @@ dependencies:
   google_fonts: ^6.3.2
   stomp_dart_client: ^3.0.1
   web_socket_channel: ^3.0.3
+  auto_size_text: ^3.0.0
 dev_dependencies:
   flutter_test:
     sdk: flutter

@@ -597,3 +597,184 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
     );
   }
 }
+
+//
+// Widget _buildSearchableDropdown({
+//   required String label,
+//   required String? selectedValue,
+//   required List<String> items,
+//   required Function(String?) onChanged,
+// }) {
+//   return Column(
+//     crossAxisAlignment: CrossAxisAlignment.start,
+//     children: [
+//       SizedBox(
+//         child: DropdownSearch<String>(
+//           popupProps: PopupProps.menu(
+//             showSearchBox: true,
+//             fit: FlexFit.loose,
+//             menuProps: MenuProps(
+//               backgroundColor: const Color(0xFF203A43),
+//               elevation: 12,
+//               shape: RoundedRectangleBorder(
+//                 borderRadius: BorderRadius.circular(18),
+//               ),
+//             ),
+//
+//             /// 🔴 NO DATA FOUND CUSTOM
+//             emptyBuilder: (context, searchEntry) {
+//               return Center(
+//                 child: Padding(
+//                   padding: const EdgeInsets.symmetric(vertical: 24),
+//                   child: Column(
+//                     mainAxisSize: MainAxisSize.min,
+//                     children: [
+//                       Icon(
+//                         Icons.search_off_rounded,
+//                         size: 40,
+//                         color: Colors.white.withOpacity(0.5),
+//                       ),
+//                       const SizedBox(height: 12),
+//                       Text(
+//                         "No data found", // hoặc "No data found"
+//                         textAlign: TextAlign.center,
+//                         style: TextStyle(
+//                           color: Colors.white.withOpacity(0.7),
+//                           fontSize: 14,
+//                           fontWeight: FontWeight.w500,
+//                         ),
+//                       ),
+//                     ],
+//                   ),
+//                 ),
+//               );
+//             },
+//             searchFieldProps: TextFieldProps(
+//               decoration: InputDecoration(
+//                 hintText: "search_or_add_new".tr(context),
+//                 filled: true,
+//                 fillColor: Colors.white.withOpacity(0.1),
+//                 prefixIcon: Icon(
+//                   Icons.search_rounded,
+//                   color: Colors.white.withOpacity(0.7),
+//                 ),
+//                 hintStyle: TextStyle(color: Colors.white.withOpacity(0.6)),
+//                 contentPadding: const EdgeInsets.symmetric(
+//                   horizontal: 14,
+//                   vertical: 12,
+//                 ),
+//                 border: OutlineInputBorder(
+//                   borderRadius: BorderRadius.circular(12),
+//                   borderSide: BorderSide.none,
+//                 ),
+//               ),
+//             ),
+//
+//             itemBuilder: (context, item, isSelected) {
+//               return Container(
+//                 margin: const EdgeInsets.symmetric(
+//                   horizontal: 6,
+//                   vertical: 4,
+//                 ),
+//                 padding: const EdgeInsets.symmetric(
+//                   horizontal: 14,
+//                   vertical: 12,
+//                 ),
+//                 decoration: BoxDecoration(
+//                   borderRadius: BorderRadius.circular(12),
+//                   color: isSelected
+//                       ? Colors.white.withOpacity(0.12)
+//                       : Colors.transparent,
+//                 ),
+//                 child: AutoSizeText(
+//                   item,
+//                   style: TextStyle(
+//                     fontSize: 14,
+//                     fontWeight: isSelected
+//                         ? FontWeight.w600
+//                         : FontWeight.w500,
+//                     color: Colors.white,
+//                   ),
+//                 ),
+//               );
+//             },
+//           ),
+//
+//           // ... (các logic asyncItems, compareFn, v.v. giữ nguyên)
+//           asyncItems: (String filter) async {
+//             var result = items
+//                 .where((e) => e.toLowerCase().contains(filter.toLowerCase()))
+//                 .toList();
+//
+//             if (filter.isNotEmpty && !items.contains(filter.trim())) {
+//               result.insert(0, filter.trim());
+//             }
+//             return result;
+//           },
+//
+//           compareFn: (item, selectedItem) =>
+//           item.trim() == selectedItem.trim(),
+//
+//           selectedItem: selectedValue ?? '',
+//
+//           dropdownDecoratorProps: DropDownDecoratorProps(
+//             dropdownSearchDecoration: InputDecoration(
+//               hintText: label,
+//               hintMaxLines: 1,
+//               floatingLabelBehavior: FloatingLabelBehavior.never,
+//
+//               /// 🌫️ nền glass
+//               filled: true,
+//               fillColor: Colors.white.withOpacity(0.08),
+//
+//               border: OutlineInputBorder(
+//                 borderRadius: BorderRadius.circular(14),
+//                 borderSide: BorderSide(color: Colors.white.withOpacity(0.35)),
+//               ),
+//               enabledBorder: OutlineInputBorder(
+//                 borderRadius: BorderRadius.circular(14),
+//                 borderSide: BorderSide(color: Colors.white.withOpacity(0.25)),
+//               ),
+//               focusedBorder: OutlineInputBorder(
+//                 borderRadius: BorderRadius.circular(14),
+//                 borderSide: const BorderSide(
+//                   color: Color(0xFF4DD0E1), // cyan
+//                   width: 1.6,
+//                 ),
+//               ),
+//
+//               contentPadding: const EdgeInsets.fromLTRB(12, 14, 12, 12),
+//
+//               /// 📝 hint
+//               hintStyle: TextStyle(
+//                 color: Colors.white.withOpacity(0.6),
+//                 fontSize: 14,
+//               ),
+//             ),
+//           ),
+//
+//           dropdownBuilder: (context, selectedItem) {
+//             return AutoSizeText(
+//               selectedItem?.isNotEmpty == true ? selectedItem! : label,
+//               maxLines: 2,
+//               minFontSize: 11,
+//               stepGranularity: 0.5,
+//               overflow: TextOverflow.visible,
+//               style: TextStyle(
+//                 fontSize: 14,
+//                 fontWeight: selectedItem?.isNotEmpty == true
+//                     ? FontWeight.bold
+//                     : FontWeight.w500,
+//                 color: selectedItem?.isNotEmpty == true
+//                     ? Colors.white
+//                     : Colors.white.withOpacity(0.6),
+//               ),
+//             );
+//           },
+//
+//           onChanged: onChanged,
+//         ),
+//       ),
+//     ],
+//   );
+// }

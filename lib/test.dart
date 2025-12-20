@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:ui';
+import 'package:auto_size_text/auto_size_text.dart';
 import 'package:chuphinh/camera_preview_box.dart';
 import 'package:chuphinh/translator.dart';
 import 'package:chuphinh/widget/glass_action_button.dart';
@@ -1106,18 +1107,51 @@ class _CameraScreenState extends State<CameraScreen> {
               showSearchBox: true,
               fit: FlexFit.loose,
               menuProps: MenuProps(
-                backgroundColor: Colors.white,
-                elevation: 8,
+                backgroundColor: const Color(0xFF203A43),
+                elevation: 12,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(18),
                 ),
               ),
+
+              /// 🔴 NO DATA FOUND CUSTOM
+              emptyBuilder: (context, searchEntry) {
+                return Center(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.search_off_rounded,
+                          size: 40,
+                          color: Colors.white.withOpacity(0.5),
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          "No data found", // hoặc "No data found"
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.7),
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
               searchFieldProps: TextFieldProps(
                 decoration: InputDecoration(
                   hintText: "search_or_add_new".tr(context),
                   filled: true,
-                  fillColor: Colors.blueGrey.shade50,
-                  prefixIcon: const Icon(Icons.search_rounded),
+                  fillColor: Colors.white.withOpacity(0.1),
+                  prefixIcon: Icon(
+                    Icons.search_rounded,
+                    color: Colors.white.withOpacity(0.7),
+                  ),
+                  hintStyle: TextStyle(color: Colors.white.withOpacity(0.6)),
                   contentPadding: const EdgeInsets.symmetric(
                     horizontal: 14,
                     vertical: 12,
@@ -1128,11 +1162,12 @@ class _CameraScreenState extends State<CameraScreen> {
                   ),
                 ),
               ),
+
               itemBuilder: (context, item, isSelected) {
                 return Container(
                   margin: const EdgeInsets.symmetric(
                     horizontal: 6,
-                    vertical: 2,
+                    vertical: 4,
                   ),
                   padding: const EdgeInsets.symmetric(
                     horizontal: 14,
@@ -1141,17 +1176,17 @@ class _CameraScreenState extends State<CameraScreen> {
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(12),
                     color: isSelected
-                        ? Colors.blueGrey.shade100
+                        ? Colors.white.withOpacity(0.12)
                         : Colors.transparent,
                   ),
-                  child: Text(
+                  child: AutoSizeText(
                     item,
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: isSelected
                           ? FontWeight.w600
                           : FontWeight.w500,
-                      color: Colors.blueGrey.shade900,
+                      color: Colors.white,
                     ),
                   ),
                 );
@@ -1180,36 +1215,56 @@ class _CameraScreenState extends State<CameraScreen> {
                 hintText: label,
                 hintMaxLines: 1,
                 floatingLabelBehavior: FloatingLabelBehavior.never,
-                isDense: true,
+
+                /// 🌫️ nền glass
                 filled: true,
-                fillColor: Colors.blue.shade50,
+                fillColor: Colors.white.withOpacity(0.08),
+
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(
-                    color: Colors.blue.shade300,
-                    width: 1.5,
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide(color: Colors.white.withOpacity(0.35)),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide(color: Colors.white.withOpacity(0.25)),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: const BorderSide(
+                    color: Color(0xFF4DD0E1), // cyan
+                    width: 1.6,
                   ),
                 ),
-                contentPadding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
+
+                contentPadding: const EdgeInsets.fromLTRB(12, 14, 12, 12),
+
+                /// 📝 hint
+                hintStyle: TextStyle(
+                  color: Colors.white.withOpacity(0.6),
+                  fontSize: 14,
+                ),
               ),
             ),
 
             dropdownBuilder: (context, selectedItem) {
-              return Text(
+              return AutoSizeText(
                 selectedItem?.isNotEmpty == true ? selectedItem! : label,
                 maxLines: 2,
-                overflow: TextOverflow.ellipsis,
+                minFontSize: 11,
+                stepGranularity: 0.5,
+                overflow: TextOverflow.visible,
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: selectedItem?.isNotEmpty == true
                       ? FontWeight.bold
                       : FontWeight.w500,
                   color: selectedItem?.isNotEmpty == true
-                      ? Colors.black87
-                      : Colors.grey[600],
+                      ? Colors.white
+                      : Colors.white.withOpacity(0.6),
                 ),
               );
             },
+
             onChanged: onChanged,
           ),
         ),
@@ -1227,12 +1282,55 @@ class _CameraScreenState extends State<CameraScreen> {
     return DropdownButtonFormField<String>(
       value: valueKey,
       isExpanded: true,
+      dropdownColor: const Color(0xFF203A43), // nền dropdown
+
       decoration: InputDecoration(
         labelText: labelKey.tr(context),
+
+        /// 🌫️ nền mờ
         filled: true,
-        fillColor: Colors.deepOrange.shade50,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-        contentPadding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
+        fillColor: Colors.white.withOpacity(0.08),
+
+        /// 🔲 viền
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide(
+            color: Colors.white.withOpacity(0.35),
+            width: 1.2,
+          ),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide(color: Colors.white.withOpacity(0.25)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide(
+            color: const Color(0xFF4DD0E1), // cyan
+            width: 1.6,
+          ),
+        ),
+
+        contentPadding: const EdgeInsets.fromLTRB(12, 16, 12, 14),
+
+        /// 📝 label bình thường
+        labelStyle: TextStyle(
+          color: Colors.white.withOpacity(0.65),
+          fontSize: 14,
+        ),
+
+        /// 🏷️ label khi bay lên
+        floatingLabelStyle: const TextStyle(
+          color: Color(0xFF4DD0E1), // cyan nổi bật
+          fontWeight: FontWeight.bold,
+          fontSize: 14,
+        ),
+      ),
+
+      style: const TextStyle(
+        color: Colors.white,
+        fontSize: 14,
+        fontWeight: FontWeight.w600,
       ),
       selectedItemBuilder: (context) {
         return items.map((e) {
@@ -1245,7 +1343,7 @@ class _CameraScreenState extends State<CameraScreen> {
               overflow: TextOverflow.visible,
               style: TextStyle(
                 fontSize: 14,
-                color: Colors.black,
+                color: Colors.white,
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -1261,16 +1359,16 @@ class _CameraScreenState extends State<CameraScreen> {
             children: [
               Text(
                 e.labelKey.tr(context),
-                style: const TextStyle(
-                  fontWeight: FontWeight.w500,
-                  fontSize: 14,
-                ),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: Colors.white),
               ),
               Text(
                 "(${e.score})",
-                style: const TextStyle(fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.7),
+                  fontSize: 12,
+                ),
               ),
             ],
           ),
