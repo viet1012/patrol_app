@@ -616,23 +616,45 @@ class _CameraScreenState extends State<CameraScreen> {
                         controller: TextEditingController(text: displayScore),
                         decoration: InputDecoration(
                           labelText: "label_risk".tr(context),
+
+                          /// 🎨 nền hiển thị
                           filled: true,
-                          fillColor: Colors.deepOrange.shade100,
-                          labelStyle: const TextStyle(
-                            fontSize: 16,
-                            color: Colors.black,
+                          fillColor: Colors.deepOrange.withOpacity(0.15),
+
+                          /// 🏷️ label
+                          labelStyle: TextStyle(
+                            fontSize: 14,
+                            color: Colors.white.withOpacity(0.65),
+                            fontWeight: FontWeight.w500,
                           ),
+
+                          floatingLabelStyle: const TextStyle(
+                            color: Colors.deepOrange,
+                            fontWeight: FontWeight.bold,
+                          ),
+
+                          /// 🔲 viền
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          contentPadding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(
+                              color: Colors.deepOrange.withOpacity(0.6),
+                            ),
+                          ),
+
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 14,
+                          ),
                         ),
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                          fontSize: 16,
+                          fontSize: 18,
                           color: (displayScore == "V" || displayScore == "IV")
                               ? Colors.red
-                              : Colors.black,
+                              : Colors.white,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -1282,14 +1304,14 @@ class _CameraScreenState extends State<CameraScreen> {
     return DropdownButtonFormField<String>(
       value: valueKey,
       isExpanded: true,
-      dropdownColor: const Color(0xFF203A43), // nền dropdown
+      dropdownColor: const Color(0xFF2A2E32), // nền dropdown
 
       decoration: InputDecoration(
         labelText: labelKey.tr(context),
 
         /// 🌫️ nền mờ
         filled: true,
-        fillColor: Colors.white.withOpacity(0.08),
+        fillColor: Colors.orange.withOpacity(0.08),
 
         /// 🔲 viền
         border: OutlineInputBorder(
@@ -1301,14 +1323,14 @@ class _CameraScreenState extends State<CameraScreen> {
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: Colors.white.withOpacity(0.25)),
+          borderSide: BorderSide(
+            color: const Color(0xFF7986CB).withOpacity(0.45),
+          ),
         ),
+
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(
-            color: const Color(0xFF4DD0E1), // cyan
-            width: 1.6,
-          ),
+          borderSide: const BorderSide(color: Color(0xFF7986CB), width: 1.8),
         ),
 
         contentPadding: const EdgeInsets.fromLTRB(12, 16, 12, 14),
@@ -1321,9 +1343,8 @@ class _CameraScreenState extends State<CameraScreen> {
 
         /// 🏷️ label khi bay lên
         floatingLabelStyle: const TextStyle(
-          color: Color(0xFF4DD0E1), // cyan nổi bật
+          color: Color(0xFF7986CB),
           fontWeight: FontWeight.bold,
-          fontSize: 14,
         ),
       ),
 
