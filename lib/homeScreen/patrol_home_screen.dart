@@ -257,7 +257,7 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
                                       floatingLabelStyle: const TextStyle(
                                         fontSize: 18,
                                         fontWeight: FontWeight.bold,
-                                        color: Color(0xFF0B2DDF),
+                                        color: Color(0xFF7986CB),
                                       ),
 
                                       contentPadding:
@@ -296,27 +296,13 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
                       const SizedBox(height: 30),
 
                       Expanded(
-                        child: AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 350),
-                          switchInCurve: Curves.easeOutCubic,
-                          switchOutCurve: Curves.easeInCubic,
-                          transitionBuilder: (child, animation) {
-                            return FadeTransition(
-                              opacity: animation,
-                              child: SlideTransition(
-                                position: Tween<Offset>(
-                                  begin: const Offset(0, 0.15),
-                                  end: Offset.zero,
-                                ).animate(animation),
-                                child: child,
-                              ),
-                            );
-                          },
-                          child: selectedFactory == null
-                              ? const SizedBox(key: ValueKey('empty'))
-                              : ListView(
-                                  key: const ValueKey('content'),
-                                  children: [
+                        child: selectedFactory == null
+                            ? const SizedBox()
+                            : ListView(
+                                key: ValueKey(selectedFactory),
+                                children: [
+                                  _animatedCard(
+                                    0,
                                     _patrolGroupCard(
                                       group: PatrolGroup.Patrol,
                                       title: 'Weekly Safety Patrol',
@@ -324,6 +310,9 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
                                       prefix: 'Patrol',
                                       titleScreen: 'Safety Patrol',
                                     ),
+                                  ),
+                                  _animatedCard(
+                                    1,
                                     _patrolGroupCard(
                                       group: PatrolGroup.Audit,
                                       title: 'SRG Safety Audit',
@@ -331,6 +320,9 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
                                       prefix: 'Audit',
                                       titleScreen: 'Safety Audit',
                                     ),
+                                  ),
+                                  _animatedCard(
+                                    2,
                                     _patrolGroupCard(
                                       group: PatrolGroup.QualityPatrol,
                                       title: 'QA Quality Patrol',
@@ -339,15 +331,32 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
                                       enabled: false,
                                       titleScreen: 'QA Patrol',
                                     ),
-                                  ],
-                                ),
-                        ),
+                                  ),
+                                ],
+                              ),
                       ),
                     ],
                   ),
                 ),
         ),
       ),
+    );
+  }
+
+  Widget _animatedCard(int index, Widget child) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: 1),
+      duration: Duration(milliseconds: 600 + index * 140),
+      curve: Curves.easeOutCubic,
+      builder: (context, value, _) {
+        return Opacity(
+          opacity: value,
+          child: Transform.translate(
+            offset: Offset(0, -(1 - value) * 20), // nhẹ hơn 30
+            child: child,
+          ),
+        );
+      },
     );
   }
 
