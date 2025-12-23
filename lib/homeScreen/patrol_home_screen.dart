@@ -25,8 +25,6 @@ class PatrolHomeScreen extends StatefulWidget {
 }
 
 class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
-  // final List<String> factories = ['612K', '611T', '613F', '614F', 'meivy'];
-
   List<String> getPlantList(List<MachineModel> machines) {
     return machines
         .map((e) => e.plant?.toString().trim() ?? '')
@@ -35,7 +33,6 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
         .toList();
   }
 
-  // String selectedFactory = '612K';
   String? selectedFactory;
 
   String currentLang = "VI";
@@ -89,7 +86,7 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
 
       setState(() {
         machines = data;
-        selectedFactory = plants.isNotEmpty ? plants.first : null;
+        selectedFactory = null;
         isLoading = false;
       });
     } catch (e) {
@@ -207,52 +204,88 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
                                     });
                                   },
                                 ),
+                                SizedBox(
+                                  width: 150,
+                                  child: DropdownButtonFormField<String>(
+                                    value: selectedFactory, // null lúc đầu
+                                    isExpanded: true,
+                                    dropdownColor: Colors.blueGrey.shade900
+                                        .withOpacity(0.95),
+                                    icon: const Icon(
+                                      Icons.arrow_drop_down,
+                                      color: Colors.white70,
+                                      size: 30,
+                                    ),
+                                    decoration: InputDecoration(
+                                      labelText: "plant".tr(
+                                        context,
+                                      ), // 👈 TEXT BẠN MUỐN
+                                      filled: true,
+                                      fillColor: Colors.white.withOpacity(0.12),
 
-                                /// 🏭 FACTORY
-                                Row(
-                                  children: [
-                                    Text(
-                                      "plant".tr(context),
-                                      style: const TextStyle(
-                                        fontSize: 20,
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(14),
+                                        borderSide: BorderSide(
+                                          color: Colors.white.withOpacity(0.35),
+                                          width: 1.2,
+                                        ),
+                                      ),
+
+                                      enabledBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(14),
+                                        borderSide: BorderSide(
+                                          color: Colors.white.withOpacity(0.35),
+                                        ),
+                                      ),
+
+                                      focusedBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(14),
+                                        borderSide: const BorderSide(
+                                          color: Color(0xFF7986CB),
+                                          width: 1.8,
+                                        ),
+                                      ),
+
+                                      /// 🏷️ label bình thường
+                                      labelStyle: TextStyle(
+                                        fontSize: 18,
                                         fontWeight: FontWeight.w600,
                                         color: Colors.white70,
                                       ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    DropdownButton<String>(
-                                      value: selectedFactory,
-                                      dropdownColor: Colors.blueGrey.shade900
-                                          .withOpacity(0.9),
-                                      underline: const SizedBox(),
-                                      icon: const Icon(
-                                        Icons.arrow_drop_down,
-                                        color: Colors.white70,
-                                        size: 30,
-                                      ),
-                                      style: const TextStyle(
-                                        fontSize: 20,
+
+                                      /// 🏷️ label khi bay lên
+                                      floatingLabelStyle: const TextStyle(
+                                        fontSize: 18,
                                         fontWeight: FontWeight.bold,
-                                        color: Colors.white,
+                                        color: Color(0xFF0B2DDF),
                                       ),
-                                      borderRadius: BorderRadius.circular(12),
-                                      items: factories
-                                          .map(
-                                            (f) => DropdownMenuItem(
-                                              value: f,
-                                              child: Text(f),
-                                            ),
-                                          )
-                                          .toList(),
-                                      onChanged: (val) {
-                                        if (val != null) {
-                                          setState(() {
-                                            selectedFactory = val;
-                                          });
-                                        }
-                                      },
+
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(
+                                            horizontal: 16,
+                                            vertical: 14,
+                                          ),
                                     ),
-                                  ],
+
+                                    style: const TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
+
+                                    items: factories.map((f) {
+                                      return DropdownMenuItem<String>(
+                                        value: f,
+                                        child: Text(f),
+                                      );
+                                    }).toList(),
+
+                                    onChanged: (val) {
+                                      setState(() {
+                                        selectedFactory = val;
+                                      });
+                                    },
+                                  ),
                                 ),
                               ],
                             ),
@@ -263,33 +296,51 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
                       const SizedBox(height: 30),
 
                       Expanded(
-                        child: ListView(
-                          children: [
-                            _patrolGroupCard(
-                              group: PatrolGroup.Patrol,
-                              title: 'Weekly Safety Patrol',
-                              icon: Icons.security,
-                              prefix: 'Patrol',
-                              titleScreen: 'Safety Patrol',
-                            ),
-
-                            _patrolGroupCard(
-                              group: PatrolGroup.Audit,
-                              title: 'SRG Safety Audit',
-                              icon: Icons.groups,
-                              prefix: 'Audit',
-                              titleScreen: 'Safety Audit',
-                            ),
-
-                            _patrolGroupCard(
-                              group: PatrolGroup.QualityPatrol,
-                              title: 'QA Quality Patrol',
-                              icon: Icons.verified,
-                              prefix: 'QA Patrol',
-                              enabled: false,
-                              titleScreen: 'QA Patrol',
-                            ),
-                          ],
+                        child: AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 350),
+                          switchInCurve: Curves.easeOutCubic,
+                          switchOutCurve: Curves.easeInCubic,
+                          transitionBuilder: (child, animation) {
+                            return FadeTransition(
+                              opacity: animation,
+                              child: SlideTransition(
+                                position: Tween<Offset>(
+                                  begin: const Offset(0, 0.15),
+                                  end: Offset.zero,
+                                ).animate(animation),
+                                child: child,
+                              ),
+                            );
+                          },
+                          child: selectedFactory == null
+                              ? const SizedBox(key: ValueKey('empty'))
+                              : ListView(
+                                  key: const ValueKey('content'),
+                                  children: [
+                                    _patrolGroupCard(
+                                      group: PatrolGroup.Patrol,
+                                      title: 'Weekly Safety Patrol',
+                                      icon: Icons.security,
+                                      prefix: 'Patrol',
+                                      titleScreen: 'Safety Patrol',
+                                    ),
+                                    _patrolGroupCard(
+                                      group: PatrolGroup.Audit,
+                                      title: 'SRG Safety Audit',
+                                      icon: Icons.groups,
+                                      prefix: 'Audit',
+                                      titleScreen: 'Safety Audit',
+                                    ),
+                                    _patrolGroupCard(
+                                      group: PatrolGroup.QualityPatrol,
+                                      title: 'QA Quality Patrol',
+                                      icon: Icons.verified,
+                                      prefix: 'QA Patrol',
+                                      enabled: false,
+                                      titleScreen: 'QA Patrol',
+                                    ),
+                                  ],
+                                ),
                         ),
                       ),
                     ],
