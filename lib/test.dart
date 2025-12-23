@@ -26,12 +26,14 @@ class CameraScreen extends StatefulWidget {
   final String lang;
 
   final PatrolGroup patrolGroup;
+  final String titleScreen;
 
-  CameraScreen({
+  const CameraScreen({
     super.key,
     required this.machines,
     required this.patrolTeams,
     required this.selectedPlant,
+    required this.titleScreen,
     required this.lang,
     required this.patrolGroup,
   });
@@ -345,7 +347,6 @@ class _CameraScreenState extends State<CameraScreen> {
 
   void _resetForm() {
     setState(() {
-      _selectedPlant = '612K';
       _selectedMachine = null;
       _comment = '';
       _counterMeasure = '';
@@ -401,11 +402,42 @@ class _CameraScreenState extends State<CameraScreen> {
       resizeToAvoidBottomInset: true,
       appBar: AppBar(
         backgroundColor: Color(0xFF121826), // soft dark blue
+        centerTitle: false,
+        titleSpacing: 4, // 👈 kéo sát về leading
         leading: GlassActionButton(
           icon: Icons.arrow_back_rounded,
           onTap: () => Navigator.pop(context),
         ),
+        title: Container(
+          padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 6),
 
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                widget.titleScreen,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  '${widget.selectedPlant}',
+                  style: const TextStyle(color: Colors.white70, fontSize: 11),
+                ),
+              ),
+            ],
+          ),
+        ),
         actions: [
           // HIỂN THỊ ẢNH THUMBNAIL TRÊN APPBAR
           if (images.isNotEmpty)

@@ -1053,31 +1053,33 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
               left: 0,
               right: 0,
               child: Center(
-                child: (widget.group == null || widget.group!.isEmpty)
-                    // 🔒 NÚT KHÓA (khi chưa chọn Group)
-                    ? GlassCircleButton(
-                        size: 80,
-                        child: Icon(
-                          Icons.lock_rounded,
-                          color: Colors.red[300],
-                          size: 36,
-                        ),
-                      )
+                child:
+                    // (widget.group == null || widget.group!.isEmpty)
+                    //     // 🔒 NÚT KHÓA (khi chưa chọn Group)
+                    //     ?
+                    // GlassCircleButton(
+                    //         size: 80,
+                    //         child: Icon(
+                    //           Icons.lock_rounded,
+                    //           color: Colors.red[300],
+                    //           size: 36,
+                    //         ),
+                    //       ):
                     // 📸 NÚT CHỤP ẢNH (khi đã chọn Group)
-                    : GestureDetector(
-                        onTap: _isCapturing ? null : _takePhoto,
-                        child: GlassCircleButton(
-                          size: 80,
-                          showProgress: _isCapturing,
-                          child: _isCapturing
-                              ? null // showProgress sẽ hiển thị loading
-                              : const Icon(
-                                  Icons.camera_alt_rounded,
-                                  color: Colors.white,
-                                  size: 36,
-                                ),
-                        ),
+                    GestureDetector(
+                      onTap: _isCapturing ? null : _takePhoto,
+                      child: GlassCircleButton(
+                        size: 80,
+                        showProgress: _isCapturing,
+                        child: _isCapturing
+                            ? null // showProgress sẽ hiển thị loading
+                            : const Icon(
+                                Icons.camera_alt_rounded,
+                                color: Colors.white,
+                                size: 36,
+                              ),
                       ),
+                    ),
               ),
             ),
           ],

@@ -1,252 +1,661 @@
+import 'package:auto_size_text/auto_size_text.dart';
+import 'package:dropdown_search/dropdown_search.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import '../api/patrol_report_api.dart';
+import '../homeScreen/patrol_home_screen.dart';
+import '../model/machine_model.dart';
+import '../model/patrol_report_model.dart';
+import '../translator.dart';
+import '../widget/error_display.dart';
+import '../widget/glass_action_button.dart';
+import 'ReportDetailPage.dart';
 
 class ReportDetailScreen extends StatefulWidget {
-  const ReportDetailScreen({super.key});
+  final List<MachineModel> machines;
+  final String? selectedPlant;
+  final String titleScreen;
+  final PatrolGroup patrolGroup;
+
+  const ReportDetailScreen({
+    super.key,
+    required this.machines,
+    required this.selectedPlant,
+    required this.titleScreen,
+    required this.patrolGroup,
+  });
 
   @override
   State<ReportDetailScreen> createState() => _ReportDetailScreenState();
 }
 
 class _ReportDetailScreenState extends State<ReportDetailScreen> {
-  // ===== Selected values =====
-  String? selectedFac;
-  String? selectedArea;
-  String? selectedMachine;
+  String? _selectedPlant;
+  String? _selectedFac;
 
-  // ===== Mock data =====
-  final List<String> facList = ['Fac A', 'Fac B'];
+  String? _filterArea;
+  String? _filterRisk;
 
-  final Map<String, List<String>> areaMap = {
-    'Fac A': ['Rough', 'Finish'],
-    'Fac B': ['Assembly'],
-  };
+  Future<List<PatrolReportModel>>? _futureReport;
 
-  final Map<String, List<String>> machineMap = {
-    'Rough': ['A-111', 'A-112'],
-    'Finish': ['F-201'],
-    'Assembly': ['B-301'],
-  };
-
-  // ===== Mock report data =====
-  Map<String, String> reportData = {};
-
-  void _loadReport() {
-    reportData = {
-      'no': '7',
-      'patrolBy': 'Group 6',
-      'time': '12/11/2025 14:30',
-      'content': 'Dây điện bị rối',
-      'action': 'Đi lại dây điện gọn gàng',
-      'user': 'Việt',
-      'comment': 'Đã đi lại dây điện',
-    };
+  List<String> getFacByPlant(String plant) {
+    final Set<String> unique = {};
+    return widget.machines
+        .where((m) => m.plant.toString() == plant)
+        .map((m) => m.fac.toString())
+        .where((f) => f.isNotEmpty)
+        .where((f) => unique.add(f))
+        .toList();
   }
 
-  // ================= BUILD =================
+  int _riskToScore(String risk) {
+    switch (risk) {
+      case 'V':
+        return 5;
+      case 'IV':
+        return 4;
+      case 'III':
+        return 3;
+      case 'II':
+        return 2;
+      case 'I':
+        return 1;
+      default:
+        return 0;
+    }
+  }
+
+  Color _riskColor(String risk) {
+    switch (risk) {
+      case 'V':
+        return Colors.red;
+      case 'IV':
+        return Colors.redAccent;
+      case 'III':
+        return Colors.amber;
+      case 'II':
+        return Colors.lightBlueAccent;
+      case 'I':
+        return Colors.greenAccent;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  void _loadReport() async {
+    if (_selectedFac == null) return;
+
+    setState(() {
+      _futureReport = null; // reset trước (optional)
+    });
+
+    try {
+      final future = PatrolReportApi.fetchReports(
+        division: _selectedFac!,
+        area: '',
+        machine: '',
+        type: widget.patrolGroup.name,
+      );
+
+      setState(() {
+        _futureReport = future;
+      });
+    } catch (e, s) {
+      debugPrint('❌ Load report error: $e');
+      debugPrintStack(stackTrace: s);
+
+      setState(() {
+        _futureReport = Future.error(e);
+      });
+    }
+  }
+
+  @override
+  void initState() {
+    _selectedPlant = widget.selectedPlant;
+    super.initState();
+  }
+
   @override
   Widget build(BuildContext context) {
+    final facList = _selectedPlant == null
+        ? []
+        : getFacByPlant(_selectedPlant!);
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Chi tiết báo cáo'),
-        backgroundColor: Colors.blue.shade700,
-        foregroundColor: Colors.white,
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
+        backgroundColor: const Color(0xFF121826),
+        centerTitle: false,
+        titleSpacing: 4, // 👈 kéo sát về leading
+        leading: GlassActionButton(
+          icon: Icons.arrow_back_rounded,
+          onTap: () => Navigator.pop(context),
+        ),
+        title: Row(
           children: [
-            _buildSelectionBox(),
-            const SizedBox(height: 16),
-
-            if (selectedFac != null &&
-                selectedArea != null &&
-                selectedMachine != null)
-              _buildReportTable()
-            else
-              const Text(
-                'Vui lòng chọn đầy đủ Xưởng / Khu vực / Mã máy',
-                style: TextStyle(color: Colors.grey),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ================= SELECT BOX =================
-  Widget _buildSelectionBox() {
-    return Column(
-      children: [
-        DropdownButtonFormField<String>(
-          decoration: const InputDecoration(labelText: 'Xưởng'),
-          value: selectedFac,
-          items: facList
-              .map((e) => DropdownMenuItem(value: e, child: Text(e)))
-              .toList(),
-          onChanged: (v) {
-            setState(() {
-              selectedFac = v;
-              selectedArea = null;
-              selectedMachine = null;
-            });
-          },
-        ),
-        const SizedBox(height: 8),
-
-        DropdownButtonFormField<String>(
-          decoration: const InputDecoration(labelText: 'Khu vực'),
-          value: selectedArea,
-          items: (areaMap[selectedFac] ?? [])
-              .map((e) => DropdownMenuItem(value: e, child: Text(e)))
-              .toList(),
-          onChanged: selectedFac == null
-              ? null
-              : (v) {
-                  setState(() {
-                    selectedArea = v;
-                    selectedMachine = null;
-                  });
-                },
-        ),
-        const SizedBox(height: 8),
-
-        DropdownButtonFormField<String>(
-          decoration: const InputDecoration(labelText: 'Mã máy'),
-          value: selectedMachine,
-          items: (machineMap[selectedArea] ?? [])
-              .map((e) => DropdownMenuItem(value: e, child: Text(e)))
-              .toList(),
-          onChanged: selectedArea == null
-              ? null
-              : (v) {
-                  setState(() {
-                    selectedMachine = v;
-                    _loadReport();
-                  });
-                },
-        ),
-      ],
-    );
-  }
-
-  // ================= REPORT TABLE (2 COLUMNS) =================
-  Widget _buildReportTable() {
-    return Table(
-      border: TableBorder.all(color: Colors.black, width: 1.2),
-      columnWidths: const {0: FlexColumnWidth(1.5), 1: FlexColumnWidth(3)},
-      children: [
-        _buildRow('No', reportData['no']!),
-        _buildRow('Patrol by', reportData['patrolBy']!),
-        _buildRow('Thời gian', reportData['time']!),
-        _buildRow('Nội dung', reportData['content']!),
-        _buildRow('Đối sách', reportData['action']!),
-
-        // ===== Picture Before =====
-        TableRow(
-          children: [
-            _cellText('Picture (Before)', bold: true, center: true),
-            Padding(
-              padding: const EdgeInsets.all(8),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            SizedBox(
+              width: 100,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  _buildImagePlaceholder('1'),
-                  _buildImagePlaceholder('2'),
+                  Text(
+                    widget.titleScreen,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      '${widget.selectedPlant}',
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
-          ],
-        ),
-
-        // ===== Picture After =====
-        TableRow(
-          decoration: BoxDecoration(color: Colors.yellow.shade100),
-          children: [
-            _cellText('Picture (After)', bold: true, center: true),
-            Padding(
-              padding: const EdgeInsets.all(8),
-              child: Center(child: _buildLargeImagePlaceholder()),
+            Spacer(),
+            Expanded(
+              child: _buildSearchableDropdown(
+                label: "fac".tr(context),
+                selectedValue: _selectedFac,
+                items: _selectedPlant == null
+                    ? <String>[]
+                    : facList.cast<String>(),
+                onChanged: (v) {
+                  setState(() {
+                    _selectedFac = v;
+                    _loadReport();
+                  });
+                },
+              ),
             ),
           ],
         ),
-
-        _buildRow(
-          'Người thực hiện',
-          reportData['user']!,
-          background: Colors.yellow.shade100,
-        ),
-        _buildRow(
-          'Comment',
-          reportData['comment']!,
-          background: Colors.yellow.shade100,
-        ),
-      ],
-    );
-  }
-
-  // ================= TABLE HELPERS =================
-  TableRow _buildRow(String label, String value, {Color? background}) {
-    return TableRow(
-      decoration: BoxDecoration(color: background),
-      children: [_cellText(label, bold: true), _cellText(value)],
-    );
-  }
-
-  Widget _cellText(String text, {bool bold = false, bool center = false}) {
-    return Padding(
-      padding: const EdgeInsets.all(8),
-      child: Text(
-        text,
-        textAlign: center ? TextAlign.center : TextAlign.left,
-        style: TextStyle(
-          fontWeight: bold ? FontWeight.bold : FontWeight.normal,
-        ),
       ),
-    );
-  }
 
-  // ================= IMAGE PLACEHOLDERS =================
-  Widget _buildImagePlaceholder(String number) {
-    return Container(
-      width: 120,
-      height: 120,
-      decoration: BoxDecoration(
-        color: Colors.grey.shade300,
-        border: Border.all(color: Colors.black),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Center(
-        child: Text(
-          number,
-          style: const TextStyle(
-            fontSize: 32,
-            fontWeight: FontWeight.bold,
-            color: Colors.grey,
+      body: Container(
+        height: MediaQuery.of(context).size.height,
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFF121826), Color(0xFF1F2937), Color(0xFF374151)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: SingleChildScrollView(
+          child: SizedBox(
+            width: MediaQuery.of(context).size.width,
+            child: _futureReport == null
+                ? const Center(
+                    child: Text(
+                      'Please select Division',
+                      style: TextStyle(color: Colors.grey),
+                    ),
+                  )
+                : FutureBuilder<List<PatrolReportModel>>(
+                    future: _futureReport,
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
+                      if (snapshot.hasError) {
+                        return ErrorDisplay(
+                          errorMessage: snapshot.error.toString(),
+                          onRetry: () {
+                            _loadReport();
+                          },
+                        );
+                      }
+
+                      /// ❗ API OK nhưng không có data
+                      if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                        return const Padding(
+                          padding: EdgeInsets.all(24),
+                          child: Text(
+                            textAlign: TextAlign.center,
+                            'No data available',
+                            style: TextStyle(color: Colors.red, fontSize: 25),
+                          ),
+                        );
+                      }
+
+                      return LayoutBuilder(
+                        builder: (context, c) {
+                          return Column(
+                            children: [
+                              _buildFilterHeader(
+                                snapshot.data!
+                                    .map((e) => e.area)
+                                    .toSet()
+                                    .toList(),
+                              ),
+                              const SizedBox(height: 8),
+                              _buildReportTable(snapshot.data!, c.maxWidth),
+                            ],
+                          );
+                        },
+                      );
+                    },
+                  ),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildLargeImagePlaceholder() {
+  Widget _buildFilterHeader(List<String> areas) {
     return Container(
-      width: 200,
-      height: 200,
+      margin: const EdgeInsets.all(8),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.grey.shade300,
-        border: Border.all(color: Colors.black),
-        borderRadius: BorderRadius.circular(8),
+        color: Colors.black.withOpacity(0.25),
+        borderRadius: BorderRadius.circular(12),
       ),
+      child: Row(
+        children: [
+          Expanded(
+            child: _buildSearchableDropdown(
+              label: "area".tr(context),
+              selectedValue: _filterArea,
+              items: areas,
+              onChanged: (v) => setState(() => _filterArea = v),
+            ),
+          ),
+          const SizedBox(width: 12),
+
+          Expanded(
+            child: _buildSearchableDropdown(
+              label: 'Risk',
+              selectedValue: _filterRisk,
+              items: const ['V', 'IV', 'III', 'II', 'I'],
+              onChanged: (v) {
+                setState(() {
+                  _filterRisk = v?.isEmpty == true ? null : v;
+                });
+              },
+            ),
+          ),
+          const SizedBox(width: 12),
+
+          GlassActionButton(
+            icon: Icons.filter_alt_off,
+            onTap: () {
+              setState(() {
+                _filterArea = null;
+                _filterRisk = null;
+              });
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReportTable(List<PatrolReportModel> list, double maxWidth) {
+    final filtered =
+        list.where((r) {
+          if (_filterArea != null && r.area != _filterArea) return false;
+          if (_filterRisk != null && r.riskTotal != _filterRisk) return false;
+          return true;
+        }).toList()..sort((a, b) {
+          // 1️⃣ So sánh risk trước
+          final riskCompare = _riskToScore(
+            b.riskTotal,
+          ).compareTo(_riskToScore(a.riskTotal));
+          if (riskCompare != 0) return riskCompare;
+
+          // 2️⃣ Cùng risk → so sánh dueDate
+          final now = DateTime.now();
+
+          final aDue = a.dueDate;
+          final bDue = b.dueDate;
+
+          // null xuống cuối
+          if (aDue == null && bDue == null) return 0;
+          if (aDue == null) return 1;
+          if (bDue == null) return -1;
+
+          final aOverdue = aDue.isBefore(now);
+          final bOverdue = bDue.isBefore(now);
+
+          // Trễ hạn lên trước
+          if (aOverdue && !bOverdue) return -1;
+          if (!aOverdue && bOverdue) return 1;
+
+          // Cùng trạng thái → cái nào gần hôm nay hơn thì lên
+          final aDiff = (aDue.difference(now)).abs();
+          final bDiff = (bDue.difference(now)).abs();
+
+          return aDiff.compareTo(bDiff);
+        });
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(minWidth: maxWidth),
+        child: DataTable(
+          columnSpacing: 28,
+          headingRowHeight: 46,
+          dataRowHeight: 52,
+          headingRowColor: MaterialStateProperty.all(
+            Colors.white.withOpacity(0.10),
+          ),
+          headingTextStyle: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 13,
+          ),
+
+          columns: const [
+            DataColumn(label: Text('No')),
+            DataColumn(label: Text('Area')),
+            DataColumn(label: Text('Risk')),
+            DataColumn(label: Text('Deadline')),
+            DataColumn(label: Text('Details')),
+          ],
+          rows: filtered.map((r) {
+            final color = _riskColor(r.riskTotal);
+            return DataRow(
+              cells: [
+                DataCell(
+                  Text(
+                    r.stt.toString(),
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                ),
+                DataCell(
+                  Text(
+                    r.area,
+                    style: TextStyle(color: Colors.white.withOpacity(0.85)),
+                  ),
+                ),
+                DataCell(
+                  Center(
+                    child: Text(
+                      r.riskTotal,
+                      style: TextStyle(
+                        color: color.withOpacity(0.85),
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+
+                DataCell(
+                  Row(
+                    children: [
+                      if (r.dueDate != null)
+                        Icon(
+                          Icons.warning_amber_rounded,
+                          size: 16,
+                          color: _getDueDateColor(r.dueDate),
+                        ),
+                      if (r.dueDate != null) const SizedBox(width: 4),
+                      Text(
+                        r.dueDate == null
+                            ? '-'
+                            : DateFormat('dd/MM/yyyy').format(r.dueDate!),
+                        style: TextStyle(
+                          color: _getDueDateColor(r.dueDate),
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                DataCell(
+                  GlassActionButton(
+                    icon: Icons.visibility_rounded,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => ReportDetailPage(report: r),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            );
+          }).toList(),
+        ),
+      ),
+    );
+  }
+
+  Color _getDueDateColor(DateTime? dueDate) {
+    if (dueDate == null) {
+      return Colors.white.withOpacity(0.85);
+    }
+
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final due = DateTime(dueDate.year, dueDate.month, dueDate.day);
+
+    final diffDays = due.difference(today).inDays;
+    if (diffDays < 0) {
+      // Trễ
+      return Colors.redAccent;
+    } else if (diffDays <= 3) {
+      // Gần tới hạn (≤ 3 ngày)
+      return Colors.orangeAccent;
+    } else {
+      // Bình thường
+      return Colors.white.withOpacity(0.85);
+    }
+  }
+
+  Widget _buildSearchableDropdown({
+    required String label,
+    required String? selectedValue,
+    required List<String> items,
+    required Function(String?) onChanged,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          child: DropdownSearch<String>(
+            popupProps: PopupProps.menu(
+              showSearchBox: true,
+              fit: FlexFit.loose,
+              menuProps: MenuProps(
+                backgroundColor: const Color(0xFF161D23),
+                elevation: 12,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(18),
+                ),
+              ),
+
+              /// 🔴 NO DATA FOUND CUSTOM
+              emptyBuilder: (context, searchEntry) {
+                return Center(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.search_off_rounded,
+                          size: 40,
+                          color: Colors.white.withOpacity(0.5),
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          "No data found", // hoặc "No data found"
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.7),
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+              searchFieldProps: TextFieldProps(
+                decoration: InputDecoration(
+                  hintText: "search_or_add_new".tr(context),
+                  filled: true,
+                  fillColor: Colors.white.withOpacity(0.1),
+                  prefixIcon: Icon(
+                    Icons.search_rounded,
+                    color: Colors.white.withOpacity(0.7),
+                  ),
+                  hintStyle: TextStyle(color: Colors.white.withOpacity(0.6)),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 12,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+              ),
+
+              itemBuilder: (context, item, isSelected) {
+                return Container(
+                  margin: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 4,
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 12,
+                  ),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    color: isSelected
+                        ? Colors.white.withOpacity(0.12)
+                        : Colors.transparent,
+                  ),
+                  child: AutoSizeText(
+                    item,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: isSelected
+                          ? FontWeight.w600
+                          : FontWeight.w500,
+                      color: Colors.white,
+                    ),
+                  ),
+                );
+              },
+            ),
+
+            // ... (các logic asyncItems, compareFn, v.v. giữ nguyên)
+            asyncItems: (String filter) async {
+              var result = items
+                  .where((e) => e.toLowerCase().contains(filter.toLowerCase()))
+                  .toList();
+
+              if (filter.isNotEmpty && !items.contains(filter.trim())) {
+                result.insert(0, filter.trim());
+              }
+              return result;
+            },
+
+            compareFn: (item, selectedItem) =>
+                item.trim() == selectedItem.trim(),
+
+            selectedItem: selectedValue ?? '',
+
+            dropdownDecoratorProps: DropDownDecoratorProps(
+              dropdownSearchDecoration: InputDecoration(
+                hintText: label,
+                hintMaxLines: 1,
+                floatingLabelBehavior: FloatingLabelBehavior.never,
+
+                // 🌫️ nền glass
+                filled: true,
+                fillColor: Colors.white.withOpacity(0.08),
+
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide(color: Colors.white.withOpacity(0.35)),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide(
+                    color: const Color(0xFF4DD0E1).withOpacity(0.45),
+                  ),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: const BorderSide(
+                    color: Color(0xFF4DD0E1), // cyan
+                    width: 1.6,
+                  ),
+                ),
+
+                // contentPadding: const EdgeInsets.fromLTRB(12, 14, 12, 12),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 4,
+                  vertical: 8,
+                ),
+
+                /// 📝 hint
+                hintStyle: TextStyle(
+                  color: Colors.white.withOpacity(0.6),
+                  fontSize: 14,
+                ),
+              ),
+            ),
+
+            dropdownBuilder: (context, selectedItem) {
+              return AutoSizeText(
+                selectedItem?.isNotEmpty == true ? selectedItem! : label,
+                maxLines: 2,
+                minFontSize: 8,
+                maxFontSize: 14,
+                stepGranularity: 0.5,
+                overflow: TextOverflow.ellipsis,
+                softWrap: false,
+                style: TextStyle(
+                  fontWeight: selectedItem?.isNotEmpty == true
+                      ? FontWeight.bold
+                      : FontWeight.w500,
+                  color: selectedItem?.isNotEmpty == true
+                      ? Colors.white
+                      : Colors.white.withOpacity(0.6),
+                ),
+              );
+            },
+
+            onChanged: onChanged,
+          ),
+        ),
+      ],
     );
   }
 }
 
 // ================= MAIN =================
-void main() {
-  runApp(
-    const MaterialApp(
-      debugShowCheckedModeBanner: false,
-      home: ReportDetailScreen(),
-    ),
-  );
-}
+// void main() {
+//   runApp(
+//     const MaterialApp(
+//       debugShowCheckedModeBanner: false,
+//       home: ReportDetailScreen(),
+//     ),
+//   );
+// }

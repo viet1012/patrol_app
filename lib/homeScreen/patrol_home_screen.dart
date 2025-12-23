@@ -8,6 +8,7 @@ import '../animate/call_to_action_arrow.dart';
 import '../animate/christmas_title.dart';
 import '../animate/glow_title.dart';
 import '../api/hse_master_service.dart';
+import '../detail/report_detail_screen.dart';
 import '../model/hse_patrol_team_model.dart';
 import '../model/machine_model.dart';
 import '../test.dart';
@@ -269,6 +270,7 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
                               title: 'Weekly Safety Patrol',
                               icon: Icons.security,
                               prefix: 'Patrol',
+                              titleScreen: 'Safety Patrol',
                             ),
 
                             _patrolGroupCard(
@@ -276,14 +278,16 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
                               title: 'SRG Safety Audit',
                               icon: Icons.groups,
                               prefix: 'Audit',
+                              titleScreen: 'Safety Audit',
                             ),
 
                             _patrolGroupCard(
                               group: PatrolGroup.QualityPatrol,
-                              title: 'QA Quality Audit',
+                              title: 'QA Quality Patrol',
                               icon: Icons.verified,
-                              prefix: 'QA Audit',
+                              prefix: 'QA Patrol',
                               enabled: false,
+                              titleScreen: 'QA Patrol',
                             ),
                           ],
                         ),
@@ -314,6 +318,7 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
     required String title,
     required IconData icon,
     required String prefix,
+    required String titleScreen,
     bool enabled = true,
   }) {
     final isExpanded = expandedGroup == group;
@@ -387,6 +392,7 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
                   group: group,
                   prefix: prefix,
                   color: color,
+                  titleScreen: titleScreen,
                 ),
                 secondChild: const SizedBox(),
               ),
@@ -401,16 +407,12 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
     required PatrolGroup group,
     required String prefix,
     required Color color,
+    required String titleScreen,
   }) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
       child: Container(
         padding: const EdgeInsets.all(18),
-        // decoration: BoxDecoration(
-        //   color: Colors.black.withOpacity(0.25), // ⬅ khác parent
-        //   borderRadius: BorderRadius.circular(20),
-        //   border: Border.all(color: color.withOpacity(0.6), width: 1.5),
-        // ),
         child: Column(
           children: [
             _patrolButton(
@@ -428,6 +430,7 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
                       lang: currentLang,
                       selectedPlant: selectedFactory,
                       patrolGroup: group,
+                      titleScreen: titleScreen,
                     ),
                   ),
                 );
@@ -438,7 +441,20 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
               number: '2)',
               title: '$prefix After',
               color: color,
-              enabled: false,
+              enabled: true,
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ReportDetailScreen(
+                      machines: machines,
+                      selectedPlant: selectedFactory,
+                      titleScreen: titleScreen,
+                      patrolGroup: group,
+                    ),
+                  ),
+                );
+              },
             ),
             const SizedBox(height: 16),
             _patrolButton(
@@ -448,71 +464,6 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
               enabled: false,
             ),
           ],
-        ),
-      ),
-    );
-  }
-
-  Widget _parentPatrolButton({
-    required PatrolGroup group,
-    required String title,
-    required IconData icon,
-    bool enabled = true,
-  }) {
-    final isExpanded = expandedGroup == group;
-    final color = _groupColor(group, enabled);
-
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(22),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-        child: GestureDetector(
-          onTap: enabled
-              ? () {
-                  setState(() {
-                    expandedGroup = isExpanded ? null : group;
-                  });
-                }
-              : null,
-          child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 30, horizontal: 24),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.18),
-              borderRadius: BorderRadius.circular(22),
-              border: Border.all(color: color, width: 2.5),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.2),
-                  blurRadius: 14,
-                  offset: const Offset(0, 6),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                Icon(icon, size: 26, color: color),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    title,
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w900,
-                      color: color,
-                      letterSpacing: 1.2,
-                    ),
-                  ),
-                ),
-                enabled
-                    ? AnimatedRotation(
-                        turns: isExpanded ? 0.5 : 0,
-                        duration: const Duration(milliseconds: 300),
-                        child: Icon(Icons.expand_more, size: 34, color: color),
-                      )
-                    : Icon(Icons.lock_outline, color: color, size: 26),
-              ],
-            ),
-          ),
         ),
       ),
     );
