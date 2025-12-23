@@ -687,7 +687,7 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
     sttSocket!.connect();
   }
 
-  static const int maxImages = 5;
+  static const int maxImages = 2;
 
   Future<void> pickImagesFromDevice(BuildContext context) async {
     final remain = maxImages - _capturedImages.length;
@@ -696,7 +696,7 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
     if (remain <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text("You can upload up to 5 images only."),
+          content: Text("You can upload up to 2 images only."),
           backgroundColor: Colors.redAccent,
           behavior: SnackBarBehavior.floating,
         ),
@@ -848,6 +848,17 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
 
   Future<void> _takePhoto() async {
     if (_isCapturing || _videoElement == null) return;
+    if (_capturedImages.length >= maxImages) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("You can capture up to 2 images only."),
+          backgroundColor: Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
     setState(() => _isCapturing = true);
 
     ///////////////////////////////////////////////////
@@ -1067,15 +1078,15 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
                     //       ):
                     // 📸 NÚT CHỤP ẢNH (khi đã chọn Group)
                     GestureDetector(
-                      onTap: _isCapturing ? null : _takePhoto,
+                      onTap: (!_isCapturing && canUpload) ? _takePhoto : null,
                       child: GlassCircleButton(
                         size: 80,
                         showProgress: _isCapturing,
                         child: _isCapturing
                             ? null // showProgress sẽ hiển thị loading
-                            : const Icon(
+                            : Icon(
                                 Icons.camera_alt_rounded,
-                                color: Colors.white,
+                                color: canUpload ? Colors.white : Colors.grey,
                                 size: 36,
                               ),
                       ),

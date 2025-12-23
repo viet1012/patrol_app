@@ -1,8 +1,11 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 
 import '../camera_preview_box.dart';
 import '../homeScreen/patrol_home_screen.dart';
 import '../model/patrol_report_model.dart';
+import 'ReplaceImagePage.dart';
 
 class ReportDetailPage extends StatefulWidget {
   final PatrolReportModel report;
@@ -85,25 +88,32 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
         itemCount: images.length,
         separatorBuilder: (_, __) => const SizedBox(width: 12),
         itemBuilder: (context, index) {
-          return ClipRRect(
-            borderRadius: BorderRadius.circular(14),
-            child: AspectRatio(
-              aspectRatio: 1, // 👈 ảnh vuông
-              child: Image.network(
-                'http://192.168.122.15:7000/${images[index]}',
-                fit: BoxFit.cover,
-                loadingBuilder: (context, child, loadingProgress) {
-                  if (loadingProgress == null) return child;
-                  return Container(
-                    color: Colors.black12,
-                    child: const Center(
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    ),
-                  );
-                },
-                errorBuilder: (_, __, ___) => Container(
-                  color: Colors.black12,
-                  child: const Icon(Icons.broken_image),
+          return GestureDetector(
+            onTap: () async {
+              final replacedImage = await Navigator.push<Uint8List>(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => ReplaceImagePage(
+                    imageUrl: 'http://192.168.122.15:7000/${images[index]}',
+                    patrolGroup: PatrolGroup.Audit, // truyền group
+                    plant: widget.report.plant,
+                  ),
+                ),
+              );
+
+              if (replacedImage != null) {
+                setState(() {
+                  // TODO: update imageNames[index] sau khi upload server
+                });
+              }
+            },
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(14),
+              child: AspectRatio(
+                aspectRatio: 1,
+                child: Image.network(
+                  'http://192.168.122.15:7000/${images[index]}',
+                  fit: BoxFit.cover,
                 ),
               ),
             ),

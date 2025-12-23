@@ -1,4 +1,5 @@
 class PatrolReportModel {
+  final int? id;
   final int stt;
   final String grp;
   final String plant;
@@ -16,6 +17,7 @@ class PatrolReportModel {
   final List<String> imageNames;
 
   PatrolReportModel({
+    this.id,
     required this.stt,
     required this.grp,
     required this.plant,
@@ -35,6 +37,7 @@ class PatrolReportModel {
 
   factory PatrolReportModel.fromJson(Map<String, dynamic> json) {
     return PatrolReportModel(
+      id: json['id'] ?? 0,
       stt: json['stt'] ?? 0,
       grp: json['grp'] ?? '',
       plant: json['plant'] ?? '',
