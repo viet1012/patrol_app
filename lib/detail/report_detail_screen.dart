@@ -201,10 +201,15 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
           child: SizedBox(
             width: MediaQuery.of(context).size.width,
             child: _futureReport == null
-                ? const Center(
-                    child: Text(
-                      'Please select Division',
-                      style: TextStyle(color: Colors.grey),
+                ? ConstrainedBox(
+                    constraints: BoxConstraints(
+                      minHeight: MediaQuery.of(context).size.height,
+                    ),
+                    child: Center(
+                      child: Text(
+                        'Please select Fac!',
+                        style: TextStyle(color: Colors.grey, fontSize: 25),
+                      ),
                     ),
                   )
                 : FutureBuilder<List<PatrolReportModel>>(
@@ -229,7 +234,7 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                           child: Text(
                             textAlign: TextAlign.center,
                             'No data available',
-                            style: TextStyle(color: Colors.red, fontSize: 25),
+                            style: TextStyle(color: Colors.grey, fontSize: 25),
                           ),
                         );
                       }
@@ -551,8 +556,13 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                   ),
                   child: AutoSizeText(
                     item,
+                    maxLines: 2,
+                    minFontSize: 8,
+                    maxFontSize: 14,
+                    stepGranularity: 0.5,
+                    overflow: TextOverflow.ellipsis,
+                    softWrap: false,
                     style: TextStyle(
-                      fontSize: 14,
                       fontWeight: isSelected
                           ? FontWeight.w600
                           : FontWeight.w500,
