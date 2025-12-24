@@ -496,6 +496,8 @@ class _CameraScreenState extends State<CameraScreen> {
         ],
       ),
       body: Container(
+        height: MediaQuery.of(context).size.height,
+
         decoration: BoxDecoration(
           gradient: const LinearGradient(
             colors: [

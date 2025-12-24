@@ -9,8 +9,12 @@ import 'ReplaceImagePage.dart';
 
 class ReportDetailPage extends StatefulWidget {
   final PatrolReportModel report;
-
-  const ReportDetailPage({super.key, required this.report});
+  final PatrolGroup patrolGroup;
+  const ReportDetailPage({
+    super.key,
+    required this.report,
+    required this.patrolGroup,
+  });
 
   @override
   State<ReportDetailPage> createState() => _ReportDetailPageState();
@@ -29,17 +33,52 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _row('Group', widget.report.grp),
-            _row('Division', widget.report.division),
-            _row('Area', widget.report.area),
-            _row('Machine', widget.report.machine),
-
-            const SizedBox(height: 12),
-            _section('Comment', widget.report.comment),
-            _section('Countermeasure', widget.report.countermeasure),
+            // ===== 2 cột thông tin =====
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _infoItem('Group', widget.report.grp),
+                      _infoItem('Area', widget.report.area),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 32),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _infoItem('Division', widget.report.division),
+                      _infoItem('Machine', widget.report.machine),
+                    ],
+                  ),
+                ),
+              ],
+            ),
 
             const SizedBox(height: 16),
-            _section('Images', ''),
+
+            // ===== Comment & Countermeasure =====
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: _sectionInline('Comment', widget.report.comment),
+                ),
+                const SizedBox(width: 32),
+                Expanded(
+                  child: _sectionInline(
+                    'Countermeasure',
+                    widget.report.countermeasure,
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 8),
             _buildImageGrid(widget.report.imageNames),
           ],
         ),
@@ -47,75 +86,70 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
     );
   }
 
-  Widget _row(String label, String value) {
+  Widget _infoItem(String label, String value) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 120,
-            child: Text(
-              label,
-              style: const TextStyle(fontWeight: FontWeight.bold),
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: RichText(
+        text: TextSpan(
+          style: Theme.of(context).textTheme.bodyMedium,
+          children: [
+            TextSpan(
+              text: '$label: ',
+              style: const TextStyle(
+                fontWeight: FontWeight.w600,
+                color: Colors.black87,
+              ),
             ),
-          ),
-          Expanded(child: Text(value)),
-        ],
+            TextSpan(
+              text: value,
+              style: const TextStyle(color: Colors.black54),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _section(String title, String content) {
+  Widget _sectionInline(String title, String content) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-        const SizedBox(height: 4),
-        Text(content),
+        Text(
+          title,
+          style: const TextStyle(
+            fontWeight: FontWeight.w600,
+            color: Colors.black87,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          content.isEmpty ? '-' : content,
+          style: const TextStyle(color: Colors.black54),
+          maxLines: 6,
+          overflow: TextOverflow.ellipsis,
+        ),
       ],
     );
   }
 
   Widget _buildImageGrid(List<String> images) {
-    if (images.isEmpty) {
-      return const Text('No images');
-    }
+    final h = MediaQuery.of(context).size.height;
 
     return SizedBox(
-      height: 160, // 👈 chiều cao cố định cho strip ảnh
+      height: h * 0.7, // 👈 đủ cho image + camera
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: images.length,
         separatorBuilder: (_, __) => const SizedBox(width: 12),
         itemBuilder: (context, index) {
-          return GestureDetector(
-            onTap: () async {
-              final replacedImage = await Navigator.push<Uint8List>(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => ReplaceImagePage(
-                    imageUrl: 'http://192.168.122.15:7000/${images[index]}',
-                    patrolGroup: PatrolGroup.Audit, // truyền group
-                    plant: widget.report.plant,
-                  ),
-                ),
-              );
-
-              if (replacedImage != null) {
-                setState(() {
-                  // TODO: update imageNames[index] sau khi upload server
-                });
-              }
-            },
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(14),
-              child: AspectRatio(
-                aspectRatio: 1,
-                child: Image.network(
-                  'http://192.168.122.15:7000/${images[index]}',
-                  fit: BoxFit.cover,
-                ),
-              ),
+          return SizedBox(
+            width: 280,
+            child: ReplaceableImageItem(
+              imageName: images[index],
+              report: widget.report,
+              patrolGroup: widget.patrolGroup,
+              plant: widget.report.plant,
+              onReplaced: () => setState(() {}),
             ),
           );
         },

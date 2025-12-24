@@ -265,7 +265,6 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
 
   Widget _buildFilterHeader(List<String> areas) {
     return Container(
-      margin: const EdgeInsets.all(8),
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       decoration: BoxDecoration(
         color: Colors.black.withOpacity(0.25),
@@ -285,7 +284,7 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
 
           Expanded(
             child: _buildSearchableDropdown(
-              label: 'Risk',
+              label: "label_risk".tr(context),
               selectedValue: _filterRisk,
               items: const ['V', 'IV', 'III', 'II', 'I'],
               onChanged: (v) {
@@ -431,7 +430,10 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => ReportDetailPage(report: r),
+                          builder: (_) => ReportDetailPage(
+                            report: r,
+                            patrolGroup: widget.patrolGroup,
+                          ),
                         ),
                       );
                     },

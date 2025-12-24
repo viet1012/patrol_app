@@ -687,7 +687,7 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
     sttSocket!.connect();
   }
 
-  static const int maxImages = 2;
+  static const int maxImages = 3;
 
   Future<void> pickImagesFromDevice(BuildContext context) async {
     final remain = maxImages - _capturedImages.length;
