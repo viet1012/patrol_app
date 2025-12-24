@@ -29,15 +29,15 @@ class ReportDetailPage extends StatefulWidget {
 }
 
 class _ReportDetailPageState extends State<ReportDetailPage> {
-  final GlobalKey<CameraPreviewBoxState> _cameraKey =
-      GlobalKey<CameraPreviewBoxState>();
-
-  List<Uint8List> _retakeImages = [];
+  final GlobalKey<CameraUpdateBoxState> _cameraKey =
+      GlobalKey<CameraUpdateBoxState>();
 
   bool _enableCamera = false;
 
   final TextEditingController _commentCtrl = TextEditingController();
   final TextEditingController _msnvCtrl = TextEditingController();
+  String? _employeeName;
+  bool _isLoadingName = false;
 
   @override
   void dispose() {
@@ -214,12 +214,15 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
   }
 
   Widget _buildThumbPreview() {
-    if (_retakeImages.isEmpty) return const SizedBox();
+    if (_cameraKey.currentState == null ||
+        _cameraKey.currentState!.images.isEmpty) {
+      return const SizedBox();
+    }
 
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Row(
-        children: _retakeImages.asMap().entries.map((entry) {
+        children: _cameraKey.currentState!.images.asMap().entries.map((entry) {
           final idx = entry.key;
           final img = entry.value;
 
@@ -243,12 +246,14 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
                   right: -4,
                   child: GestureDetector(
                     onTap: () {
-                      setState(() {
-                        _retakeImages.removeAt(idx);
-                        if (_retakeImages.isEmpty) {
-                          _enableCamera = true;
-                        }
-                      });
+                      _cameraKey.currentState?.removeImage(idx);
+
+                      // setState(() {
+                      //   _retakeImages.removeAt(idx);
+                      //   if (_retakeImages.isEmpty) {
+                      //     _enableCamera = true;
+                      //   }
+                      // });
                     },
                     child: Container(
                       padding: const EdgeInsets.all(2),
@@ -274,6 +279,7 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
 
   Widget _buildRetakeSection() {
     return Card(
+      color: const Color(0xFF121826).withOpacity(.4),
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
@@ -281,24 +287,80 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // const Text(
-            //   'Chụp lại & cập nhật',
-            //   style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-            // ),
             const SizedBox(height: 12),
 
             /// ===== MSNV =====
-            TextField(
-              controller: _msnvCtrl,
-              decoration: const InputDecoration(
-                labelText: 'MSNV',
-                border: OutlineInputBorder(),
-              ),
-              onChanged: (v) {
-                if (v.trim().isNotEmpty && !_enableCamera) {
-                  setState(() => _enableCamera = true);
-                }
-              },
+            Row(
+              children: [
+                Expanded(
+                  flex: 3,
+                  child: TextField(
+                    controller: _msnvCtrl,
+                    decoration: InputDecoration(
+                      labelText: 'MSNV',
+                      labelStyle: const TextStyle(color: Colors.white70),
+                      enabledBorder: OutlineInputBorder(
+                        borderSide: BorderSide(color: Colors.white54),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderSide: BorderSide(
+                          color: Colors.blueAccent.shade200,
+                        ),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      filled: true,
+                      fillColor: Colors.white.withOpacity(0.12),
+                    ),
+                    style: const TextStyle(color: Colors.white),
+                    onChanged: (v) {
+                      if (v.trim().isNotEmpty && !_enableCamera) {
+                        setState(() => _enableCamera = true);
+                      }
+                      fetchEmployeeName(v); // gọi API mỗi khi thay đổi MSNV
+                    },
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  flex: 4,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 16,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.white38),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.25),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: _isLoadingName
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : Text(
+                            _employeeName ?? 'Name',
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              fontSize: 14,
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                  ),
+                ),
+              ],
             ),
 
             const SizedBox(height: 12),
@@ -311,30 +373,36 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
             /// ===== CAMERA =====
             if (_enableCamera)
               CameraUpdateBox(
-                key: ValueKey(DateTime.now().millisecondsSinceEpoch),
+                key: _cameraKey,
                 size: 280,
                 plant: widget.report.plant,
                 patrolGroup: widget.patrolGroup,
                 type: "RETAKE",
-                onImagesChanged: (images) {
-                  if (images.isNotEmpty) {
-                    setState(() {
-                      _retakeImages.add(images.last);
-                    });
-                  }
-                },
+                onImagesChanged: (_) => setState(() {}),
               ),
 
             /// ===== COMMENT =====
-            if (_retakeImages.isNotEmpty) ...[
+            if (_cameraKey.currentState != null &&
+                _cameraKey.currentState!.images.isNotEmpty) ...[
               const SizedBox(height: 16),
               TextField(
                 controller: _commentCtrl,
                 maxLines: 3,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Comment',
-                  border: OutlineInputBorder(),
+                  labelStyle: const TextStyle(color: Colors.white70),
+                  enabledBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: Colors.white54),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: Colors.blueAccent.shade200),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  filled: true,
+                  fillColor: Colors.white.withOpacity(0.12),
                 ),
+                style: const TextStyle(color: Colors.white),
               ),
             ],
 
@@ -346,23 +414,24 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
               height: 48,
               child: ElevatedButton.icon(
                 onPressed:
-                    (_retakeImages.isNotEmpty &&
+                    (_cameraKey.currentState != null &&
+                        _cameraKey.currentState!.images.isNotEmpty &&
                         _msnvCtrl.text.trim().isNotEmpty)
                     ? () async {
                         try {
                           await updateAtReport(
                             reportId: widget.report.id!,
-                            msnv: _msnvCtrl.text.trim(),
+                            msnv: '${_msnvCtrl.text.trim()}_$_employeeName',
                             comment: _commentCtrl.text.trim(),
-                            images: _retakeImages,
+                            images: _cameraKey.currentState!.images,
                           );
 
                           /// RESET UI → cho phép chụp lại tiếp
                           setState(() {
-                            _retakeImages.clear();
                             _commentCtrl.clear();
                             _enableCamera = false;
                           });
+                          _cameraKey.currentState?.clearAll(); // xóa hết ảnh
 
                           /// FORCE reload camera
                           await Future.delayed(
@@ -392,6 +461,46 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
         ),
       ),
     );
+  }
+
+  Future<void> fetchEmployeeName(String code) async {
+    if (code.trim().isEmpty) {
+      setState(() {
+        _employeeName = null;
+      });
+      return;
+    }
+
+    setState(() {
+      _isLoadingName = true;
+    });
+
+    try {
+      final dio = DioClient.dio;
+      final response = await dio.get(
+        '/api/hr/name',
+        queryParameters: {'code': code.trim()},
+      );
+
+      if (response.statusCode == 200) {
+        setState(() {
+          _employeeName = response.data.toString();
+        });
+      } else {
+        setState(() {
+          _employeeName = null;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching employee name: $e');
+      setState(() {
+        _employeeName = null;
+      });
+    } finally {
+      setState(() {
+        _isLoadingName = false;
+      });
+    }
   }
 
   Future<void> updateAtReport({

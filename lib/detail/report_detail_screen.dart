@@ -368,6 +368,7 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
           columns: const [
             DataColumn(label: Text('No')),
             DataColumn(label: Text('Area')),
+            DataColumn(label: Text('Machine')),
             DataColumn(label: Text('Risk')),
             DataColumn(label: Text('Deadline')),
             DataColumn(label: Text('Details')),
@@ -389,6 +390,12 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                   ),
                 ),
                 DataCell(
+                  Text(
+                    r.machine,
+                    style: TextStyle(color: Colors.white.withOpacity(0.85)),
+                  ),
+                ),
+                DataCell(
                   Center(
                     child: Text(
                       r.riskTotal,
@@ -403,17 +410,17 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                 DataCell(
                   Row(
                     children: [
-                      if (r.dueDate != null)
-                        Icon(
-                          Icons.warning_amber_rounded,
-                          size: 16,
-                          color: _getDueDateColor(r.dueDate),
-                        ),
-                      if (r.dueDate != null) const SizedBox(width: 4),
+                      // if (r.dueDate != null)
+                      //   Icon(
+                      //     Icons.warning_amber_rounded,
+                      //     size: 16,
+                      //     color: _getDueDateColor(r.dueDate),
+                      //   ),
+                      // if (r.dueDate != null) const SizedBox(width: 4),
                       Text(
                         r.dueDate == null
                             ? '-'
-                            : DateFormat('dd/MM/yyyy').format(r.dueDate!),
+                            : DateFormat('M/d/yy').format(r.dueDate!),
                         style: TextStyle(
                           color: _getDueDateColor(r.dueDate),
                           fontWeight: FontWeight.w500,
@@ -528,7 +535,10 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                     Icons.search_rounded,
                     color: Colors.white.withOpacity(0.7),
                   ),
-                  hintStyle: TextStyle(color: Colors.white.withOpacity(0.6)),
+                  hintStyle: TextStyle(
+                    color: Colors.white.withOpacity(0.6),
+                    fontSize: 11,
+                  ),
                   contentPadding: const EdgeInsets.symmetric(
                     horizontal: 8,
                     vertical: 12,
@@ -638,8 +648,8 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
               return AutoSizeText(
                 selectedItem?.isNotEmpty == true ? selectedItem! : label,
                 maxLines: 1,
-                minFontSize: 8,
-                maxFontSize: 14,
+                minFontSize: 9,
+                maxFontSize: 13,
                 stepGranularity: 0.5,
                 overflow: TextOverflow.ellipsis,
                 softWrap: false,

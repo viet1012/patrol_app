@@ -193,26 +193,25 @@ class _ReplaceableImageItemState extends State<ReplaceableImageItem> {
           ),
 
           /// CAMERA BUTTON
-          Positioned(
-            top: 6,
-            right: 6,
-            child: InkWell(
-              onTap: _openCameraOverlay,
-              child: Container(
-                padding: const EdgeInsets.all(6),
-                decoration: const BoxDecoration(
-                  color: Colors.black54,
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.delete_forever,
-                  size: 18,
-                  color: Colors.white,
-                ),
-              ),
-            ),
-          ),
-
+          // Positioned(
+          //   top: 6,
+          //   right: 6,
+          //   child: InkWell(
+          //     onTap: _openCameraOverlay,
+          //     child: Container(
+          //       padding: const EdgeInsets.all(6),
+          //       decoration: const BoxDecoration(
+          //         color: Colors.black54,
+          //         shape: BoxShape.circle,
+          //       ),
+          //       child: const Icon(
+          //         Icons.delete_forever,
+          //         size: 18,
+          //         color: Colors.white,
+          //       ),
+          //     ),
+          //   ),
+          // ),
           if (_loading)
             const Positioned.fill(
               child: ColoredBox(
