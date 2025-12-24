@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import '../camera_preview_box.dart';
 import '../homeScreen/patrol_home_screen.dart';
 import '../model/patrol_report_model.dart';
-import 'ReplaceImagePage.dart';
+import 'replaceable_image_item.dart';
 
 class ReportDetailPage extends StatefulWidget {
   final PatrolReportModel report;
@@ -136,7 +136,7 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
     final h = MediaQuery.of(context).size.height;
 
     return SizedBox(
-      height: h * 0.7, // 👈 đủ cho image + camera
+      height: h * 0.9, // 👈 đủ cho image + camera
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: images.length,
@@ -149,7 +149,11 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
               report: widget.report,
               patrolGroup: widget.patrolGroup,
               plant: widget.report.plant,
-              onReplaced: () => setState(() {}),
+              onReplaced: (newImage) {
+                setState(() {
+                  images[index] = newImage; // 🔥 UPDATE LIST CHA
+                });
+              },
             ),
           );
         },

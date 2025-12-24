@@ -845,7 +845,7 @@ class _CameraScreenState extends State<CameraScreen> {
                                   child: ConstrainedBox(
                                     constraints: BoxConstraints(
                                       maxWidth: constraints.maxWidth,
-                                      maxHeight: 220,
+                                      maxHeight: 250,
                                     ),
                                     child: ListView.separated(
                                       padding: EdgeInsets.zero,
@@ -997,7 +997,7 @@ class _CameraScreenState extends State<CameraScreen> {
                                   child: ConstrainedBox(
                                     constraints: BoxConstraints(
                                       maxWidth: constraints.maxWidth,
-                                      maxHeight: 220,
+                                      maxHeight: 250,
                                     ),
                                     child: ListView.separated(
                                       padding: EdgeInsets.zero,

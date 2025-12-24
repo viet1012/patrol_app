@@ -9,7 +9,7 @@ import '../model/patrol_report_model.dart';
 import '../translator.dart';
 import '../widget/error_display.dart';
 import '../widget/glass_action_button.dart';
-import 'ReportDetailPage.dart';
+import 'report_detail_page.dart';
 
 class ReportDetailScreen extends StatefulWidget {
   final List<MachineModel> machines;
@@ -558,8 +558,8 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                   ),
                   child: AutoSizeText(
                     item,
-                    maxLines: 2,
-                    minFontSize: 8,
+                    maxLines: 8,
+                    minFontSize: 7,
                     maxFontSize: 14,
                     stepGranularity: 0.5,
                     overflow: TextOverflow.ellipsis,
@@ -637,7 +637,7 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
             dropdownBuilder: (context, selectedItem) {
               return AutoSizeText(
                 selectedItem?.isNotEmpty == true ? selectedItem! : label,
-                maxLines: 2,
+                maxLines: 1,
                 minFontSize: 8,
                 maxFontSize: 14,
                 stepGranularity: 0.5,

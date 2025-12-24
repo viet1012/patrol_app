@@ -1,5 +1,4 @@
 import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
 
 import '../api/replace_image_api.dart';
@@ -13,7 +12,7 @@ class ReplaceableImageItem extends StatefulWidget {
   final PatrolReportModel report;
   final PatrolGroup patrolGroup;
   final String? plant;
-  final VoidCallback onReplaced;
+  final void Function(String newImage) onReplaced;
 
   const ReplaceableImageItem({
     super.key,
@@ -30,10 +29,20 @@ class ReplaceableImageItem extends StatefulWidget {
 
 class _ReplaceableImageItemState extends State<ReplaceableImageItem> {
   bool _replaceMode = false;
-  Uint8List? _newImage;
   bool _loading = false;
 
-  String get imageUrl => 'http://192.168.122.15:7000/${widget.imageName}';
+  Uint8List? _newImage;
+
+  /// 🔥 QUAN TRỌNG: ảnh hiện tại
+  late String _currentImageName;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentImageName = widget.imageName;
+  }
+
+  String get imageUrl => 'http://localhost:7000/$_currentImageName';
 
   Future<void> _submitReplace() async {
     if (_newImage == null) return;
@@ -41,19 +50,22 @@ class _ReplaceableImageItemState extends State<ReplaceableImageItem> {
     setState(() => _loading = true);
 
     try {
-      await replaceImageApi(
+      final newImageName = await replaceImageApi(
         id: widget.report.id!,
-        oldImage: widget.imageName,
+        oldImage: _currentImageName, // ✅ LUÔN ĐÚNG
         newImageBytes: _newImage!,
       );
 
-      widget.onReplaced();
-
       setState(() {
+        _currentImageName = newImageName; // 🔥 UPDATE ẢNH HIỆN TẠI
         _replaceMode = false;
-        // _newImage = null;
+        _newImage = null;
       });
+
+      widget.onReplaced(newImageName);
+      // nếu parent cần reload list
     } catch (e) {
+      print("err: ${e.toString()}");
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Replace failed: $e')));
@@ -66,7 +78,7 @@ class _ReplaceableImageItemState extends State<ReplaceableImageItem> {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        /// 🖼 IMAGE – height cố định
+        /// ================= IMAGE =================
         SizedBox(
           height: 220,
           child: Stack(
@@ -76,7 +88,7 @@ class _ReplaceableImageItemState extends State<ReplaceableImageItem> {
                 child: _newImage != null
                     ? Image.memory(
                         _newImage!,
-                        key: ValueKey(_newImage), // 👈 QUAN TRỌNG
+                        key: ValueKey(_newImage),
                         width: double.infinity,
                         height: double.infinity,
                         fit: BoxFit.cover,
@@ -90,7 +102,7 @@ class _ReplaceableImageItemState extends State<ReplaceableImageItem> {
                       ),
               ),
 
-              /// BTN CAMERA
+              /// CAMERA BUTTON
               Positioned(
                 top: 6,
                 right: 6,
@@ -122,27 +134,24 @@ class _ReplaceableImageItemState extends State<ReplaceableImageItem> {
           ),
         ),
 
-        ///  CAMERA – ăn phần còn lại
+        /// ================= CAMERA =================
         if (_replaceMode)
           Expanded(
             child: Column(
               children: [
-                Expanded(
-                  child: CameraUpdateBox(
-                    plant: widget.plant,
-                    patrolGroup: widget.patrolGroup,
-                    type: "REPLACE",
-                    onImagesChanged: (images) {
-                      if (images.isNotEmpty) {
-                        setState(() {
-                          _newImage = images.last;
-                        });
-                      }
-                    },
-                  ),
+                CameraUpdateBox(
+                  plant: widget.plant,
+                  patrolGroup: widget.patrolGroup,
+                  type: "REPLACE",
+                  onImagesChanged: (images) {
+                    if (images.isNotEmpty) {
+                      setState(() {
+                        _newImage = images.last;
+                      });
+                    }
+                  },
                 ),
 
-                /// BUTTON – height cố định
                 if (_newImage != null)
                   SizedBox(
                     height: 44,
