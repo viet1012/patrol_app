@@ -661,13 +661,3 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
     );
   }
 }
-
-// ================= MAIN =================
-// void main() {
-//   runApp(
-//     const MaterialApp(
-//       debugShowCheckedModeBanner: false,
-//       home: ReportDetailScreen(),
-//     ),
-//   );
-// }

@@ -52,12 +52,9 @@ class CameraUpdateBoxState extends State<CameraUpdateBox>
   // internal api (use widget.sttCtrl if provided)
   late String _fac;
   late String _group;
-  late String _wsUrl;
 
   int stt = 0;
   SttWebSocket? sttSocket;
-
-  bool _sttLoading = true;
 
   static const int maxImages = 2;
 
@@ -68,7 +65,7 @@ class CameraUpdateBoxState extends State<CameraUpdateBox>
     if (remain <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text("You can upload up to 5 images only."),
+          content: Text("You can upload up to $maxImages images only."),
           backgroundColor: Colors.redAccent,
           behavior: SnackBarBehavior.floating,
         ),
@@ -342,7 +339,7 @@ class CameraUpdateBoxState extends State<CameraUpdateBox>
 
             Positioned(
               bottom: 14,
-              left: 14,
+              left: 1,
               child: GestureDetector(
                 onTap: canUpload ? () => pickImagesFromDevice(context) : null,
                 child: GlassCircleButton(
@@ -358,7 +355,7 @@ class CameraUpdateBoxState extends State<CameraUpdateBox>
 
             Positioned(
               bottom: 14,
-              right: 14,
+              right: 1,
               child: GlassZoomControl(
                 zoom: _zoom,
                 minZoom: _minZoom,
@@ -368,14 +365,14 @@ class CameraUpdateBoxState extends State<CameraUpdateBox>
             ),
 
             Positioned(
-              bottom: -18,
+              bottom: -10,
               left: 0,
               right: 0,
               child: Center(
                 child: GestureDetector(
                   onTap: _isCapturing ? null : _takePhoto,
                   child: GlassCircleButton(
-                    size: 80,
+                    size: 60,
                     showProgress: _isCapturing,
                     child: _isCapturing
                         ? null // showProgress sẽ hiển thị loading

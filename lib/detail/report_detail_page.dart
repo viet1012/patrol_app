@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../camera_preview_box.dart';
 import '../homeScreen/patrol_home_screen.dart';
 import '../model/patrol_report_model.dart';
+import 'CameraBox.dart';
 import 'replaceable_image_item.dart';
 
 class ReportDetailPage extends StatefulWidget {
@@ -80,6 +81,7 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
 
             const SizedBox(height: 8),
             _buildImageGrid(widget.report.imageNames),
+            // Container(height: 200, color: Colors.red),
           ],
         ),
       ),
@@ -136,7 +138,7 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
     final h = MediaQuery.of(context).size.height;
 
     return SizedBox(
-      height: h * 0.9, // 👈 đủ cho image + camera
+      height: 320, // 👈 đủ cho image + camera
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: images.length,
