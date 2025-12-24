@@ -297,7 +297,7 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
                   child: TextField(
                     controller: _msnvCtrl,
                     decoration: InputDecoration(
-                      labelText: 'MSNV',
+                      labelText: 'Code',
                       labelStyle: const TextStyle(color: Colors.white70),
                       enabledBorder: OutlineInputBorder(
                         borderSide: BorderSide(color: Colors.white54),
@@ -403,60 +403,112 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
                   fillColor: Colors.white.withOpacity(0.12),
                 ),
                 style: const TextStyle(color: Colors.white),
+                onChanged: (value) {
+                  setState(
+                    () {},
+                  ); // Bắt buộc gọi setState để UI rebuild và nút lưu hiện/ẩn đúng
+                },
               ),
             ],
 
             const SizedBox(height: 20),
 
             /// ===== SAVE =====
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: ElevatedButton.icon(
-                onPressed:
-                    (_cameraKey.currentState != null &&
-                        _cameraKey.currentState!.images.isNotEmpty &&
-                        _msnvCtrl.text.trim().isNotEmpty)
-                    ? () async {
-                        try {
-                          await updateAtReport(
-                            reportId: widget.report.id!,
-                            msnv: '${_msnvCtrl.text.trim()}_$_employeeName',
-                            comment: _commentCtrl.text.trim(),
-                            images: _cameraKey.currentState!.images,
-                          );
+            // SizedBox(
+            //   width: double.infinity,
+            //   height: 48,
+            //   child: ElevatedButton.icon(
+            //     onPressed:
+            //         (_cameraKey.currentState != null &&
+            //             _cameraKey.currentState!.images.isNotEmpty &&
+            //             _msnvCtrl.text.trim().isNotEmpty)
+            //         ? () async {
+            //             try {
+            //               await updateAtReport(
+            //                 reportId: widget.report.id!,
+            //                 msnv: '${_msnvCtrl.text.trim()}_$_employeeName',
+            //                 comment: _commentCtrl.text.trim(),
+            //                 images: _cameraKey.currentState!.images,
+            //               );
+            //
+            //               /// RESET UI → cho phép chụp lại tiếp
+            //               setState(() {
+            //                 _commentCtrl.clear();
+            //                 _enableCamera = false;
+            //               });
+            //               _cameraKey.currentState?.clearAll(); // xóa hết ảnh
+            //
+            //               /// FORCE reload camera
+            //               await Future.delayed(
+            //                 const Duration(milliseconds: 200),
+            //               );
+            //               setState(() => _enableCamera = true);
+            //
+            //               ScaffoldMessenger.of(context).showSnackBar(
+            //                 const SnackBar(
+            //                   content: Text('Cập nhật AT thành công'),
+            //                 ),
+            //               );
+            //             } catch (e) {
+            //               debugPrint('Update AT error: $e');
+            //               ScaffoldMessenger.of(context).showSnackBar(
+            //                 const SnackBar(content: Text('Lỗi cập nhật AT')),
+            //               );
+            //             }
+            //           }
+            //         : null,
+            //
+            //     icon: const Icon(Icons.save),
+            //     label: const Text('Save'),
+            //   ),
+            // ),
+            if (_commentCtrl.text.trim().isNotEmpty)
+              SizedBox(
+                width: 100,
+                height: 48,
+                child: GlassActionButton(
+                  onTap:
+                      (_cameraKey.currentState != null &&
+                          _cameraKey.currentState!.images.isNotEmpty &&
+                          _msnvCtrl.text.trim().isNotEmpty)
+                      ? () async {
+                          try {
+                            await updateAtReport(
+                              reportId: widget.report.id!,
+                              msnv: '${_msnvCtrl.text.trim()}_$_employeeName',
+                              comment: _commentCtrl.text.trim(),
+                              images: _cameraKey.currentState!.images,
+                            );
 
-                          /// RESET UI → cho phép chụp lại tiếp
-                          setState(() {
-                            _commentCtrl.clear();
-                            _enableCamera = false;
-                          });
-                          _cameraKey.currentState?.clearAll(); // xóa hết ảnh
+                            /// RESET UI → cho phép chụp lại tiếp
+                            setState(() {
+                              _commentCtrl.clear();
+                              _enableCamera = false;
+                            });
+                            _cameraKey.currentState?.clearAll(); // xóa hết ảnh
 
-                          /// FORCE reload camera
-                          await Future.delayed(
-                            const Duration(milliseconds: 200),
-                          );
-                          setState(() => _enableCamera = true);
+                            /// FORCE reload camera
+                            await Future.delayed(
+                              const Duration(milliseconds: 200),
+                            );
+                            setState(() => _enableCamera = true);
 
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Cập nhật AT thành công'),
-                            ),
-                          );
-                        } catch (e) {
-                          debugPrint('Update AT error: $e');
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Lỗi cập nhật AT')),
-                          );
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Cập nhật AT thành công'),
+                              ),
+                            );
+                          } catch (e) {
+                            debugPrint('Update AT error: $e');
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Lỗi cập nhật AT')),
+                            );
+                          }
                         }
-                      }
-                    : null,
-
-                icon: const Icon(Icons.save),
-                label: const Text('Lưu cập nhật'),
+                      : null,
+                  icon: Icons.save,
+                ),
               ),
-            ),
           ],
         ),
       ),
