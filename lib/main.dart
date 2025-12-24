@@ -43,6 +43,7 @@ class _MyAppState extends State<MyApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      title: 'S-Patrol',
       locale: _locale,
       supportedLocales: const [Locale('vi'), Locale('en'), Locale('ja')],
       localeResolutionCallback: (locale, supportedLocales) {
