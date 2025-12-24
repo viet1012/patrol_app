@@ -25,12 +25,26 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
   final GlobalKey<CameraPreviewBoxState> _cameraKey =
       GlobalKey<CameraPreviewBoxState>();
 
+  List<Uint8List> _retakeImages = [];
+
+  bool _enableCamera = false;
+
+  final TextEditingController _commentCtrl = TextEditingController();
+  final TextEditingController _msnvCtrl = TextEditingController();
+
+  @override
+  void dispose() {
+    _commentCtrl.dispose();
+    _msnvCtrl.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Report Detail')),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(8),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -81,7 +95,8 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
 
             const SizedBox(height: 8),
             _buildImageGrid(widget.report.imageNames),
-            // Container(height: 200, color: Colors.red),
+            const SizedBox(height: 8),
+            _buildRetakeSection(),
           ],
         ),
       ),
@@ -159,6 +174,159 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
             ),
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildThumbPreview() {
+    if (_retakeImages.isEmpty) return const SizedBox();
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: _retakeImages.asMap().entries.map((entry) {
+          final idx = entry.key;
+          final img = entry.value;
+
+          return Padding(
+            padding: const EdgeInsets.only(right: 6),
+            child: Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.memory(
+                    img,
+                    width: 56,
+                    height: 56,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+
+                /// ❌ REMOVE
+                Positioned(
+                  top: -4,
+                  right: -4,
+                  child: GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _retakeImages.removeAt(idx);
+                        if (_retakeImages.isEmpty) {
+                          _enableCamera = true;
+                        }
+                      });
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: const BoxDecoration(
+                        color: Colors.red,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.close,
+                        size: 14,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildRetakeSection() {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            // const Text(
+            //   'Chụp lại & cập nhật',
+            //   style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            // ),
+            const SizedBox(height: 12),
+
+            /// ===== MSNV =====
+            TextField(
+              controller: _msnvCtrl,
+              decoration: const InputDecoration(
+                labelText: 'MSNV',
+                border: OutlineInputBorder(),
+              ),
+              onChanged: (v) {
+                if (v.trim().isNotEmpty && !_enableCamera) {
+                  setState(() => _enableCamera = true);
+                }
+              },
+            ),
+
+            const SizedBox(height: 12),
+
+            /// ===== THUMBNAIL PREVIEW =====
+            _buildThumbPreview(),
+
+            const SizedBox(height: 12),
+
+            /// ===== CAMERA =====
+            if (_enableCamera)
+              CameraUpdateBox(
+                key: ValueKey(DateTime.now().millisecondsSinceEpoch),
+                size: 280,
+                plant: widget.report.plant,
+                patrolGroup: widget.patrolGroup,
+                type: "RETAKE",
+                onImagesChanged: (images) {
+                  if (images.isNotEmpty) {
+                    setState(() {
+                      _retakeImages.add(images.last);
+                    });
+                  }
+                },
+              ),
+
+            /// ===== COMMENT =====
+            if (_retakeImages.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              TextField(
+                controller: _commentCtrl,
+                maxLines: 3,
+                decoration: const InputDecoration(
+                  labelText: 'Comment',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+
+            const SizedBox(height: 20),
+
+            /// ===== SAVE =====
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton.icon(
+                onPressed:
+                    (_retakeImages.isNotEmpty &&
+                        _msnvCtrl.text.trim().isNotEmpty)
+                    ? () {
+                        debugPrint('MSNV: ${_msnvCtrl.text}');
+                        debugPrint('Comment: ${_commentCtrl.text}');
+                        debugPrint('Total images: ${_retakeImages.length}');
+
+                        // TODO: API upload nhiều ảnh
+                      }
+                    : null,
+                icon: const Icon(Icons.save),
+                label: const Text('Lưu cập nhật'),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
