@@ -147,6 +147,8 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
                       'assets/flags/favicon.png',
                       width: 40,
                       height: 40,
+                      filterQuality: FilterQuality.high,
+                      fit: BoxFit.contain,
                     ),
                     SizedBox(width: 8),
                     EmbossGlowTitle(text: 'S-PATROL'),
