@@ -1127,6 +1127,7 @@ class _CameraScreenState extends State<CameraScreen> {
           child: DropdownSearch<String>(
             popupProps: PopupProps.menu(
               showSearchBox: true,
+              isFilterOnline: true,
               fit: FlexFit.loose,
               menuProps: MenuProps(
                 backgroundColor: const Color(0xFF161D23),
@@ -1183,6 +1184,9 @@ class _CameraScreenState extends State<CameraScreen> {
                     borderSide: BorderSide.none,
                   ),
                 ),
+                style: TextStyle(
+                  color: Colors.white, // <-- set màu chữ nhập thành trắng
+                ),
               ),
 
               itemBuilder: (context, item, isSelected) {
@@ -1221,12 +1225,12 @@ class _CameraScreenState extends State<CameraScreen> {
                   .where((e) => e.toLowerCase().contains(filter.toLowerCase()))
                   .toList();
 
+              // Nếu filter không rỗng và chưa có trong items thì thêm vào đầu danh sách
               if (filter.isNotEmpty && !items.contains(filter.trim())) {
                 result.insert(0, filter.trim());
               }
               return result;
             },
-
             compareFn: (item, selectedItem) =>
                 item.trim() == selectedItem.trim(),
 
