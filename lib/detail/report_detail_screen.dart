@@ -353,7 +353,7 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
       child: ConstrainedBox(
         constraints: BoxConstraints(minWidth: maxWidth),
         child: DataTable(
-          columnSpacing: 28,
+          columnSpacing: 16,
           headingRowHeight: 46,
           dataRowHeight: 52,
           headingRowColor: MaterialStateProperty.all(
@@ -431,19 +431,33 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                 ),
 
                 DataCell(
-                  GlassActionButton(
-                    icon: Icons.visibility_rounded,
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => ReportDetailPage(
-                            report: r,
-                            patrolGroup: widget.patrolGroup,
-                          ),
+                  Row(
+                    children: [
+                      GlassActionButton(
+                        icon: Icons.visibility_rounded,
+                        onTap: () async {
+                          final result = await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => ReportDetailPage(
+                                report: r,
+                                patrolGroup: widget.patrolGroup,
+                              ),
+                            ),
+                          );
+                          if (result == true) {
+                            _loadReport();
+                          }
+                        },
+                      ),
+                      Text(
+                        r.atStatus.toString(),
+                        style: TextStyle(
+                          color: _getDueDateColor(r.dueDate),
+                          fontWeight: FontWeight.w500,
                         ),
-                      );
-                    },
+                      ),
+                    ],
                   ),
                 ),
               ],

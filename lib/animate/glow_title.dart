@@ -21,10 +21,9 @@ class _EmbossGlowTitleState extends State<EmbossGlowTitle>
       duration: const Duration(seconds: 3),
     )..repeat(reverse: true);
 
-    _glow = Tween<double>(
-      begin: 6,
-      end: 14,
-    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
+    _glow = Tween<double>(begin: 10, end: 28).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOutSine),
+    );
   }
 
   @override
@@ -41,31 +40,38 @@ class _EmbossGlowTitleState extends State<EmbossGlowTitle>
         return Text(
           widget.text,
           style: TextStyle(
-            fontSize: 24,
+            fontSize: 26,
             fontWeight: FontWeight.w900,
-            letterSpacing: 2,
-            color: Colors.white,
+            letterSpacing: 2.5,
 
-            // 🎯 MAGIC HERE
+            /// 🌊 Avatar blue
+            color: const Color(0xFF7DF9FF), // neon cyan
+
             shadows: [
-              // ⬇️ Shadow đậm phía dưới → nổi
+              /// 🌑 Deep shadow (xanh tím)
               Shadow(
                 offset: const Offset(0, 4),
-                blurRadius: 6,
-                color: Colors.black.withOpacity(0.6),
+                blurRadius: 10,
+                color: const Color(0xFF081A2F).withOpacity(0.9),
               ),
 
-              // ⬆️ Highlight phía trên → emboss
+              /// ❄️ Soft top highlight (bioluminescent)
               Shadow(
                 offset: const Offset(0, -2),
-                blurRadius: 2,
-                color: Colors.white.withOpacity(0.35),
+                blurRadius: 4,
+                color: const Color(0xFFB8FFFF).withOpacity(0.6),
               ),
 
-              // ✨ Glow nhẹ (animated)
+              /// ✨ MAIN GLOW – Pandora energy
               Shadow(
                 blurRadius: _glow.value,
-                color: Colors.lightBlueAccent.withOpacity(0.6),
+                color: const Color(0xFF00E5FF).withOpacity(0.8),
+              ),
+
+              /// 🔮 Secondary aura (xanh tím)
+              Shadow(
+                blurRadius: _glow.value * 1.4,
+                color: const Color(0xFF4F8CFF).withOpacity(0.35),
               ),
             ],
           ),

@@ -53,6 +53,7 @@ dependencies:
   stomp_dart_client: ^3.0.1
   web_socket_channel: ^3.0.3
   auto_size_text: ^3.0.0
+  image: ^4.3.0
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -76,7 +77,7 @@ flutter:
   uses-material-design: true
   generate: true
   assets:
-    - assets/flags/vn.png
+    - assets/flags/
     - assets/flags/jp.png
   fonts:
     - family: Roboto

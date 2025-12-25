@@ -54,17 +54,25 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
         titleSpacing: 4, // 👈 kéo sát về leading
         leading: GlassActionButton(
           icon: Icons.arrow_back_rounded,
-          onTap: () => Navigator.pop(context),
+          onTap: () => Navigator.pop(context, true),
         ),
         backgroundColor: const Color(0xFF121826),
-        title: Text(
-          'Patrol After',
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            fontStyle: FontStyle.italic,
-          ),
+        title: Column(
+          children: [
+            Text(
+              'Patrol After',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+            Text(
+              widget.report.plant,
+              style: const TextStyle(color: Colors.white70, fontSize: 11),
+            ),
+          ],
         ),
       ),
       body: Container(
@@ -464,8 +472,8 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
             // ),
             if (_commentCtrl.text.trim().isNotEmpty)
               SizedBox(
-                width: 100,
-                height: 48,
+                width: 60,
+                height: 60,
                 child: GlassActionButton(
                   onTap:
                       (_cameraKey.currentState != null &&
@@ -507,6 +515,7 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
                         }
                       : null,
                   icon: Icons.save,
+                  backgroundColor: Color(0xFF2665B6),
                 ),
               ),
           ],

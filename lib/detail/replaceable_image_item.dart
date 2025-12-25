@@ -1,5 +1,7 @@
 import 'dart:typed_data';
+import 'package:chuphinh/api/api_config.dart';
 import 'package:flutter/material.dart';
+import 'package:image/image.dart' as img;
 
 import '../api/replace_image_api.dart';
 import '../homeScreen/patrol_home_screen.dart';
@@ -46,7 +48,7 @@ class _ReplaceableImageItemState extends State<ReplaceableImageItem> {
     });
   }
 
-  String get imageUrl => 'http://localhost:7000/$_currentImageName';
+  String get imageUrl => '${ApiConfig.baseUrl}/images/$_currentImageName';
 
   // ================= CAMERA OVERLAY =================
   Future<void> _openCameraOverlay() async {
@@ -189,6 +191,17 @@ class _ReplaceableImageItemState extends State<ReplaceableImageItem> {
               height: double.infinity,
               fit: BoxFit.cover,
               key: ValueKey(imageUrl),
+              headers: {'ngrok-skip-browser-warning': 'true'},
+              // ?? FIX QUAN TR?NG
+              // webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
+              //
+              // errorBuilder: (context, error, stack) {
+              //   print('error: ${error}');
+              //
+              //   return Center(
+              //     child: Icon(Icons.broken_image, color: Colors.red),
+              //   );
+              // },
             ),
           ),
 

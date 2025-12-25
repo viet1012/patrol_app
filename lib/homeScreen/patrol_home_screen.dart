@@ -140,7 +140,27 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
               borderRadius: BorderRadius.circular(24),
               child: BackdropFilter(
                 filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                child: EmbossGlowTitle(text: 'AUDIT WEB'),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Image.asset(
+                      'assets/flags/favicon.png',
+                      width: 40,
+                      height: 40,
+                    ),
+                    SizedBox(width: 8),
+                    EmbossGlowTitle(text: 'S-PATROL'),
+                    SizedBox(width: 8),
+                    Text(
+                      'V1.1',
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 14,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
