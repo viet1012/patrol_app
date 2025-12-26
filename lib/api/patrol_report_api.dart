@@ -5,19 +5,25 @@ import 'dio_client.dart';
 
 class PatrolReportApi {
   static Future<List<PatrolReportModel>> fetchReports({
+    required String plant,
     required String division,
     required String area,
     required String machine,
     required String type,
+    required String afStatus,
+    required String grp,
   }) async {
     try {
       final endpoint = '/api/patrol_report/filter';
 
       final queryParams = {
+        'plant': plant,
         'division': division,
         'area': area,
         'machine': machine,
         'type': type,
+        'afStatus': afStatus,
+        'grp': grp,
       };
 
       /// 🔥 IN RA ENDPOINT + QUERY

@@ -10,6 +10,7 @@ import 'package:dropdown_search/dropdown_search.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'api/api_config.dart';
+import 'edit/edit_before_screen.dart';
 import 'homeScreen/patrol_home_screen.dart';
 import 'model/hse_patrol_team_model.dart';
 import 'model/machine_model.dart';
@@ -243,7 +244,7 @@ class _CameraScreenState extends State<CameraScreen> {
         'type': widget.patrolGroup.name,
         'division': _selectedFac ?? '',
         'area': _selectedArea ?? '',
-        'group': normalizeGroup(_selectedGroup) ?? '',
+        'group': _selectedGroup ?? '',
         'machine': _selectedMachine ?? '',
         'comment': _comment,
         'countermeasure': _counterMeasure,
@@ -1069,6 +1070,29 @@ class _CameraScreenState extends State<CameraScreen> {
                           color: Colors.orange.shade900,
                         ),
                       ),
+                    ),
+                    GlassActionButton(
+                      icon: Icons.edit_calendar_sharp,
+                      enabled: true,
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => EditBeforeScreen(
+                              machines: widget.machines,
+                              selectedFac: _selectedFac,
+                              selectedPlant: _selectedPlant,
+                              selectedGrp: _selectedGroup,
+                              titleScreen: widget.titleScreen,
+                              patrolGroup: widget.patrolGroup,
+                            ),
+                          ),
+                        );
+                      },
+                      backgroundColor: hasImages
+                          ? const Color(0xFF22C55E)
+                          : null,
+                      iconColor: hasImages ? Colors.black : Colors.white,
                     ),
                   ],
                 ),

@@ -514,7 +514,7 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
             const SizedBox(height: 16),
             _patrolButton(
               number: '2)',
-              title: '$prefix After',
+              title: 'Action After',
               color: color,
               enabled: true,
               onTap: () {
@@ -534,7 +534,7 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
             const SizedBox(height: 16),
             _patrolButton(
               number: '3)',
-              title: '$prefix ReCheck',
+              title: 'HSE ReCheck',
               color: color,
               enabled: false,
             ),

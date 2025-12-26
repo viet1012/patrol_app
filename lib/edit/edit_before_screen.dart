@@ -3,35 +3,39 @@ import 'package:dropdown_search/dropdown_search.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../api/patrol_report_api.dart';
+import '../detail/report_detail_page.dart';
 import '../homeScreen/patrol_home_screen.dart';
 import '../model/machine_model.dart';
 import '../model/patrol_report_model.dart';
 import '../translator.dart';
 import '../widget/error_display.dart';
 import '../widget/glass_action_button.dart';
-import 'report_detail_page.dart';
 
-class ReportDetailScreen extends StatefulWidget {
+class EditBeforeScreen extends StatefulWidget {
   final List<MachineModel> machines;
   final String? selectedPlant;
+  final String? selectedGrp;
+  final String? selectedFac;
+
   final String titleScreen;
   final PatrolGroup patrolGroup;
 
-  const ReportDetailScreen({
+  const EditBeforeScreen({
     super.key,
     required this.machines,
+    required this.selectedGrp,
     required this.selectedPlant,
     required this.titleScreen,
     required this.patrolGroup,
+    required this.selectedFac,
   });
 
   @override
-  State<ReportDetailScreen> createState() => _ReportDetailScreenState();
+  State<EditBeforeScreen> createState() => _EditBeforeScreenState();
 }
 
-class _ReportDetailScreenState extends State<ReportDetailScreen> {
+class _EditBeforeScreenState extends State<EditBeforeScreen> {
   String? _selectedPlant;
-  String? _selectedFac;
 
   String? _filterArea;
   String? _filterRisk;
@@ -83,8 +87,15 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
   }
 
   void _loadReport() async {
-    if (_selectedFac == null) return;
-
+    if (widget.selectedGrp == null || widget.selectedGrp!.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('⚠️ Please select Group'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
     setState(() {
       _futureReport = null; // reset trước (optional)
     });
@@ -92,12 +103,12 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
     try {
       final future = PatrolReportApi.fetchReports(
         plant: widget.selectedPlant!,
-        division: _selectedFac!,
+        division: '',
         area: '',
         machine: '',
         type: widget.patrolGroup.name,
         afStatus: '',
-        grp: '',
+        grp: widget.selectedGrp!,
       );
 
       setState(() {
@@ -115,16 +126,15 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
 
   @override
   void initState() {
-    _selectedPlant = widget.selectedPlant;
     super.initState();
+
+    _selectedPlant = widget.selectedPlant;
+
+    _loadReport();
   }
 
   @override
   Widget build(BuildContext context) {
-    final facList = _selectedPlant == null
-        ? []
-        : getFacByPlant(_selectedPlant!);
-
     return Scaffold(
       appBar: AppBar(
         backgroundColor: const Color(0xFF121826),
@@ -161,7 +171,7 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
-                      '${widget.selectedPlant}',
+                      '${widget.selectedPlant}_${widget.selectedGrp}',
                       style: const TextStyle(
                         color: Colors.white70,
                         fontSize: 11,
@@ -169,22 +179,6 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                     ),
                   ),
                 ],
-              ),
-            ),
-            Spacer(),
-            Expanded(
-              child: _buildSearchableDropdown(
-                label: "fac".tr(context),
-                selectedValue: _selectedFac,
-                items: _selectedPlant == null
-                    ? <String>[]
-                    : facList.cast<String>(),
-                onChanged: (v) {
-                  setState(() {
-                    _selectedFac = v;
-                    _loadReport();
-                  });
-                },
               ),
             ),
           ],
@@ -210,7 +204,7 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                     ),
                     child: Center(
                       child: Text(
-                        'Please select Fac!',
+                        'Please select Group!',
                         style: TextStyle(color: Colors.grey, fontSize: 25),
                       ),
                     ),
@@ -411,25 +405,14 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                 ),
 
                 DataCell(
-                  Row(
-                    children: [
-                      // if (r.dueDate != null)
-                      //   Icon(
-                      //     Icons.warning_amber_rounded,
-                      //     size: 16,
-                      //     color: _getDueDateColor(r.dueDate),
-                      //   ),
-                      // if (r.dueDate != null) const SizedBox(width: 4),
-                      Text(
-                        r.dueDate == null
-                            ? '-'
-                            : DateFormat('M/d/yy').format(r.dueDate!),
-                        style: TextStyle(
-                          color: _getDueDateColor(r.dueDate),
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
+                  Text(
+                    r.dueDate == null
+                        ? '-'
+                        : DateFormat('M/d/yy').format(r.dueDate!),
+                    style: TextStyle(
+                      color: _getDueDateColor(r.dueDate),
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ),
 
