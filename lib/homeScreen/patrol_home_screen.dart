@@ -153,14 +153,7 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
                     SizedBox(width: 8),
                     EmbossGlowTitle(text: 'S-PATROL'),
                     SizedBox(width: 8),
-                    Text(
-                      'V1.1',
-                      style: const TextStyle(
-                        color: Colors.white70,
-                        fontSize: 14,
-                        fontStyle: FontStyle.italic,
-                      ),
-                    ),
+                    EmbossGlowTitle(text: 'V1.1', fontSize: 14),
                   ],
                 ),
               ),

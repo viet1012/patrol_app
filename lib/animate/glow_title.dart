@@ -2,7 +2,12 @@ import 'package:flutter/material.dart';
 
 class EmbossGlowTitle extends StatefulWidget {
   final String text;
-  const EmbossGlowTitle({super.key, required this.text});
+  final double fontSize;
+  const EmbossGlowTitle({
+    super.key,
+    required this.text,
+    this.fontSize = 26, // default size nếu không truyền
+  });
 
   @override
   State<EmbossGlowTitle> createState() => _EmbossGlowTitleState();
@@ -40,38 +45,42 @@ class _EmbossGlowTitleState extends State<EmbossGlowTitle>
         return Text(
           widget.text,
           style: TextStyle(
-            fontSize: 26,
+            fontSize: widget.fontSize,
             fontWeight: FontWeight.w900,
             letterSpacing: 2.5,
-
-            /// 🌊 Avatar blue
-            color: const Color(0xFF7DF9FF), // neon cyan
-
+            color: Colors.white,
             shadows: [
-              /// 🌑 Deep shadow (xanh tím)
               Shadow(
-                offset: const Offset(0, 4),
-                blurRadius: 10,
-                color: const Color(0xFF081A2F).withOpacity(0.9),
-              ),
-
-              /// ❄️ Soft top highlight (bioluminescent)
+                offset: Offset(-1, -1),
+                color: Color(0xFF4F8CFF),
+              ), // trên trái
               Shadow(
-                offset: const Offset(0, -2),
-                blurRadius: 4,
-                color: const Color(0xFFB8FFFF).withOpacity(0.6),
-              ),
-
-              /// ✨ MAIN GLOW – Pandora energy
+                offset: Offset(1, -1),
+                color: Color(0xFF4F8CFF),
+              ), // trên phải
+              Shadow(
+                offset: Offset(-1, 1),
+                color: Color(0xFF4F8CFF),
+              ), // dưới trái
+              Shadow(
+                offset: Offset(1, 1),
+                color: Color(0xFF4F8CFF),
+              ), // dưới phải
+              // Glow động
               Shadow(
                 blurRadius: _glow.value,
-                color: const Color(0xFF00E5FF).withOpacity(0.8),
+                color: Color(0xFF4F8CFF).withOpacity(0.8),
+              ),
+              Shadow(
+                blurRadius: _glow.value * 1.5,
+                color: Color(0xFF4F8CFF).withOpacity(0.4),
               ),
 
-              /// 🔮 Secondary aura (xanh tím)
+              // Bóng đổ dưới
               Shadow(
-                blurRadius: _glow.value * 1.4,
-                color: const Color(0xFF4F8CFF).withOpacity(0.35),
+                offset: Offset(0, 3),
+                blurRadius: 6,
+                color: Colors.black.withOpacity(0.6),
               ),
             ],
           ),
