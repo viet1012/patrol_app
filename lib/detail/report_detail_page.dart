@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -38,9 +39,11 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
   final TextEditingController _msnvCtrl = TextEditingController();
   String? _employeeName;
   bool _isLoadingName = false;
+  Timer? _debounce;
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _commentCtrl.dispose();
     _msnvCtrl.dispose();
     super.dispose();
@@ -322,10 +325,19 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
                     ),
                     style: const TextStyle(color: Colors.white),
                     onChanged: (v) {
-                      if (v.trim().isNotEmpty && !_enableCamera) {
-                        setState(() => _enableCamera = true);
+                      final value = v.trim();
+
+                      // Hủy timer cũ nếu còn
+                      if (_debounce?.isActive ?? false) {
+                        _debounce!.cancel();
                       }
-                      fetchEmployeeName(v); // gọi API mỗi khi thay đổi MSNV
+
+                      // Chỉ xử lý khi đủ 4 ký tự
+                      if (value.length < 4) return;
+
+                      _debounce = Timer(const Duration(milliseconds: 400), () {
+                        fetchEmployeeName(value);
+                      });
                     },
                   ),
                 ),
@@ -379,15 +391,15 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
             const SizedBox(height: 12),
 
             /// ===== CAMERA =====
-            if (_enableCamera)
-              CameraUpdateBox(
-                key: _cameraKey,
-                size: 280,
-                plant: widget.report.plant,
-                patrolGroup: widget.patrolGroup,
-                type: "RETAKE",
-                onImagesChanged: (_) => setState(() {}),
-              ),
+            // if (_enableCamera)
+            CameraUpdateBox(
+              key: _cameraKey,
+              size: 280,
+              plant: widget.report.plant,
+              patrolGroup: widget.patrolGroup,
+              type: "RETAKE",
+              onImagesChanged: (_) => setState(() {}),
+            ),
 
             /// ===== COMMENT =====
             if (_cameraKey.currentState != null &&
@@ -422,54 +434,6 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
             const SizedBox(height: 20),
 
             /// ===== SAVE =====
-            // SizedBox(
-            //   width: double.infinity,
-            //   height: 48,
-            //   child: ElevatedButton.icon(
-            //     onPressed:
-            //         (_cameraKey.currentState != null &&
-            //             _cameraKey.currentState!.images.isNotEmpty &&
-            //             _msnvCtrl.text.trim().isNotEmpty)
-            //         ? () async {
-            //             try {
-            //               await updateAtReport(
-            //                 reportId: widget.report.id!,
-            //                 msnv: '${_msnvCtrl.text.trim()}_$_employeeName',
-            //                 comment: _commentCtrl.text.trim(),
-            //                 images: _cameraKey.currentState!.images,
-            //               );
-            //
-            //               /// RESET UI → cho phép chụp lại tiếp
-            //               setState(() {
-            //                 _commentCtrl.clear();
-            //                 _enableCamera = false;
-            //               });
-            //               _cameraKey.currentState?.clearAll(); // xóa hết ảnh
-            //
-            //               /// FORCE reload camera
-            //               await Future.delayed(
-            //                 const Duration(milliseconds: 200),
-            //               );
-            //               setState(() => _enableCamera = true);
-            //
-            //               ScaffoldMessenger.of(context).showSnackBar(
-            //                 const SnackBar(
-            //                   content: Text('Cập nhật AT thành công'),
-            //                 ),
-            //               );
-            //             } catch (e) {
-            //               debugPrint('Update AT error: $e');
-            //               ScaffoldMessenger.of(context).showSnackBar(
-            //                 const SnackBar(content: Text('Lỗi cập nhật AT')),
-            //               );
-            //             }
-            //           }
-            //         : null,
-            //
-            //     icon: const Icon(Icons.save),
-            //     label: const Text('Save'),
-            //   ),
-            // ),
             if (_commentCtrl.text.trim().isNotEmpty)
               SizedBox(
                 width: 60,
@@ -481,12 +445,15 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
                           _msnvCtrl.text.trim().isNotEmpty)
                       ? () async {
                           try {
+                            showLoading(context);
+
                             await updateAtReport(
                               reportId: widget.report.id!,
                               msnv: '${_msnvCtrl.text.trim()}_$_employeeName',
                               comment: _commentCtrl.text.trim(),
                               images: _cameraKey.currentState!.images,
                             );
+                            hideLoading(context);
 
                             /// RESET UI → cho phép chụp lại tiếp
                             setState(() {
@@ -501,16 +468,13 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
                             );
                             setState(() => _enableCamera = true);
 
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Cập nhật AT thành công'),
-                              ),
+                            _showSnackBar(
+                              'Update AF successful!',
+                              Colors.green,
                             );
                           } catch (e) {
                             debugPrint('Update AT error: $e');
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Lỗi cập nhật AT')),
-                            );
+                            _showSnackBar('Server error: $e', Colors.red);
                           }
                         }
                       : null,
@@ -520,6 +484,24 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
               ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _showSnackBar(
+    String message,
+    Color color, {
+    Duration duration = const Duration(seconds: 10),
+  }) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).removeCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: color,
+        duration: duration,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );
   }
@@ -562,6 +544,18 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
         _isLoadingName = false;
       });
     }
+  }
+
+  void showLoading(BuildContext context) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+  }
+
+  void hideLoading(BuildContext context) {
+    Navigator.of(context, rootNavigator: true).pop();
   }
 
   Future<void> updateAtReport({
