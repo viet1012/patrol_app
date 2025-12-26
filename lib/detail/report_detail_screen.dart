@@ -503,6 +503,7 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
           child: DropdownSearch<String>(
             popupProps: PopupProps.menu(
               showSearchBox: true,
+              isFilterOnline: true,
               fit: FlexFit.loose,
               menuProps: MenuProps(
                 backgroundColor: const Color(0xFF161D23),
@@ -549,18 +550,18 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                     Icons.search_rounded,
                     color: Colors.white.withOpacity(0.7),
                   ),
-                  hintStyle: TextStyle(
-                    color: Colors.white.withOpacity(0.6),
-                    fontSize: 11,
-                  ),
+                  hintStyle: TextStyle(color: Colors.white.withOpacity(0.6)),
                   contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 8,
+                    horizontal: 14,
                     vertical: 12,
                   ),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide.none,
                   ),
+                ),
+                style: TextStyle(
+                  color: Colors.white, // <-- set màu chữ nhập thành trắng
                 ),
               ),
 
@@ -582,13 +583,8 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                   ),
                   child: AutoSizeText(
                     item,
-                    maxLines: 8,
-                    minFontSize: 7,
-                    maxFontSize: 14,
-                    stepGranularity: 0.5,
-                    overflow: TextOverflow.ellipsis,
-                    softWrap: false,
                     style: TextStyle(
+                      fontSize: 14,
                       fontWeight: isSelected
                           ? FontWeight.w600
                           : FontWeight.w500,
@@ -605,12 +601,12 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                   .where((e) => e.toLowerCase().contains(filter.toLowerCase()))
                   .toList();
 
+              // Nếu filter không rỗng và chưa có trong items thì thêm vào đầu danh sách
               if (filter.isNotEmpty && !items.contains(filter.trim())) {
                 result.insert(0, filter.trim());
               }
               return result;
             },
-
             compareFn: (item, selectedItem) =>
                 item.trim() == selectedItem.trim(),
 
@@ -622,7 +618,7 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                 hintMaxLines: 1,
                 floatingLabelBehavior: FloatingLabelBehavior.never,
 
-                // 🌫️ nền glass
+                /// 🌫️ nền glass
                 filled: true,
                 fillColor: Colors.white.withOpacity(0.08),
 
@@ -644,11 +640,7 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                   ),
                 ),
 
-                // contentPadding: const EdgeInsets.fromLTRB(12, 14, 12, 12),
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 4,
-                  vertical: 8,
-                ),
+                contentPadding: const EdgeInsets.fromLTRB(12, 14, 12, 12),
 
                 /// 📝 hint
                 hintStyle: TextStyle(
@@ -662,12 +654,11 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
               return AutoSizeText(
                 selectedItem?.isNotEmpty == true ? selectedItem! : label,
                 maxLines: 1,
-                minFontSize: 9,
-                maxFontSize: 13,
+                minFontSize: 11,
                 stepGranularity: 0.5,
-                overflow: TextOverflow.ellipsis,
-                softWrap: false,
+                overflow: TextOverflow.visible,
                 style: TextStyle(
+                  fontSize: 14,
                   fontWeight: selectedItem?.isNotEmpty == true
                       ? FontWeight.bold
                       : FontWeight.w500,
