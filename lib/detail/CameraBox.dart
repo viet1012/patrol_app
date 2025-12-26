@@ -370,15 +370,16 @@ class CameraUpdateBoxState extends State<CameraUpdateBox>
               right: 0,
               child: Center(
                 child: GestureDetector(
-                  onTap: _isCapturing ? null : _takePhoto,
+                  onTap: (!_isCapturing && canUpload) ? _takePhoto : null,
+
                   child: GlassCircleButton(
                     size: 60,
                     showProgress: _isCapturing,
                     child: _isCapturing
                         ? null // showProgress sẽ hiển thị loading
-                        : const Icon(
+                        : Icon(
                             Icons.camera_alt_rounded,
-                            color: Colors.white,
+                            color: canUpload ? Colors.white : Colors.grey,
                             size: 36,
                           ),
                   ),
