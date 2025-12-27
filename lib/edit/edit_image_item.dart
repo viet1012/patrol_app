@@ -5,6 +5,7 @@ import '../api/api_config.dart';
 import '../api/replace_image_api.dart';
 import '../homeScreen/patrol_home_screen.dart';
 import '../model/patrol_report_model.dart';
+import '../widget/glass_action_button.dart';
 
 class EditImageItem extends StatefulWidget {
   final String imageName;
@@ -137,18 +138,32 @@ class _EditImageItemState extends State<EditImageItem> {
                   },
                 ),
 
-                if (_newImages.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: ElevatedButton.icon(
-                      icon: const Icon(Icons.check),
-                      label: const Text("Thêm ảnh"),
-                      onPressed: () async {
-                        Navigator.pop(context);
-                        await _submitAdd();
-                      },
-                    ),
-                  ),
+                // if (_newImages.isNotEmpty)
+                //   Padding(
+                //     padding: const EdgeInsets.all(12),
+                //     child: ElevatedButton.icon(
+                //       icon: const Icon(Icons.check),
+                //       label: const Text("Thêm ảnh"),
+                //       onPressed: () async {
+                //         Navigator.pop(context);
+                //         await _submitAdd();
+                //       },
+                //     ),
+                //   ),
+                GlassActionButton(
+                  icon: Icons.send_rounded,
+                  enabled: _newImages.isNotEmpty,
+                  onTap: () async {
+                    Navigator.pop(context);
+                    await _submitAdd();
+                  },
+                  backgroundColor: _newImages.isNotEmpty
+                      ? const Color(0xFF22C55E)
+                      : null,
+                  iconColor: _newImages.isNotEmpty
+                      ? Colors.black
+                      : Colors.white,
+                ),
               ],
             );
           },
@@ -187,20 +202,85 @@ class _EditImageItemState extends State<EditImageItem> {
   Future<void> _deleteImage() async {
     final ok = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Xóa ảnh?'),
-        content: const Text('Ảnh sẽ bị xóa vĩnh viễn'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Hủy'),
+      barrierDismissible: false,
+      builder: (context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
           ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Xóa'),
+          child: Padding(
+            padding: const EdgeInsets.all(8),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // ⚠️ ICON
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: const BoxDecoration(
+                    color: Colors.redAccent,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.delete_forever,
+                    color: Colors.white,
+                    size: 32,
+                  ),
+                ),
+
+                const SizedBox(height: 16),
+
+                // TITLE
+                const Text(
+                  "Delete Image?",
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+
+                const SizedBox(height: 8),
+
+                // CONTENT
+                const Text(
+                  "This image will be permanently deleted.\nThis action cannot be undone.",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.black54),
+                ),
+
+                const SizedBox(height: 20),
+
+                // BUTTONS
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(context, false),
+                        style: OutlinedButton.styleFrom(
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        child: const Text("Cancel"),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () => Navigator.pop(context, true),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.redAccent,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        child: const Text("Delete"),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
-        ],
-      ),
+        );
+      },
     );
 
     if (ok != true) return;
