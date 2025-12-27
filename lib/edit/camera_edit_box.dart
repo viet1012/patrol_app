@@ -15,24 +15,22 @@ import '../homeScreen/patrol_home_screen.dart';
 class CameraEditBox extends StatefulWidget {
   final double size;
   final Function(List<Uint8List> images)? onImagesChanged;
-
+  final int maxAllowImages; // 🔥 SỐ ẢNH CÒN ĐƯỢC PHÉP
   final String? plant; // ✅ THÊM
   final String? group; // ✅ BẮT BUỘC
   final String type;
   final String? wsUrl;
-  final PatrolGroup patrolGroup;
 
   const CameraEditBox({
     super.key,
     this.size = 320,
     this.onImagesChanged,
+    required this.maxAllowImages,
     this.group,
     required this.type,
     this.plant,
 
     this.wsUrl,
-
-    required this.patrolGroup,
   });
 
   @override
@@ -56,15 +54,14 @@ class CameraEditBoxState extends State<CameraEditBox>
   int stt = 0;
   SttWebSocket? sttSocket;
 
-  static const int maxImages = 2;
+  int get maxImages => widget.maxAllowImages;
+  int get remain => maxImages - _capturedImages.length;
 
   Future<void> pickImagesFromDevice(BuildContext context) async {
-    final remain = maxImages - _capturedImages.length;
-
     // ❌ Đã đủ ảnh → báo ngay
     if (remain <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Text("You can upload up to $maxImages images only."),
           backgroundColor: Colors.redAccent,
           behavior: SnackBarBehavior.floating,
@@ -342,10 +339,12 @@ class CameraEditBoxState extends State<CameraEditBox>
                 onTap: canUpload ? () => pickImagesFromDevice(context) : null,
                 child: GlassCircleButton(
                   size: 50,
-                  child: Icon(
-                    Icons.upload_rounded,
-                    color: canUpload ? Colors.white : Colors.grey,
-                    size: 30,
+                  child: Tooltip(
+                    message: canUpload ? "Upload ảnh" : "Đã đủ $maxImages ảnh",
+                    child: Icon(
+                      Icons.upload_rounded,
+                      color: canUpload ? Colors.white : Colors.grey,
+                    ),
                   ),
                 ),
               ),

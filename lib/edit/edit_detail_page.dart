@@ -10,7 +10,7 @@ import 'package:http/http.dart' hide MultipartFile;
 import '../api/api_config.dart';
 import '../api/dio_client.dart';
 import '../camera_preview_box.dart';
-import '../detail/edit_image_item.dart';
+import 'edit_image_item.dart';
 import '../homeScreen/patrol_home_screen.dart';
 import '../model/patrol_report_model.dart';
 import '../widget/glass_action_button.dart';
@@ -210,9 +210,18 @@ class _EditDetailPageState extends State<EditDetailPage> {
               report: widget.report,
               patrolGroup: widget.patrolGroup,
               plant: widget.report.plant,
-              onReplaced: (newImage) {
+
+              /// ➕ ADD
+              onAdd: (newImage) {
                 setState(() {
-                  images[index] = newImage; // 🔥 UPDATE LIST CHA
+                  widget.report.imageNames.add(newImage);
+                });
+              },
+
+              /// 🗑 DELETE
+              onDelete: () {
+                setState(() {
+                  widget.report.imageNames.removeAt(index);
                 });
               },
             ),
@@ -256,13 +265,6 @@ class _EditDetailPageState extends State<EditDetailPage> {
                   child: GestureDetector(
                     onTap: () {
                       _cameraKey.currentState?.removeImage(idx);
-
-                      // setState(() {
-                      //   _retakeImages.removeAt(idx);
-                      //   if (_retakeImages.isEmpty) {
-                      //     _enableCamera = true;
-                      //   }
-                      // });
                     },
                     child: Container(
                       padding: const EdgeInsets.all(2),
@@ -284,75 +286,5 @@ class _EditDetailPageState extends State<EditDetailPage> {
         }).toList(),
       ),
     );
-  }
-
-  void _showSnackBar(
-    String message,
-    Color color, {
-    Duration duration = const Duration(seconds: 10),
-  }) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).removeCurrentSnackBar();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: color,
-        duration: duration,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-    );
-  }
-
-  Future<void> fetchEmployeeName(String code) async {
-    if (code.trim().isEmpty) {
-      setState(() {
-        _employeeName = null;
-      });
-      return;
-    }
-
-    setState(() {
-      _isLoadingName = true;
-    });
-
-    try {
-      final dio = DioClient.dio;
-      final response = await dio.get(
-        '/api/hr/name',
-        queryParameters: {'code': code.trim()},
-      );
-
-      if (response.statusCode == 200) {
-        setState(() {
-          _employeeName = response.data.toString();
-        });
-      } else {
-        setState(() {
-          _employeeName = null;
-        });
-      }
-    } catch (e) {
-      debugPrint('Error fetching employee name: $e');
-      setState(() {
-        _employeeName = null;
-      });
-    } finally {
-      setState(() {
-        _isLoadingName = false;
-      });
-    }
-  }
-
-  void showLoading(BuildContext context) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => const Center(child: CircularProgressIndicator()),
-    );
-  }
-
-  void hideLoading(BuildContext context) {
-    Navigator.of(context, rootNavigator: true).pop();
   }
 }

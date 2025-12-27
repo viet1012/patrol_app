@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 import 'package:dio/dio.dart';
+import 'package:flutter/cupertino.dart';
 
 import 'api_config.dart';
 import 'dio_client.dart';
@@ -40,4 +41,90 @@ Future<String> replaceImageApi({
   /// backend PHẢI trả:
   /// { "newImage": "xxx.jpg" }
   return response.data['newImage'] as String;
+}
+
+/// ===============================
+/// ➕ ADD IMAGE
+/// ===============================
+Future<String> addImageApi({
+  required int id,
+  required Uint8List imageBytes,
+}) async {
+  final String path = '/api/patrol_report/$id/add_image';
+
+  try {
+    final formData = FormData.fromMap({
+      'image': MultipartFile.fromBytes(
+        imageBytes,
+        filename: 'add_${DateTime.now().millisecondsSinceEpoch}.jpg',
+        contentType: DioMediaType('image', 'jpeg'),
+      ),
+    });
+
+    final response = await DioClient.dio.post(
+      path,
+      data: formData,
+      options: Options(contentType: 'multipart/form-data'),
+    );
+
+    /// LOG RESPONSE
+    debugPrint('✅ ADD IMAGE SUCCESS');
+    debugPrint('Status: ${response.statusCode}');
+    debugPrint('Data: ${response.data}');
+
+    if (response.statusCode != 200) {
+      throw Exception(
+        'Add image failed | status=${response.statusCode} | data=${response.data}',
+      );
+    }
+
+    if (response.data == null || response.data['newImage'] == null) {
+      throw Exception('Response thiếu imageName: ${response.data}');
+    }
+
+    return response.data['newImage'] as String;
+  }
+  /// 🎯 BẮT LỖI DIO
+  on DioException catch (e) {
+    debugPrint('❌ DIO ERROR - ADD IMAGE');
+    debugPrint('Message: ${e.message}');
+    debugPrint('Type: ${e.type}');
+    debugPrint('Path: ${e.requestOptions.path}');
+
+    if (e.response != null) {
+      debugPrint('StatusCode: ${e.response?.statusCode}');
+      debugPrint('ResponseData: ${e.response?.data}');
+      debugPrint('Headers: ${e.response?.headers}');
+    } else {
+      debugPrint('No response from server');
+    }
+
+    throw Exception('Add image Dio error: ${e.response?.data ?? e.message}');
+  }
+  /// 🎯 BẮT LỖI KHÁC
+  catch (e, stack) {
+    debugPrint('❌ UNKNOWN ERROR - ADD IMAGE');
+    debugPrint('Error: $e');
+    debugPrint('StackTrace: $stack');
+    rethrow;
+  }
+}
+
+/// ===============================
+/// 🗑 DELETE IMAGE
+/// ===============================
+Future<void> deleteImageApi({
+  required int id,
+  required String imageName,
+}) async {
+  final String path = '/api/patrol_report/$id/delete_image';
+
+  final response = await DioClient.dio.delete(
+    path,
+    queryParameters: {'image': imageName},
+  );
+
+  if (response.statusCode != 200) {
+    throw Exception('Delete image failed: ${response.data}');
+  }
 }

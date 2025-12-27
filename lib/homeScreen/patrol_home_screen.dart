@@ -4,11 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:shimmer/shimmer.dart';
 
 import '../LanguageFlagButton.dart';
+import '../after/report_detail_screen.dart';
 import '../animate/call_to_action_arrow.dart';
 import '../animate/christmas_title.dart';
 import '../animate/glow_title.dart';
 import '../api/hse_master_service.dart';
-import '../detail/report_detail_screen.dart';
 import '../model/hse_patrol_team_model.dart';
 import '../model/machine_model.dart';
 import '../test.dart';
