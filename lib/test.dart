@@ -1075,6 +1075,10 @@ class _CameraScreenState extends State<CameraScreen> {
                       icon: Icons.edit_calendar_sharp,
                       enabled: true,
                       onTap: () {
+                        if (_selectedGroup == null || _selectedGroup!.isEmpty) {
+                          _showSelectGroupWarning(context);
+                          return;
+                        }
                         Navigator.push(
                           context,
                           MaterialPageRoute(
@@ -1427,6 +1431,93 @@ class _CameraScreenState extends State<CameraScreen> {
       }).toList(),
 
       onChanged: (v) => setState(() => onChanged(v)),
+    );
+  }
+
+  void _showSelectGroupWarning(BuildContext context) {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black54, // nền tối phía sau
+      builder: (_) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 24),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(20),
+                color: Colors.black.withOpacity(0.55),
+                border: Border.all(color: Colors.white.withOpacity(0.15)),
+              ),
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // ⚠️ ICON
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.orange.withOpacity(0.15),
+                    ),
+                    child: const Icon(
+                      Icons.warning_amber_rounded,
+                      color: Colors.orange,
+                      size: 42,
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // TITLE
+                  const Text(
+                    "Group Required",
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                  ),
+
+                  const SizedBox(height: 8),
+
+                  // MESSAGE
+                  const Text(
+                    "Please select a group before continuing.",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 14, color: Colors.white70),
+                  ),
+
+                  const SizedBox(height: 22),
+
+                  // OK BUTTON
+                  SizedBox(
+                    width: 150,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.white.withOpacity(0.9),
+                        foregroundColor: Colors.black,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text(
+                        "OK",
+                        style: TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
