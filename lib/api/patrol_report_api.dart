@@ -12,6 +12,7 @@ class PatrolReportApi {
     required String type,
     required String afStatus,
     required String grp,
+    required String pic,
   }) async {
     try {
       final endpoint = '/api/patrol_report/filter';
@@ -24,6 +25,7 @@ class PatrolReportApi {
         'type': type,
         'afStatus': afStatus,
         'grp': grp,
+        'pic': pic,
       };
 
       /// 🔥 IN RA ENDPOINT + QUERY

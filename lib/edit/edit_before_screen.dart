@@ -1,4 +1,5 @@
 import 'package:auto_size_text/auto_size_text.dart';
+import 'package:chuphinh/edit/edit_detail_page.dart';
 import 'package:dropdown_search/dropdown_search.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -109,6 +110,7 @@ class _EditBeforeScreenState extends State<EditBeforeScreen> {
         type: widget.patrolGroup.name,
         afStatus: '',
         grp: widget.selectedGrp!,
+        pic: '',
       );
 
       setState(() {
@@ -147,21 +149,27 @@ class _EditBeforeScreenState extends State<EditBeforeScreen> {
         title: Row(
           children: [
             SizedBox(
-              width: 100,
+              width: 140,
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                    widget.titleScreen,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      fontStyle: FontStyle.italic,
-                    ),
+                  Row(
+                    children: [
+                      Text(
+                        '[Edit] ${widget.titleScreen}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ],
                   ),
+
                   const SizedBox(height: 4),
                   Container(
+                    alignment: Alignment.center,
                     padding: const EdgeInsets.symmetric(
                       horizontal: 8,
                       vertical: 2,
@@ -425,7 +433,7 @@ class _EditBeforeScreenState extends State<EditBeforeScreen> {
                           final result = await Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => ReportDetailPage(
+                              builder: (_) => EditDetailPage(
                                 report: r,
                                 patrolGroup: widget.patrolGroup,
                               ),

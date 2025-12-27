@@ -10,28 +10,28 @@ import 'package:http/http.dart' hide MultipartFile;
 import '../api/api_config.dart';
 import '../api/dio_client.dart';
 import '../camera_preview_box.dart';
+import '../detail/edit_image_item.dart';
 import '../homeScreen/patrol_home_screen.dart';
 import '../model/patrol_report_model.dart';
 import '../widget/glass_action_button.dart';
-import 'camera_update_box.dart';
-import 'replaceable_image_item.dart';
+import 'camera_edit_box.dart';
 
-class ReportDetailPage extends StatefulWidget {
+class EditDetailPage extends StatefulWidget {
   final PatrolReportModel report;
   final PatrolGroup patrolGroup;
-  const ReportDetailPage({
+  const EditDetailPage({
     super.key,
     required this.report,
     required this.patrolGroup,
   });
 
   @override
-  State<ReportDetailPage> createState() => _ReportDetailPageState();
+  State<EditDetailPage> createState() => _EditDetailPageState();
 }
 
-class _ReportDetailPageState extends State<ReportDetailPage> {
-  final GlobalKey<CameraUpdateBoxState> _cameraKey =
-      GlobalKey<CameraUpdateBoxState>();
+class _EditDetailPageState extends State<EditDetailPage> {
+  final GlobalKey<CameraEditBoxState> _cameraKey =
+      GlobalKey<CameraEditBoxState>();
 
   bool _enableCamera = false;
 
@@ -63,7 +63,7 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
         title: Column(
           children: [
             Text(
-              'Patrol After',
+              'Edit Detail',
               style: const TextStyle(
                 color: Colors.white,
                 fontSize: 13,
@@ -139,8 +139,6 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
 
               const SizedBox(height: 8),
               _buildImageGrid(widget.report.imageNames),
-              const SizedBox(height: 8),
-              _buildRetakeSection(),
             ],
           ),
         ),
@@ -207,7 +205,7 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
         itemBuilder: (context, index) {
           return SizedBox(
             width: 280,
-            child: ReplaceableImageItem(
+            child: EditImageItem(
               imageName: images[index],
               report: widget.report,
               patrolGroup: widget.patrolGroup,
@@ -288,206 +286,6 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
     );
   }
 
-  Widget _buildRetakeSection() {
-    return Card(
-      color: const Color(0xFF121826).withOpacity(.4),
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
-        padding: const EdgeInsets.all(8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            const SizedBox(height: 12),
-
-            /// ===== MSNV =====
-            Row(
-              children: [
-                Expanded(
-                  flex: 3,
-                  child: TextField(
-                    controller: _msnvCtrl,
-                    decoration: InputDecoration(
-                      labelText: 'Code',
-                      labelStyle: const TextStyle(color: Colors.white70),
-                      enabledBorder: OutlineInputBorder(
-                        borderSide: BorderSide(color: Colors.white54),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderSide: BorderSide(
-                          color: Colors.blueAccent.shade200,
-                        ),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      filled: true,
-                      fillColor: Colors.white.withOpacity(0.12),
-                    ),
-                    style: const TextStyle(color: Colors.white),
-                    onChanged: (v) {
-                      final value = v.trim();
-
-                      // Hủy timer cũ nếu còn
-                      if (_debounce?.isActive ?? false) {
-                        _debounce!.cancel();
-                      }
-
-                      // Chỉ xử lý khi đủ 4 ký tự
-                      if (value.length < 4) return;
-
-                      _debounce = Timer(const Duration(milliseconds: 400), () {
-                        fetchEmployeeName(value);
-                      });
-                    },
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  flex: 4,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 16,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.white38),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.25),
-                          blurRadius: 4,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: _isLoadingName
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
-                        : Text(
-                            _employeeName ?? 'Name',
-                            style: const TextStyle(
-                              color: Colors.white70,
-                              fontSize: 14,
-                              fontStyle: FontStyle.italic,
-                            ),
-                          ),
-                  ),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 12),
-
-            /// ===== THUMBNAIL PREVIEW =====
-            _buildThumbPreview(),
-
-            const SizedBox(height: 12),
-
-            /// ===== CAMERA =====
-            // if (_enableCamera)
-            CameraUpdateBox(
-              key: _cameraKey,
-              size: 280,
-              plant: widget.report.plant,
-              patrolGroup: widget.patrolGroup,
-              type: "RETAKE",
-              onImagesChanged: (_) => setState(() {}),
-            ),
-
-            /// ===== COMMENT =====
-            if (_cameraKey.currentState != null &&
-                _cameraKey.currentState!.images.isNotEmpty) ...[
-              const SizedBox(height: 16),
-              TextField(
-                controller: _commentCtrl,
-                maxLines: 3,
-                decoration: InputDecoration(
-                  labelText: 'Comment',
-                  labelStyle: const TextStyle(color: Colors.white70),
-                  enabledBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: Colors.white54),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: Colors.blueAccent.shade200),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  filled: true,
-                  fillColor: Colors.white.withOpacity(0.12),
-                ),
-                style: const TextStyle(color: Colors.white),
-                onChanged: (value) {
-                  setState(
-                    () {},
-                  ); // Bắt buộc gọi setState để UI rebuild và nút lưu hiện/ẩn đúng
-                },
-              ),
-            ],
-
-            const SizedBox(height: 20),
-
-            /// ===== SAVE =====
-            if (_commentCtrl.text.trim().isNotEmpty)
-              SizedBox(
-                width: 60,
-                height: 60,
-                child: GlassActionButton(
-                  onTap:
-                      (_cameraKey.currentState != null &&
-                          _cameraKey.currentState!.images.isNotEmpty &&
-                          _msnvCtrl.text.trim().isNotEmpty)
-                      ? () async {
-                          try {
-                            showLoading(context);
-
-                            await updateAtReport(
-                              reportId: widget.report.id!,
-                              msnv: '${_msnvCtrl.text.trim()}_$_employeeName',
-                              comment: _commentCtrl.text.trim(),
-                              images: _cameraKey.currentState!.images,
-                            );
-                            hideLoading(context);
-
-                            /// RESET UI → cho phép chụp lại tiếp
-                            setState(() {
-                              _commentCtrl.clear();
-                              _enableCamera = false;
-                            });
-                            _cameraKey.currentState?.clearAll(); // xóa hết ảnh
-
-                            /// FORCE reload camera
-                            await Future.delayed(
-                              const Duration(milliseconds: 200),
-                            );
-                            setState(() => _enableCamera = true);
-
-                            _showSnackBar(
-                              'Update AF successful!',
-                              Colors.green,
-                            );
-                          } catch (e) {
-                            debugPrint('Update AT error: $e');
-                            _showSnackBar('Server error: $e', Colors.red);
-                          }
-                        }
-                      : null,
-                  icon: Icons.save,
-                  backgroundColor: Color(0xFF2665B6),
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
   void _showSnackBar(
     String message,
     Color color, {
@@ -556,54 +354,5 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
 
   void hideLoading(BuildContext context) {
     Navigator.of(context, rootNavigator: true).pop();
-  }
-
-  Future<void> updateAtReport({
-    required int reportId,
-    required String msnv,
-    required String comment,
-    required List<Uint8List> images,
-  }) async {
-    final dio = DioClient.dio;
-
-    final dataJson = {"atComment": comment, "atPic": msnv};
-
-    final formData = FormData();
-
-    // data (JSON STRING)
-    formData.fields.add(MapEntry('data', jsonEncode(dataJson)));
-
-    // images (BYTES)
-    for (int i = 0; i < images.length; i++) {
-      formData.files.add(
-        MapEntry(
-          'images',
-          MultipartFile.fromBytes(
-            images[i],
-            filename: 'retake_${i + 1}.jpg',
-            contentType: MediaType('image', 'jpeg'),
-          ),
-        ),
-      );
-    }
-
-    final url = '/api/patrol_report/$reportId/update_at';
-
-    debugPrint('Calling PUT $url');
-    debugPrint('Base URL: ${dio.options.baseUrl}');
-    debugPrint('Full URL: ${dio.options.baseUrl}$url');
-
-    try {
-      final response = await dio.put(
-        url,
-        data: formData,
-        options: Options(contentType: 'multipart/form-data'),
-      );
-      debugPrint('Response status: ${response.statusCode}');
-      debugPrint('Response data: ${response.data}');
-    } catch (e) {
-      debugPrint('Error during PUT request: $e');
-      rethrow;
-    }
   }
 }

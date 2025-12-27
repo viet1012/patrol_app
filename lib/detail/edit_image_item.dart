@@ -8,14 +8,14 @@ import '../homeScreen/patrol_home_screen.dart';
 import '../model/patrol_report_model.dart';
 import 'camera_update_box.dart';
 
-class ReplaceableImageItem extends StatefulWidget {
+class EditImageItem extends StatefulWidget {
   final String imageName;
   final PatrolReportModel report;
   final PatrolGroup patrolGroup;
   final String? plant;
   final void Function(String newImage) onReplaced;
 
-  const ReplaceableImageItem({
+  const EditImageItem({
     super.key,
     required this.imageName,
     required this.report,
@@ -25,10 +25,10 @@ class ReplaceableImageItem extends StatefulWidget {
   });
 
   @override
-  State<ReplaceableImageItem> createState() => _ReplaceableImageItemState();
+  State<EditImageItem> createState() => _EditImageItemState();
 }
 
-class _ReplaceableImageItemState extends State<ReplaceableImageItem> {
+class _EditImageItemState extends State<EditImageItem> {
   bool _loading = false;
   Uint8List? _newImage;
 
@@ -183,27 +183,6 @@ class _ReplaceableImageItemState extends State<ReplaceableImageItem> {
       height: 220, // 🔥 CỐ ĐỊNH – KHÔNG BAO GIỜ ĐẨY LAYOUT
       child: Stack(
         children: [
-          // ClipRRect(
-          //   borderRadius: BorderRadius.circular(14),
-          //   child: Image.network(
-          //     imageUrl,
-          //     width: double.infinity,
-          //     height: double.infinity,
-          //     fit: BoxFit.cover,
-          //     key: ValueKey(imageUrl),
-          //     headers: {'ngrok-skip-browser-warning': 'true'},
-          //     // ?? FIX QUAN TR?NG
-          //     // webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
-          //     //
-          //     // errorBuilder: (context, error, stack) {
-          //     //   print('error: ${error}');
-          //     //
-          //     //   return Center(
-          //     //     child: Icon(Icons.broken_image, color: Colors.red),
-          //     //   );
-          //     // },
-          //   ),
-          // ),
           GestureDetector(
             onTap: _openImageViewer,
             child: Hero(
@@ -223,25 +202,25 @@ class _ReplaceableImageItemState extends State<ReplaceableImageItem> {
           ),
 
           /// CAMERA BUTTON
-          // Positioned(
-          //   top: 6,
-          //   right: 6,
-          //   child: InkWell(
-          //     onTap: _openCameraOverlay,
-          //     child: Container(
-          //       padding: const EdgeInsets.all(6),
-          //       decoration: const BoxDecoration(
-          //         color: Colors.black54,
-          //         shape: BoxShape.circle,
-          //       ),
-          //       child: const Icon(
-          //         Icons.delete_forever,
-          //         size: 18,
-          //         color: Colors.white,
-          //       ),
-          //     ),
-          //   ),
-          // ),
+          Positioned(
+            top: 6,
+            right: 6,
+            child: InkWell(
+              onTap: _openCameraOverlay,
+              child: Container(
+                padding: const EdgeInsets.all(6),
+                decoration: const BoxDecoration(
+                  color: Colors.black54,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.delete_forever,
+                  size: 18,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ),
           if (_loading)
             const Positioned.fill(
               child: ColoredBox(

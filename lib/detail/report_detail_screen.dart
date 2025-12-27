@@ -31,18 +31,19 @@ class ReportDetailScreen extends StatefulWidget {
 
 class _ReportDetailScreenState extends State<ReportDetailScreen> {
   String? _selectedPlant;
-  String? _selectedFac;
+  String? selectedPIC;
 
   String? _filterArea;
   String? _filterRisk;
 
   Future<List<PatrolReportModel>>? _futureReport;
 
-  List<String> getFacByPlant(String plant) {
+  List<String> findPicsByPlant(String plant) {
     final Set<String> unique = {};
+
     return widget.machines
         .where((m) => m.plant.toString() == plant)
-        .map((m) => m.fac.toString())
+        .map((m) => m.pic.toString())
         .where((f) => f.isNotEmpty)
         .where((f) => unique.add(f))
         .toList();
@@ -83,7 +84,7 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
   }
 
   void _loadReport() async {
-    if (_selectedFac == null) return;
+    if (selectedPIC == null) return;
 
     setState(() {
       _futureReport = null; // reset trước (optional)
@@ -92,12 +93,13 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
     try {
       final future = PatrolReportApi.fetchReports(
         plant: widget.selectedPlant!,
-        division: _selectedFac!,
+        division: '',
         area: '',
         machine: '',
         type: widget.patrolGroup.name,
         afStatus: '',
         grp: '',
+        pic: selectedPIC!,
       );
 
       setState(() {
@@ -113,9 +115,15 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
     }
   }
 
+  void debugFindPics() {
+    final pics = findPicsByPlant(_selectedPlant!);
+    // debugPrint('📌 PIC FOUND (${pics.length}): $pics');
+  }
+
   @override
   void initState() {
     _selectedPlant = widget.selectedPlant;
+    debugFindPics();
     super.initState();
   }
 
@@ -123,7 +131,7 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
   Widget build(BuildContext context) {
     final facList = _selectedPlant == null
         ? []
-        : getFacByPlant(_selectedPlant!);
+        : findPicsByPlant(_selectedPlant!);
 
     return Scaffold(
       appBar: AppBar(
@@ -174,14 +182,14 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
             Spacer(),
             Expanded(
               child: _buildSearchableDropdown(
-                label: "fac".tr(context),
-                selectedValue: _selectedFac,
+                label: "PIC",
+                selectedValue: selectedPIC,
                 items: _selectedPlant == null
                     ? <String>[]
                     : facList.cast<String>(),
                 onChanged: (v) {
                   setState(() {
-                    _selectedFac = v;
+                    selectedPIC = v;
                     _loadReport();
                   });
                 },
@@ -210,7 +218,7 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                     ),
                     child: Center(
                       child: Text(
-                        'Please select Fac!',
+                        'Please select PIC!',
                         style: TextStyle(color: Colors.grey, fontSize: 25),
                       ),
                     ),
