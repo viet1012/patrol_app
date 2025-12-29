@@ -97,28 +97,20 @@ class _LoginPageState extends State<LoginPage> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF38BDF8), Color(0xFF2563EB)],
-                    ),
-                  ),
-                  child: const Icon(
-                    Icons.lock_outline,
-                    size: 30,
-                    color: Colors.white,
-                  ),
+                Image.asset(
+                  'assets/flags/favicon.png',
+                  width: 80,
+                  height: 80,
+                  filterQuality: FilterQuality.high,
+                  fit: BoxFit.contain,
                 ),
-
                 const SizedBox(height: 16),
 
                 const Text(
                   "Welcome Back",
                   style: TextStyle(
                     color: Colors.white,
-                    fontSize: 22,
+                    fontSize: 20,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
