@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'homeScreen/patrol_home_screen.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
-import 'l10n/app_localizations.dart'; // đường dẫn tuỳ vào bạn
+import 'l10n/app_localizations.dart';
+import 'login/login_page.dart'; // đường dẫn tuỳ vào bạn
 
 void main() {
   runApp(const MyApp());
@@ -65,7 +66,7 @@ class _MyAppState extends State<MyApp> {
       theme: ThemeData(
         textTheme: GoogleFonts.notoSansTextTheme(Theme.of(context).textTheme),
       ),
-      home: const PatrolHomeScreen(),
+      home: const LoginPage(),
     );
   }
 }
