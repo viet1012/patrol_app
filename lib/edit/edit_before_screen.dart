@@ -13,6 +13,8 @@ import '../widget/glass_action_button.dart';
 
 class EditBeforeScreen extends StatefulWidget {
   final List<MachineModel> machines;
+  final String accountCode;
+
   final String? selectedPlant;
   final String? selectedGrp;
   final String? selectedFac;
@@ -22,6 +24,7 @@ class EditBeforeScreen extends StatefulWidget {
 
   const EditBeforeScreen({
     super.key,
+    required this.accountCode,
     required this.machines,
     required this.selectedGrp,
     required this.selectedPlant,

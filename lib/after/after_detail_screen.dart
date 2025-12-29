@@ -12,6 +12,7 @@ import '../widget/glass_action_button.dart';
 import 'after_detail_page.dart';
 
 class AfterDetailScreen extends StatefulWidget {
+  final String accountCode;
   final List<MachineModel> machines;
   final String? selectedPlant;
   final String titleScreen;
@@ -23,6 +24,7 @@ class AfterDetailScreen extends StatefulWidget {
     required this.selectedPlant,
     required this.titleScreen,
     required this.patrolGroup,
+    required this.accountCode,
   });
 
   @override
@@ -451,6 +453,7 @@ class _AfterDetailScreenState extends State<AfterDetailScreen> {
                             context,
                             MaterialPageRoute(
                               builder: (_) => AfterDetailPage(
+                                accountCode: widget.accountCode,
                                 report: r,
                                 patrolGroup: widget.patrolGroup,
                               ),

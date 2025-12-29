@@ -28,6 +28,7 @@ class CameraScreen extends StatefulWidget {
 
   final PatrolGroup patrolGroup;
   final String titleScreen;
+  final String accountCode;
 
   const CameraScreen({
     super.key,
@@ -37,6 +38,7 @@ class CameraScreen extends StatefulWidget {
     required this.titleScreen,
     required this.lang,
     required this.patrolGroup,
+    required this.accountCode,
   });
 
   @override
@@ -240,6 +242,7 @@ class _CameraScreenState extends State<CameraScreen> {
         );
       }
       final reportMap = {
+        'userCreate': widget.accountCode,
         'plant': _selectedPlant ?? '',
         'type': widget.patrolGroup.name,
         'division': _selectedFac ?? '',
@@ -371,7 +374,6 @@ class _CameraScreenState extends State<CameraScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // print('Lang: ${widget.patrolGroup.name}');
     final plantList = getPlants();
     final groupList = getGroupsByPlant();
 
@@ -397,8 +399,6 @@ class _CameraScreenState extends State<CameraScreen> {
     final minLength = (widget.lang == 'JP') ? 1 : 2;
 
     return Scaffold(
-      // backgroundColor: Colors.blueGrey.shade200,
-
       // ✅ QUAN TRỌNG: Giúp giao diện tự co lên khi bàn phím hiện
       resizeToAvoidBottomInset: true,
       appBar: AppBar(
@@ -1083,6 +1083,8 @@ class _CameraScreenState extends State<CameraScreen> {
                           context,
                           MaterialPageRoute(
                             builder: (_) => EditBeforeScreen(
+                              accountCode: widget.accountCode,
+
                               machines: widget.machines,
                               selectedFac: _selectedFac,
                               selectedPlant: _selectedPlant,

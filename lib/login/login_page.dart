@@ -47,7 +47,7 @@ class _LoginPageState extends State<LoginPage> {
 
     Navigator.pushReplacement(
       context,
-      MaterialPageRoute(builder: (_) => const PatrolHomeScreen()),
+      MaterialPageRoute(builder: (_) => PatrolHomeScreen(accountCode: code)),
     );
   }
 

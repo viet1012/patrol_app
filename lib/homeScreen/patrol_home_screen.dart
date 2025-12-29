@@ -1,5 +1,7 @@
 import 'dart:ui';
 
+import 'package:chuphinh/widget/glass_action_button.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:shimmer/shimmer.dart';
 
@@ -9,6 +11,7 @@ import '../animate/call_to_action_arrow.dart';
 import '../animate/christmas_title.dart';
 import '../animate/glow_title.dart';
 import '../api/hse_master_service.dart';
+import '../login/login_page.dart';
 import '../model/hse_patrol_team_model.dart';
 import '../model/machine_model.dart';
 import '../test.dart';
@@ -18,7 +21,9 @@ import '../widget/error_display.dart';
 enum PatrolGroup { Patrol, Audit, QualityPatrol }
 
 class PatrolHomeScreen extends StatefulWidget {
-  const PatrolHomeScreen({super.key});
+  final String accountCode;
+
+  const PatrolHomeScreen({super.key, required this.accountCode});
 
   @override
   State<PatrolHomeScreen> createState() => _PatrolHomeScreenState();
@@ -198,6 +203,26 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      Row(
+                        children: [
+                          Text(
+                            "Welcome:",
+                            style: const TextStyle(
+                              fontSize: 20,
+                              color: Colors.white70,
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                          SizedBox(width: 8),
+                          Text(
+                            widget.accountCode,
+                            style: const TextStyle(
+                              fontSize: 22,
+                              color: Colors.pinkAccent,
+                            ),
+                          ),
+                        ],
+                      ),
                       ClipRRect(
                         borderRadius: BorderRadius.circular(16),
                         child: BackdropFilter(
@@ -349,6 +374,49 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
                                   ),
                                 ],
                               ),
+                      ),
+                      GlassActionButton(
+                        icon: Icons.logout,
+                        onTap: () async {
+                          if (!context.mounted) return;
+
+                          final confirm = await showDialog<bool>(
+                            context: context,
+                            builder: (ctx) => AlertDialog(
+                              title: const Text("Logout"),
+                              content: const Text("Do you want to logout?"),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(ctx, false),
+                                  child: const Text("Cancel"),
+                                ),
+                                ElevatedButton(
+                                  onPressed: () => Navigator.pop(ctx, true),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.redAccent,
+                                    foregroundColor: Colors.white,
+                                  ),
+                                  child: const Text("Logout"),
+                                ),
+                              ],
+                            ),
+                          );
+
+                          if (confirm != true) return;
+
+                          if (!context.mounted) return;
+
+                          Navigator.pushAndRemoveUntil(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const LoginPage(),
+                            ),
+                            (_) => false,
+                          );
+                        },
                       ),
                     ],
                   ),
@@ -506,6 +574,7 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
                       selectedPlant: selectedFactory,
                       patrolGroup: group,
                       titleScreen: titleScreen,
+                      accountCode: widget.accountCode,
                     ),
                   ),
                 );
@@ -522,6 +591,7 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
                   context,
                   MaterialPageRoute(
                     builder: (_) => AfterDetailScreen(
+                      accountCode: widget.accountCode,
                       machines: machines,
                       selectedPlant: selectedFactory,
                       titleScreen: titleScreen,

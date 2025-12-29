@@ -1,15 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' hide MultipartFile;
-
-import '../api/api_config.dart';
 import '../api/dio_client.dart';
-import '../camera_preview_box.dart';
 import '../homeScreen/patrol_home_screen.dart';
 import '../model/patrol_report_model.dart';
 import '../widget/glass_action_button.dart';
@@ -17,10 +13,13 @@ import 'camera_after_box.dart';
 import 'replaceable_image_item.dart';
 
 class AfterDetailPage extends StatefulWidget {
+  final String accountCode;
   final PatrolReportModel report;
   final PatrolGroup patrolGroup;
+
   const AfterDetailPage({
     super.key,
+    required this.accountCode,
     required this.report,
     required this.patrolGroup,
   });
@@ -448,8 +447,9 @@ class _AfterDetailPageState extends State<AfterDetailPage> {
                             showLoading(context);
 
                             await updateAtReport(
+                              userAfter: widget.accountCode,
                               reportId: widget.report.id!,
-                              msnv: '${_msnvCtrl.text.trim()}_$_employeeName',
+                              atPic: '${_msnvCtrl.text.trim()}_$_employeeName',
                               comment: _commentCtrl.text.trim(),
                               images: _cameraKey.currentState!.images,
                             );
@@ -559,14 +559,19 @@ class _AfterDetailPageState extends State<AfterDetailPage> {
   }
 
   Future<void> updateAtReport({
+    required String userAfter,
     required int reportId,
-    required String msnv,
+    required String atPic,
     required String comment,
     required List<Uint8List> images,
   }) async {
     final dio = DioClient.dio;
 
-    final dataJson = {"atComment": comment, "atPic": msnv};
+    final dataJson = {
+      "userAfter": userAfter,
+      "atComment": comment,
+      "atPic": atPic,
+    };
 
     final formData = FormData();
 
