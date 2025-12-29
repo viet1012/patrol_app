@@ -74,12 +74,6 @@ class _AfterDetailScreenState extends State<AfterDetailScreen> {
         return Colors.red;
       case 'IV':
         return Colors.redAccent;
-      case 'III':
-        return Colors.amber;
-      case 'II':
-        return Colors.lightBlueAccent;
-      case 'I':
-        return Colors.greenAccent;
       default:
         return Colors.grey;
     }
