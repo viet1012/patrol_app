@@ -76,21 +76,13 @@ class _RegisterBottomSheetState extends State<RegisterBottomSheet> {
             const SizedBox(height: 18),
 
             // icon
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: const BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: LinearGradient(
-                  colors: [Color(0xFF38BDF8), Color(0xFF2563EB)],
-                ),
-              ),
-              child: const Icon(
-                Icons.person_add_alt_1,
-                color: Colors.white,
-                size: 26,
-              ),
+            Image.asset(
+              'assets/flags/favicon.png',
+              width: 80,
+              height: 80,
+              filterQuality: FilterQuality.high,
+              fit: BoxFit.contain,
             ),
-
             const SizedBox(height: 14),
 
             const Text(
