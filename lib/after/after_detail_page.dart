@@ -13,25 +13,25 @@ import '../camera_preview_box.dart';
 import '../homeScreen/patrol_home_screen.dart';
 import '../model/patrol_report_model.dart';
 import '../widget/glass_action_button.dart';
-import 'camera_update_box.dart';
+import 'camera_after_box.dart';
 import 'replaceable_image_item.dart';
 
-class ReportDetailPage extends StatefulWidget {
+class AfterDetailPage extends StatefulWidget {
   final PatrolReportModel report;
   final PatrolGroup patrolGroup;
-  const ReportDetailPage({
+  const AfterDetailPage({
     super.key,
     required this.report,
     required this.patrolGroup,
   });
 
   @override
-  State<ReportDetailPage> createState() => _ReportDetailPageState();
+  State<AfterDetailPage> createState() => _AfterDetailPageState();
 }
 
-class _ReportDetailPageState extends State<ReportDetailPage> {
-  final GlobalKey<CameraUpdateBoxState> _cameraKey =
-      GlobalKey<CameraUpdateBoxState>();
+class _AfterDetailPageState extends State<AfterDetailPage> {
+  final GlobalKey<CameraAfterBoxState> _cameraKey =
+      GlobalKey<CameraAfterBoxState>();
 
   bool _enableCamera = false;
 
@@ -392,7 +392,7 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
 
             /// ===== CAMERA =====
             // if (_enableCamera)
-            CameraUpdateBox(
+            CameraAfterBox(
               key: _cameraKey,
               size: 280,
               plant: widget.report.plant,

@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:shimmer/shimmer.dart';
 
 import '../LanguageFlagButton.dart';
-import '../after/report_detail_screen.dart';
+import '../after/after_detail_screen.dart';
 import '../animate/call_to_action_arrow.dart';
 import '../animate/christmas_title.dart';
 import '../animate/glow_title.dart';
@@ -521,7 +521,7 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => ReportDetailScreen(
+                    builder: (_) => AfterDetailScreen(
                       machines: machines,
                       selectedPlant: selectedFactory,
                       titleScreen: titleScreen,

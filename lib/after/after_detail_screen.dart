@@ -9,15 +9,15 @@ import '../model/patrol_report_model.dart';
 import '../translator.dart';
 import '../widget/error_display.dart';
 import '../widget/glass_action_button.dart';
-import 'report_detail_page.dart';
+import 'after_detail_page.dart';
 
-class ReportDetailScreen extends StatefulWidget {
+class AfterDetailScreen extends StatefulWidget {
   final List<MachineModel> machines;
   final String? selectedPlant;
   final String titleScreen;
   final PatrolGroup patrolGroup;
 
-  const ReportDetailScreen({
+  const AfterDetailScreen({
     super.key,
     required this.machines,
     required this.selectedPlant,
@@ -26,10 +26,10 @@ class ReportDetailScreen extends StatefulWidget {
   });
 
   @override
-  State<ReportDetailScreen> createState() => _ReportDetailScreenState();
+  State<AfterDetailScreen> createState() => _AfterDetailScreenState();
 }
 
-class _ReportDetailScreenState extends State<ReportDetailScreen> {
+class _AfterDetailScreenState extends State<AfterDetailScreen> {
   String? _selectedPlant;
   String? selectedPIC;
 
@@ -450,7 +450,7 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                           final result = await Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => ReportDetailPage(
+                              builder: (_) => AfterDetailPage(
                                 report: r,
                                 patrolGroup: widget.patrolGroup,
                               ),

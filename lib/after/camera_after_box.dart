@@ -12,7 +12,7 @@ import 'package:flutter/material.dart';
 
 import '../homeScreen/patrol_home_screen.dart';
 
-class CameraUpdateBox extends StatefulWidget {
+class CameraAfterBox extends StatefulWidget {
   final double size;
   final Function(List<Uint8List> images)? onImagesChanged;
 
@@ -22,7 +22,7 @@ class CameraUpdateBox extends StatefulWidget {
   final String? wsUrl;
   final PatrolGroup patrolGroup;
 
-  const CameraUpdateBox({
+  const CameraAfterBox({
     super.key,
     this.size = 320,
     this.onImagesChanged,
@@ -36,10 +36,10 @@ class CameraUpdateBox extends StatefulWidget {
   });
 
   @override
-  State<CameraUpdateBox> createState() => CameraUpdateBoxState();
+  State<CameraAfterBox> createState() => CameraAfterBoxState();
 }
 
-class CameraUpdateBoxState extends State<CameraUpdateBox>
+class CameraAfterBoxState extends State<CameraAfterBox>
     with TickerProviderStateMixin {
   html.MediaStream? _stream;
   html.VideoElement? _videoElement;
@@ -135,7 +135,7 @@ class CameraUpdateBoxState extends State<CameraUpdateBox>
   }
 
   @override
-  void didUpdateWidget(covariant CameraUpdateBox oldWidget) {
+  void didUpdateWidget(covariant CameraAfterBox oldWidget) {
     super.didUpdateWidget(oldWidget);
 
     final newFac = (widget.plant ?? "").trim();
@@ -150,7 +150,7 @@ class CameraUpdateBoxState extends State<CameraUpdateBox>
         _group = newGroup;
       });
 
-      debugPrint("CameraUpdateBox updated: fac=$_fac, group=$_group");
+      debugPrint("CameraAfterBox updated: fac=$_fac, group=$_group");
     }
   }
 

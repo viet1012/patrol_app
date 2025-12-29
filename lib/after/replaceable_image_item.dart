@@ -6,7 +6,7 @@ import 'package:image/image.dart' as img;
 import '../api/replace_image_api.dart';
 import '../homeScreen/patrol_home_screen.dart';
 import '../model/patrol_report_model.dart';
-import 'camera_update_box.dart';
+import 'camera_after_box.dart';
 
 class ReplaceableImageItem extends StatefulWidget {
   final String imageName;
@@ -97,7 +97,7 @@ class _ReplaceableImageItemState extends State<ReplaceableImageItem> {
                     ),
 
                   /// 📷 CAMERA
-                  CameraUpdateBox(
+                  CameraAfterBox(
                     key: _cameraKey,
                     size: 300,
                     plant: widget.plant,
