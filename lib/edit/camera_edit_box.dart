@@ -29,7 +29,6 @@ class CameraEditBox extends StatefulWidget {
     this.group,
     required this.type,
     this.plant,
-
     this.wsUrl,
   });
 
@@ -282,108 +281,151 @@ class CameraEditBoxState extends State<CameraEditBox>
   @override
   Widget build(BuildContext context) {
     return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Stack(
-          children: [
-            Container(
-              width: widget.size,
-              height: widget.size,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(20),
-                child: Stack(
-                  fit: StackFit.expand,
+        // ===== PREVIEW =====
+        if (_capturedImages.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          SizedBox(
+            height: 90,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: _capturedImages.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              itemBuilder: (context, index) {
+                return Stack(
                   children: [
-                    // 🎥 CAMERA
-                    _videoElement != null
-                        ? Transform.scale(
-                            scale: _zoom,
-                            child: HtmlElementView(
-                              key: ValueKey(_viewType),
-                              viewType: _viewType,
-                            ),
-                          )
-                        : Container(
-                            color: Colors.grey[300],
-                            child: const Center(
-                              child: CircularProgressIndicator(),
-                            ),
-                          ),
-
-                    // 🧊 GLASS OVERLAY (NHẸ)
-                    BackdropFilter(
-                      filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
-                      child: Container(color: Colors.white.withOpacity(0.08)),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: Image.memory(
+                        _capturedImages[index],
+                        width: 80,
+                        height: 80,
+                        fit: BoxFit.cover,
+                      ),
                     ),
 
-                    // ⚡ FLASH EFFECT
-                    AnimatedBuilder(
-                      animation: _flashController,
-                      builder: (context, child) => Container(
-                        color: Colors.white.withOpacity(
-                          0.85 * _flashController.value,
+                    // ❌ nút xoá
+                    Positioned(
+                      top: 2,
+                      right: 2,
+                      child: GestureDetector(
+                        onTap: () => removeImage(index),
+                        child: Container(
+                          decoration: const BoxDecoration(
+                            color: Colors.black54,
+                            shape: BoxShape.circle,
+                          ),
+                          padding: const EdgeInsets.all(2),
+                          child: const Icon(
+                            Icons.close,
+                            size: 14,
+                            color: Colors.white,
+                          ),
                         ),
                       ),
                     ),
                   ],
-                ),
-              ),
+                );
+              },
             ),
+          ),
+        ],
+        // ===== CAMERA =====
+        _buildCamera(),
+      ],
+    );
+  }
 
-            Positioned(
-              bottom: 14,
-              left: 1,
-              child: GestureDetector(
-                onTap: canUpload ? () => pickImagesFromDevice(context) : null,
-                child: GlassCircleButton(
-                  size: 50,
-                  child: Tooltip(
-                    message: canUpload ? "Upload ảnh" : "Đã đủ $maxImages ảnh",
-                    child: Icon(
-                      Icons.upload_rounded,
-                      color: canUpload ? Colors.white : Colors.grey,
+  Widget _buildCamera() {
+    return Stack(
+      children: [
+        Container(
+          width: widget.size,
+          height: widget.size,
+          decoration: BoxDecoration(borderRadius: BorderRadius.circular(20)),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(20),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                _videoElement != null
+                    ? Transform.scale(
+                        scale: _zoom,
+                        child: HtmlElementView(
+                          key: ValueKey(_viewType),
+                          viewType: _viewType,
+                        ),
+                      )
+                    : const Center(child: CircularProgressIndicator()),
+
+                BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
+                  child: Container(color: Colors.white.withOpacity(0.08)),
+                ),
+
+                AnimatedBuilder(
+                  animation: _flashController,
+                  builder: (_, __) => Container(
+                    color: Colors.white.withOpacity(
+                      0.85 * _flashController.value,
                     ),
                   ),
                 ),
+              ],
+            ),
+          ),
+        ),
+
+        // Upload
+        Positioned(
+          bottom: 14,
+          left: 1,
+          child: GestureDetector(
+            onTap: canUpload ? () => pickImagesFromDevice(context) : null,
+            child: GlassCircleButton(
+              size: 50,
+              child: Icon(
+                Icons.upload_rounded,
+                color: canUpload ? Colors.white : Colors.grey,
               ),
             ),
+          ),
+        ),
 
-            Positioned(
-              bottom: 14,
-              right: 1,
-              child: GlassZoomControl(
-                zoom: _zoom,
-                minZoom: _minZoom,
-                maxZoom: _maxZoom,
-                onChanged: (v) => setState(() => _zoom = v),
+        // Zoom
+        Positioned(
+          bottom: 14,
+          right: 1,
+          child: GlassZoomControl(
+            zoom: _zoom,
+            minZoom: _minZoom,
+            maxZoom: _maxZoom,
+            onChanged: (v) => setState(() => _zoom = v),
+          ),
+        ),
+
+        // Capture
+        Positioned(
+          bottom: -10,
+          left: 0,
+          right: 0,
+          child: Center(
+            child: GestureDetector(
+              onTap: (!_isCapturing && canUpload) ? _takePhoto : null,
+              child: GlassCircleButton(
+                size: 60,
+                showProgress: _isCapturing,
+                child: _isCapturing
+                    ? null
+                    : Icon(
+                        Icons.camera_alt_rounded,
+                        color: canUpload ? Colors.white : Colors.grey,
+                        size: 36,
+                      ),
               ),
             ),
-
-            Positioned(
-              bottom: -10,
-              left: 0,
-              right: 0,
-              child: Center(
-                child: GestureDetector(
-                  onTap: (!_isCapturing && canUpload) ? _takePhoto : null,
-
-                  child: GlassCircleButton(
-                    size: 60,
-                    showProgress: _isCapturing,
-                    child: _isCapturing
-                        ? null // showProgress sẽ hiển thị loading
-                        : Icon(
-                            Icons.camera_alt_rounded,
-                            color: canUpload ? Colors.white : Colors.grey,
-                            size: 36,
-                          ),
-                  ),
-                ),
-              ),
-            ),
-          ],
+          ),
         ),
       ],
     );

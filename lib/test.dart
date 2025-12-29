@@ -1093,17 +1093,12 @@ class _CameraScreenState extends State<CameraScreen> {
                           ),
                         );
                       },
-                      backgroundColor: hasImages
-                          ? const Color(0xFF22C55E)
-                          : null,
+                      backgroundColor: const Color(0xFF22C55E).withOpacity(.4),
                       iconColor: hasImages ? Colors.black : Colors.white,
                     ),
                   ],
                 ),
               ),
-
-              // const SizedBox(height: 200),
-              // ✅ Thêm khoảng trắng lớn để đẩy nội dung lên khi bàn phím hiện
             ],
           ),
         ),

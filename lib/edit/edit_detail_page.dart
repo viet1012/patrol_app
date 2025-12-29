@@ -9,7 +9,7 @@ import 'package:http/http.dart' hide MultipartFile;
 
 import '../api/api_config.dart';
 import '../api/dio_client.dart';
-import '../camera_preview_box.dart';
+import '../api/replace_image_api.dart';
 import 'edit_image_item.dart';
 import '../homeScreen/patrol_home_screen.dart';
 import '../model/patrol_report_model.dart';
@@ -194,15 +194,27 @@ class _EditDetailPageState extends State<EditDetailPage> {
   }
 
   Widget _buildImageGrid(List<String> images) {
-    final h = MediaQuery.of(context).size.height;
+    const int maxImages = 2;
+    final bool canAdd = images.length < maxImages;
 
     return SizedBox(
-      height: 320, // 👈 đủ cho image + camera
+      height: 320,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        itemCount: images.length,
+        itemCount: images.length + (canAdd ? 1 : 0), // 🔥 CHỈ +1 KHI ĐƯỢC ADD
         separatorBuilder: (_, __) => const SizedBox(width: 12),
         itemBuilder: (context, index) {
+          // ===== Ô ADD IMAGE =====
+          if (canAdd && index == images.length) {
+            return SizedBox(
+              width: 280,
+              child: _AddImageTile(
+                onTap: () => _openAddCameraFromParent(context),
+              ),
+            );
+          }
+
+          // ===== ẢNH CŨ =====
           return SizedBox(
             width: 280,
             child: EditImageItem(
@@ -210,15 +222,11 @@ class _EditDetailPageState extends State<EditDetailPage> {
               report: widget.report,
               patrolGroup: widget.patrolGroup,
               plant: widget.report.plant,
-
-              /// ➕ ADD
               onAdd: (newImage) {
                 setState(() {
                   widget.report.imageNames.add(newImage);
                 });
               },
-
-              /// 🗑 DELETE
               onDelete: () {
                 setState(() {
                   widget.report.imageNames.removeAt(index);
@@ -231,59 +239,84 @@ class _EditDetailPageState extends State<EditDetailPage> {
     );
   }
 
-  Widget _buildThumbPreview() {
-    if (_cameraKey.currentState == null ||
-        _cameraKey.currentState!.images.isEmpty) {
-      return const SizedBox();
-    }
+  void _openAddCameraFromParent(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.black,
+      builder: (_) {
+        List<Uint8List> captured = [];
 
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: _cameraKey.currentState!.images.asMap().entries.map((entry) {
-          final idx = entry.key;
-          final img = entry.value;
-
-          return Padding(
-            padding: const EdgeInsets.only(right: 6),
-            child: Stack(
+        return StatefulBuilder(
+          builder: (context, setModal) {
+            return Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: Image.memory(
-                    img,
-                    width: 56,
-                    height: 56,
-                    fit: BoxFit.cover,
-                  ),
+                CameraEditBox(
+                  size: 300,
+                  plant: widget.report.plant,
+                  type: "ADD",
+                  maxAllowImages: 2 - widget.report.imageNames.length,
+                  onImagesChanged: (imgs) {
+                    setModal(() => captured = imgs);
+                  },
                 ),
 
-                /// ❌ REMOVE
-                Positioned(
-                  top: -4,
-                  right: -4,
-                  child: GestureDetector(
-                    onTap: () {
-                      _cameraKey.currentState?.removeImage(idx);
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.all(2),
-                      decoration: const BoxDecoration(
-                        color: Colors.red,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.close,
-                        size: 14,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
+                GlassActionButton(
+                  backgroundColor: captured.isNotEmpty
+                      ? const Color(0xFF22C55E)
+                      : null,
+                  iconColor: captured.isNotEmpty ? Colors.black : Colors.white,
+                  icon: Icons.send_rounded,
+                  enabled: captured.isNotEmpty,
+                  onTap: () async {
+                    Navigator.pop(context);
+
+                    for (final img in captured) {
+                      final name = await addImageApi(
+                        id: widget.report.id!,
+                        imageBytes: img,
+                      );
+
+                      setState(() {
+                        widget.report.imageNames.add(name);
+                      });
+                    }
+                  },
                 ),
               ],
-            ),
-          );
-        }).toList(),
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+class _AddImageTile extends StatelessWidget {
+  final VoidCallback onTap;
+  const _AddImageTile({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.white24, width: 1.2),
+          color: Colors.white.withOpacity(0.05),
+        ),
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: const [
+              Icon(Icons.add_a_photo, color: Colors.white70, size: 36),
+              SizedBox(height: 8),
+              Text("Add Image", style: TextStyle(color: Colors.white70)),
+            ],
+          ),
+        ),
       ),
     );
   }
