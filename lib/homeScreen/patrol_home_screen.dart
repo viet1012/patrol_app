@@ -10,6 +10,7 @@ import '../after/after_detail_screen.dart';
 import '../animate/call_to_action_arrow.dart';
 import '../animate/christmas_title.dart';
 import '../animate/glow_title.dart';
+import '../api/dio_client.dart';
 import '../api/hse_master_service.dart';
 import '../login/login_page.dart';
 import '../model/hse_patrol_team_model.dart';
@@ -50,9 +51,16 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
   // bool showWeeklyOptions = false;
   PatrolGroup? expandedGroup;
 
+  String _employeeName = '';
+  Future<void> _initEmployee() async {
+    await fetchEmployeeName(widget.accountCode);
+    debugPrint("EMPLOYEE NAME = $_employeeName");
+  }
+
   @override
   void initState() {
     super.initState();
+    _initEmployee();
     _loadHseMaster();
     _loadTeams();
   }
@@ -129,6 +137,38 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
     color: Colors.white,
     letterSpacing: 2,
   );
+
+  Future<void> fetchEmployeeName(String code) async {
+    if (code.trim().isEmpty) {
+      setState(() {
+        _employeeName = '';
+      });
+      return;
+    }
+
+    try {
+      final dio = DioClient.dio;
+      final response = await dio.get(
+        '/api/hr/name',
+        queryParameters: {'code': code.trim()},
+      );
+
+      if (response.statusCode == 200) {
+        setState(() {
+          _employeeName = response.data.toString();
+        });
+      } else {
+        setState(() {
+          _employeeName = '';
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching employee name: $e');
+      setState(() {
+        _employeeName = '';
+      });
+    } finally {}
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -208,17 +248,19 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
                           Text(
                             "Welcome:",
                             style: const TextStyle(
-                              fontSize: 20,
+                              fontSize: 16,
                               color: Colors.white70,
                               fontStyle: FontStyle.italic,
                             ),
                           ),
                           SizedBox(width: 8),
                           Text(
-                            widget.accountCode,
+                            (_employeeName != null && _employeeName.isNotEmpty)
+                                ? _employeeName
+                                : (widget.accountCode ?? ''),
                             style: const TextStyle(
-                              fontSize: 22,
-                              color: Colors.pinkAccent,
+                              fontSize: 18,
+                              color: Colors.lightBlueAccent,
                             ),
                           ),
                         ],

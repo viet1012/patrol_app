@@ -48,6 +48,18 @@ class _AfterDetailPageState extends State<AfterDetailPage> {
     super.dispose();
   }
 
+  Future<void> _initEmployee() async {
+    await fetchEmployeeName(widget.accountCode);
+    debugPrint("EMPLOYEE NAME = $_employeeName");
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _msnvCtrl.text = widget.accountCode;
+    _initEmployee();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -89,7 +101,8 @@ class _AfterDetailPageState extends State<AfterDetailPage> {
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(8),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            // crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               // ===== 2 cột thông tin =====
               Row(
@@ -296,93 +309,92 @@ class _AfterDetailPageState extends State<AfterDetailPage> {
         padding: const EdgeInsets.all(8),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const SizedBox(height: 12),
-
             /// ===== MSNV =====
-            Row(
-              children: [
-                Expanded(
-                  flex: 3,
-                  child: TextField(
-                    controller: _msnvCtrl,
-                    decoration: InputDecoration(
-                      labelText: 'Code',
-                      labelStyle: const TextStyle(color: Colors.white70),
-                      enabledBorder: OutlineInputBorder(
-                        borderSide: BorderSide(color: Colors.white54),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderSide: BorderSide(
-                          color: Colors.blueAccent.shade200,
-                        ),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      filled: true,
-                      fillColor: Colors.white.withOpacity(0.12),
-                    ),
-                    style: const TextStyle(color: Colors.white),
-                    onChanged: (v) {
-                      final value = v.trim();
-
-                      // Hủy timer cũ nếu còn
-                      if (_debounce?.isActive ?? false) {
-                        _debounce!.cancel();
-                      }
-
-                      // Chỉ xử lý khi đủ 4 ký tự
-                      if (value.length < 4) return;
-
-                      _debounce = Timer(const Duration(milliseconds: 400), () {
-                        fetchEmployeeName(value);
-                      });
-                    },
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  flex: 4,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 16,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.white38),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.25),
-                          blurRadius: 4,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: _isLoadingName
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
-                        : Text(
-                            _employeeName ?? 'Name',
-                            style: const TextStyle(
-                              color: Colors.white70,
-                              fontSize: 14,
-                              fontStyle: FontStyle.italic,
-                            ),
-                          ),
-                  ),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 12),
+            // Row(
+            //   children: [
+            //     Expanded(
+            //       flex: 3,
+            //       child: TextField(
+            //         controller: _msnvCtrl,
+            //         decoration: InputDecoration(
+            //           labelText: 'Code',
+            //           labelStyle: const TextStyle(color: Colors.white70),
+            //           enabledBorder: OutlineInputBorder(
+            //             borderSide: BorderSide(color: Colors.white54),
+            //             borderRadius: BorderRadius.circular(8),
+            //           ),
+            //           focusedBorder: OutlineInputBorder(
+            //             borderSide: BorderSide(
+            //               color: Colors.blueAccent.shade200,
+            //             ),
+            //             borderRadius: BorderRadius.circular(8),
+            //           ),
+            //           filled: true,
+            //           fillColor: Colors.white.withOpacity(0.12),
+            //         ),
+            //         style: const TextStyle(color: Colors.white),
+            //         onChanged: (v) {
+            //           final value = v.trim();
+            //
+            //           // Hủy timer cũ nếu còn
+            //           if (_debounce?.isActive ?? false) {
+            //             _debounce!.cancel();
+            //           }
+            //
+            //           // Chỉ xử lý khi đủ 4 ký tự
+            //           if (value.length < 4) return;
+            //
+            //           _debounce = Timer(const Duration(milliseconds: 400), () {
+            //             fetchEmployeeName(value);
+            //           });
+            //         },
+            //       ),
+            //     ),
+            //     const SizedBox(width: 12),
+            //     Expanded(
+            //       flex: 4,
+            //       child: Container(
+            //         padding: const EdgeInsets.symmetric(
+            //           horizontal: 12,
+            //           vertical: 16,
+            //         ),
+            //         decoration: BoxDecoration(
+            //           color: Colors.white.withOpacity(0.15),
+            //           borderRadius: BorderRadius.circular(8),
+            //           border: Border.all(color: Colors.white38),
+            //           boxShadow: [
+            //             BoxShadow(
+            //               color: Colors.black.withOpacity(0.25),
+            //               blurRadius: 4,
+            //               offset: const Offset(0, 2),
+            //             ),
+            //           ],
+            //         ),
+            //         child: _isLoadingName
+            //             ? const SizedBox(
+            //                 width: 16,
+            //                 height: 16,
+            //                 child: CircularProgressIndicator(
+            //                   strokeWidth: 2,
+            //                   color: Colors.white,
+            //                 ),
+            //               )
+            //             : Text(
+            //                 _employeeName ?? 'Name',
+            //                 style: const TextStyle(
+            //                   color: Colors.white70,
+            //                   fontSize: 14,
+            //                   fontStyle: FontStyle.italic,
+            //                 ),
+            //               ),
+            //       ),
+            //     ),
+            //   ],
+            // ),
+            //
+            // const SizedBox(height: 12),
 
             /// ===== THUMBNAIL PREVIEW =====
             _buildThumbPreview(),
@@ -567,11 +579,7 @@ class _AfterDetailPageState extends State<AfterDetailPage> {
   }) async {
     final dio = DioClient.dio;
 
-    final dataJson = {
-      "userAfter": userAfter,
-      "atComment": comment,
-      "atPic": atPic,
-    };
+    final dataJson = {"atComment": comment, "atPic": atPic};
 
     final formData = FormData();
 
