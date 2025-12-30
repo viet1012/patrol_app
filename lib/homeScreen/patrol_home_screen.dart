@@ -546,6 +546,17 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
   }
 
   void _onExpandGroup(PatrolGroup group) {
+    // Nếu đang mở → click lại thì đóng
+    if (expandedGroup == group) {
+      setState(() {
+        expandedGroup = null;
+        _autoTeam = null;
+        _needManualSelect = true;
+      });
+      return;
+    }
+
+    // Nếu click group khác → mở group mới
     final team = HseMasterService.findTeamByEmp(
       widget.accountCode,
       group,
