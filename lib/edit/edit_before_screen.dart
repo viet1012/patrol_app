@@ -85,15 +85,15 @@ class _EditBeforeScreenState extends State<EditBeforeScreen> {
   }
 
   void _loadReport() async {
-    if (widget.selectedGrp == null || widget.selectedGrp!.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('⚠️ Please select Group'),
-          backgroundColor: Colors.orange,
-        ),
-      );
-      return;
-    }
+    // if (widget.selectedGrp == null || widget.selectedGrp!.isEmpty) {
+    //   ScaffoldMessenger.of(context).showSnackBar(
+    //     const SnackBar(
+    //       content: Text('⚠️ Please select Group'),
+    //       backgroundColor: Colors.orange,
+    //     ),
+    //   );
+    //   return;
+    // }
     setState(() {
       _futureReport = null; // reset trước (optional)
     });
@@ -106,8 +106,10 @@ class _EditBeforeScreenState extends State<EditBeforeScreen> {
         machine: '',
         type: widget.patrolGroup.name,
         afStatus: '',
-        grp: widget.selectedGrp!,
+        grp: '',
+        // grp: widget.selectedGrp!,
         pic: '',
+        patrolUser: widget.accountCode,
       );
 
       setState(() {

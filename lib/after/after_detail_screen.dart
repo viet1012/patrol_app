@@ -89,14 +89,10 @@ class _AfterDetailScreenState extends State<AfterDetailScreen> {
     try {
       final future = PatrolReportApi.fetchReports(
         plant: widget.selectedPlant!,
-        division: '',
-        area: '',
-        machine: '',
         type: widget.patrolGroup.name,
-        afStatus: '',
-        grp: '',
-        pic: selectedPIC!,
+        pic: selectedPIC!.trim(),
       );
+      debugPrint('?? SELECTED PIC = "$selectedPIC"');
 
       setState(() {
         _futureReport = future;
@@ -609,10 +605,10 @@ class _AfterDetailScreenState extends State<AfterDetailScreen> {
                   .where((e) => e.toLowerCase().contains(filter.toLowerCase()))
                   .toList();
 
-              // Nếu filter không rỗng và chưa có trong items thì thêm vào đầu danh sách
-              if (filter.isNotEmpty && !items.contains(filter.trim())) {
-                result.insert(0, filter.trim());
-              }
+              // // Nếu filter không rỗng và chưa có trong items thì thêm vào đầu danh sách
+              // if (filter.isNotEmpty && !items.contains(filter.trim())) {
+              //   result.insert(0, filter.trim());
+              // }
               return result;
             },
             compareFn: (item, selectedItem) =>

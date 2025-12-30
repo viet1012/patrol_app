@@ -281,7 +281,7 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
               : Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 24,
-                    vertical: 20,
+                    vertical: 16,
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -308,6 +308,7 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
                           ),
                         ],
                       ),
+                      SizedBox(height: 8),
                       ClipRRect(
                         borderRadius: BorderRadius.circular(16),
                         child: BackdropFilter(
@@ -422,7 +423,7 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
                         ),
                       ),
 
-                      const SizedBox(height: 30),
+                      const SizedBox(height: 18),
 
                       Expanded(
                         child: selectedFactory == null

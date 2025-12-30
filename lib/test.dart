@@ -10,6 +10,7 @@ import 'package:dropdown_search/dropdown_search.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'api/api_config.dart';
+import 'common/common_ui_helper.dart';
 import 'edit/edit_before_screen.dart';
 import 'homeScreen/patrol_home_screen.dart';
 import 'model/hse_patrol_team_model.dart';
@@ -186,53 +187,43 @@ class _CameraScreenState extends State<CameraScreen> {
         .toList();
   }
 
-  void _showSnackBar(
-    String message,
-    Color color, {
-    Duration duration = const Duration(seconds: 10),
-  }) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).removeCurrentSnackBar();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: color,
-        duration: duration,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-    );
-  }
-
   String normalizeGroup(String? group) {
     return group == null ? '' : group.replaceAll(' ', '').trim();
   }
 
   Future<void> _sendReport() async {
     final images = _cameraKey.currentState?.images ?? [];
-    if (images.isEmpty) {
-      _showSnackBar('Please take at least one photo.', Colors.orange);
-      return;
-    }
+
+    // ================= VALIDATE =================
 
     if (_selectedMachine == null) {
-      _showSnackBar('Please select all required information.', Colors.orange);
+      CommonUI.showWarning(
+        context: context,
+        title: "Information Required",
+        message: "Please select all required information.",
+      );
       return;
     }
 
     if (_comment.trim().isEmpty) {
-      _showSnackBar('Please enter a comment.', Colors.orange);
+      CommonUI.showWarning(
+        context: context,
+        title: "Comment Required",
+        message: "Please enter a comment.",
+      );
       return;
     }
 
-    _showSnackBar(
-      'Đang gửi ${images.length} ảnh...',
-      Colors.blue,
+    // ================= LOADING =================
+    CommonUI.showSnackBar(
+      context: context,
+      message: 'Đang gửi ${images.length} ảnh...',
+      color: Colors.blue,
       duration: const Duration(seconds: 60),
     );
 
     try {
-      // Tạo danh sách MultipartFile
+      // ================= IMAGE =================
       final imageFiles = <MultipartFile>[];
       for (int i = 0; i < images.length; i++) {
         imageFiles.add(
@@ -243,6 +234,8 @@ class _CameraScreenState extends State<CameraScreen> {
           ),
         );
       }
+
+      // ================= REPORT =================
       final reportMap = {
         'userCreate': widget.accountCode,
         'plant': _selectedPlant ?? '',
@@ -276,7 +269,6 @@ class _CameraScreenState extends State<CameraScreen> {
               )
               .labelKey,
         ),
-
         'riskSev': ''.combinedViJa(
           context,
           severityOptions
@@ -286,18 +278,8 @@ class _CameraScreenState extends State<CameraScreen> {
               )
               .labelKey,
         ),
-
         'riskTotal': getScoreSymbol(),
       };
-
-      // In ra dữ liệu report JSON
-      print('Report JSON: ${jsonEncode(reportMap)}');
-      print('Số ảnh gửi lên server: ${imageFiles.length}');
-      for (int i = 0; i < imageFiles.length; i++) {
-        print(
-          'Ảnh ${i + 1}: filename=${imageFiles[i].filename}, kích thước=${imageFiles[i].length} bytes',
-        );
-      }
 
       final formData = FormData.fromMap({
         'report': jsonEncode(reportMap),
@@ -308,19 +290,24 @@ class _CameraScreenState extends State<CameraScreen> {
 
       final response = await dio.post(
         "${ApiConfig.baseUrl}/api/report",
-        // "https://doctrinally-preambitious-evia.ngrok-free.dev/api/report",
         data: formData,
         options: Options(sendTimeout: const Duration(seconds: 120)),
       );
 
+      // ================= RESULT =================
       if (response.statusCode! >= 200 && response.statusCode! < 300) {
-        _showSnackBar(
-          'Successfully sent ${images.length} images!',
-          Colors.green,
+        CommonUI.showSnackBar(
+          context: context,
+          message: 'Successfully sent ${images.length} images!',
+          color: Colors.green,
         );
         _resetForm();
       } else {
-        _showSnackBar('Server error: ${response.statusCode}', Colors.red);
+        CommonUI.showSnackBar(
+          context: context,
+          message: 'Server error: ${response.statusCode}',
+          color: Colors.red,
+        );
       }
     } on DioException catch (e) {
       String msg = 'Error: ';
@@ -329,9 +316,14 @@ class _CameraScreenState extends State<CameraScreen> {
       } else {
         msg += e.message ?? 'Unknown';
       }
-      _showSnackBar(msg, Colors.red);
+
+      CommonUI.showSnackBar(context: context, message: msg, color: Colors.red);
     } catch (e) {
-      _showSnackBar('Error: $e', Colors.red);
+      CommonUI.showSnackBar(
+        context: context,
+        message: 'Error: $e',
+        color: Colors.red,
+      );
     }
   }
 
@@ -804,16 +796,33 @@ class _CameraScreenState extends State<CameraScreen> {
                                     color: Colors.white,
                                     fontSize: _fontSize,
                                   ),
-                                  decoration: InputDecoration(
-                                    hintText: "commentHint".tr(context),
-                                    filled: true,
-                                    alignLabelWithHint: true,
 
-                                    fillColor: Colors.green.withOpacity(0.08),
-                                    hintStyle: TextStyle(
-                                      color: Colors.red.withOpacity(.6),
-                                      fontSize: 14,
+                                  decoration: InputDecoration(
+                                    // hintText: '${"commentHint".tr(context)}*',
+                                    filled: true,
+                                    hint: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text(
+                                          "commentHint".tr(context),
+                                          style: TextStyle(
+                                            color: Colors.red.withOpacity(.6),
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Icon(
+                                          Icons.star_rounded,
+                                          size: 14,
+                                          color: Colors.red.withOpacity(.6),
+                                        ),
+                                      ],
                                     ),
+                                    fillColor: Colors.green.withOpacity(0.08),
+
                                     border: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(14),
                                       borderSide: BorderSide(
@@ -836,9 +845,9 @@ class _CameraScreenState extends State<CameraScreen> {
                                         ).withOpacity(.45), // cyan
                                       ),
                                     ),
-
                                     contentPadding: const EdgeInsets.all(12),
                                   ),
+
                                   onChanged: (v) {
                                     _comment = v;
                                     _autoFont(v);
@@ -971,6 +980,7 @@ class _CameraScreenState extends State<CameraScreen> {
                                     hintStyle: TextStyle(
                                       color: Colors.white.withOpacity(.6),
                                       fontSize: 14,
+                                      fontWeight: FontWeight.bold,
                                     ),
                                     border: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(14),
@@ -1086,31 +1096,26 @@ class _CameraScreenState extends State<CameraScreen> {
                     Expanded(
                       child: Text(
                         "needRecheck".tr(context),
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.orange.shade900,
-                        ),
+                        style: TextStyle(fontSize: 14, color: Colors.white70),
                       ),
                     ),
                     GlassActionButton(
                       icon: Icons.edit_calendar_sharp,
                       enabled: true,
                       onTap: () {
-                        if (_selectedGroup == null || _selectedGroup!.isEmpty) {
-                          _showSelectGroupWarning(context);
-                          return;
-                        }
+                        // if (_selectedGroup == null || _selectedGroup!.isEmpty) {
+                        //   _showSelectGroupWarning(context);
+                        //   return;
+                        // }
                         Navigator.push(
                           context,
                           MaterialPageRoute(
                             builder: (_) => EditBeforeScreen(
                               accountCode: widget.accountCode,
-
                               machines: widget.machines,
                               selectedFac: _selectedFac,
                               selectedPlant: _selectedPlant,
-                              selectedGrp: _selectedGroup,
+                              selectedGrp: widget.autoTeam?.grp ?? '',
                               titleScreen: widget.titleScreen,
                               patrolGroup: widget.patrolGroup,
                             ),
@@ -1330,7 +1335,7 @@ class _CameraScreenState extends State<CameraScreen> {
               FontWeight fontWeight;
 
               if (isEmpty && isRequired) {
-                textColor = Colors.red.withOpacity(.8);
+                textColor = Colors.red.withOpacity(.6);
                 fontWeight = FontWeight.w600;
               } else if (!isEmpty) {
                 textColor = Colors.white;
@@ -1363,13 +1368,10 @@ class _CameraScreenState extends State<CameraScreen> {
                   /// ⭐ REQUIRED ICON
                   if (isRequired && isEmpty) ...[
                     const SizedBox(width: 6),
-                    Tooltip(
-                      message: "Required field",
-                      child: Icon(
-                        Icons.star_rounded, // ⭐ hoặc Icons.error_outline
-                        size: 14,
-                        color: Colors.red.withOpacity(.7),
-                      ),
+                    Icon(
+                      Icons.star_rounded, // ⭐
+                      size: 14,
+                      color: Colors.red.withOpacity(.6),
                     ),
                   ],
                 ],
@@ -1489,10 +1491,18 @@ class _CameraScreenState extends State<CameraScreen> {
     );
   }
 
-  void _showSelectGroupWarning(BuildContext context) {
+  void showGlassDialog({
+    required BuildContext context,
+    IconData icon = Icons.info_outline,
+    Color iconColor = Colors.blueAccent,
+    String title = '',
+    String message = '',
+    String buttonText = 'OK',
+    VoidCallback? onPressed,
+  }) {
     showDialog(
       context: context,
-      barrierColor: Colors.black54, // nền tối phía sau
+      barrierColor: Colors.black54,
       builder: (_) => Dialog(
         backgroundColor: Colors.transparent,
         insetPadding: const EdgeInsets.symmetric(horizontal: 24),
@@ -1501,53 +1511,53 @@ class _CameraScreenState extends State<CameraScreen> {
           child: BackdropFilter(
             filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
             child: Container(
+              padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(20),
                 color: Colors.black.withOpacity(0.55),
+                borderRadius: BorderRadius.circular(20),
                 border: Border.all(color: Colors.white.withOpacity(0.15)),
               ),
-              padding: const EdgeInsets.all(24),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // ⚠️ ICON
+                  /// ICON
                   Container(
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: Colors.orange.withOpacity(0.15),
+                      color: iconColor.withOpacity(0.15),
                     ),
-                    child: const Icon(
-                      Icons.warning_amber_rounded,
-                      color: Colors.orange,
-                      size: 42,
-                    ),
+                    child: Icon(icon, color: iconColor, size: 42),
                   ),
 
                   const SizedBox(height: 16),
 
-                  // TITLE
-                  const Text(
-                    "Group Required",
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
+                  /// TITLE
+                  if (title.isNotEmpty)
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
                     ),
-                  ),
 
-                  const SizedBox(height: 8),
-
-                  // MESSAGE
-                  const Text(
-                    "Please select a group before continuing.",
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 14, color: Colors.white70),
-                  ),
+                  if (message.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      message,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Colors.white70,
+                      ),
+                    ),
+                  ],
 
                   const SizedBox(height: 22),
 
-                  // OK BUTTON
+                  /// BUTTON
                   SizedBox(
                     width: 150,
                     child: ElevatedButton(
@@ -1560,10 +1570,13 @@ class _CameraScreenState extends State<CameraScreen> {
                           borderRadius: BorderRadius.circular(14),
                         ),
                       ),
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text(
-                        "OK",
-                        style: TextStyle(fontWeight: FontWeight.w600),
+                      onPressed: () {
+                        Navigator.pop(context);
+                        onPressed?.call();
+                      },
+                      child: Text(
+                        buttonText,
+                        style: const TextStyle(fontWeight: FontWeight.w600),
                       ),
                     ),
                   ),
