@@ -232,7 +232,7 @@ class _LoginPageState extends State<LoginPage> {
                       child: const Text(
                         "Change password",
                         style: TextStyle(
-                          color: Color(0xFFFB7185),
+                          color: Colors.white70,
                           fontWeight: FontWeight.w500,
                         ),
                       ),
