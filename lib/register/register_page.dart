@@ -78,8 +78,8 @@ class _RegisterBottomSheetState extends State<RegisterBottomSheet> {
             // icon
             Image.asset(
               'assets/flags/favicon.png',
-              width: 80,
-              height: 80,
+              width: 120,
+              height: 120,
               filterQuality: FilterQuality.high,
               fit: BoxFit.contain,
             ),
@@ -105,7 +105,7 @@ class _RegisterBottomSheetState extends State<RegisterBottomSheet> {
 
             _input(
               controller: _codeCtrl,
-              label: "Code",
+              label: "Employee ID",
               icon: Icons.badge_outlined,
               isNumber: true,
             ),

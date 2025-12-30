@@ -29,6 +29,7 @@ class CameraScreen extends StatefulWidget {
   final PatrolGroup patrolGroup;
   final String titleScreen;
   final String accountCode;
+  final HsePatrolTeamModel? autoTeam;
 
   const CameraScreen({
     super.key,
@@ -39,6 +40,7 @@ class CameraScreen extends StatefulWidget {
     required this.lang,
     required this.patrolGroup,
     required this.accountCode,
+    this.autoTeam,
   });
 
   @override
@@ -366,8 +368,20 @@ class _CameraScreenState extends State<CameraScreen> {
 
   @override
   void initState() {
-    _selectedPlant = widget.selectedPlant;
+    // _selectedPlant = widget.selectedPlant;
     super.initState();
+
+    final team = widget.autoTeam;
+
+    // auto select Plant - Fac - Group
+    if (team != null) {
+      _selectedPlant = team.plant;
+      _selectedFac = team.fac;
+      _selectedGroup = team.grp;
+    } else {
+      _selectedPlant = widget.selectedPlant;
+    }
+
     _loadInitialDataComment();
     _loadInitialDataCounter();
   }
@@ -535,11 +549,13 @@ class _CameraScreenState extends State<CameraScreen> {
                       label: "group".tr(context),
                       selectedValue: _selectedGroup,
                       items: groupList,
-                      onChanged: (v) {
-                        setState(() {
-                          _selectedGroup = v;
-                        });
-                      },
+                      onChanged: widget.autoTeam != null
+                          ? null // 🔒 khóa
+                          : (v) {
+                              setState(() {
+                                _selectedGroup = v;
+                              });
+                            },
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -1143,7 +1159,7 @@ class _CameraScreenState extends State<CameraScreen> {
     required String label,
     required String? selectedValue,
     required List<String> items,
-    required Function(String?) onChanged,
+    required Function(String?)? onChanged,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

@@ -1,5 +1,6 @@
 class HsePatrolTeamModel {
   final int no;
+  final String? fac;
   final String? plant;
   final String? grp;
   final String? pic1;
@@ -13,6 +14,7 @@ class HsePatrolTeamModel {
   final String? pic9;
   final String? pic10;
   final String? note;
+  final String? type;
 
   HsePatrolTeamModel({
     required this.no,
@@ -29,11 +31,14 @@ class HsePatrolTeamModel {
     this.pic9,
     this.pic10,
     this.note,
+    this.fac,
+    this.type,
   });
 
   factory HsePatrolTeamModel.fromJson(Map<String, dynamic> json) {
     return HsePatrolTeamModel(
       no: json['no'],
+      fac: json['fac'],
       plant: json['plant'],
       grp: json['grp'],
       pic1: json['pic1'],
@@ -47,6 +52,7 @@ class HsePatrolTeamModel {
       pic9: json['pic9'],
       pic10: json['pic10'],
       note: json['note'],
+      type: json['type'],
     );
   }
 }

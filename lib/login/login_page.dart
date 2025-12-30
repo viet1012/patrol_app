@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../animate/glow_title.dart';
 import '../api/auth_api.dart';
 import '../homeScreen/patrol_home_screen.dart';
 import '../register/register_page.dart';
@@ -99,11 +100,13 @@ class _LoginPageState extends State<LoginPage> {
               children: [
                 Image.asset(
                   'assets/flags/favicon.png',
-                  width: 80,
-                  height: 80,
+                  width: 120,
+                  height: 120,
                   filterQuality: FilterQuality.high,
                   fit: BoxFit.contain,
                 ),
+                EmbossGlowTitle(text: 'V1.1', fontSize: 13),
+
                 const SizedBox(height: 16),
 
                 const Text(
@@ -126,7 +129,7 @@ class _LoginPageState extends State<LoginPage> {
 
                 _input(
                   controller: _codeCtrl,
-                  label: "Code",
+                  label: "Employee ID",
                   icon: Icons.badge_outlined,
                   isNumber: true,
                 ),

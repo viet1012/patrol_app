@@ -57,6 +57,9 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
     debugPrint("EMPLOYEE NAME = $_employeeName");
   }
 
+  HsePatrolTeamModel? _autoTeam;
+  bool _needManualSelect = true;
+
   @override
   void initState() {
     super.initState();
@@ -66,23 +69,36 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
   }
 
   Future<void> _loadTeams() async {
-    setState(() {
-      isLoading = true;
-      errorMessage = null;
-    });
-
     try {
       final data = await HseMasterService.fetchAll();
+
+      HsePatrolTeamModel? found;
+      PatrolGroup? foundGroup;
+
+      for (final g in PatrolGroup.values) {
+        final t = HseMasterService.findTeamByEmp(widget.accountCode, g, data);
+        if (t != null) {
+          found = t;
+          foundGroup = g;
+          break;
+        }
+      }
+
       setState(() {
         teams = data;
-        isLoading = false;
+        _autoTeam = found;
+        expandedGroup = foundGroup;
+        _needManualSelect = found == null;
+
+        if (found != null) {
+          selectedFactory = found.plant;
+        }
       });
+      print(
+        "Plant: ${found?.plant} - Fac: ${found?.fac} - Group: ${found?.grp} ",
+      );
     } catch (e) {
-      debugPrint('❌ Load patrol teams error: $e');
-      setState(() {
-        errorMessage = e.toString();
-        isLoading = false;
-      });
+      errorMessage = e.toString();
     }
   }
 
@@ -198,7 +214,6 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
                     SizedBox(width: 8),
                     EmbossGlowTitle(text: 'S-PATROL'),
                     SizedBox(width: 8),
-                    EmbossGlowTitle(text: 'V1.1', fontSize: 14),
                   ],
                 ),
               ),
@@ -255,7 +270,7 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
                           ),
                           SizedBox(width: 8),
                           Text(
-                            (_employeeName != null && _employeeName.isNotEmpty)
+                            (_employeeName.isNotEmpty)
                                 ? _employeeName
                                 : (widget.accountCode ?? ''),
                             style: const TextStyle(
@@ -365,6 +380,10 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
                                     onChanged: (val) {
                                       setState(() {
                                         selectedFactory = val;
+
+                                        // 👇 nếu user đổi plant thì coi như chọn tay
+                                        _autoTeam = null;
+                                        _needManualSelect = true;
                                       });
                                     },
                                   ),
@@ -498,6 +517,24 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
     }
   }
 
+  void _onExpandGroup(PatrolGroup group) {
+    final team = HseMasterService.findTeamByEmp(
+      widget.accountCode,
+      group,
+      teams,
+    );
+
+    setState(() {
+      expandedGroup = group;
+      _autoTeam = team;
+      _needManualSelect = team == null;
+
+      if (team != null) {
+        selectedFactory = team.plant;
+      }
+    });
+  }
+
   Widget _patrolGroupCard({
     required PatrolGroup group,
     required String title,
@@ -526,11 +563,10 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
               InkWell(
                 onTap: enabled
                     ? () {
-                        setState(() {
-                          expandedGroup = isExpanded ? null : group;
-                        });
+                        _onExpandGroup(group);
                       }
                     : null,
+
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
                     vertical: 20,
@@ -617,6 +653,7 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
                       patrolGroup: group,
                       titleScreen: titleScreen,
                       accountCode: widget.accountCode,
+                      autoTeam: _autoTeam,
                     ),
                   ),
                 );
