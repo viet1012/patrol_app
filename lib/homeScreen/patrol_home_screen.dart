@@ -64,8 +64,12 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
   void initState() {
     super.initState();
     _initEmployee();
-    _loadHseMaster();
-    _loadTeams();
+    _initData();
+  }
+
+  Future<void> _initData() async {
+    await _loadHseMaster(); // load machines trước
+    await _loadTeams(); // sau đó mới auto set plant
   }
 
   Future<void> _loadTeams() async {
@@ -115,7 +119,9 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
 
       setState(() {
         machines = data;
-        selectedFactory = null;
+        if (_autoTeam == null) {
+          selectedFactory = null;
+        }
         isLoading = false;
       });
     } catch (e) {
@@ -125,6 +131,19 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
         isLoading = false;
       });
     }
+  }
+
+  List<String> getAllFactories({
+    required List<MachineModel> machines,
+    required List<HsePatrolTeamModel> teams,
+  }) {
+    final machinePlants = machines
+        .map((e) => e.plant?.trim())
+        .whereType<String>();
+
+    final teamPlants = teams.map((e) => e.plant?.trim()).whereType<String>();
+
+    return {...machinePlants, ...teamPlants}.toList();
   }
 
   // Common decoration for glass containers
@@ -188,9 +207,18 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final List<String> factories = getPlantList(machines);
-    ;
+    // final List<String> factories = getPlantList(machines);
+    final factories = _autoTeam != null
+        ? [_autoTeam!.plant!]
+        : getAllFactories(machines: machines, teams: teams);
+    factories.sort((a, b) {
+      int getNum(String s) => int.tryParse(s.split('_').last) ?? 0;
 
+      return getNum(a).compareTo(getNum(b));
+    });
+
+    debugPrint('FACTORIES = $factories');
+    debugPrint('AUTO TEAM = ${_autoTeam?.plant}');
     return Scaffold(
       appBar: PreferredSize(
         preferredSize: const Size.fromHeight(50),

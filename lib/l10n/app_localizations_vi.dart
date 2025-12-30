@@ -12,16 +12,16 @@ class AppLocalizationsVi extends AppLocalizations {
   String get plant => 'Nhà máy';
 
   @override
-  String get group => 'Nhóm(*)';
+  String get group => 'Nhóm';
 
   @override
-  String get fac => 'Phân xưởng(*)';
+  String get fac => 'Phân xưởng';
 
   @override
-  String get area => 'Khu vực(*)';
+  String get area => 'Khu vực';
 
   @override
-  String get machine => 'Máy móc(*)';
+  String get machine => 'Máy móc';
 
   @override
   String get search_or_add_new => 'Tìm kiếm hoặc nhập mới...';
@@ -101,7 +101,7 @@ class AppLocalizationsVi extends AppLocalizations {
   String get needSelectArea => 'Chưa chọn khu vực';
 
   @override
-  String get commentHint => 'Nội dung...(*)';
+  String get commentHint => 'Nội dung...';
 
   @override
   String get counterMeasureHint => 'Đối sách...';

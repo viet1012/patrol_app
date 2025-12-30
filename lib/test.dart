@@ -556,6 +556,7 @@ class _CameraScreenState extends State<CameraScreen> {
                                 _selectedGroup = v;
                               });
                             },
+                      isRequired: true,
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -587,6 +588,7 @@ class _CameraScreenState extends State<CameraScreen> {
                           }
                         });
                       },
+                      isRequired: true,
                     ),
                   ),
                 ],
@@ -617,6 +619,7 @@ class _CameraScreenState extends State<CameraScreen> {
                           }
                         });
                       },
+                      isRequired: true,
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -633,6 +636,7 @@ class _CameraScreenState extends State<CameraScreen> {
                       onChanged: (v) {
                         setState(() => _selectedMachine = v);
                       },
+                      isRequired: true,
                     ),
                   ),
                 ],
@@ -803,9 +807,11 @@ class _CameraScreenState extends State<CameraScreen> {
                                   decoration: InputDecoration(
                                     hintText: "commentHint".tr(context),
                                     filled: true,
+                                    alignLabelWithHint: true,
+
                                     fillColor: Colors.green.withOpacity(0.08),
                                     hintStyle: TextStyle(
-                                      color: Colors.white.withOpacity(.6),
+                                      color: Colors.red.withOpacity(.6),
                                       fontSize: 14,
                                     ),
                                     border: OutlineInputBorder(
@@ -1160,6 +1166,7 @@ class _CameraScreenState extends State<CameraScreen> {
     required String? selectedValue,
     required List<String> items,
     required Function(String?)? onChanged,
+    bool isRequired = false,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1297,6 +1304,7 @@ class _CameraScreenState extends State<CameraScreen> {
                     color: const Color(0xFF4DD0E1).withOpacity(0.45),
                   ),
                 ),
+
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(14),
                   borderSide: const BorderSide(
@@ -1316,21 +1324,55 @@ class _CameraScreenState extends State<CameraScreen> {
             ),
 
             dropdownBuilder: (context, selectedItem) {
-              return AutoSizeText(
-                selectedItem?.isNotEmpty == true ? selectedItem! : label,
-                maxLines: 2,
-                minFontSize: 11,
-                stepGranularity: 0.5,
-                overflow: TextOverflow.visible,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: selectedItem?.isNotEmpty == true
-                      ? FontWeight.bold
-                      : FontWeight.w500,
-                  color: selectedItem?.isNotEmpty == true
-                      ? Colors.white
-                      : Colors.white.withOpacity(0.6),
-                ),
+              final bool isEmpty = selectedItem == null || selectedItem.isEmpty;
+
+              Color textColor;
+              FontWeight fontWeight;
+
+              if (isEmpty && isRequired) {
+                textColor = Colors.red.withOpacity(.8);
+                fontWeight = FontWeight.w600;
+              } else if (!isEmpty) {
+                textColor = Colors.white;
+                fontWeight = FontWeight.bold;
+              } else {
+                textColor = Colors.white.withOpacity(0.6);
+                fontWeight = FontWeight.w500;
+              }
+
+              return Row(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  /// 📝 TEXT
+                  Expanded(
+                    child: AutoSizeText(
+                      isEmpty ? label : selectedItem,
+                      maxLines: 2,
+                      minFontSize: 11,
+                      stepGranularity: 0.5,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: fontWeight,
+                        color: textColor,
+                      ),
+                    ),
+                  ),
+
+                  /// ⭐ REQUIRED ICON
+                  if (isRequired && isEmpty) ...[
+                    const SizedBox(width: 6),
+                    Tooltip(
+                      message: "Required field",
+                      child: Icon(
+                        Icons.star_rounded, // ⭐ hoặc Icons.error_outline
+                        size: 14,
+                        color: Colors.red.withOpacity(.7),
+                      ),
+                    ),
+                  ],
+                ],
               );
             },
 

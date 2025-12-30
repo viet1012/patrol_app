@@ -2,10 +2,10 @@
   "@@locale": "ja",
 
   "plant": "工場",
-  "group": "グループ(*)",
-  "fac": "工場(*)",
-  "area": "エリア(*)",
-  "machine": "機械(*)",
+  "group": "グループ",
+  "fac": "工場",
+  "area": "エリア",
+  "machine": "機械",
   "search_or_add_new": "検索または新規入力...",
 
   "label_freq": "発生頻度",
@@ -43,7 +43,7 @@
   },
 
   "needSelectArea": "エリアが選択されていません",
-  "commentHint": "コンテンツ...(*)",
+  "commentHint": "コンテンツ...",
   "counterMeasureHint": "対策..."
 
 }

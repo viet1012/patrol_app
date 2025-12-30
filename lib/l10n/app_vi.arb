@@ -2,10 +2,10 @@
   "@@locale": "vi",
 
   "plant": "Nhà máy",
-  "group": "Nhóm(*)",
-  "fac": "Phân xưởng(*)",
-  "area": "Khu vực(*)",
-  "machine": "Máy móc(*)",
+  "group": "Nhóm",
+  "fac": "Phân xưởng",
+  "area": "Khu vực",
+  "machine": "Máy móc",
   "search_or_add_new": "Tìm kiếm hoặc nhập mới...",
 
   "label_freq": "Tần suất phát sinh",
@@ -45,6 +45,6 @@
   },
 
   "needSelectArea": "Chưa chọn khu vực",
-  "commentHint": "Nội dung...(*)",
+  "commentHint": "Nội dung...",
   "counterMeasureHint": "Đối sách..."
 }
