@@ -13,6 +13,10 @@ class RegisterBottomSheet extends StatefulWidget {
 class _RegisterBottomSheetState extends State<RegisterBottomSheet> {
   final TextEditingController _codeCtrl = TextEditingController();
   final TextEditingController _passCtrl = TextEditingController();
+  final TextEditingController _confirmPassCtrl = TextEditingController();
+
+  bool _showPassword = false;
+  bool _showConfirmPassword = false;
 
   String? _errorMsg;
 
@@ -20,17 +24,24 @@ class _RegisterBottomSheetState extends State<RegisterBottomSheet> {
   void dispose() {
     _codeCtrl.dispose();
     _passCtrl.dispose();
+    _confirmPassCtrl.dispose();
     super.dispose();
   }
 
   void _register() async {
     final code = _codeCtrl.text.trim();
     final pass = _passCtrl.text.trim();
+    final confirm = _confirmPassCtrl.text.trim();
 
     setState(() => _errorMsg = null);
 
-    if (code.isEmpty || pass.isEmpty) {
-      setState(() => _errorMsg = "Please enter code and password");
+    if (code.isEmpty || pass.isEmpty || confirm.isEmpty) {
+      setState(() => _errorMsg = "Please fill all fields");
+      return;
+    }
+
+    if (pass != confirm) {
+      setState(() => _errorMsg = "Passwords do not match");
       return;
     }
 
@@ -41,6 +52,20 @@ class _RegisterBottomSheetState extends State<RegisterBottomSheet> {
       return;
     }
 
+    // ✅ ĐĂNG KÝ THÀNH CÔNG
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text("🎉 Register successful"),
+        backgroundColor: Color(0xFF16A34A), // green
+        behavior: SnackBarBehavior.floating,
+        duration: Duration(seconds: 2),
+      ),
+    );
+
+    // Đóng bottom sheet sau 1 chút cho user kịp thấy
+    await Future.delayed(const Duration(milliseconds: 600));
     Navigator.pop(context);
   }
 
@@ -119,7 +144,16 @@ class _RegisterBottomSheetState extends State<RegisterBottomSheet> {
               obscure: true,
             ),
 
-            const SizedBox(height: 28),
+            const SizedBox(height: 16),
+
+            _input(
+              controller: _confirmPassCtrl,
+              label: "Confirm Password",
+              icon: Icons.lock_reset_outlined,
+              obscure: true,
+              isConfirm: true,
+            ),
+            const SizedBox(height: 16),
 
             SizedBox(
               width: double.infinity,
@@ -163,10 +197,15 @@ class _RegisterBottomSheetState extends State<RegisterBottomSheet> {
     required IconData icon,
     bool obscure = false,
     bool isNumber = false,
+    bool isConfirm = false,
   }) {
+    final isPasswordField = obscure;
+
+    bool showPassword = isConfirm ? _showConfirmPassword : _showPassword;
+
     return TextField(
       controller: controller,
-      obscureText: obscure,
+      obscureText: isPasswordField ? !showPassword : false,
       keyboardType: isNumber ? TextInputType.number : TextInputType.text,
       inputFormatters: isNumber
           ? [FilteringTextInputFormatter.digitsOnly]
@@ -176,6 +215,28 @@ class _RegisterBottomSheetState extends State<RegisterBottomSheet> {
         labelText: label,
         labelStyle: const TextStyle(color: Colors.white70),
         prefixIcon: Icon(icon, color: Colors.white70),
+
+        // 👁 icon xem / ẩn mật khẩu
+        suffixIcon: isPasswordField
+            ? IconButton(
+                icon: Icon(
+                  showPassword
+                      ? Icons.visibility_off_outlined
+                      : Icons.visibility_outlined,
+                  color: Colors.white60,
+                ),
+                onPressed: () {
+                  setState(() {
+                    if (isConfirm) {
+                      _showConfirmPassword = !_showConfirmPassword;
+                    } else {
+                      _showPassword = !_showPassword;
+                    }
+                  });
+                },
+              )
+            : null,
+
         filled: true,
         fillColor: const Color(0xFF020617),
         border: OutlineInputBorder(

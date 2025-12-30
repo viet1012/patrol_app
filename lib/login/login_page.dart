@@ -17,6 +17,7 @@ class _LoginPageState extends State<LoginPage> {
   final TextEditingController _passCtrl = TextEditingController();
 
   String? _errorMsg;
+  bool _showPassword = false;
 
   @override
   void dispose() {
@@ -203,9 +204,11 @@ class _LoginPageState extends State<LoginPage> {
     bool obscure = false,
     bool isNumber = false,
   }) {
+    final isPasswordField = obscure;
+
     return TextField(
       controller: controller,
-      obscureText: obscure,
+      obscureText: isPasswordField ? !_showPassword : false,
       keyboardType: isNumber ? TextInputType.number : TextInputType.text,
       inputFormatters: isNumber
           ? [FilteringTextInputFormatter.digitsOnly]
@@ -215,6 +218,24 @@ class _LoginPageState extends State<LoginPage> {
         labelText: label,
         labelStyle: const TextStyle(color: Colors.white70),
         prefixIcon: Icon(icon, color: Colors.white70),
+
+        // 👁 ICON CON MẮT
+        suffixIcon: isPasswordField
+            ? IconButton(
+                icon: Icon(
+                  _showPassword
+                      ? Icons.visibility_off_outlined
+                      : Icons.visibility_outlined,
+                  color: Colors.white60,
+                ),
+                onPressed: () {
+                  setState(() {
+                    _showPassword = !_showPassword;
+                  });
+                },
+              )
+            : null,
+
         filled: true,
         fillColor: const Color(0xFF020617),
         border: OutlineInputBorder(
