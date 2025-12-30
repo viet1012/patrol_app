@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../api/auth_api.dart';
+import '../common/common_ui_helper.dart';
 
 class RegisterBottomSheet extends StatefulWidget {
   const RegisterBottomSheet({super.key});
@@ -55,18 +56,14 @@ class _RegisterBottomSheetState extends State<RegisterBottomSheet> {
     // ✅ ĐĂNG KÝ THÀNH CÔNG
     if (!mounted) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text("🎉 Register successful"),
-        backgroundColor: Color(0xFF16A34A), // green
-        behavior: SnackBarBehavior.floating,
-        duration: Duration(seconds: 2),
-      ),
+    CommonUI.showSnackBar(
+      context: context,
+      message: 'Register successful',
+      color: Colors.green,
     );
-
     // Đóng bottom sheet sau 1 chút cho user kịp thấy
     await Future.delayed(const Duration(milliseconds: 600));
-    Navigator.pop(context);
+    Navigator.pop(context, code); // ✅ trả về account
   }
 
   @override

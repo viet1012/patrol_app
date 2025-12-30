@@ -4,6 +4,7 @@ import '../animate/glow_title.dart';
 import '../api/auth_api.dart';
 import '../homeScreen/patrol_home_screen.dart';
 import '../register/register_page.dart';
+import 'change_password_screen.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -15,6 +16,7 @@ class LoginPage extends StatefulWidget {
 class _LoginPageState extends State<LoginPage> {
   final TextEditingController _codeCtrl = TextEditingController();
   final TextEditingController _passCtrl = TextEditingController();
+  final FocusNode _passFocus = FocusNode();
 
   String? _errorMsg;
   bool _showPassword = false;
@@ -23,6 +25,7 @@ class _LoginPageState extends State<LoginPage> {
   void dispose() {
     _codeCtrl.dispose();
     _passCtrl.dispose();
+    _passFocus.dispose(); // 👈 thêm dòng này
     super.dispose();
   }
 
@@ -53,12 +56,53 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
-  void _showRegisterSheet() {
-    showModalBottomSheet(
+  Future<void> _showRegisterSheet() async {
+    final result = await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => const RegisterBottomSheet(),
+    );
+
+    if (result != null && result.isNotEmpty) {
+      setState(() {
+        _codeCtrl.text = result;
+        _passCtrl.clear();
+      });
+
+      // ✅ FOCUS VÀO Ô PASSWORD
+      Future.delayed(const Duration(milliseconds: 200), () {
+        _passFocus.requestFocus();
+      });
+    }
+  }
+
+  Future<void> _showChangePasswordSheet() async {
+    final account = _codeCtrl.text.trim();
+
+    if (account.isEmpty) {
+      setState(() {
+        _errorMsg = "Please enter Employee ID first";
+      });
+      return;
+    }
+
+    // Gọi API kiểm tra account tồn tại
+    final exists = await AuthApi.checkAccountExists(account);
+
+    if (!exists) {
+      setState(() {
+        _errorMsg = "Account does not exist";
+      });
+      return;
+    }
+
+    // Nếu tồn tại, mới show modal đổi mật khẩu
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => ChangePasswordBottomSheet(account: account),
     );
   }
 
@@ -142,6 +186,7 @@ class _LoginPageState extends State<LoginPage> {
                   label: "Password",
                   icon: Icons.lock_outline,
                   obscure: true,
+                  focusNode: _passFocus, // 👈 thêm
                 ),
 
                 const SizedBox(height: 28),
@@ -179,15 +224,32 @@ class _LoginPageState extends State<LoginPage> {
 
                 const SizedBox(height: 18),
 
-                GestureDetector(
-                  onTap: _showRegisterSheet,
-                  child: const Text(
-                    "Create new account",
-                    style: TextStyle(
-                      color: Color(0xFF38BDF8),
-                      fontWeight: FontWeight.w500,
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    GestureDetector(
+                      onTap: _showChangePasswordSheet,
+                      child: const Text(
+                        "Change password",
+                        style: TextStyle(
+                          color: Color(0xFFFB7185),
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
                     ),
-                  ),
+                    const SizedBox(width: 12),
+
+                    GestureDetector(
+                      onTap: _showRegisterSheet,
+                      child: const Text(
+                        "Create new account",
+                        style: TextStyle(
+                          color: Color(0xFF38BDF8),
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -203,11 +265,13 @@ class _LoginPageState extends State<LoginPage> {
     required IconData icon,
     bool obscure = false,
     bool isNumber = false,
+    FocusNode? focusNode, // 👈 thêm
   }) {
     final isPasswordField = obscure;
 
     return TextField(
       controller: controller,
+      focusNode: focusNode, // 👈 gán vào đây
       obscureText: isPasswordField ? !_showPassword : false,
       keyboardType: isNumber ? TextInputType.number : TextInputType.text,
       inputFormatters: isNumber
@@ -218,8 +282,6 @@ class _LoginPageState extends State<LoginPage> {
         labelText: label,
         labelStyle: const TextStyle(color: Colors.white70),
         prefixIcon: Icon(icon, color: Colors.white70),
-
-        // 👁 ICON CON MẮT
         suffixIcon: isPasswordField
             ? IconButton(
                 icon: Icon(
@@ -235,7 +297,6 @@ class _LoginPageState extends State<LoginPage> {
                 },
               )
             : null,
-
         filled: true,
         fillColor: const Color(0xFF020617),
         border: OutlineInputBorder(
@@ -243,6 +304,14 @@ class _LoginPageState extends State<LoginPage> {
           borderSide: BorderSide.none,
         ),
       ),
+
+      onChanged: (value) {
+        if (_errorMsg != null) {
+          setState(() {
+            _errorMsg = null;
+          });
+        }
+      },
     );
   }
 }
