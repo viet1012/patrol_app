@@ -107,6 +107,7 @@ class _AfterDetailScreenState extends State<AfterDetailScreen> {
         plant: widget.selectedPlant!,
         type: widget.patrolGroup.name,
         pic: selectedPIC!.trim(),
+        afStatus: 'Wait',
       );
       debugPrint('?? SELECTED PIC = "$selectedPIC"');
 
