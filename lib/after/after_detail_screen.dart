@@ -40,15 +40,31 @@ class _AfterDetailScreenState extends State<AfterDetailScreen> {
 
   Future<List<PatrolReportModel>>? _futureReport;
 
-  List<String> findPicsByPlant(String plant) {
-    final Set<String> unique = {};
+  // List<String> findPicsByPlant(String plant) {
+  //   final Set<String> unique = {};
+  //
+  //   return widget.machines
+  //       .where((m) => m.plant.toString() == plant)
+  //       .map((m) => m.pic.toString())
+  //       .where((f) => f.isNotEmpty)
+  //       .where((f) => unique.add(f))
+  //       .toList();
+  // }
 
-    return widget.machines
-        .where((m) => m.plant.toString() == plant)
-        .map((m) => m.pic.toString())
-        .where((f) => f.isNotEmpty)
-        .where((f) => unique.add(f))
+  Future<List<String>> findPicsByPlantFromApi(String plant) async {
+    final reports = await PatrolReportApi.fetchReports(plant: plant);
+
+    final Set<String> uniquePics = {};
+
+    final pics = reports
+        .map(
+          (r) => r.pic?.trim() ?? '',
+        ) // giả sử PatrolReportModel có trường pic
+        .where((pic) => pic.isNotEmpty)
+        .where((pic) => uniquePics.add(pic))
         .toList();
+
+    return pics;
   }
 
   int _riskToScore(String risk) {
@@ -107,23 +123,23 @@ class _AfterDetailScreenState extends State<AfterDetailScreen> {
     }
   }
 
-  void debugFindPics() {
-    final pics = findPicsByPlant(_selectedPlant!);
-    // debugPrint('📌 PIC FOUND (${pics.length}): $pics');
-  }
+  // void debugFindPics() {
+  //   final pics = findPicsByPlant(_selectedPlant!);
+  //   // debugPrint('📌 PIC FOUND (${pics.length}): $pics');
+  // }
 
   @override
   void initState() {
     _selectedPlant = widget.selectedPlant;
-    debugFindPics();
+    // debugFindPics();
     super.initState();
   }
 
   @override
   Widget build(BuildContext context) {
-    final facList = _selectedPlant == null
-        ? []
-        : findPicsByPlant(_selectedPlant!);
+    // final facList = _selectedPlant == null
+    //     ? []
+    //     : findPicsByPlant(_selectedPlant!);
 
     return Scaffold(
       appBar: AppBar(
@@ -172,20 +188,60 @@ class _AfterDetailScreenState extends State<AfterDetailScreen> {
               ),
             ),
             Spacer(),
+            // Expanded(
+            //   child: _buildSearchableDropdown(
+            //     label: "PIC",
+            //     selectedValue: selectedPIC,
+            //     items: _selectedPlant == null
+            //         ? <String>[]
+            //         : facList.cast<String>(),
+            //     onChanged: (v) {
+            //       setState(() {
+            //         selectedPIC = v;
+            //         _loadReport();
+            //       });
+            //     },
+            //   ),
+            // ),
             Expanded(
-              child: _buildSearchableDropdown(
-                label: "PIC",
-                selectedValue: selectedPIC,
-                items: _selectedPlant == null
-                    ? <String>[]
-                    : facList.cast<String>(),
-                onChanged: (v) {
-                  setState(() {
-                    selectedPIC = v;
-                    _loadReport();
-                  });
-                },
-              ),
+              child: _selectedPlant == null
+                  ? _buildSearchableDropdown(
+                      label: "PIC",
+                      selectedValue: selectedPIC,
+                      items: const [],
+                      onChanged: (v) {
+                        setState(() {
+                          selectedPIC = v;
+                          _loadReport();
+                        });
+                      },
+                    )
+                  : FutureBuilder<List<String>>(
+                      future: findPicsByPlantFromApi(_selectedPlant!),
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return const Center(
+                            child: CircularProgressIndicator(),
+                          );
+                        } else if (snapshot.hasError) {
+                          return Text('Error: ${snapshot.error}');
+                        } else {
+                          final picList = snapshot.data ?? [];
+                          return _buildSearchableDropdown(
+                            label: "PIC",
+                            selectedValue: selectedPIC,
+                            items: picList,
+                            onChanged: (v) {
+                              setState(() {
+                                selectedPIC = v;
+                                _loadReport();
+                              });
+                            },
+                          );
+                        }
+                      },
+                    ),
             ),
           ],
         ),

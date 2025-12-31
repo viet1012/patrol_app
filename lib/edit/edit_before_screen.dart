@@ -12,7 +12,6 @@ import '../widget/error_display.dart';
 import '../widget/glass_action_button.dart';
 
 class EditBeforeScreen extends StatefulWidget {
-  final List<MachineModel> machines;
   final String accountCode;
 
   final String? selectedPlant;
@@ -25,7 +24,6 @@ class EditBeforeScreen extends StatefulWidget {
   const EditBeforeScreen({
     super.key,
     required this.accountCode,
-    required this.machines,
     required this.selectedGrp,
     required this.selectedPlant,
     required this.titleScreen,
@@ -44,16 +42,6 @@ class _EditBeforeScreenState extends State<EditBeforeScreen> {
   String? _filterRisk;
 
   Future<List<PatrolReportModel>>? _futureReport;
-
-  List<String> getFacByPlant(String plant) {
-    final Set<String> unique = {};
-    return widget.machines
-        .where((m) => m.plant.toString() == plant)
-        .map((m) => m.fac.toString())
-        .where((f) => f.isNotEmpty)
-        .where((f) => unique.add(f))
-        .toList();
-  }
 
   int _riskToScore(String risk) {
     switch (risk) {
@@ -85,15 +73,6 @@ class _EditBeforeScreenState extends State<EditBeforeScreen> {
   }
 
   void _loadReport() async {
-    // if (widget.selectedGrp == null || widget.selectedGrp!.isEmpty) {
-    //   ScaffoldMessenger.of(context).showSnackBar(
-    //     const SnackBar(
-    //       content: Text('⚠️ Please select Group'),
-    //       backgroundColor: Colors.orange,
-    //     ),
-    //   );
-    //   return;
-    // }
     setState(() {
       _futureReport = null; // reset trước (optional)
     });
@@ -101,14 +80,7 @@ class _EditBeforeScreenState extends State<EditBeforeScreen> {
     try {
       final future = PatrolReportApi.fetchReports(
         plant: widget.selectedPlant!,
-        division: '',
-        area: '',
-        machine: '',
         type: widget.patrolGroup.name,
-        afStatus: '',
-        grp: '',
-        // grp: widget.selectedGrp!,
-        pic: '',
         patrolUser: widget.accountCode,
       );
 

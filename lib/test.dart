@@ -1112,7 +1112,6 @@ class _CameraScreenState extends State<CameraScreen> {
                           MaterialPageRoute(
                             builder: (_) => EditBeforeScreen(
                               accountCode: widget.accountCode,
-                              machines: widget.machines,
                               selectedFac: _selectedFac,
                               selectedPlant: _selectedPlant,
                               selectedGrp: widget.autoTeam?.grp ?? '',

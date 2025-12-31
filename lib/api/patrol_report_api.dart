@@ -41,15 +41,15 @@ class PatrolReportApi {
         '${DioClient.dio.options.baseUrl}$endpoint',
       ).replace(queryParameters: queryParams);
 
-      debugPrint('?? API CALL: $uri');
+      // debugPrint('?? API CALL: $uri');
 
       final response = await DioClient.dio.get(
         endpoint,
         queryParameters: queryParams,
       );
 
-      debugPrint('?? RAW RESPONSE = ${response.data}');
-      debugPrint('? STATUS: ${response.statusCode}');
+      // debugPrint('?? RAW RESPONSE = ${response.data}');
+      // debugPrint('? STATUS: ${response.statusCode}');
 
       if (response.statusCode == 200 && response.data is List) {
         return (response.data as List)
