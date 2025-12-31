@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import '../api/replace_image_api.dart';
+import '../common/common_ui_helper.dart';
 import 'edit_image_item.dart';
 import '../homeScreen/patrol_home_screen.dart';
 import '../model/patrol_report_model.dart';
@@ -165,6 +166,12 @@ class _EditDetailPageState extends State<EditDetailPage> {
 
   Future<void> _onSave() async {
     try {
+      // ⏳ Có thể show loading nếu muốn
+      // CommonUI.showSnackBar(
+      //   context: context,
+      //   message: 'Saving...',
+      // );
+
       await updateReportApi(
         id: widget.report.id!,
         comment: _commentCtrl.text.trim(),
@@ -172,13 +179,35 @@ class _EditDetailPageState extends State<EditDetailPage> {
       );
 
       if (!mounted) return;
-      Navigator.pop(context, true); // báo màn trước reload API
-    } catch (e) {
-      debugPrint('❌ UPDATE FAILED: $e');
+
+      /// ✅ THÀNH CÔNG → dialog glass
+      CommonUI.showGlassDialog(
+        context: context,
+        icon: Icons.check_circle_rounded,
+        iconColor: Colors.greenAccent,
+        title: 'Update Successful',
+        message: 'The report has been updated successfully.',
+        buttonText: 'OK',
+      );
+
+      /// ⏳ đợi dialog đóng rồi pop
+      await Future.delayed(const Duration(milliseconds: 500));
+
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Update failed')));
+      Navigator.pop(context, true); // báo màn trước reload API
+    } catch (e, s) {
+      debugPrint('❌ UPDATE FAILED: $e');
+      debugPrintStack(stackTrace: s);
+
+      if (!mounted) return;
+
+      /// ❌ THẤT BẠI → warning dialog
+      CommonUI.showWarning(
+        context: context,
+        title: 'Update Failed',
+        message:
+            'Unable to update the report.\nPlease check your connection or try again.',
+      );
     }
   }
 
