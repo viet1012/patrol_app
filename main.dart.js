@@ -8258,7 +8258,7 @@ A.aR().$1("\u274c RESPONSE: "+A.j(i==null?null:i.a))
 i=k.b
 if(i==null)i=null
 else{i=i.a
-i=i==null?null:J.bo(i,"message")}if(i==null)i="Unable to login. Please try again"
+i=i==null?null:J.bo(i,"message")}if(i==null)i="Unable to login. Please try again."
 q=new A.h3(!1,i)
 s=1
 break}else{j=i
@@ -49195,7 +49195,7 @@ try{m=q.a
 l=m.d
 l.toString
 k=m.w
-p=A.E9(null,m.c,null,l,k.b)
+p=A.E9("Wait,Redo",m.c,null,l,k.b)
 q.L(new A.aDE(q,p))}catch(i){o=A.aa(i)
 n=A.aV(i)
 A.aR().$1("\u274c Load report error: "+A.j(o))
