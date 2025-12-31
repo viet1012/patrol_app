@@ -205,8 +205,6 @@ class _AfterDetailPageState extends State<AfterDetailPage> {
   }
 
   Widget _buildImageGrid(List<String> images) {
-    final h = MediaQuery.of(context).size.height;
-
     return SizedBox(
       height: 320, // 👈 đủ cho image + camera
       child: ListView.separated(

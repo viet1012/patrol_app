@@ -1,14 +1,8 @@
 import 'dart:async';
-import 'dart:convert';
-import 'dart:io';
+
 import 'dart:typed_data';
 
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' hide MultipartFile;
-
-import '../api/api_config.dart';
-import '../api/dio_client.dart';
 import '../api/replace_image_api.dart';
 import 'edit_image_item.dart';
 import '../homeScreen/patrol_home_screen.dart';
@@ -33,19 +27,22 @@ class _EditDetailPageState extends State<EditDetailPage> {
   final GlobalKey<CameraEditBoxState> _cameraKey =
       GlobalKey<CameraEditBoxState>();
 
-  bool _enableCamera = false;
-
   final TextEditingController _commentCtrl = TextEditingController();
-  final TextEditingController _msnvCtrl = TextEditingController();
-  String? _employeeName;
-  bool _isLoadingName = false;
+  final TextEditingController _counterCtrl = TextEditingController();
+
   Timer? _debounce;
+  @override
+  void initState() {
+    super.initState();
+    _commentCtrl.text = widget.report.comment;
+    _counterCtrl.text = widget.report.countermeasure;
+  }
 
   @override
   void dispose() {
     _debounce?.cancel();
     _commentCtrl.dispose();
-    _msnvCtrl.dispose();
+    _counterCtrl.dispose();
     super.dispose();
   }
 
@@ -77,6 +74,7 @@ class _EditDetailPageState extends State<EditDetailPage> {
             ),
           ],
         ),
+        actions: [GlassActionButton(icon: Icons.save_rounded, onTap: _onSave)],
       ),
       body: Container(
         height: MediaQuery.of(context).size.height,
@@ -124,15 +122,10 @@ class _EditDetailPageState extends State<EditDetailPage> {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: _sectionInline('Comment', widget.report.comment),
-                  ),
+                  Expanded(child: _sectionInlineEdit('Comment', _commentCtrl)),
                   const SizedBox(width: 32),
                   Expanded(
-                    child: _sectionInline(
-                      'Countermeasure',
-                      widget.report.countermeasure,
-                    ),
+                    child: _sectionInlineEdit('Countermeasure', _counterCtrl),
                   ),
                 ],
               ),
@@ -170,7 +163,26 @@ class _EditDetailPageState extends State<EditDetailPage> {
     );
   }
 
-  Widget _sectionInline(String title, String content) {
+  Future<void> _onSave() async {
+    try {
+      await updateReportApi(
+        id: widget.report.id!,
+        comment: _commentCtrl.text.trim(),
+        countermeasure: _counterCtrl.text.trim(),
+      );
+
+      if (!mounted) return;
+      Navigator.pop(context, true); // báo màn trước reload API
+    } catch (e) {
+      debugPrint('❌ UPDATE FAILED: $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Update failed')));
+    }
+  }
+
+  Widget _sectionInlineEdit(String title, TextEditingController ctrl) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -182,12 +194,20 @@ class _EditDetailPageState extends State<EditDetailPage> {
           ),
         ),
         const SizedBox(height: 6),
-        Text(
-          content.isEmpty ? '-' : content,
-          style: TextStyle(color: Colors.white.withOpacity(0.85)),
-
+        TextField(
+          controller: ctrl,
           maxLines: 6,
-          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(color: Colors.white),
+          decoration: InputDecoration(
+            hintText: 'Enter $title',
+            hintStyle: TextStyle(color: Colors.white38),
+            filled: true,
+            fillColor: Colors.white.withOpacity(0.05),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide.none,
+            ),
+          ),
         ),
       ],
     );
