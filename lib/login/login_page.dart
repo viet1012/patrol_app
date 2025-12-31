@@ -150,7 +150,7 @@ class _LoginPageState extends State<LoginPage> {
                   filterQuality: FilterQuality.high,
                   fit: BoxFit.contain,
                 ),
-                EmbossGlowTitle(text: 'V1.1', fontSize: 13),
+                EmbossGlowTitle(text: 'V1.2', fontSize: 13),
 
                 const SizedBox(height: 16),
 
