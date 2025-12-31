@@ -50161,7 +50161,7 @@ s=4
 return A.L(A.aOg(null,B.D,null,new A.aGq(n),null,null,o,null,!0,!0,!0,null,null,!1,!1,t.z),$async$vo)
 case 4:case 1:return A.E(q,r)}})
 return A.F($async$vo,r)},
-M(a){var s=this,r=null,q=A.aG(26),p=t.p,o=A.b([A.aPY("assets/flags/favicon.png",B.eK,B.fB,120,120),new A.vN("V1.1",13,r),B.bj,B.aeL,B.hM,B.af1,B.a9c,s.ahP(s.d,B.rH,!0,"Employee ID"),B.bj,s.ahQ(s.e,s.f,B.h4,"Password",!0),B.a9d,A.c4(A.C1(!1,B.af0,r,r,r,r,r,r,s.gaio(),r,A.C3(r,r,B.lx,r,r,r,6,r,r,r,r,r,r,r,new A.cw(A.aG(16),B.q),r,r,r,r,r)),48,1/0)],p),n=s.r
+M(a){var s=this,r=null,q=A.aG(26),p=t.p,o=A.b([A.aPY("assets/flags/favicon.png",B.eK,B.fB,120,120),new A.vN("V1.2",13,r),B.bj,B.aeL,B.hM,B.af1,B.a9c,s.ahP(s.d,B.rH,!0,"Employee ID"),B.bj,s.ahQ(s.e,s.f,B.h4,"Password",!0),B.a9d,A.c4(A.C1(!1,B.af0,r,r,r,r,r,r,s.gaio(),r,A.C3(r,r,B.lx,r,r,r,6,r,r,r,r,r,r,r,new A.cw(A.aG(16),B.q),r,r,r,r,r)),48,1/0)],p),n=s.r
 if(n!=null)B.b.Z(o,A.b([B.dv,A.b_(n,r,r,r,r,r,r,r,B.Ju,r,r,r)],p))
 o.push(B.kC)
 o.push(A.cE(A.b([A.dG(r,B.af5,B.K,!1,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,s.ganf(),r,r,r,r,r,r,!1,B.ai),B.cU,A.dG(r,B.aeF,B.K,!1,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,s.gani(),r,r,r,r,r,r,!1,B.ai)],p),B.A,B.dY,B.E,0,r))
