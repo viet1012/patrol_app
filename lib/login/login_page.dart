@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import '../animate/glow_title.dart';
 import '../api/auth_api.dart';
 import '../homeScreen/patrol_home_screen.dart';
@@ -150,7 +151,16 @@ class _LoginPageState extends State<LoginPage> {
                   filterQuality: FilterQuality.high,
                   fit: BoxFit.contain,
                 ),
-                EmbossGlowTitle(text: 'V1.2', fontSize: 13),
+                FutureBuilder<String>(
+                  future: getAppVersion(),
+                  builder: (context, snapshot) {
+                    if (!snapshot.hasData) {
+                      return EmbossGlowTitle(text: 'V...', fontSize: 13);
+                    }
+
+                    return EmbossGlowTitle(text: snapshot.data!, fontSize: 13);
+                  },
+                ),
 
                 const SizedBox(height: 16),
 
@@ -257,6 +267,11 @@ class _LoginPageState extends State<LoginPage> {
         ),
       ),
     );
+  }
+
+  Future<String> getAppVersion() async {
+    final info = await PackageInfo.fromPlatform();
+    return 'V${info.version}+${info.buildNumber}';
   }
 
   Widget _input({
