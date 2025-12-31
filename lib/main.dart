@@ -1,3 +1,4 @@
+import 'package:chuphinh/table/patrol_report_table.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'homeScreen/patrol_home_screen.dart';
@@ -6,6 +7,7 @@ import 'l10n/app_localizations.dart';
 import 'login/login_page.dart'; // đường dẫn tuỳ vào bạn
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
   runApp(const MyApp());
 }
 
