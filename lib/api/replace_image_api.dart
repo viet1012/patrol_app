@@ -1,7 +1,9 @@
+import 'dart:convert';
 import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:flutter/cupertino.dart';
 
+import '../model/patrol_edit_model.dart';
 import 'api_config.dart';
 import 'dio_client.dart';
 
@@ -126,5 +128,39 @@ Future<void> deleteImageApi({
 
   if (response.statusCode != 200) {
     throw Exception('Delete image failed: ${response.data}');
+  }
+}
+
+Future<void> updateReportApi({
+  required int id,
+  required String comment,
+  required String countermeasure,
+  List<Uint8List>? images,
+}) async {
+  final path = '/api/patrol_report/$id/edit';
+
+  final dto = {'comment': comment, 'countermeasure': countermeasure};
+
+  final formData = FormData.fromMap({
+    'data': jsonEncode(dto),
+    if (images != null)
+      'images': images
+          .map(
+            (e) => MultipartFile.fromBytes(
+              e,
+              filename: 'edit_${DateTime.now().millisecondsSinceEpoch}.jpg',
+            ),
+          )
+          .toList(),
+  });
+
+  final res = await DioClient.dio.post(
+    path,
+    data: formData,
+    options: Options(contentType: 'multipart/form-data'),
+  );
+
+  if (res.statusCode != 200) {
+    throw Exception('Update failed');
   }
 }

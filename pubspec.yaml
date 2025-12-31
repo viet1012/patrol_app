@@ -54,6 +54,7 @@ dependencies:
   web_socket_channel: ^3.0.3
   auto_size_text: ^3.0.0
   image: ^4.3.0
+  package_info_plus: ^9.0.0
 dev_dependencies:
   flutter_test:
     sdk: flutter
