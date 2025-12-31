@@ -39,7 +39,8 @@ class AuthApi {
       return AuthResult(
         success: false,
         message:
-            e.response?.data?['message'] ?? 'Unable to login. Please try again',
+            e.response?.data?['message'] ??
+            'Unable to login. Please try again.',
       );
     } catch (e) {
       return AuthResult(success: false, message: e.toString());

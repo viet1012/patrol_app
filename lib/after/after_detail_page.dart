@@ -199,9 +199,6 @@ class _AfterDetailPageState extends State<AfterDetailPage> {
         Text(
           content.isEmpty ? '-' : content,
           style: TextStyle(color: Colors.white.withOpacity(0.85)),
-
-          maxLines: 6,
-          overflow: TextOverflow.ellipsis,
         ),
       ],
     );

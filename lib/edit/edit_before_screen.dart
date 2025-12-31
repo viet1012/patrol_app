@@ -82,6 +82,7 @@ class _EditBeforeScreenState extends State<EditBeforeScreen> {
         plant: widget.selectedPlant!,
         type: widget.patrolGroup.name,
         patrolUser: widget.accountCode,
+        afStatus: 'Wait,Redo',
       );
 
       setState(() {
