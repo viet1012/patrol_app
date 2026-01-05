@@ -3,6 +3,8 @@ import 'package:dropdown_search/dropdown_search.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../api/patrol_report_api.dart';
+import '../common/common_ui_helper.dart';
+import '../common/due_date_utils.dart';
 import '../homeScreen/patrol_home_screen.dart';
 import '../model/machine_model.dart';
 import '../model/patrol_report_model.dart';
@@ -39,6 +41,7 @@ class _AfterDetailScreenState extends State<AfterDetailScreen> {
   String? _filterRisk;
 
   Future<List<PatrolReportModel>>? _futureReport;
+  Future<List<String>>? _futurePics;
 
   // List<String> findPicsByPlant(String plant) {
   //   final Set<String> unique = {};
@@ -83,14 +86,6 @@ class _AfterDetailScreenState extends State<AfterDetailScreen> {
 
       if (uniquePics.add(pic)) {
         pics.add(pic);
-
-        if (pic == emptyLabel) {
-          debugPrint('⚠️ Add EMPTY PIC as "$emptyLabel" | reportId=${r.id}');
-        } else {
-          debugPrint('✅ Add PIC: $pic | reportId=${r.id}');
-        }
-      } else {
-        debugPrint('🔁 Duplicate PIC skipped: "$pic" | reportId=${r.id}');
       }
     }
 
@@ -128,44 +123,36 @@ class _AfterDetailScreenState extends State<AfterDetailScreen> {
     }
   }
 
-  void _loadReport() async {
-    if (selectedPIC == null) return;
+  void _loadReport() {
+    if (selectedPIC == null || widget.selectedPlant == null) return;
 
     const emptyLabel = 'UNKNOWN';
     final picFilter = (selectedPIC == emptyLabel) ? '' : selectedPIC!.trim();
 
     debugPrint('?? SELECTED PIC UI="$selectedPIC" | API pic="$picFilter"');
 
-    setState(() => _futureReport = null);
-
-    final future = PatrolReportApi.fetchReports(
-      plant: widget.selectedPlant!,
-      type: widget.patrolGroup.name,
-      pic: picFilter, // 👈 gửi '' khi UNKNOWN
-      afStatus: 'Wait,Redo',
-    );
-
-    setState(() => _futureReport = future);
+    setState(() {
+      _futureReport = PatrolReportApi.fetchReports(
+        plant: widget.selectedPlant!,
+        type: widget.patrolGroup.name,
+        pic: picFilter,
+        afStatus: 'Wait,Redo',
+      );
+    });
   }
-
-  // void debugFindPics() {
-  //   final pics = findPicsByPlant(_selectedPlant!);
-  //   // debugPrint('📌 PIC FOUND (${pics.length}): $pics');
-  // }
 
   @override
   void initState() {
-    _selectedPlant = widget.selectedPlant;
-    // debugFindPics();
     super.initState();
+    _selectedPlant = widget.selectedPlant;
+
+    if (_selectedPlant != null) {
+      _futurePics = findPicsByPlantFromApi(_selectedPlant!);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    // final facList = _selectedPlant == null
-    //     ? []
-    //     : findPicsByPlant(_selectedPlant!);
-
     return Scaffold(
       appBar: AppBar(
         backgroundColor: const Color(0xFF121826),
@@ -178,18 +165,22 @@ class _AfterDetailScreenState extends State<AfterDetailScreen> {
         title: Row(
           children: [
             SizedBox(
-              width: 100,
+              width: 140,
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                    widget.titleScreen,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      fontStyle: FontStyle.italic,
-                    ),
+                  Row(
+                    children: [
+                      Text(
+                        '[After] ${widget.titleScreen}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 4),
                   Container(
@@ -213,21 +204,6 @@ class _AfterDetailScreenState extends State<AfterDetailScreen> {
               ),
             ),
             Spacer(),
-            // Expanded(
-            //   child: _buildSearchableDropdown(
-            //     label: "PIC",
-            //     selectedValue: selectedPIC,
-            //     items: _selectedPlant == null
-            //         ? <String>[]
-            //         : facList.cast<String>(),
-            //     onChanged: (v) {
-            //       setState(() {
-            //         selectedPIC = v;
-            //         _loadReport();
-            //       });
-            //     },
-            //   ),
-            // ),
             Expanded(
               child: _selectedPlant == null
                   ? _buildSearchableDropdown(
@@ -237,34 +213,36 @@ class _AfterDetailScreenState extends State<AfterDetailScreen> {
                       onChanged: (v) {
                         setState(() {
                           selectedPIC = v;
-                          _loadReport();
                         });
+                        _loadReport();
                       },
                     )
                   : FutureBuilder<List<String>>(
-                      future: findPicsByPlantFromApi(_selectedPlant!),
+                      future: _futurePics,
                       builder: (context, snapshot) {
                         if (snapshot.connectionState ==
                             ConnectionState.waiting) {
                           return const Center(
                             child: CircularProgressIndicator(),
                           );
-                        } else if (snapshot.hasError) {
-                          return Text('Error: ${snapshot.error}');
-                        } else {
-                          final picList = snapshot.data ?? [];
-                          return _buildSearchableDropdown(
-                            label: "PIC",
-                            selectedValue: selectedPIC,
-                            items: picList,
-                            onChanged: (v) {
-                              setState(() {
-                                selectedPIC = v;
-                                _loadReport();
-                              });
-                            },
+                        }
+                        if (snapshot.hasError) {
+                          return Text(
+                            'Server error',
+                            style: TextStyle(color: Colors.red, fontSize: 12),
                           );
                         }
+
+                        final picList = snapshot.data ?? [];
+                        return _buildSearchableDropdown(
+                          label: "PIC",
+                          selectedValue: selectedPIC,
+                          items: picList,
+                          onChanged: (v) {
+                            setState(() => selectedPIC = v);
+                            _loadReport();
+                          },
+                        );
                       },
                     ),
             ),
@@ -492,25 +470,14 @@ class _AfterDetailScreenState extends State<AfterDetailScreen> {
                 ),
 
                 DataCell(
-                  Row(
-                    children: [
-                      // if (r.dueDate != null)
-                      //   Icon(
-                      //     Icons.warning_amber_rounded,
-                      //     size: 16,
-                      //     color: _getDueDateColor(r.dueDate),
-                      //   ),
-                      // if (r.dueDate != null) const SizedBox(width: 4),
-                      Text(
-                        r.dueDate == null
-                            ? '-'
-                            : DateFormat('M/d/yy').format(r.dueDate!),
-                        style: TextStyle(
-                          color: _getDueDateColor(r.dueDate),
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
+                  Text(
+                    r.dueDate == null
+                        ? '-'
+                        : DateFormat('M/d/yy').format(r.dueDate!),
+                    style: TextStyle(
+                      color: DueDateUtils.getDueDateColor(r.dueDate),
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ),
 
@@ -538,7 +505,7 @@ class _AfterDetailScreenState extends State<AfterDetailScreen> {
                       Text(
                         r.atStatus.toString(),
                         style: TextStyle(
-                          color: _getDueDateColor(r.dueDate),
+                          color: DueDateUtils.getDueDateColor(r.dueDate),
                           fontWeight: FontWeight.w500,
                         ),
                       ),
@@ -551,32 +518,6 @@ class _AfterDetailScreenState extends State<AfterDetailScreen> {
         ),
       ),
     );
-  }
-
-  Color _getDueDateColor(DateTime? dueDate) {
-    if (dueDate == null) {
-      return Colors.white.withOpacity(0.85);
-    }
-
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final due = DateTime(dueDate.year, dueDate.month, dueDate.day);
-
-    final diffDays = due.difference(today).inDays;
-    if (diffDays < 0) {
-      // Trễ
-      return Colors.redAccent;
-    } else if (diffDays <= 3) {
-      // Gần tới hạn (≤ 3 ngày)
-      return Colors.orangeAccent;
-    } else {
-      // Bình thường
-      return Colors.white.withOpacity(0.85);
-    }
-  }
-
-  String _displayPIC(String pic) {
-    return pic.trim().isEmpty ? '--- Chưa có PIC ---' : pic;
   }
 
   Widget _buildSearchableDropdown({
