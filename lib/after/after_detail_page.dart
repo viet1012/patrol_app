@@ -214,16 +214,16 @@ class _AfterDetailPageState extends State<AfterDetailPage> {
     );
   }
 
-  Widget _buildImageGrid(List<String> images) {
-    return SizedBox(
+  Widget _buildImageGrid1(List<String> images) {
+    return Container(
       height: 320, // 👈 đủ cho image + camera
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: images.length,
         separatorBuilder: (_, __) => const SizedBox(width: 12),
         itemBuilder: (context, index) {
-          return SizedBox(
-            width: 280,
+          return Container(
+            width: 320,
             child: ReplaceableImageItem(
               imageName: images[index],
               report: widget.report,
@@ -232,6 +232,57 @@ class _AfterDetailPageState extends State<AfterDetailPage> {
               onReplaced: (newImage) {
                 setState(() {
                   images[index] = newImage; // 🔥 UPDATE LIST CHA
+                });
+              },
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildImageGrid(List<String> images) {
+    // ===== CASE 1: chỉ có 1 ảnh → căn giữa =====
+    if (images.length == 1) {
+      return SizedBox(
+        height: 320,
+        child: Center(
+          child: SizedBox(
+            width: 320,
+            child: ReplaceableImageItem(
+              imageName: images.first,
+              report: widget.report,
+              patrolGroup: widget.patrolGroup,
+              plant: widget.report.plant,
+              onReplaced: (newImage) {
+                setState(() {
+                  images[0] = newImage;
+                });
+              },
+            ),
+          ),
+        ),
+      );
+    }
+
+    // ===== CASE 2: nhiều ảnh → scroll ngang =====
+    return SizedBox(
+      height: 320,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: images.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 12),
+        itemBuilder: (context, index) {
+          return SizedBox(
+            width: 320,
+            child: ReplaceableImageItem(
+              imageName: images[index],
+              report: widget.report,
+              patrolGroup: widget.patrolGroup,
+              plant: widget.report.plant,
+              onReplaced: (newImage) {
+                setState(() {
+                  images[index] = newImage;
                 });
               },
             ),

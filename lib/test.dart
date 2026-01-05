@@ -187,21 +187,21 @@ class _CameraScreenState extends State<CameraScreen> {
   List<String> get groupList =>
       List.generate(numbersGroup, (index) => 'Group ${index + 1}');
 
-  List<String> getGroupsByPlant() {
-    return widget.patrolTeams
-        .where((e) => e.plant == widget.selectedPlant)
-        .map((e) => e.grp)
-        .whereType<String>()
-        .toSet() // tránh trùng
-        .toList();
-  }
-
   List<String> getPlants() {
     final Set<String> unique = {};
     return widget.machines
         .map((m) => m.plant.toString())
         .where((p) => p.isNotEmpty)
         .where((p) => unique.add(p))
+        .toList();
+  }
+
+  List<String> getGroupsByPlant() {
+    return widget.patrolTeams
+        .where((e) => e.plant == widget.selectedPlant)
+        .map((e) => e.grp)
+        .whereType<String>()
+        .toSet() // tránh trùng
         .toList();
   }
 
@@ -1141,6 +1141,7 @@ class _CameraScreenState extends State<CameraScreen> {
                           context,
                           MaterialPageRoute(
                             builder: (_) => EditBeforeScreen(
+                              machines: widget.machines,
                               accountCode: widget.accountCode,
                               selectedFac: _selectedFac,
                               selectedPlant: _selectedPlant,

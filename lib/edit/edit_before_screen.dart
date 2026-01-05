@@ -20,9 +20,11 @@ class EditBeforeScreen extends StatefulWidget {
 
   final String titleScreen;
   final PatrolGroup patrolGroup;
+  final List<MachineModel> machines; // ✅ thêm
 
   const EditBeforeScreen({
     super.key,
+    required this.machines,
     required this.accountCode,
     required this.selectedGrp,
     required this.selectedPlant,
@@ -406,6 +408,7 @@ class _EditBeforeScreenState extends State<EditBeforeScreen> {
                             context,
                             MaterialPageRoute(
                               builder: (_) => EditDetailPage(
+                                machines: widget.machines,
                                 report: r,
                                 patrolGroup: widget.patrolGroup,
                               ),

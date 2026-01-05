@@ -133,17 +133,45 @@ Future<void> deleteImageApi({
 
 Future<void> updateReportApi({
   required int id,
-  required String comment,
-  required String countermeasure,
+  String? comment,
+  String? countermeasure,
+
+  // ✅ meta fields
+  String? grp,
+  String? plant,
+  String? division,
+  String? area,
+  String? machine,
+
+  // ✅ audit
+  String? editUser,
+
+  // ✅ images
   List<Uint8List>? images,
+  List<String>? deleteImages,
 }) async {
   final path = '/api/patrol_report/$id/edit';
 
-  final dto = {'comment': comment, 'countermeasure': countermeasure};
+  // ✅ dto: field nào null thì BE sẽ giữ nguyên
+  final dto = <String, dynamic>{
+    if (comment != null) 'comment': comment,
+    if (countermeasure != null) 'countermeasure': countermeasure,
+
+    if (grp != null) 'grp': grp,
+    if (plant != null) 'plant': plant,
+    if (division != null) 'division': division,
+    if (area != null) 'area': area,
+    if (machine != null) 'machine': machine,
+
+    if (editUser != null) 'editUser': editUser,
+
+    if (deleteImages != null) 'deleteImages': deleteImages,
+  };
 
   final formData = FormData.fromMap({
     'data': jsonEncode(dto),
-    if (images != null)
+
+    if (images != null && images.isNotEmpty)
       'images': images
           .map(
             (e) => MultipartFile.fromBytes(
@@ -161,6 +189,6 @@ Future<void> updateReportApi({
   );
 
   if (res.statusCode != 200) {
-    throw Exception('Update failed');
+    throw Exception('Update failed: ${res.statusCode}');
   }
 }

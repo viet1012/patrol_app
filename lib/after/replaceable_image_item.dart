@@ -179,8 +179,8 @@ class _ReplaceableImageItemState extends State<ReplaceableImageItem> {
   // ================= UI =================
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 220, // 🔥 CỐ ĐỊNH – KHÔNG BAO GIỜ ĐẨY LAYOUT
+    return AspectRatio(
+      aspectRatio: 280 / 320,
       child: Stack(
         children: [
           // ClipRRect(

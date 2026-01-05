@@ -2,9 +2,13 @@ import 'dart:async';
 
 import 'dart:typed_data';
 
+import 'package:auto_size_text/auto_size_text.dart';
+import 'package:dropdown_search/dropdown_search.dart';
 import 'package:flutter/material.dart';
 import '../api/replace_image_api.dart';
 import '../common/common_ui_helper.dart';
+import '../model/machine_model.dart';
+import '../translator.dart';
 import 'edit_image_item.dart';
 import '../homeScreen/patrol_home_screen.dart';
 import '../model/patrol_report_model.dart';
@@ -14,10 +18,13 @@ import 'camera_edit_box.dart';
 class EditDetailPage extends StatefulWidget {
   final PatrolReportModel report;
   final PatrolGroup patrolGroup;
+  final List<MachineModel> machines; // ✅ thêm
+
   const EditDetailPage({
     super.key,
     required this.report,
     required this.patrolGroup,
+    required this.machines,
   });
 
   @override
@@ -30,14 +37,195 @@ class _EditDetailPageState extends State<EditDetailPage> {
 
   final TextEditingController _commentCtrl = TextEditingController();
   final TextEditingController _counterCtrl = TextEditingController();
+  String? _selectedGroup;
+  String? _selectedDivision; // map = fac
+  String? _selectedArea;
+  String? _selectedMachine;
 
-  Timer? _debounce;
   @override
   void initState() {
     super.initState();
     _commentCtrl.text = widget.report.comment;
     _counterCtrl.text = widget.report.countermeasure;
+
+    _selectedGroup = widget.report.grp;
+    _selectedDivision = widget.report.division; // nếu division == fac
+    _selectedArea = widget.report.area;
+
+    final m = widget.report.machine.trim();
+    _selectedMachine = (m == "<Null>" || m.isEmpty) ? null : m;
+
+    _autoFixInvalidSelections();
   }
+
+  List<String> get groupList => List.generate(10, (i) => 'Group ${i + 1}');
+
+  List<String> getFacByPlant(String plant) {
+    final unique = <String>{};
+    return widget.machines
+        .where((m) => m.plant.toString() == plant)
+        .map((m) => m.fac.toString())
+        .where((s) => s.trim().isNotEmpty)
+        .where(unique.add)
+        .toList();
+  }
+
+  List<String> getAreaByFac(String plant, String fac) {
+    final unique = <String>{};
+    return widget.machines
+        .where((m) => m.plant.toString() == plant)
+        .where((m) => m.fac.toString() == fac)
+        .map((m) => m.area.toString())
+        .where((s) => s.trim().isNotEmpty)
+        .where(unique.add)
+        .toList();
+  }
+
+  List<String> getMachineByArea(String plant, String fac, String area) {
+    final unique = <String>{};
+    return widget.machines
+        .where((m) => m.plant.toString() == plant)
+        .where((m) => m.fac.toString() == fac)
+        .where((m) => m.area.toString() == area)
+        .map((m) => m.macId.toString())
+        .where((s) => s.trim().isNotEmpty)
+        .where(unique.add)
+        .toList();
+  }
+
+  void _autoFixInvalidSelections() {
+    final plant = widget.report.plant;
+
+    final facList = getFacByPlant(plant);
+    if (_selectedDivision == null || !facList.contains(_selectedDivision)) {
+      _selectedDivision = facList.isNotEmpty ? facList.first : null;
+    }
+    if (_selectedDivision == null) return;
+
+    final areaList = getAreaByFac(plant, _selectedDivision!);
+    if (_selectedArea == null || !areaList.contains(_selectedArea)) {
+      _selectedArea = areaList.isNotEmpty ? areaList.first : null;
+    }
+    if (_selectedArea == null) return;
+
+    final machineList = getMachineByArea(
+      plant,
+      _selectedDivision!,
+      _selectedArea!,
+    );
+    if (_selectedMachine == null || !machineList.contains(_selectedMachine)) {
+      _selectedMachine = machineList.isNotEmpty ? machineList.first : null;
+    }
+  }
+
+  Widget _buildEditableMeta() {
+    final plant = widget.report.plant;
+
+    final facList = getFacByPlant(plant);
+    final areaList = (_selectedDivision == null)
+        ? <String>[]
+        : getAreaByFac(plant, _selectedDivision!);
+    final machineList = (_selectedDivision == null || _selectedArea == null)
+        ? <String>[]
+        : getMachineByArea(plant, _selectedDivision!, _selectedArea!);
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.20),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withOpacity(0.10)),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: _buildSearchableDropdown(
+                  label: "Group",
+                  selectedValue: _selectedGroup,
+                  items: groupList,
+                  onChanged: (v) => setState(() => _selectedGroup = v),
+                  isRequired: true,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildSearchableDropdown(
+                  label: "Division",
+                  selectedValue: _selectedDivision,
+                  items: facList,
+                  onChanged: (v) {
+                    setState(() {
+                      _selectedDivision = v;
+                      _selectedArea = null;
+                      _selectedMachine = null;
+
+                      if (v == null) return;
+
+                      final areas = getAreaByFac(plant, v);
+                      if (areas.length == 1) {
+                        _selectedArea = areas.first;
+                        final machines = getMachineByArea(
+                          plant,
+                          v,
+                          areas.first,
+                        );
+                        if (machines.length == 1)
+                          _selectedMachine = machines.first;
+                      }
+                    });
+                  },
+                  isRequired: true,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: _buildSearchableDropdown(
+                  label: "Area",
+                  selectedValue: _selectedArea,
+                  items: areaList,
+                  onChanged: (v) {
+                    setState(() {
+                      _selectedArea = v;
+                      _selectedMachine = null;
+
+                      if (_selectedDivision == null || v == null) return;
+
+                      final machines = getMachineByArea(
+                        plant,
+                        _selectedDivision!,
+                        v,
+                      );
+                      if (machines.length == 1)
+                        _selectedMachine = machines.first;
+                    });
+                  },
+                  isRequired: true,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildSearchableDropdown(
+                  label: "Machine",
+                  selectedValue: _selectedMachine,
+                  items: machineList,
+                  onChanged: (v) => setState(() => _selectedMachine = v),
+                  isRequired: true,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Timer? _debounce;
 
   @override
   void dispose() {
@@ -100,32 +288,7 @@ class _EditDetailPageState extends State<EditDetailPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ===== 2 cột thông tin =====
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _infoItem('Group', widget.report.grp),
-                        _infoItem('Area', widget.report.area),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 32),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _infoItem('Division', widget.report.division),
-                        _infoItem('Machine', widget.report.machine),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-
+              _buildEditableMeta(),
               const SizedBox(height: 16),
 
               // ===== Comment & Countermeasure =====
@@ -185,6 +348,12 @@ class _EditDetailPageState extends State<EditDetailPage> {
         id: widget.report.id!,
         comment: _commentCtrl.text.trim(),
         countermeasure: _counterCtrl.text.trim(),
+
+        grp: _selectedGroup,
+        plant: widget.report.plant,
+        division: _selectedDivision,
+        area: _selectedArea,
+        machine: _selectedMachine,
       );
 
       if (!mounted) return;
@@ -245,6 +414,225 @@ class _EditDetailPageState extends State<EditDetailPage> {
               borderRadius: BorderRadius.circular(8),
               borderSide: BorderSide.none,
             ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSearchableDropdown({
+    required String label,
+    required String? selectedValue,
+    required List<String> items,
+    required Function(String?)? onChanged,
+    bool isRequired = false,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          child: DropdownSearch<String>(
+            popupProps: PopupProps.menu(
+              showSearchBox: true,
+              isFilterOnline: true,
+              fit: FlexFit.loose,
+              menuProps: MenuProps(
+                backgroundColor: const Color(0xFF161D23),
+                elevation: 12,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(18),
+                ),
+              ),
+
+              /// 🔴 NO DATA FOUND CUSTOM
+              emptyBuilder: (context, searchEntry) {
+                return Center(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.search_off_rounded,
+                          size: 40,
+                          color: Colors.white.withOpacity(0.5),
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          "No data found", // hoặc "No data found"
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.7),
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+              searchFieldProps: TextFieldProps(
+                decoration: InputDecoration(
+                  hintText: "search_or_add_new".tr(context),
+                  filled: true,
+                  fillColor: Colors.white.withOpacity(0.1),
+                  prefixIcon: Icon(
+                    Icons.search_rounded,
+                    color: Colors.white.withOpacity(0.7),
+                  ),
+                  hintStyle: TextStyle(color: Colors.white.withOpacity(0.6)),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 12,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+                style: TextStyle(
+                  color: Colors.white, // <-- set màu chữ nhập thành trắng
+                ),
+              ),
+
+              itemBuilder: (context, item, isSelected) {
+                return Container(
+                  margin: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 4,
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 12,
+                  ),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    color: isSelected
+                        ? Colors.white.withOpacity(0.12)
+                        : Colors.transparent,
+                  ),
+                  child: AutoSizeText(
+                    item,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: isSelected
+                          ? FontWeight.w600
+                          : FontWeight.w500,
+                      color: Colors.white,
+                    ),
+                  ),
+                );
+              },
+            ),
+
+            // ... (các logic asyncItems, compareFn, v.v. giữ nguyên)
+            asyncItems: (String filter) async {
+              var result = items
+                  .where((e) => e.toLowerCase().contains(filter.toLowerCase()))
+                  .toList();
+
+              // Nếu filter không rỗng và chưa có trong items thì thêm vào đầu danh sách
+              if (filter.isNotEmpty && !items.contains(filter.trim())) {
+                result.insert(0, filter.trim());
+              }
+              return result;
+            },
+            compareFn: (item, selectedItem) =>
+                item.trim() == selectedItem.trim(),
+
+            selectedItem: selectedValue ?? '',
+
+            dropdownDecoratorProps: DropDownDecoratorProps(
+              dropdownSearchDecoration: InputDecoration(
+                hintText: label,
+                hintMaxLines: 1,
+                floatingLabelBehavior: FloatingLabelBehavior.never,
+
+                /// 🌫️ nền glass
+                filled: true,
+                fillColor: Colors.white.withOpacity(0.08),
+
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide(color: Colors.white.withOpacity(0.35)),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide(
+                    color: const Color(0xFF4DD0E1).withOpacity(0.45),
+                  ),
+                ),
+
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: const BorderSide(
+                    color: Color(0xFF4DD0E1), // cyan
+                    width: 1.6,
+                  ),
+                ),
+
+                contentPadding: const EdgeInsets.fromLTRB(12, 14, 12, 12),
+
+                /// 📝 hint
+                hintStyle: TextStyle(
+                  color: Colors.white.withOpacity(0.6),
+                  fontSize: 14,
+                ),
+              ),
+            ),
+
+            dropdownBuilder: (context, selectedItem) {
+              final bool isEmpty = selectedItem == null || selectedItem.isEmpty;
+
+              Color textColor;
+              FontWeight fontWeight;
+
+              if (isEmpty && isRequired) {
+                textColor = Colors.red.withOpacity(.6);
+                fontWeight = FontWeight.w600;
+              } else if (!isEmpty) {
+                textColor = Colors.white;
+                fontWeight = FontWeight.bold;
+              } else {
+                textColor = Colors.white.withOpacity(0.6);
+                fontWeight = FontWeight.w500;
+              }
+
+              return Row(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  /// 📝 TEXT
+                  Expanded(
+                    child: AutoSizeText(
+                      isEmpty ? label : selectedItem,
+                      maxLines: 2,
+                      minFontSize: 11,
+                      stepGranularity: 0.5,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: fontWeight,
+                        color: textColor,
+                      ),
+                    ),
+                  ),
+
+                  /// ⭐ REQUIRED ICON
+                  if (isRequired && isEmpty) ...[
+                    const SizedBox(width: 6),
+                    Icon(
+                      Icons.star_rounded, // ⭐
+                      size: 14,
+                      color: Colors.red.withOpacity(.6),
+                    ),
+                  ],
+                ],
+              );
+            },
+
+            onChanged: onChanged,
           ),
         ),
       ],
