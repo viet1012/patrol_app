@@ -10,6 +10,7 @@ import 'package:dropdown_search/dropdown_search.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'api/api_config.dart';
+import 'api/hse_master_service.dart';
 import 'common/common_ui_helper.dart';
 import 'edit/edit_before_screen.dart';
 import 'homeScreen/patrol_home_screen.dart';
@@ -72,6 +73,31 @@ class _CameraScreenState extends State<CameraScreen> {
   Timer? _commentDebounce;
   Timer? _counterDebounce;
 
+  String? _employeeName;
+  bool _isLoadingName = false;
+
+  @override
+  void initState() {
+    // _selectedPlant = widget.selectedPlant;
+    super.initState();
+
+    final team = widget.autoTeam;
+
+    // auto select Plant - Fac - Group
+    if (team != null) {
+      _selectedPlant = team.plant;
+      _selectedFac = team.fac;
+      _selectedGroup = team.grp;
+    } else {
+      _selectedPlant = widget.selectedPlant;
+    }
+    fetchEmployeeName(
+      widget.accountCode,
+    ).then((name) => debugPrint('EMPLOYEE NAME = $name'));
+    _loadInitialDataComment();
+    _loadInitialDataCounter();
+  }
+
   @override
   void dispose() {
     _commentDebounce?.cancel();
@@ -79,6 +105,31 @@ class _CameraScreenState extends State<CameraScreen> {
     _commentFocusNode.dispose();
     _counterFocusNode.dispose();
     super.dispose();
+  }
+
+  Future<String?> fetchEmployeeName(String code) async {
+    final empCode = code.trim();
+    if (empCode.isEmpty) return null;
+
+    if (!mounted) return null;
+    setState(() => _isLoadingName = true);
+
+    try {
+      final name = await HseMasterService.fetchEmployeeName(empCode);
+
+      if (!mounted) return null;
+      setState(() => _employeeName = name);
+      return name;
+    } catch (e) {
+      debugPrint('Error fetching employee name: $e');
+
+      if (!mounted) return null;
+      setState(() => _employeeName = null);
+      return null;
+    } finally {
+      if (!mounted) return null;
+      setState(() => _isLoadingName = false);
+    }
   }
 
   int get totalScore {
@@ -237,7 +288,7 @@ class _CameraScreenState extends State<CameraScreen> {
 
       // ================= REPORT =================
       final reportMap = {
-        'userCreate': widget.accountCode,
+        'userCreate': '${widget.accountCode}_$_employeeName',
         'plant': _selectedPlant ?? '',
         'type': widget.patrolGroup.name,
         'division': _selectedFac ?? '',
@@ -340,7 +391,6 @@ class _CameraScreenState extends State<CameraScreen> {
       else
         _fontSize = 14;
     });
-    // print("length: ${text.length} +_fontSize: ${_fontSize}");
   }
 
   void _resetForm() {
@@ -356,26 +406,6 @@ class _CameraScreenState extends State<CameraScreen> {
       _needRecheck = false;
     });
     _cameraKey.currentState?.clearAll(); // xóa hết ảnh
-  }
-
-  @override
-  void initState() {
-    // _selectedPlant = widget.selectedPlant;
-    super.initState();
-
-    final team = widget.autoTeam;
-
-    // auto select Plant - Fac - Group
-    if (team != null) {
-      _selectedPlant = team.plant;
-      _selectedFac = team.fac;
-      _selectedGroup = team.grp;
-    } else {
-      _selectedPlant = widget.selectedPlant;
-    }
-
-    _loadInitialDataComment();
-    _loadInitialDataCounter();
   }
 
   @override

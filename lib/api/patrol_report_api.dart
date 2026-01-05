@@ -5,7 +5,7 @@ import 'dio_client.dart';
 
 class PatrolReportApi {
   static Future<List<PatrolReportModel>> fetchReports({
-    required String plant, // b?t bu?c
+    String? plant, // b?t bu?c
     String? division,
     String? area,
     String? machine,
@@ -19,11 +19,18 @@ class PatrolReportApi {
       final endpoint = '/api/patrol_report/filter';
 
       /// ? CH? ADD PARAM KHI CÓ GIÁ TR?
-      final Map<String, String> queryParams = {'plant': plant};
+      final Map<String, String> queryParams = {'plant': ?plant};
 
       void addIfNotEmpty(String key, String? value) {
         if (value != null && value.trim().isNotEmpty) {
           queryParams[key] = value.trim();
+        }
+      }
+
+      // ✅ Cho phép gửi param ngay cả khi rỗng (dùng cho pic='')
+      void addEvenIfEmpty(String key, String? value) {
+        if (value != null) {
+          queryParams[key] = value.trim(); // có thể là ''
         }
       }
 
@@ -33,7 +40,7 @@ class PatrolReportApi {
       addIfNotEmpty('type', type);
       addIfNotEmpty('afStatus', afStatus);
       addIfNotEmpty('grp', grp);
-      addIfNotEmpty('pic', pic);
+      addEvenIfEmpty('pic', pic);
       addIfNotEmpty('patrolUser', patrolUser);
 
       /// ?? DEBUG
@@ -41,7 +48,7 @@ class PatrolReportApi {
         '${DioClient.dio.options.baseUrl}$endpoint',
       ).replace(queryParameters: queryParams);
 
-      // debugPrint('?? API CALL: $uri');
+      debugPrint('?? API CALL: $uri');
 
       final response = await DioClient.dio.get(
         endpoint,

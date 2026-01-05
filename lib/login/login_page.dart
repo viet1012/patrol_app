@@ -5,6 +5,7 @@ import '../animate/glow_title.dart';
 import '../api/auth_api.dart';
 import '../homeScreen/patrol_home_screen.dart';
 import '../register/register_page.dart';
+import '../session/session_store.dart';
 import 'change_password_screen.dart';
 
 class LoginPage extends StatefulWidget {
@@ -21,6 +22,37 @@ class _LoginPageState extends State<LoginPage> {
 
   String? _errorMsg;
   bool _showPassword = false;
+  bool _rememberMe = true; // nếu bạn muốn mặc định luôn nhớ đăng nhập
+
+  @override
+  void initState() {
+    super.initState();
+    _autoLoginWithSavedCreds();
+  }
+
+  Future<void> _autoLoginWithSavedCreds() async {
+    final creds = await SessionStore.getCreds();
+    if (creds == null) return;
+
+    final (account, password) = creds;
+
+    // (Tuỳ bạn) show loading nhẹ hoặc disable UI trong lúc auto login
+    final result = await AuthApi.login(account: account, password: password);
+
+    if (!mounted) return;
+
+    if (!result.success) {
+      // Password đổi / account bị khóa / server từ chối -> xoá creds để user login lại
+      await SessionStore.clear();
+      return;
+    }
+
+    // đi thẳng vào Home
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (_) => PatrolHomeScreen(accountCode: account)),
+    );
+  }
 
   @override
   void dispose() {
@@ -48,7 +80,12 @@ class _LoginPageState extends State<LoginPage> {
       return;
     }
 
-    // ✅ LOGIN OK → CHUYỂN SANG HOME
+    if (_rememberMe) {
+      await SessionStore.saveCreds(account: code, password: pass);
+    } else {
+      await SessionStore.clear();
+    }
+
     if (!mounted) return;
 
     Navigator.pushReplacement(
@@ -200,6 +237,18 @@ class _LoginPageState extends State<LoginPage> {
                 ),
 
                 const SizedBox(height: 28),
+                Row(
+                  children: [
+                    Checkbox(
+                      value: _rememberMe,
+                      onChanged: (v) => setState(() => _rememberMe = v ?? true),
+                    ),
+                    const Text(
+                      "Remember me",
+                      style: TextStyle(color: Colors.white70),
+                    ),
+                  ],
+                ),
 
                 SizedBox(
                   width: double.infinity,
