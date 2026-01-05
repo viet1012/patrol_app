@@ -80,7 +80,6 @@ class _CameraScreenState extends State<CameraScreen> {
   void initState() {
     // _selectedPlant = widget.selectedPlant;
     super.initState();
-
     final team = widget.autoTeam;
 
     // auto select Plant - Fac - Group
@@ -198,7 +197,7 @@ class _CameraScreenState extends State<CameraScreen> {
 
   List<String> getGroupsByPlant() {
     return widget.patrolTeams
-        .where((e) => e.plant == widget.selectedPlant)
+        .where((e) => e.plant == _selectedPlant)
         .map((e) => e.grp)
         .whereType<String>()
         .toSet() // tránh trùng
@@ -571,16 +570,15 @@ class _CameraScreenState extends State<CameraScreen> {
                       label: "group".tr(context),
                       selectedValue: _selectedGroup,
                       items: groupList,
-                      onChanged: widget.autoTeam != null
-                          ? null // 🔒 khóa
-                          : (v) {
-                              setState(() {
-                                _selectedGroup = v;
-                              });
-                            },
+                      onChanged: (v) {
+                        setState(() {
+                          _selectedGroup = v;
+                        });
+                      },
                       isRequired: true,
                     ),
                   ),
+
                   const SizedBox(width: 8),
                   Expanded(
                     child: _buildSearchableDropdown(
