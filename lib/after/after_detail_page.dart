@@ -6,6 +6,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' hide MultipartFile;
 import '../api/dio_client.dart';
+import '../api/hse_master_service.dart';
 import '../homeScreen/patrol_home_screen.dart';
 import '../model/patrol_report_model.dart';
 import '../widget/glass_action_button.dart';
@@ -41,6 +42,13 @@ class _AfterDetailPageState extends State<AfterDetailPage> {
   Timer? _debounce;
 
   @override
+  void initState() {
+    super.initState();
+    _msnvCtrl.text = widget.accountCode;
+    _initEmployee();
+  }
+
+  @override
   void dispose() {
     _debounce?.cancel();
     _commentCtrl.dispose();
@@ -54,13 +62,6 @@ class _AfterDetailPageState extends State<AfterDetailPage> {
   }
 
   @override
-  void initState() {
-    super.initState();
-    _msnvCtrl.text = widget.accountCode;
-    _initEmployee();
-  }
-
-  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
@@ -71,19 +72,28 @@ class _AfterDetailPageState extends State<AfterDetailPage> {
           onTap: () => Navigator.pop(context, true),
         ),
         backgroundColor: const Color(0xFF121826),
-        title: Column(
+        title: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              'Patrol After',
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                fontStyle: FontStyle.italic,
-              ),
+            Column(
+              children: [
+                Text(
+                  'Patrol After',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+                Text(
+                  widget.report.plant,
+                  style: const TextStyle(color: Colors.white70, fontSize: 11),
+                ),
+              ],
             ),
             Text(
-              widget.report.plant,
+              'ID: ${widget.report.id.toString()}',
               style: const TextStyle(color: Colors.white70, fontSize: 11),
             ),
           ],
@@ -514,42 +524,37 @@ class _AfterDetailPageState extends State<AfterDetailPage> {
   }
 
   Future<void> fetchEmployeeName(String code) async {
-    if (code.trim().isEmpty) {
+    final empCode = code.trim();
+
+    if (empCode.isEmpty) {
+      if (!mounted) return;
       setState(() {
         _employeeName = null;
+        _isLoadingName = false;
       });
       return;
     }
 
-    setState(() {
-      _isLoadingName = true;
-    });
+    if (!mounted) return;
+    setState(() => _isLoadingName = true);
 
     try {
-      final dio = DioClient.dio;
-      final response = await dio.get(
-        '/api/hr/name',
-        queryParameters: {'code': code.trim()},
-      );
+      final name = await HseMasterService.fetchEmployeeName(empCode);
 
-      if (response.statusCode == 200) {
-        setState(() {
-          _employeeName = response.data.toString();
-        });
-      } else {
-        setState(() {
-          _employeeName = null;
-        });
-      }
+      if (!mounted) return;
+      setState(() {
+        _employeeName = name; // null nếu không có
+      });
     } catch (e) {
       debugPrint('Error fetching employee name: $e');
+
+      if (!mounted) return;
       setState(() {
         _employeeName = null;
       });
     } finally {
-      setState(() {
-        _isLoadingName = false;
-      });
+      if (!mounted) return;
+      setState(() => _isLoadingName = false);
     }
   }
 

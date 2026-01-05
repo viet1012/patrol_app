@@ -51,18 +51,51 @@ class _AfterDetailScreenState extends State<AfterDetailScreen> {
   //       .toList();
   // }
 
+  // Future<List<String>> findPicsByPlantFromApi(String plant) async {
+  //   final reports = await PatrolReportApi.fetchReports(plant: plant);
+  //   print("Count: ${reports.length}");
+  //   final Set<String> uniquePics = {};
+  //
+  //   final pics = reports
+  //       .map(
+  //         (r) => r.pic?.trim() ?? '',
+  //       ) // giả sử PatrolReportModel có trường pic
+  //       .where((pic) => pic.isNotEmpty)
+  //       .where((pic) => uniquePics.add(pic))
+  //       .toList();
+  //
+  //   return pics;
+  // }
   Future<List<String>> findPicsByPlantFromApi(String plant) async {
+    debugPrint('🔍 Fetch reports for plant = [$plant]');
+
     final reports = await PatrolReportApi.fetchReports(plant: plant);
+    debugPrint('📦 Total reports: ${reports.length}');
+
+    const emptyLabel = 'UNKNOWN'; // 👈 nhãn cho PIC rỗng
 
     final Set<String> uniquePics = {};
+    final List<String> pics = [];
 
-    final pics = reports
-        .map(
-          (r) => r.pic?.trim() ?? '',
-        ) // giả sử PatrolReportModel có trường pic
-        .where((pic) => pic.isNotEmpty)
-        .where((pic) => uniquePics.add(pic))
-        .toList();
+    for (final r in reports) {
+      final rawPic = r.pic?.trim();
+      final pic = (rawPic == null || rawPic.isEmpty) ? emptyLabel : rawPic;
+
+      if (uniquePics.add(pic)) {
+        pics.add(pic);
+
+        if (pic == emptyLabel) {
+          debugPrint('⚠️ Add EMPTY PIC as "$emptyLabel" | reportId=${r.id}');
+        } else {
+          debugPrint('✅ Add PIC: $pic | reportId=${r.id}');
+        }
+      } else {
+        debugPrint('🔁 Duplicate PIC skipped: "$pic" | reportId=${r.id}');
+      }
+    }
+
+    debugPrint('🎯 Unique PIC count: ${pics.length}');
+    debugPrint('📋 PIC LIST: $pics');
 
     return pics;
   }
@@ -98,30 +131,21 @@ class _AfterDetailScreenState extends State<AfterDetailScreen> {
   void _loadReport() async {
     if (selectedPIC == null) return;
 
-    setState(() {
-      _futureReport = null; // reset trước (optional)
-    });
+    const emptyLabel = 'UNKNOWN';
+    final picFilter = (selectedPIC == emptyLabel) ? '' : selectedPIC!.trim();
 
-    try {
-      final future = PatrolReportApi.fetchReports(
-        plant: widget.selectedPlant!,
-        type: widget.patrolGroup.name,
-        pic: selectedPIC!.trim(),
-        afStatus: 'Wait,Redo',
-      );
-      debugPrint('?? SELECTED PIC = "$selectedPIC"');
+    debugPrint('?? SELECTED PIC UI="$selectedPIC" | API pic="$picFilter"');
 
-      setState(() {
-        _futureReport = future;
-      });
-    } catch (e, s) {
-      debugPrint('❌ Load report error: $e');
-      debugPrintStack(stackTrace: s);
+    setState(() => _futureReport = null);
 
-      setState(() {
-        _futureReport = Future.error(e);
-      });
-    }
+    final future = PatrolReportApi.fetchReports(
+      plant: widget.selectedPlant!,
+      type: widget.patrolGroup.name,
+      pic: picFilter, // 👈 gửi '' khi UNKNOWN
+      afStatus: 'Wait,Redo',
+    );
+
+    setState(() => _futureReport = future);
   }
 
   // void debugFindPics() {
@@ -551,6 +575,10 @@ class _AfterDetailScreenState extends State<AfterDetailScreen> {
     }
   }
 
+  String _displayPIC(String pic) {
+    return pic.trim().isEmpty ? '--- Chưa có PIC ---' : pic;
+  }
+
   Widget _buildSearchableDropdown({
     required String label,
     required String? selectedValue,
@@ -644,8 +672,11 @@ class _AfterDetailScreenState extends State<AfterDetailScreen> {
                   ),
                   child: AutoSizeText(
                     item,
+                    maxLines: 1,
+                    minFontSize: 11,
+                    stepGranularity: 0.5,
+                    overflow: TextOverflow.visible,
                     style: TextStyle(
-                      fontSize: 14,
                       fontWeight: isSelected
                           ? FontWeight.w600
                           : FontWeight.w500,
@@ -716,10 +747,10 @@ class _AfterDetailScreenState extends State<AfterDetailScreen> {
                 selectedItem?.isNotEmpty == true ? selectedItem! : label,
                 maxLines: 1,
                 minFontSize: 11,
+                maxFontSize: 14,
                 stepGranularity: 0.5,
                 overflow: TextOverflow.visible,
                 style: TextStyle(
-                  fontSize: 14,
                   fontWeight: selectedItem?.isNotEmpty == true
                       ? FontWeight.bold
                       : FontWeight.w500,

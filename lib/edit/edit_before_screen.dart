@@ -151,7 +151,7 @@ class _EditBeforeScreenState extends State<EditBeforeScreen> {
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
-                      '${widget.selectedPlant}_${widget.selectedGrp}',
+                      '${widget.selectedPlant}',
                       style: const TextStyle(
                         color: Colors.white70,
                         fontSize: 11,

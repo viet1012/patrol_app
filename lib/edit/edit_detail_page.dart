@@ -58,19 +58,28 @@ class _EditDetailPageState extends State<EditDetailPage> {
           onTap: () => Navigator.pop(context, true),
         ),
         backgroundColor: const Color(0xFF121826),
-        title: Column(
+        title: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              'Edit Detail',
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                fontStyle: FontStyle.italic,
-              ),
+            Column(
+              children: [
+                Text(
+                  'Edit Detail',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+                Text(
+                  widget.report.plant,
+                  style: const TextStyle(color: Colors.white70, fontSize: 11),
+                ),
+              ],
             ),
             Text(
-              widget.report.plant,
+              'ID: ${widget.report.id.toString()}',
               style: const TextStyle(color: Colors.white70, fontSize: 11),
             ),
           ],

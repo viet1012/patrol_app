@@ -60,4 +60,26 @@ class HseMasterService {
     }
     return null;
   }
+
+  static Future<String?> fetchEmployeeName(String code) async {
+    final empCode = code.trim();
+    if (empCode.isEmpty) return null;
+
+    try {
+      final res = await DioClient.dio.get(
+        '/api/hr/name',
+        queryParameters: {'code': empCode},
+      );
+
+      // Backend bạn trả string thuần (response.data)
+      if (res.statusCode == 200) {
+        final name = res.data?.toString().trim();
+        return (name == null || name.isEmpty) ? null : name;
+      }
+
+      return null;
+    } on DioException catch (e) {
+      throw Exception(DioErrorHandler.handle(e));
+    }
+  }
 }

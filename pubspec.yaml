@@ -55,6 +55,8 @@ dependencies:
   auto_size_text: ^3.0.0
   image: ^4.3.0
   package_info_plus: ^9.0.0
+  flutter_secure_storage: ^10.0.0
+  shared_preferences: ^2.5.4
 dev_dependencies:
   flutter_test:
     sdk: flutter

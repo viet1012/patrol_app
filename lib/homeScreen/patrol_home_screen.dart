@@ -12,9 +12,11 @@ import '../animate/christmas_title.dart';
 import '../animate/glow_title.dart';
 import '../api/dio_client.dart';
 import '../api/hse_master_service.dart';
+import '../common/common_ui_helper.dart';
 import '../login/login_page.dart';
 import '../model/hse_patrol_team_model.dart';
 import '../model/machine_model.dart';
+import '../session/session_store.dart';
 import '../test.dart';
 import '../translator.dart';
 import '../widget/error_display.dart';
@@ -468,34 +470,21 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
                       GlassActionButton(
                         icon: Icons.logout,
                         onTap: () async {
-                          if (!context.mounted) return;
-
-                          final confirm = await showDialog<bool>(
+                          final confirm = await CommonUI.showGlassConfirm(
                             context: context,
-                            builder: (ctx) => AlertDialog(
-                              title: const Text("Logout"),
-                              content: const Text("Do you want to logout?"),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              actions: [
-                                TextButton(
-                                  onPressed: () => Navigator.pop(ctx, false),
-                                  child: const Text("Cancel"),
-                                ),
-                                ElevatedButton(
-                                  onPressed: () => Navigator.pop(ctx, true),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.redAccent,
-                                    foregroundColor: Colors.white,
-                                  ),
-                                  child: const Text("Logout"),
-                                ),
-                              ],
-                            ),
+                            icon: Icons.logout_rounded,
+                            iconColor: Colors.redAccent,
+                            title: "Logout",
+                            message: "Do you want to logout?",
+                            cancelText: "Cancel",
+                            confirmText: "Logout",
+                            confirmColor: Colors.redAccent,
                           );
 
-                          if (confirm != true) return;
+                          if (!confirm) return;
+                          if (!context.mounted) return;
+
+                          await SessionStore.clear();
 
                           if (!context.mounted) return;
 

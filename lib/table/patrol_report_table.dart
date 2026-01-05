@@ -106,7 +106,7 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
           _HCell('Plant', 70),
           _HCell('Division', 90),
           _HCell('Area', 90),
-          _HCell('Machine', 140),
+          _HCell('Machine', 100),
 
           _HCell('Risk F', 80),
           _HCell('Risk P', 80),
@@ -150,13 +150,14 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
         children: [
           _cell(e.stt.toString(), 50),
           _cell(e.type ?? '-', 80),
-          _badge(e.grp, Colors.blue, 90),
+          _cell(e.grp, 90),
           _cell(e.plant, 70),
           _cell(e.division, 90),
           _cell(e.area, 90),
-          _cell(e.machine, 140),
+          _cell(e.machine, 100),
 
-          _cell(e.riskFreq, 80),
+          _cellClickable(context, e.riskFreq, 80, 'Risk Frequency'),
+
           _cell(e.riskProb, 80),
           _cell(e.riskSev, 80),
           _badgeRisk(e.riskTotal),
@@ -188,16 +189,57 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
     );
   }
 
-  Widget _cell(String text, double w) {
+  Widget _cellClickable(
+    BuildContext context,
+    String text,
+    double w,
+    String title,
+  ) {
+    final value = text.isEmpty ? '-' : text;
+
     return SizedBox(
       width: w,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 6),
-        child: Text(
-          text.isEmpty ? '-' : text,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontSize: 13),
+      child: InkWell(
+        onTap: () {
+          showDialog(
+            context: context,
+            builder: (_) => AlertDialog(
+              title: Text(title),
+              content: SingleChildScrollView(child: SelectableText(value)),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Close'),
+                ),
+              ],
+            ),
+          );
+        },
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 6),
+          child: Text(value, maxLines: 1, overflow: TextOverflow.ellipsis),
+        ),
+      ),
+    );
+  }
+
+  Widget _cell(String text, double w) {
+    final value = text.isEmpty ? '-' : text;
+
+    return SizedBox(
+      width: w,
+      child: Tooltip(
+        message: value,
+        waitDuration: const Duration(milliseconds: 400),
+        textStyle: const TextStyle(fontSize: 13, color: Colors.white70),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 6),
+          child: Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 13),
+          ),
         ),
       ),
     );
@@ -206,10 +248,17 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
   Widget _badge(String text, Color c, double w) {
     return SizedBox(
       width: w,
-      child: Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12),
         child: Text(
           text,
-          style: TextStyle(color: c, fontWeight: FontWeight.w600),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            fontSize: 13,
+            color: Colors.blue,
+            fontWeight: FontWeight.bold,
+          ),
         ),
       ),
     );
