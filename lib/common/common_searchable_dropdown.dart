@@ -108,6 +108,11 @@ class CommonSearchableDropdown extends StatelessWidget {
                 ),
                 child: AutoSizeText(
                   item,
+                  maxLines: 2,
+                  minFontSize: 11,
+                  stepGranularity: 0.5,
+                  overflow: TextOverflow.ellipsis,
+
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,

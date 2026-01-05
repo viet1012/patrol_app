@@ -86,14 +86,6 @@ class _AfterDetailScreenState extends State<AfterDetailScreen> {
 
       if (uniquePics.add(pic)) {
         pics.add(pic);
-
-        if (pic == emptyLabel) {
-          debugPrint('⚠️ Add EMPTY PIC as "$emptyLabel" | reportId=${r.id}');
-        } else {
-          debugPrint('✅ Add PIC: $pic | reportId=${r.id}');
-        }
-      } else {
-        debugPrint('🔁 Duplicate PIC skipped: "$pic" | reportId=${r.id}');
       }
     }
 
