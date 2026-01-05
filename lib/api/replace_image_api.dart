@@ -135,7 +135,7 @@ Future<void> updateReportApi({
   required int id,
   String? comment,
   String? countermeasure,
-
+  String? pic,
   // ✅ meta fields
   String? grp,
   String? plant,
@@ -156,6 +156,7 @@ Future<void> updateReportApi({
   final dto = <String, dynamic>{
     if (comment != null) 'comment': comment,
     if (countermeasure != null) 'countermeasure': countermeasure,
+    if (pic != null) 'pic': pic,
 
     if (grp != null) 'grp': grp,
     if (plant != null) 'plant': plant,

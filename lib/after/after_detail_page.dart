@@ -2,13 +2,20 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:auto_size_text/auto_size_text.dart';
 import 'package:dio/dio.dart';
+import 'package:dropdown_search/dropdown_search.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' hide MultipartFile;
 import '../api/dio_client.dart';
 import '../api/hse_master_service.dart';
+import '../api/patrol_report_api.dart';
+import '../api/replace_image_api.dart';
+import '../common/common_searchable_dropdown.dart';
+import '../common/common_ui_helper.dart';
 import '../homeScreen/patrol_home_screen.dart';
 import '../model/patrol_report_model.dart';
+import '../translator.dart';
 import '../widget/glass_action_button.dart';
 import 'camera_after_box.dart';
 import 'replaceable_image_item.dart';
@@ -41,11 +48,27 @@ class _AfterDetailPageState extends State<AfterDetailPage> {
   bool _isLoadingName = false;
   Timer? _debounce;
 
+  // ✅ PIC dropdown
+  static const String emptyLabel = 'UNKNOWN';
+  Future<List<String>>? _futurePics;
+  String? _selectedPIC; // UI selected
+  String? _oldPIC;
+
   @override
   void initState() {
     super.initState();
     _msnvCtrl.text = widget.accountCode;
-    _initEmployee();
+    fetchEmployeeName(
+      widget.accountCode,
+    ).then((name) => debugPrint('EMPLOYEE NAME = $name'));
+
+    // ✅ init PIC
+    final rawPic = widget.report.pic?.trim();
+    _selectedPIC = (rawPic == null || rawPic.isEmpty) ? emptyLabel : rawPic;
+    _oldPIC = _selectedPIC;
+
+    // ✅ cache list PIC theo plant
+    _futurePics = findPicsByPlantFromApi(widget.report.plant);
   }
 
   @override
@@ -56,9 +79,27 @@ class _AfterDetailPageState extends State<AfterDetailPage> {
     super.dispose();
   }
 
-  Future<void> _initEmployee() async {
-    await fetchEmployeeName(widget.accountCode);
-    debugPrint("EMPLOYEE NAME = $_employeeName");
+  Future<List<String>> findPicsByPlantFromApi(String plant) async {
+    debugPrint('🔍 Fetch reports for plant = [$plant]');
+
+    final reports = await PatrolReportApi.fetchReports(plant: plant);
+    debugPrint('📦 Total reports: ${reports.length}');
+
+    final Set<String> uniquePics = {};
+    final List<String> pics = [];
+
+    for (final r in reports) {
+      final rawPic = r.pic?.trim();
+      final pic = (rawPic == null || rawPic.isEmpty) ? emptyLabel : rawPic;
+
+      if (uniquePics.add(pic)) {
+        pics.add(pic);
+      }
+    }
+
+    debugPrint('🎯 Unique PIC count: ${pics.length}');
+    debugPrint('📋 PIC LIST: $pics');
+    return pics;
   }
 
   @override
@@ -140,8 +181,6 @@ class _AfterDetailPageState extends State<AfterDetailPage> {
                 ],
               ),
 
-              const SizedBox(height: 16),
-
               // ===== Comment & Countermeasure =====
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -157,6 +196,28 @@ class _AfterDetailPageState extends State<AfterDetailPage> {
                     ),
                   ),
                 ],
+              ),
+              const SizedBox(height: 12),
+
+              Align(
+                alignment: Alignment.centerLeft,
+
+                child: SizedBox(
+                  width: 160,
+                  child: Row(
+                    children: [
+                      Text(
+                        'PIC',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(child: _buildPicDropdown()),
+                    ],
+                  ),
+                ),
               ),
 
               const SizedBox(height: 8),
@@ -211,33 +272,6 @@ class _AfterDetailPageState extends State<AfterDetailPage> {
           style: TextStyle(color: Colors.white.withOpacity(0.85)),
         ),
       ],
-    );
-  }
-
-  Widget _buildImageGrid1(List<String> images) {
-    return Container(
-      height: 320, // 👈 đủ cho image + camera
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: images.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 12),
-        itemBuilder: (context, index) {
-          return Container(
-            width: 320,
-            child: ReplaceableImageItem(
-              imageName: images[index],
-              report: widget.report,
-              patrolGroup: widget.patrolGroup,
-              plant: widget.report.plant,
-              onReplaced: (newImage) {
-                setState(() {
-                  images[index] = newImage; // 🔥 UPDATE LIST CHA
-                });
-              },
-            ),
-          );
-        },
-      ),
     );
   }
 
@@ -353,6 +387,76 @@ class _AfterDetailPageState extends State<AfterDetailPage> {
           );
         }).toList(),
       ),
+    );
+  }
+
+  Widget _buildPicDropdown() {
+    return FutureBuilder<List<String>>(
+      future: _futurePics,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const SizedBox(
+            height: 48,
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        if (snapshot.hasError) {
+          return const Text(
+            'Load PIC failed',
+            style: TextStyle(color: Colors.redAccent),
+          );
+        }
+
+        final picList = snapshot.data ?? const <String>[];
+
+        // return _buildSearchableDropdown(
+        //   label: "PIC",
+        //   selectedValue: _selectedPIC,
+        //   items: picList,
+        //   onChanged: (v) {
+        //     setState(() => _selectedPIC = v);
+        //   },
+        // );
+
+        return CommonSearchableDropdown(
+          label: "PIC",
+          selectedValue: _selectedPIC,
+          items: picList,
+          isRequired: true,
+          onChanged: (v) async {
+            if (v == null || v == _selectedPIC) return;
+
+            final prev = _selectedPIC;
+
+            // cập nhật UI trước để user thấy họ vừa chọn gì
+            setState(() => _selectedPIC = v);
+
+            final ok = await CommonUI.showGlassConfirm(
+              context: context,
+              icon: Icons.help_outline_rounded,
+              iconColor: Colors.orangeAccent,
+              title: "Confirm update",
+              message: 'Update PIC to "$v" ?',
+              cancelText: "Cancel",
+              confirmText: "Update",
+              confirmColor: const Color(0xFF22C55E),
+            );
+
+            if (!ok) {
+              // ❌ user cancel -> revert lại giá trị cũ
+              setState(() => _selectedPIC = prev);
+              return;
+            }
+
+            // ✅ user confirm -> gọi save
+            await _onSave();
+
+            // nếu save OK thì commit old
+            _oldPIC = _selectedPIC;
+          },
+        );
+      },
     );
   }
 
@@ -574,37 +678,66 @@ class _AfterDetailPageState extends State<AfterDetailPage> {
     );
   }
 
-  Future<void> fetchEmployeeName(String code) async {
-    final empCode = code.trim();
+  Future<void> _onSave() async {
+    try {
+      const emptyLabel = 'UNKNOWN';
+      final picToApi = (_selectedPIC == emptyLabel) ? null : _selectedPIC;
 
-    if (empCode.isEmpty) {
+      await updateReportApi(id: widget.report.id!, pic: picToApi);
+
       if (!mounted) return;
-      setState(() {
-        _employeeName = null;
-        _isLoadingName = false;
-      });
-      return;
-    }
 
-    if (!mounted) return;
+      CommonUI.showGlassDialog(
+        context: context,
+        icon: Icons.check_circle_rounded,
+        iconColor: Colors.greenAccent,
+        title: 'Update Successful',
+        message: 'The report has been updated successfully.',
+        buttonText: 'OK',
+      );
+
+      await Future.delayed(const Duration(milliseconds: 500));
+      if (!mounted) return;
+      Navigator.pop(context, true);
+    } catch (e, s) {
+      debugPrint('❌ UPDATE FAILED: $e');
+      debugPrintStack(stackTrace: s);
+
+      if (!mounted) return;
+
+      // ❌ nếu fail thì revert về old cho chắc
+      setState(() => _selectedPIC = _oldPIC);
+
+      CommonUI.showWarning(
+        context: context,
+        title: 'Update Failed',
+        message:
+            'Unable to update the report.\nPlease check your connection or try again.',
+      );
+    }
+  }
+
+  Future<String?> fetchEmployeeName(String code) async {
+    final empCode = code.trim();
+    if (empCode.isEmpty) return null;
+
+    if (!mounted) return null;
     setState(() => _isLoadingName = true);
 
     try {
       final name = await HseMasterService.fetchEmployeeName(empCode);
 
-      if (!mounted) return;
-      setState(() {
-        _employeeName = name; // null nếu không có
-      });
+      if (!mounted) return null;
+      setState(() => _employeeName = name);
+      return name;
     } catch (e) {
       debugPrint('Error fetching employee name: $e');
 
-      if (!mounted) return;
-      setState(() {
-        _employeeName = null;
-      });
+      if (!mounted) return null;
+      setState(() => _employeeName = null);
+      return null;
     } finally {
-      if (!mounted) return;
+      if (!mounted) return null;
       setState(() => _isLoadingName = false);
     }
   }

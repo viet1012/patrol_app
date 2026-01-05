@@ -3,6 +3,7 @@ import 'package:dropdown_search/dropdown_search.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../api/patrol_report_api.dart';
+import '../common/common_ui_helper.dart';
 import '../common/due_date_utils.dart';
 import '../homeScreen/patrol_home_screen.dart';
 import '../model/machine_model.dart';
@@ -233,8 +234,12 @@ class _AfterDetailScreenState extends State<AfterDetailScreen> {
                             child: CircularProgressIndicator(),
                           );
                         }
-                        if (snapshot.hasError)
-                          return Text('Error: ${snapshot.error}');
+                        if (snapshot.hasError) {
+                          return Text(
+                            'Server error',
+                            style: TextStyle(color: Colors.red, fontSize: 12),
+                          );
+                        }
 
                         final picList = snapshot.data ?? [];
                         return _buildSearchableDropdown(
