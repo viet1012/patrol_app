@@ -3,9 +3,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:ui';
 
-import 'package:auto_size_text/auto_size_text.dart';
 import 'package:dio/dio.dart';
-import 'package:dropdown_search/dropdown_search.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' hide MultipartFile;
 import '../api/dio_client.dart';

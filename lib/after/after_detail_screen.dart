@@ -192,12 +192,50 @@ class _AfterDetailScreenState extends State<AfterDetailScreen> {
                       children: [
                         _buildSummaryCard(data),
                         const SizedBox(height: 10),
-                        Expanded(child: _buildPivotTable(data)),
+                        Expanded(
+                          child: LayoutBuilder(
+                            builder: (context, asyncSnapshot) {
+                              return _buildPivotTable(
+                                data,
+                                asyncSnapshot.maxWidth,
+                              );
+                            },
+                          ),
+                        ),
                       ],
                     ),
                   );
                 },
               ),
+      ),
+    );
+  }
+
+  Widget _colHighlight({
+    required Widget child,
+    required double width,
+    required bool isFirst, // cột bắt đầu khung đỏ
+    required bool isLast, // cột kết thúc khung đỏ
+    Color borderColor = Colors.red,
+    Color bg = const Color(0x22FF0000), // đỏ mờ
+  }) {
+    return SizedBox(
+      width: width,
+      child: Container(
+        alignment: Alignment.center,
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        decoration: BoxDecoration(
+          color: bg,
+          border: Border(
+            left: isFirst
+                ? BorderSide(color: borderColor, width: 1)
+                : BorderSide.none,
+            right: isLast
+                ? BorderSide(color: borderColor, width: 1)
+                : BorderSide.none,
+          ),
+        ),
+        child: child,
       ),
     );
   }
@@ -227,20 +265,19 @@ class _AfterDetailScreenState extends State<AfterDetailScreen> {
     );
   }
 
-  Widget _buildPivotTable(RiskPivotResponse data) {
+  Widget _buildPivotTable(RiskPivotResponse data, double maxWidth) {
     final rows = [...data.rows]..sort((a, b) => b.total.compareTo(a.total));
 
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(
-          minWidth: 400,
-        ), // 👈 nhỏ hơn 640 nếu muốn
-        child: SingleChildScrollView(
+      child: SingleChildScrollView(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minWidth: maxWidth),
+
           child: DataTable(
             // ✅ KÉO GẦN LẠI
-            columnSpacing: 8, // 👈 từ 18 xuống 8
-            horizontalMargin: 6, // 👈 thêm để giảm padding 2 bên
+            columnSpacing: 8, //
+            horizontalMargin: 6, //
             checkboxHorizontalMargin: 6,
 
             headingRowHeight: 42,
@@ -255,27 +292,53 @@ class _AfterDetailScreenState extends State<AfterDetailScreen> {
               fontSize: 13,
             ),
 
-            columns: const [
-              DataColumn(
+            columns: [
+              const DataColumn(
                 label: SizedBox(width: 120, child: Text('PIC')),
               ), // 👈 PIC rộng vừa đủ
-              DataColumn(
+              const DataColumn(
                 label: SizedBox(width: 28, child: Center(child: Text('I'))),
               ),
-              DataColumn(
+              const DataColumn(
                 label: SizedBox(width: 28, child: Center(child: Text('II'))),
               ),
-              DataColumn(
+              const DataColumn(
                 label: SizedBox(width: 34, child: Center(child: Text('III'))),
               ),
               DataColumn(
-                label: SizedBox(width: 34, child: Center(child: Text('IV'))),
+                label: _colHighlight(
+                  width: 34,
+                  isFirst: true,
+                  isLast: true,
+                  borderColor: Colors.redAccent,
+                  bg: Colors.redAccent.withOpacity(0.08),
+                  child: const Text(
+                    'IV',
+                    style: TextStyle(color: Colors.redAccent),
+                  ),
+                ),
               ),
               DataColumn(
-                label: SizedBox(width: 28, child: Center(child: Text('V'))),
+                label: _colHighlight(
+                  width: 34,
+                  isFirst: true,
+                  isLast: true,
+                  borderColor: Colors.red,
+                  bg: Colors.red.withOpacity(0.08),
+                  child: const Text('V', style: TextStyle(color: Colors.red)),
+                ),
               ),
-              DataColumn(
-                label: SizedBox(width: 46, child: Center(child: Text('Total'))),
+
+              const DataColumn(
+                label: SizedBox(
+                  width: 46,
+                  child: Center(
+                    child: Text(
+                      'Total',
+                      style: TextStyle(color: Colors.cyanAccent),
+                    ),
+                  ),
+                ),
               ),
             ],
 
@@ -296,10 +359,23 @@ class _AfterDetailScreenState extends State<AfterDetailScreen> {
       fontSize: 13,
     );
 
-    Widget numCell(int v, {double w = 28}) => SizedBox(
-      width: w,
-      child: Center(child: Text('$v', style: textStyle)),
-    );
+    Widget numCell(
+      int v, {
+      double w = 28,
+      Color? color, // ✅ màu riêng cho từng cột
+    }) {
+      final display = (v == 0) ? '-' : '$v';
+
+      return SizedBox(
+        width: w,
+        child: Center(
+          child: Text(
+            display,
+            style: textStyle.copyWith(color: color ?? textStyle.color),
+          ),
+        ),
+      );
+    }
 
     return DataRow(
       color: isTotal
@@ -344,15 +420,57 @@ class _AfterDetailScreenState extends State<AfterDetailScreen> {
             ),
           ),
         ),
+        // ... I, II, III giữ nguyên
         DataCell(numCell(r.i, w: 28)),
         DataCell(numCell(r.ii, w: 28)),
         DataCell(numCell(r.iii, w: 34)),
-        DataCell(numCell(r.iv, w: 34)),
-        DataCell(numCell(r.v, w: 28)),
+
+        // IV / V / Total nổi bật
+        // IV
+        DataCell(
+          _colHighlight(
+            width: 34,
+            isFirst: true,
+            isLast: true,
+            borderColor: Colors.redAccent,
+            bg: Colors.redAccent.withOpacity(0.06),
+            child: Text(
+              (r.iv == 0) ? '-' : '${r.iv}',
+              style: textStyle.copyWith(
+                color: Colors.redAccent,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ),
+
+        // V
+        DataCell(
+          _colHighlight(
+            width: 34,
+            isFirst: true,
+            isLast: true,
+            borderColor: Colors.red,
+            bg: Colors.red.withOpacity(0.06),
+            child: Text(
+              (r.v == 0) ? '-' : '${r.v}',
+              style: textStyle.copyWith(
+                color: Colors.red,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ),
+
         DataCell(
           SizedBox(
             width: 46,
-            child: Center(child: Text('${r.total}', style: textStyle)),
+            child: Center(
+              child: Text(
+                (r.total == 0) ? '-' : '${r.total}',
+                style: textStyle.copyWith(color: Colors.cyanAccent),
+              ),
+            ),
           ),
         ),
       ],
