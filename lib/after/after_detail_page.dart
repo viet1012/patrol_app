@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
+import 'dart:ui';
 
 import 'package:auto_size_text/auto_size_text.dart';
 import 'package:dio/dio.dart';
@@ -155,6 +156,8 @@ class _AfterDetailPageState extends State<AfterDetailPage> {
             // crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
+              // ===== Report layout dạng "báo cáo" (cards đều nhau) =====
+
               // ===== 2 cột thông tin =====
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -163,8 +166,19 @@ class _AfterDetailPageState extends State<AfterDetailPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _infoItem('Group', widget.report.grp),
-                        _infoItem('Area', widget.report.area),
+                        _buildInfoCard(
+                          icon: Icons.groups_rounded,
+                          label: "group".tr(context),
+                          value: widget.report.grp,
+                          color: Colors.blue.shade400,
+                        ),
+                        const SizedBox(height: 8),
+                        _buildInfoCard(
+                          icon: Icons.location_on_rounded,
+                          label: "area".tr(context),
+                          value: widget.report.area,
+                          color: Colors.orange.shade400,
+                        ),
                       ],
                     ),
                   ),
@@ -173,32 +187,160 @@ class _AfterDetailPageState extends State<AfterDetailPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _infoItem('Division', widget.report.division),
-                        _infoItem('Machine', widget.report.machine),
+                        _buildInfoCard(
+                          icon: Icons.business_rounded,
+                          label: "fac".tr(context),
+                          value: widget.report.division,
+                          color: Colors.purple.shade400,
+                        ),
+                        const SizedBox(height: 8),
+
+                        _buildInfoCard(
+                          icon: Icons.precision_manufacturing_rounded,
+                          label: "machine".tr(context),
+                          value: widget.report.machine,
+                          color: Colors.teal.shade400,
+                        ),
                       ],
                     ),
                   ),
                 ],
               ),
+              const SizedBox(height: 14),
+              IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment:
+                      CrossAxisAlignment.stretch, // ⭐ QUAN TRỌNG
+                  children: [
+                    Expanded(
+                      child: _buildSectionCard(
+                        title: 'Comment',
+                        content: widget.report.comment,
+                        icon: Icons.comment_rounded,
+                        accentColor: Colors.amber.shade600,
+                      ),
+                    ),
+                    const SizedBox(width: 32),
+                    Expanded(
+                      child: _buildSectionCard(
+                        title: 'Countermeasure',
+                        content: widget.report.countermeasure,
+                        icon: Icons.handyman_rounded,
+                        accentColor: Colors.green.shade600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
 
-              // ===== Comment & Countermeasure =====
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Expanded(
-                    child: _sectionInline('Comment', widget.report.comment),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildRiskCard(
+                          icon: Icons.groups_rounded,
+                          label: "label_freq".tr(context),
+                          color: Colors.white70,
+                          value: widget.report.riskFreq,
+                        ),
+                        const SizedBox(height: 8),
+                        _buildRiskCard(
+                          icon: Icons.groups_rounded,
+                          label: "label_prob".tr(context),
+                          value: widget.report.riskProb,
+                          color: Colors.white70,
+                        ),
+                      ],
+                    ),
                   ),
                   const SizedBox(width: 32),
                   Expanded(
-                    child: _sectionInline(
-                      'Countermeasure',
-                      widget.report.countermeasure,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildRiskCard(
+                          icon: Icons.groups_rounded,
+                          label: "label_sev".tr(context),
+                          value: widget.report.riskSev,
+                          color: Colors.white70,
+                        ),
+                        const SizedBox(height: 8),
+                        _buildRiskCard(
+                          icon: Icons.groups_rounded,
+                          label: "label_risk".tr(context),
+                          value: widget.report.riskTotal,
+                          color:
+                              (widget.report.riskTotal == "V" ||
+                                  widget.report.riskTotal == "IV")
+                              ? Colors.red
+                              : Colors.white70,
+                        ),
+                      ],
                     ),
                   ),
                 ],
               ),
+              // ===== Comment & Countermeasure =====
+              // Row(
+              //   crossAxisAlignment: CrossAxisAlignment.start,
+              //   children: [
+              //     Expanded(
+              //       child: _sectionInline('Comment', widget.report.comment),
+              //     ),
+              //     const SizedBox(width: 32),
+              //     Expanded(
+              //       child: _sectionInline(
+              //         'Countermeasure',
+              //         widget.report.countermeasure,
+              //       ),
+              //     ),
+              //   ],
+              // ),
+              //  ====== Risk
+              // Row(
+              //   crossAxisAlignment: CrossAxisAlignment.start,
+              //   children: [
+              //     Expanded(
+              //       child: _sectionInline(
+              //         "label_freq".tr(context),
+              //         widget.report.riskFreq,
+              //       ),
+              //     ),
+              //     const SizedBox(width: 32),
+              //     Expanded(
+              //       child: _sectionInline(
+              //         "label_prob".tr(context),
+              //         widget.report.riskProb,
+              //       ),
+              //     ),
+              //   ],
+              // ),
+              // Row(
+              //   crossAxisAlignment: CrossAxisAlignment.start,
+              //   children: [
+              //     Expanded(
+              //       child: _sectionInline(
+              //         "label_sev".tr(context),
+              //         widget.report.riskSev,
+              //       ),
+              //     ),
+              //     const SizedBox(width: 32),
+              //     Expanded(
+              //       child: _sectionInline(
+              //         "label_risk".tr(context),
+              //         widget.report.riskTotal,
+              //       ),
+              //     ),
+              //   ],
+              // ),
               const SizedBox(height: 12),
 
+              const SizedBox(height: 12),
+              // ===== THÔNG TIN CHÍNH (Group, Area, Fac, Machine) =====
               Align(
                 alignment: Alignment.centerLeft,
 
@@ -255,23 +397,142 @@ class _AfterDetailPageState extends State<AfterDetailPage> {
     );
   }
 
-  Widget _sectionInline(String title, String content) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: const TextStyle(
-            fontWeight: FontWeight.w600,
-            color: Colors.white,
+  Widget _buildInfoCard({
+    required IconData icon,
+    required String label,
+    required String value,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withOpacity(0.2)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
           ),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          content.isEmpty ? '-' : content,
-          style: TextStyle(color: Colors.white.withOpacity(0.85)),
-        ),
-      ],
+        ],
+      ),
+      child: Row(
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white70,
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            value.isEmpty ? '-' : value,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRiskCard({
+    required IconData icon,
+    required String label,
+    required String value,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.10),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: color.withOpacity(0.45),
+          width: 1,
+        ), // ✅ dùng color
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.12),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.75),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  value.trim().isEmpty ? '-' : value.trim(),
+                  style: TextStyle(
+                    color: color, // ✅ dùng color
+                    fontSize: 14,
+                    fontWeight: FontWeight.w900,
+                    height: 1.2,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSectionCard({
+    required String title,
+    required String content,
+    required IconData icon,
+    required Color accentColor,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.08), // mờ nhẹ hơn một chút
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: accentColor.withOpacity(0.25), width: 1),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min, // ⭐
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            content.isEmpty ? '-' : content,
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.85),
+              fontSize: 13,
+              height: 1.4,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -565,7 +826,7 @@ class _AfterDetailPageState extends State<AfterDetailPage> {
             // if (_enableCamera)
             CameraAfterBox(
               key: _cameraKey,
-              size: 280,
+              size: 320,
               plant: widget.report.plant,
               patrolGroup: widget.patrolGroup,
               type: "RETAKE",
