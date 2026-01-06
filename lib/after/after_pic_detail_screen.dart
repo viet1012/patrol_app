@@ -52,10 +52,7 @@ class _AfterPicDetailScreenState extends State<AfterPicDetailScreen> {
         plant: widget.plant,
         type: widget.patrolGroup.name,
         pic: picFilter,
-        // ⚠️ bạn đang dùng "afStatus" nhưng entity có "at_status"
-        // tùy API filter của bạn đang xài field nào:
-        afStatus: widget
-            .atStatus, // nếu BE filter by at_status thì đổi key bên api fetchReports
+        afStatus: widget.atStatus,
       );
     });
   }
@@ -282,177 +279,173 @@ class _AfterPicDetailScreenState extends State<AfterPicDetailScreen> {
           return aDiff.compareTo(bDiff);
         });
 
-    return Scrollbar(
-      thumbVisibility: true,
+    return SingleChildScrollView(
+      scrollDirection: Axis.vertical,
+
       child: SingleChildScrollView(
-        scrollDirection: Axis.vertical,
+        scrollDirection: Axis.horizontal,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minWidth: maxWidth),
+          child: DataTable(
+            columnSpacing: 6,
+            horizontalMargin: 6,
+            headingRowHeight: 42,
 
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: ConstrainedBox(
-            constraints: BoxConstraints(minWidth: maxWidth),
-            child: DataTable(
-              columnSpacing: 6,
-              horizontalMargin: 6,
-              headingRowHeight: 42,
+            // ✅ FIX: chỉ set 1 cái để tránh NOT NORMALIZED
+            dataRowHeight: 60, // đủ cho Area/Machine/Status xuống dòng
 
-              // ✅ FIX: chỉ set 1 cái để tránh NOT NORMALIZED
-              dataRowHeight: 60, // đủ cho Area/Machine/Status xuống dòng
-
-              headingRowColor: MaterialStateProperty.all(
-                Colors.white.withOpacity(0.10),
-              ),
-              headingTextStyle: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: 13,
-              ),
-              columns: const [
-                DataColumn(label: Text('No')),
-                DataColumn(label: Text('Area')),
-                DataColumn(label: Text('Machine')),
-                DataColumn(label: Text('Risk')),
-                DataColumn(label: Text('Deadline')),
-                DataColumn(label: Text('Details')),
-              ],
-              rows: filtered.map((r) {
-                final color = _riskColor(r.riskTotal);
-
-                return DataRow(
-                  cells: [
-                    DataCell(
-                      SizedBox(
-                        width: 28,
-                        child: Text(
-                          '${r.stt}',
-                          style: const TextStyle(color: Colors.white),
-                        ),
-                      ),
-                    ),
-
-                    DataCell(
-                      ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 120),
-                        child: Text(
-                          r.area,
-                          softWrap: true,
-                          maxLines: 3,
-                          overflow: TextOverflow.visible,
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.85),
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    DataCell(
-                      ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 150),
-                        child: Text(
-                          r.machine,
-                          softWrap: true,
-                          maxLines: 3,
-                          overflow: TextOverflow.visible,
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.85),
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    DataCell(
-                      SizedBox(
-                        width: 32,
-                        child: Center(
-                          child: Text(
-                            r.riskTotal,
-                            style: TextStyle(
-                              color: color.withOpacity(0.85),
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    DataCell(
-                      SizedBox(
-                        width: 74,
-                        child: Text(
-                          r.dueDate == null
-                              ? '-'
-                              : DateFormat('M/d/yy').format(r.dueDate!),
-                          style: TextStyle(
-                            color: DueDateUtils.getDueDateColor(r.dueDate),
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    DataCell(
-                      ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 170),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            SizedBox(
-                              width: 32,
-                              height: 32,
-                              child: Material(
-                                color: Colors.white.withOpacity(0.10),
-                                borderRadius: BorderRadius.circular(8),
-                                child: InkWell(
-                                  borderRadius: BorderRadius.circular(8),
-                                  onTap: () async {
-                                    final result = await Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) => AfterDetailPage(
-                                          accountCode: widget.accountCode,
-                                          report: r,
-                                          patrolGroup: widget.patrolGroup,
-                                        ),
-                                      ),
-                                    );
-                                    if (result == true) {
-                                      _loadReport();
-                                      Navigator.pop(context, true);
-                                    }
-                                  },
-                                  child: const Center(
-                                    child: Icon(
-                                      Icons.visibility_rounded,
-                                      size: 18,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: Text(
-                                r.atStatus.toString(),
-                                softWrap: true,
-                                maxLines: 3,
-                                overflow: TextOverflow.visible,
-                                style: TextStyle(
-                                  color: DueDateUtils.getDueDateColor(
-                                    r.dueDate,
-                                  ),
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                );
-              }).toList(),
+            headingRowColor: MaterialStateProperty.all(
+              Colors.white.withOpacity(0.10),
             ),
+            headingTextStyle: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: 13,
+            ),
+            columns: const [
+              DataColumn(label: Text('No')),
+              DataColumn(label: Text('Area')),
+              DataColumn(label: Text('Machine')),
+              DataColumn(label: Text('Risk')),
+              DataColumn(label: Text('Deadline')),
+              DataColumn(label: Text('Details')),
+            ],
+            rows: filtered.map((r) {
+              final color = _riskColor(r.riskTotal);
+
+              return DataRow(
+                cells: [
+                  DataCell(
+                    SizedBox(
+                      width: 28,
+                      child: Text(
+                        '${r.stt}',
+                        style: const TextStyle(color: Colors.white),
+                      ),
+                    ),
+                  ),
+
+                  DataCell(
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 120),
+                      child: Text(
+                        r.area,
+                        softWrap: true,
+                        maxLines: 3,
+                        overflow: TextOverflow.visible,
+                        style: TextStyle(color: Colors.white.withOpacity(0.85)),
+                      ),
+                    ),
+                  ),
+
+                  DataCell(
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 150),
+                      child: Text(
+                        r.machine,
+                        softWrap: true,
+                        maxLines: 3,
+                        overflow: TextOverflow.visible,
+                        style: TextStyle(color: Colors.white.withOpacity(0.85)),
+                      ),
+                    ),
+                  ),
+
+                  DataCell(
+                    SizedBox(
+                      width: 32,
+                      child: Center(
+                        child: Text(
+                          r.riskTotal,
+                          style: TextStyle(
+                            color: color.withOpacity(0.85),
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  DataCell(
+                    SizedBox(
+                      width: 74,
+                      child: Text(
+                        r.dueDate == null
+                            ? '-'
+                            : DateFormat('M/d/yy').format(r.dueDate!),
+                        style: TextStyle(
+                          color: DueDateUtils.getDueDateColor(r.dueDate),
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  DataCell(
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 170),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          SizedBox(
+                            width: 32,
+                            height: 32,
+                            child: Material(
+                              color: Colors.white.withOpacity(0.10),
+                              borderRadius: BorderRadius.circular(8),
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(8),
+                                onTap: () async {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => AfterDetailPage(
+                                        accountCode: widget.accountCode,
+                                        report: r,
+                                        patrolGroup: widget.patrolGroup,
+                                      ),
+                                    ),
+                                  ).then((result) {
+                                    if (result == true && mounted) {
+                                      _loadReport();
+                                    }
+                                  });
+
+                                  // if (result == true) {
+                                  //   _loadReport();
+                                  //   Navigator.pop(context, true);
+                                  // }
+                                },
+                                child: const Center(
+                                  child: Icon(
+                                    Icons.visibility_rounded,
+                                    size: 18,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              r.atStatus.toString(),
+                              softWrap: true,
+                              maxLines: 3,
+                              overflow: TextOverflow.visible,
+                              style: TextStyle(
+                                color: DueDateUtils.getDueDateColor(r.dueDate),
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            }).toList(),
           ),
         ),
       ),
