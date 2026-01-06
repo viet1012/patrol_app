@@ -266,16 +266,17 @@ class _ReplaceableImageItemState extends State<ReplaceableImageItem> {
             body: SafeArea(
               child: Stack(
                 children: [
-                  Center(
-                    child: Hero(
-                      tag: imageUrl,
-                      child: InteractiveViewer(
-                        minScale: 1,
-                        maxScale: 5,
-                        child: Image.network(
-                          imageUrl,
-                          headers: {'ngrok-skip-browser-warning': 'true'},
+                  Positioned.fill(
+                    child: InteractiveViewer(
+                      minScale: 1,
+                      maxScale: 5,
+                      child: SizedBox.expand(
+                        child: FittedBox(
                           fit: BoxFit.contain,
+                          child: Image.network(
+                            imageUrl,
+                            headers: {'ngrok-skip-browser-warning': 'true'},
+                          ),
                         ),
                       ),
                     ),

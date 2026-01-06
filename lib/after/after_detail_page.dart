@@ -156,9 +156,7 @@ class _AfterDetailPageState extends State<AfterDetailPage> {
             // crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // ===== Report layout dạng "báo cáo" (cards đều nhau) =====
-
-              // ===== 2 cột thông tin =====
+              // ===== THÔNG TIN CHÍNH (Group, Area, Fac, Machine) =====
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -220,7 +218,7 @@ class _AfterDetailPageState extends State<AfterDetailPage> {
                         accentColor: Colors.amber.shade600,
                       ),
                     ),
-                    const SizedBox(width: 32),
+                    const SizedBox(width: 12),
                     Expanded(
                       child: _buildSectionCard(
                         title: 'Countermeasure',
@@ -257,7 +255,7 @@ class _AfterDetailPageState extends State<AfterDetailPage> {
                       ],
                     ),
                   ),
-                  const SizedBox(width: 32),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -284,63 +282,8 @@ class _AfterDetailPageState extends State<AfterDetailPage> {
                   ),
                 ],
               ),
-              // ===== Comment & Countermeasure =====
-              // Row(
-              //   crossAxisAlignment: CrossAxisAlignment.start,
-              //   children: [
-              //     Expanded(
-              //       child: _sectionInline('Comment', widget.report.comment),
-              //     ),
-              //     const SizedBox(width: 32),
-              //     Expanded(
-              //       child: _sectionInline(
-              //         'Countermeasure',
-              //         widget.report.countermeasure,
-              //       ),
-              //     ),
-              //   ],
-              // ),
-              //  ====== Risk
-              // Row(
-              //   crossAxisAlignment: CrossAxisAlignment.start,
-              //   children: [
-              //     Expanded(
-              //       child: _sectionInline(
-              //         "label_freq".tr(context),
-              //         widget.report.riskFreq,
-              //       ),
-              //     ),
-              //     const SizedBox(width: 32),
-              //     Expanded(
-              //       child: _sectionInline(
-              //         "label_prob".tr(context),
-              //         widget.report.riskProb,
-              //       ),
-              //     ),
-              //   ],
-              // ),
-              // Row(
-              //   crossAxisAlignment: CrossAxisAlignment.start,
-              //   children: [
-              //     Expanded(
-              //       child: _sectionInline(
-              //         "label_sev".tr(context),
-              //         widget.report.riskSev,
-              //       ),
-              //     ),
-              //     const SizedBox(width: 32),
-              //     Expanded(
-              //       child: _sectionInline(
-              //         "label_risk".tr(context),
-              //         widget.report.riskTotal,
-              //       ),
-              //     ),
-              //   ],
-              // ),
-              const SizedBox(height: 12),
 
               const SizedBox(height: 12),
-              // ===== THÔNG TIN CHÍNH (Group, Area, Fac, Machine) =====
               Align(
                 alignment: Alignment.centerLeft,
 
@@ -362,36 +305,12 @@ class _AfterDetailPageState extends State<AfterDetailPage> {
                 ),
               ),
 
-              const SizedBox(height: 8),
+              const SizedBox(height: 12),
               _buildImageGrid(widget.report.imageNames),
               const SizedBox(height: 8),
               _buildRetakeSection(),
             ],
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _infoItem(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: RichText(
-        text: TextSpan(
-          style: Theme.of(context).textTheme.bodyMedium,
-          children: [
-            TextSpan(
-              text: '$label: ',
-              style: const TextStyle(
-                fontWeight: FontWeight.w600,
-                color: Colors.white,
-              ),
-            ),
-            TextSpan(
-              text: value,
-              style: TextStyle(color: Colors.white.withOpacity(0.85)),
-            ),
-          ],
         ),
       ),
     );
@@ -474,9 +393,9 @@ class _AfterDetailPageState extends State<AfterDetailPage> {
                 Text(
                   label,
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.75),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
                 const SizedBox(height: 6),
@@ -484,7 +403,7 @@ class _AfterDetailPageState extends State<AfterDetailPage> {
                   value.trim().isEmpty ? '-' : value.trim(),
                   style: TextStyle(
                     color: color, // ✅ dùng color
-                    fontSize: 14,
+                    fontSize: 13,
                     fontWeight: FontWeight.w900,
                     height: 1.2,
                   ),
