@@ -186,7 +186,13 @@ class CameraAfterBoxState extends State<CameraAfterBox>
         ..setAttribute('autoplay', 'true')
         ..setAttribute('playsinline', 'true')
         ..setAttribute('muted', 'true')
+        ..style.width =
+            '100%' // ✅ THÊM
+        ..style.height =
+            '100%' // ✅ THÊM
         ..style.objectFit = 'cover'
+        ..style.backgroundColor =
+            'black' // ✅ THÊM
         ..style.pointerEvents = 'none'
         ..srcObject = stream;
 
@@ -196,10 +202,15 @@ class CameraAfterBoxState extends State<CameraAfterBox>
         (id) => video,
       );
 
-      setState(() {
-        _stream = stream;
-        _videoElement = video;
-        _viewType = newViewType;
+      video.onLoadedMetadata.listen((_) async {
+        await video.play();
+
+        if (!mounted) return;
+        setState(() {
+          _stream = stream;
+          _videoElement = video;
+          _viewType = newViewType;
+        });
       });
     } catch (e) {
       debugPrint("Camera error: $e");
