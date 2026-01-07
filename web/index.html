@@ -1,49 +1,254 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <!--
-    If you are serving your web app in a path other than the root, change the
-    href value below to reflect the base path you are serving from.
+    <base href="/" />
 
-    The path provided below has to start and end with a slash "/" in order for
-    it to work correctly.
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta name="description" content="Flutter Web QR Camera" />
 
-    For more details:
-    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+    <meta name="apple-mobile-web-app-title" content="chuphinh" />
+    <link rel="apple-touch-icon" href="icons/Icon-192.png" />
 
-    This is a placeholder for base href that will be replaced by the value of
-    the `--base-href` argument provided to `flutter build`.
-  -->
-  <base href="/">
+    <link rel="icon" type="image/png" href="favicon.png" />
 
-  <meta charset="UTF-8">
-  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="A new Flutter project.">
-
-  <!-- iOS meta tags & icons -->
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="chuphinh">
-  <link rel="apple-touch-icon" href="icons/Icon-192.png">
-
-  <!-- Favicon -->
-  <link rel="icon" type="image/png" href="favicon.png"/>
     <style>
         @font-face {
           font-family: "Roboto";
-          src: url("assets/fonts/Roboto/Roboto-VariableFont_wdth.ttf") format("truetype");
-          font-weight: normal;
-          font-style: normal;
+          src: url("assets/fonts/Roboto/Roboto-VariableFont_wdth.ttf")
+            format("truetype");
         }
-
         body {
           font-family: "Roboto", sans-serif;
         }
     </style>
-  <title>S-Patrol</title>
-  <link rel="manifest" href="manifest.json">
+
+    <title>S-Patrol</title>
+    <link rel="manifest" href="manifest.json" />
 </head>
+
 <body>
-  <script src="flutter_bootstrap.js" async></script>
+<!-- ZXing UMD -->
+<script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js"></script>
+
+<script>
+    // ===============================
+    // Common helpers
+    // ===============================
+    let qrReader = null;
+    let qrRunning = false;
+
+    function dispatch(name, detail) {
+      window.dispatchEvent(new CustomEvent(name, { detail }));
+    }
+
+    function dispatchQr(text, error) {
+      dispatch("qr-from-image", { text: text || "", error: error || "" });
+    }
+
+    // ===============================
+    // LIVE SCAN ONCE (bấm 1 lần quét 1 lần)
+    // Dart gọi: startQrCamera()
+    // ===============================
+    window.startQrCamera = async function () {
+      try {
+        if (qrRunning) return;
+        qrRunning = true;
+
+        if (!window.ZXing || !ZXing.BrowserMultiFormatReader) {
+          console.error("ZXing not loaded");
+          qrRunning = false;
+          return;
+        }
+
+        const videoId = "qr-video";
+        const videoEl = document.getElementById(videoId);
+        if (!videoEl) {
+          console.error("Video element #qr-video not found");
+          qrRunning = false;
+          return;
+        }
+
+        qrReader = new ZXing.BrowserMultiFormatReader();
+
+        const result = await qrReader.decodeOnceFromVideoDevice(null, videoId);
+
+        dispatch("qr-decoded", {
+          text: result && result.text ? String(result.text) : "",
+        });
+      } catch (e) {
+        console.error("startQrCamera error", e);
+      } finally {
+        qrRunning = false;
+      }
+    };
+
+    window.stopQrCamera = function () {
+      try {
+        qrRunning = false;
+        if (qrReader) {
+          qrReader.reset();
+          qrReader = null;
+        }
+      } catch (e) {
+        console.error("stopQrCamera error", e);
+      }
+    };
+
+    // ============================================================
+    // ✅ CAPTURE 1 FRAME THEN DECODE (bấm 1 phát)
+    // Dart gọi: captureAndDecodeQr()
+    // ============================================================
+    window.captureAndDecodeQr = async function () {
+      try {
+        if (!window.ZXing) {
+          dispatchQr("", "ZXing not loaded");
+          return;
+        }
+
+        const video = document.getElementById("qr-video");
+        if (!video) {
+          dispatchQr("", "qr-video not found");
+          return;
+        }
+
+        if (!video.videoWidth || !video.videoHeight) {
+          dispatchQr("", "video not ready");
+          return;
+        }
+
+        // zoom crop vào giữa để QR to hơn
+        const base = Math.min(video.videoWidth, video.videoHeight);
+        const cropScale = 0.6;
+        const size = base * cropScale;
+
+        const sx = (video.videoWidth - size) / 2;
+        const sy = (video.videoHeight - size) / 2;
+
+        const trySizes = [1024, 1536, 2048];
+        let lastErr = "";
+
+        for (const out of trySizes) {
+          const canvas = document.createElement("canvas");
+          canvas.width = out;
+          canvas.height = out;
+
+          const ctx = canvas.getContext("2d", { willReadFrequently: true });
+          ctx.imageSmoothingEnabled = false;
+          ctx.drawImage(video, sx, sy, size, size, 0, 0, out, out);
+
+          const reader = ZXing.BrowserQRCodeReader
+            ? new ZXing.BrowserQRCodeReader()
+            : new ZXing.BrowserMultiFormatReader();
+
+          try {
+            let result = null;
+
+            if (typeof reader.decodeFromCanvas === "function") {
+              result = await reader.decodeFromCanvas(canvas);
+            } else if (typeof reader.decodeFromImageUrl === "function") {
+              const dataUrl = canvas.toDataURL("image/png");
+              result = await reader.decodeFromImageUrl(dataUrl);
+            } else {
+              reader.reset && reader.reset();
+              dispatchQr("", "No decodeFromCanvas/decodeFromImageUrl on this ZXing build");
+              return;
+            }
+
+            reader.reset && reader.reset();
+            dispatchQr(result && result.text ? String(result.text) : "", "");
+            return;
+          } catch (e) {
+            lastErr = String(e);
+            reader.reset && reader.reset();
+          }
+        }
+
+        dispatchQr("", lastErr || "Decode failed");
+      } catch (e) {
+        dispatchQr("", String(e));
+      }
+    };
+
+    // ============================================================
+    // ✅ REALTIME LOOP SCAN (quét liên tục đến khi ra QR)
+    // Dart gọi: startQrLoop() / stopQrLoop()
+    // ============================================================
+    let qrLoopReader = null;
+    let qrLoopRunning = false;
+
+    let lastText = "";
+    let lastAt = 0;
+    const COOLDOWN_MS = 1200;
+
+    window.startQrLoop = async function () {
+      try {
+        if (qrLoopRunning) return;
+        qrLoopRunning = true;
+
+        if (!window.ZXing || !ZXing.BrowserMultiFormatReader) {
+          dispatchQr("", "ZXing not loaded");
+          qrLoopRunning = false;
+          return;
+        }
+
+        const videoId = "qr-video";
+        const videoEl = document.getElementById(videoId);
+        if (!videoEl) {
+          dispatchQr("", "qr-video not found");
+          qrLoopRunning = false;
+          return;
+        }
+
+        qrLoopReader = new ZXing.BrowserMultiFormatReader();
+
+        qrLoopReader.decodeFromVideoDevice(null, videoId, (result, err) => {
+          if (!qrLoopRunning) return;
+
+          if (result && result.text) {
+            const text = String(result.text);
+            const now = Date.now();
+
+            // ✅ chặn bắn trùng liên tục
+            if (text === lastText && now - lastAt < COOLDOWN_MS) return;
+
+            lastText = text;
+            lastAt = now;
+
+            dispatchQr(text, "");
+            return; // ✅ KHÔNG stop loop nữa
+          }
+
+          // err NotFoundException spam -> bỏ qua
+        });
+      } catch (e) {
+        dispatchQr("", String(e));
+        qrLoopRunning = false;
+      }
+    };
+
+    window.stopQrLoop = function () {
+      try {
+        qrLoopRunning = false;
+
+        if (qrLoopReader) {
+          // ✅ ưu tiên stop decode, không đụng camera
+          if (typeof qrLoopReader.stopContinuousDecode === "function") {
+            qrLoopReader.stopContinuousDecode();
+          } else {
+            // fallback
+            qrLoopReader.reset();
+          }
+
+          // giữ lại reader để start lại nhanh hơn
+          // qrLoopReader = null; // ❌ đừng null nếu muốn ổn định
+        }
+      } catch (e) {}
+    };
+</script>
+
+<script src="flutter_bootstrap.js"></script>
 </body>
 </html>
