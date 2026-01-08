@@ -407,6 +407,8 @@ class _CameraScreenState extends State<CameraScreen> {
     _cameraKey.currentState?.clearAll(); // xóa hết ảnh
   }
 
+  String _qr = '';
+
   @override
   Widget build(BuildContext context) {
     final plantList = getPlants();
@@ -451,7 +453,7 @@ class _CameraScreenState extends State<CameraScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                widget.titleScreen,
+                '${widget.titleScreen}-$_qr',
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 13,
@@ -558,6 +560,10 @@ class _CameraScreenState extends State<CameraScreen> {
                 group: _selectedGroup,
                 onImagesChanged: (_) => setState(() {}),
                 patrolGroup: widget.patrolGroup,
+                onQrDetected: (qr) {
+                  setState(() => _qr = qr); // ✅ nhận về đây
+                  debugPrint("PARENT GOT QR: $qr");
+                },
               ),
 
               const SizedBox(height: 16),

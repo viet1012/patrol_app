@@ -57,6 +57,8 @@ dependencies:
   package_info_plus: ^9.0.0
   flutter_secure_storage: ^10.0.0
   shared_preferences: ^2.5.4
+  js: ^0.6.7
+  qr_code_vision: ^0.1.2
 dev_dependencies:
   flutter_test:
     sdk: flutter
