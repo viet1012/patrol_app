@@ -317,11 +317,6 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
 
     // ✅ gửi về class cha
     widget.onQrDetected?.call(text);
-
-    // (tuỳ) snackbar debug
-    // ScaffoldMessenger.of(context).showSnackBar(
-    //   SnackBar(content: Text("QR: $text"), behavior: SnackBarBehavior.floating),
-    // );
   }
 
   // =========================
@@ -411,6 +406,12 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
   void clearAll() {
     setState(() => _capturedImages.clear());
     widget.onImagesChanged?.call(_capturedImages);
+  }
+
+  void resetQr() {
+    setState(() {
+      _lastQr = null;
+    });
   }
 
   Future<void> _takePhoto() async {
@@ -550,16 +551,46 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
             Positioned(
               top: 12,
               left: 12,
-              child: Text(
-                'QR: ${_lastQr ?? '-'}',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.18),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: Colors.white.withOpacity(0.5),
+                        width: 1,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.qr_code_rounded,
+                          size: 20,
+                          color: Colors.white,
+                        ),
+                        SizedBox(width: 8),
+                        Text(
+                          _lastQr ?? '',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
             ),
-
             // STT
             Positioned(
               top: 12,
@@ -570,8 +601,8 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
                   filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
                   child: Container(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 10,
+                      horizontal: 8,
+                      vertical: 5,
                     ),
                     decoration: BoxDecoration(
                       color: Colors.white.withOpacity(0.18),
@@ -594,7 +625,7 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
                             'No. ${stt + 1}',
                             style: const TextStyle(
                               color: Colors.white,
-                              fontSize: 18,
+                              fontSize: 13,
                               fontWeight: FontWeight.bold,
                               letterSpacing: 0.6,
                             ),

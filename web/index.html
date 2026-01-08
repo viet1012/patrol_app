@@ -264,6 +264,9 @@
       ensureCanvas(sw, sh);
       ctx.drawImage(videoEl, sx, sy, sw, sh, 0, 0, sw, sh);
 
+<!--      let img = ctx.getImageData(0,0,sw,sh);-->
+<!--      img = filterPinkOnly(img);-->
+<!--      ctx.putImageData(img,0,0);-->
 
 
       // decode canvas -> result
