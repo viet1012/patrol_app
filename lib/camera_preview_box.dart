@@ -110,6 +110,12 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
   // =========================
   // Lifecycle
   // =========================
+  late final AnimationController _qrFlashCtrl;
+  late final Animation<double> _qrScaleAnim;
+  late final Animation<double> _qrShakeAnim;
+
+  int _qrChangeCount = 0;
+
   @override
   void initState() {
     super.initState();
@@ -127,6 +133,21 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
     _startCamera();
     _loadStt();
     _connectSocket();
+
+    _qrFlashCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 220),
+    );
+
+    _qrScaleAnim = Tween<double>(
+      begin: 1.0,
+      end: 1.06,
+    ).animate(CurvedAnimation(parent: _qrFlashCtrl, curve: Curves.easeOut));
+
+    _qrShakeAnim = Tween<double>(
+      begin: 0.0,
+      end: 3.0,
+    ).animate(CurvedAnimation(parent: _qrFlashCtrl, curve: Curves.easeInOut));
   }
 
   @override
@@ -147,6 +168,7 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
 
   @override
   void dispose() {
+    _qrFlashCtrl.dispose();
     _stopQrScan();
     _flashController.dispose();
     _stopCamera();
@@ -154,6 +176,13 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
       sttSocket?.dispose();
     } catch (_) {}
     super.dispose();
+  }
+
+  void _playQrChangedFx() {
+    // nháy nhanh + rung nhẹ
+    _qrFlashCtrl.forward(from: 0).then((_) {
+      if (mounted) _qrFlashCtrl.reverse();
+    });
   }
 
   // =========================
@@ -283,6 +312,8 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
     _lastQr = text;
     _lastQrAt = now;
 
+    _qrChangeCount++;
+    _playQrChangedFx();
     // ✅ points (nếu có)
     final pointsRaw = detail['points'];
     List<Offset>? pts;
@@ -551,46 +582,83 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
             Positioned(
               top: 12,
               left: 12,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(16),
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 5,
+              child: AnimatedBuilder(
+                animation: _qrFlashCtrl,
+                builder: (context, child) {
+                  final dx = (_qrFlashCtrl.value < 0.5
+                      ? -_qrShakeAnim.value
+                      : _qrShakeAnim.value);
+
+                  return Transform.translate(
+                    offset: Offset(dx, 0),
+                    child: Transform.scale(
+                      scale: _qrScaleAnim.value,
+                      child: child,
                     ),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.18),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: Colors.white.withOpacity(0.5),
-                        width: 1,
+                  );
+                },
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 5,
                       ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.qr_code_rounded,
-                          size: 20,
-                          color: Colors.white,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.18),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: _qrFlashCtrl.isAnimating
+                              ? Colors.greenAccent.withOpacity(0.9)
+                              : Colors.white.withOpacity(0.5),
+                          width: 1,
                         ),
-                        SizedBox(width: 8),
-                        Text(
-                          _lastQr ?? '',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.qr_code_rounded,
+                            size: 20,
+                            color: _qrFlashCtrl.isAnimating
+                                ? Colors.greenAccent
+                                : Colors.white,
                           ),
-                        ),
-                      ],
+                          const SizedBox(width: 8),
+
+                          // ✅ Text “nhảy” khi đổi QR
+                          AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 180),
+                            transitionBuilder: (child, anim) => FadeTransition(
+                              opacity: anim,
+                              child: SlideTransition(
+                                position: Tween<Offset>(
+                                  begin: const Offset(0, 0.35),
+                                  end: Offset.zero,
+                                ).animate(anim),
+                                child: child,
+                              ),
+                            ),
+                            child: Text(
+                              _lastQr ?? '',
+                              key: ValueKey(_lastQr), // quan trọng
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
               ),
             ),
+
             // STT
             Positioned(
               top: 12,

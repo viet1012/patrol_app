@@ -228,57 +228,60 @@ class _AfterDetailPageState extends State<AfterDetailPage> {
                   ],
                 ),
               ),
+
               const SizedBox(height: 14),
 
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildRiskCard(
-                          icon: Icons.groups_rounded,
-                          label: "label_freq".tr(context),
-                          color: Colors.white70,
-                          value: widget.report.riskFreq,
-                        ),
-                        const SizedBox(height: 8),
-                        _buildRiskCard(
-                          icon: Icons.groups_rounded,
-                          label: "label_prob".tr(context),
-                          value: widget.report.riskProb,
-                          color: Colors.white70,
-                        ),
-                      ],
+              IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildInfoCard(
+                            icon: Icons.groups_rounded,
+                            label: "Created at",
+                            color: Colors.white70,
+                            value: formatDateTime(widget.report.createdAt),
+                          ),
+                          const SizedBox(height: 8),
+                          _buildRiskCard(
+                            icon: Icons.groups_rounded,
+                            label: "Review Similar Cases",
+                            value: widget.report.checkInfo,
+                            color: Colors.white70,
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildRiskCard(
-                          icon: Icons.groups_rounded,
-                          label: "label_sev".tr(context),
-                          value: widget.report.riskSev,
-                          color: Colors.white70,
-                        ),
-                        const SizedBox(height: 8),
-                        _buildRiskCard(
-                          icon: Icons.groups_rounded,
-                          label: "label_risk".tr(context),
-                          value: widget.report.riskTotal,
-                          color:
-                              (widget.report.riskTotal == "V" ||
-                                  widget.report.riskTotal == "IV")
-                              ? Colors.red
-                              : Colors.white70,
-                        ),
-                      ],
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildInfoCard(
+                            icon: Icons.groups_rounded,
+                            label: "Deadline",
+                            value: formatDateTime(widget.report.dueDate),
+                            color: Colors.white70,
+                          ),
+                          const SizedBox(height: 8),
+                          _buildRiskCard(
+                            icon: Icons.groups_rounded,
+                            label: "label_risk".tr(context),
+                            value: widget.report.riskTotal,
+                            color:
+                                (widget.report.riskTotal == "V" ||
+                                    widget.report.riskTotal == "IV")
+                                ? Colors.red
+                                : Colors.white70,
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
 
               const SizedBox(height: 12),
@@ -358,6 +361,15 @@ class _AfterDetailPageState extends State<AfterDetailPage> {
     );
   }
 
+  String formatDateTime(DateTime? dt) {
+    if (dt == null) return '-';
+
+    // tuỳ bạn muốn format kiểu nào
+    return '${dt.day.toString().padLeft(2, '0')}/'
+        '${dt.month.toString().padLeft(2, '0')}/'
+        '${dt.year} ';
+  }
+
   Widget _buildRiskCard({
     required IconData icon,
     required String label,
@@ -365,7 +377,7 @@ class _AfterDetailPageState extends State<AfterDetailPage> {
     required Color color,
   }) {
     return Container(
-      padding: const EdgeInsets.all(10),
+      padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.10),
         borderRadius: BorderRadius.circular(16),
@@ -396,7 +408,7 @@ class _AfterDetailPageState extends State<AfterDetailPage> {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 3),
                 Text(
                   value.trim().isEmpty ? '-' : value.trim(),
                   style: TextStyle(
@@ -439,7 +451,7 @@ class _AfterDetailPageState extends State<AfterDetailPage> {
               fontWeight: FontWeight.bold,
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 3),
           Text(
             content.isEmpty ? '-' : content,
             style: TextStyle(
