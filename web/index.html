@@ -1,49 +1,464 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <!--
-    If you are serving your web app in a path other than the root, change the
-    href value below to reflect the base path you are serving from.
+    <base href="/" />
 
-    The path provided below has to start and end with a slash "/" in order for
-    it to work correctly.
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta name="description" content="Flutter Web QR Camera" />
 
-    For more details:
-    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+    <meta name="apple-mobile-web-app-title" content="chuphinh" />
+    <link rel="apple-touch-icon" href="icons/Icon-192.png" />
 
-    This is a placeholder for base href that will be replaced by the value of
-    the `--base-href` argument provided to `flutter build`.
-  -->
-  <base href="/">
+    <link rel="icon" type="image/png" href="favicon.png" />
 
-  <meta charset="UTF-8">
-  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="A new Flutter project.">
-
-  <!-- iOS meta tags & icons -->
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="chuphinh">
-  <link rel="apple-touch-icon" href="icons/Icon-192.png">
-
-  <!-- Favicon -->
-  <link rel="icon" type="image/png" href="favicon.png"/>
     <style>
         @font-face {
           font-family: "Roboto";
-          src: url("assets/fonts/Roboto/Roboto-VariableFont_wdth.ttf") format("truetype");
-          font-weight: normal;
-          font-style: normal;
+          src: url("assets/fonts/Roboto/Roboto-VariableFont_wdth.ttf")
+            format("truetype");
         }
-
         body {
           font-family: "Roboto", sans-serif;
         }
     </style>
-  <title>S-Patrol</title>
-  <link rel="manifest" href="manifest.json">
+
+    <title>S-Patrol</title>
+    <link rel="manifest" href="manifest.json" />
 </head>
+
 <body>
-  <script src="flutter_bootstrap.js" async></script>
+
+<!-- ZXing UMD -->
+<!-- ZXing UMD -->
+<!-- ZXing UMD -->
+<script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js"></script>
+
+<script>
+    // ===============================
+    // CONFIG (tune)
+    // ===============================
+    const FAST_MS = 60;           // quét nhanh
+    const HARD_MS = 120;          // try harder (chậm hơn, chính xác hơn)
+    const SWITCH_TO_HARD = 900;   // sau N ms không thấy QR -> bật hard
+    const SWITCH_BACK_FAST = 2000;// sau N ms có QR ổn -> về fast
+
+    const COOLDOWN_MS = 300;      // chống spam trùng text
+    const MIN_LEN = 1;            // bỏ QR rỗng
+    const REQUIRE_STABLE = 1;     // 1 = bắt được là emit; 2~3 = cần lặp lại để chắc
+
+    // ROI crop (% of frame). 0.6 = cắt vùng giữa 60% width/height để decode nhanh hơn
+    const USE_ROI = true;
+    const ROI_SCALE = 0.65;
+
+    // ===============================
+    // STATE
+    // ===============================
+    let stream = null;
+    let videoTrack = null;
+
+    let qrLoopRunning = false;
+    let loopTimer = null;
+
+    let lastText = "";
+    let lastEmitAt = 0;
+
+    // stability voting
+    let stableText = "";
+    let stableCount = 0;
+
+    let mode = "fast";      // fast | hard
+    let lastSuccessAt = 0;
+    let lastAttemptAt = 0;
+
+    // ZXing
+    let codeReader = null;  // BrowserQRCodeReader
+    let qrReader = null;    // QRCodeReader (core)
+
+    // canvas capture
+    let canvas = null;
+    let ctx = null;
+
+    // ===============================
+    // HELPERS
+    // ===============================
+    function dispatch(name, detail) {
+      window.dispatchEvent(new CustomEvent(name, { detail }));
+    }
+
+    function dispatchQr(text, error, points) {
+      dispatch("qr-from-image", {
+        text: text || "",
+        error: error || "",
+        points: Array.isArray(points) ? points : null,
+      });
+    }
+
+    function safePoints(result) {
+      const ptsRaw = result?.resultPoints || result?.getResultPoints?.() || [];
+      if (!Array.isArray(ptsRaw) || ptsRaw.length === 0) return null;
+      return ptsRaw.map((p) => ({
+        x: p?.x ?? p?.getX?.() ?? 0,
+        y: p?.y ?? p?.getY?.() ?? 0,
+      }));
+    }
+
+    function ensureCanvas(w, h) {
+      if (!canvas) {
+        canvas = document.createElement("canvas");
+        ctx = canvas.getContext("2d", { willReadFrequently: true });
+      }
+      if (canvas.width !== w) canvas.width = w;
+      if (canvas.height !== h) canvas.height = h;
+    }
+
+    function now() { return Date.now(); }
+
+    function setMode(next) {
+      if (mode === next) return;
+      mode = next;
+    }
+
+    function buildHints(isHard) {
+      // DecodeHintType nằm trong ZXing core (umd): ZXing.DecodeHintType
+      // Một số build có thể thiếu -> fallback null.
+      try {
+        const hints = new Map();
+        // QR only
+        if (ZXing.DecodeHintType?.POSSIBLE_FORMATS && ZXing.BarcodeFormat?.QR_CODE) {
+          hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [ZXing.BarcodeFormat.QR_CODE]);
+        }
+        if (ZXing.DecodeHintType?.TRY_HARDER) {
+          hints.set(ZXing.DecodeHintType.TRY_HARDER, !!isHard);
+        }
+        // Bonus: ignore check digit (không ảnh hưởng QR) -> bỏ
+        return hints;
+      } catch (_) {
+        return null;
+      }
+    }
+
+    function makeReaders() {
+      // BrowserQRCodeReader dùng để decode canvas/image (có helper)
+      // QRCodeReader core để set hints chuẩn nhất
+      // Tuỳ bản ZXing UMD, class có thể khác; ta cố gắng theo hướng "không crash".
+      if (!window.ZXing) throw new Error("ZXing not loaded");
+
+      // Core QR reader (nếu có)
+      try {
+        qrReader = new ZXing.QRCodeReader();
+      } catch (_) {
+        qrReader = null;
+      }
+
+      // Browser reader
+      codeReader = new ZXing.BrowserQRCodeReader(null, 0);
+    }
+
+    async function openCamera(videoId = "qr-video") {
+      const videoEl = document.getElementById(videoId);
+      if (!videoEl) throw new Error(`Video element #${videoId} not found`);
+
+      if (stream && videoEl.srcObject === stream) return videoEl;
+
+      // Mở camera 1 lần
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: "environment",
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
+        audio: false,
+      });
+
+      videoEl.srcObject = stream;
+      await videoEl.play();
+
+      videoTrack = stream.getVideoTracks?.()[0] || null;
+      return videoEl;
+    }
+
+    function closeCamera() {
+      try { videoTrack?.stop?.(); } catch (_) {}
+      try {
+        if (stream) {
+          stream.getTracks().forEach((t) => {
+            try { t.stop(); } catch (_) {}
+          });
+        }
+      } catch (_) {}
+      stream = null;
+      videoTrack = null;
+    }
+
+     function roiScaleForMode() {
+      // fast: crop giữa để nhanh
+      // hard: mở rộng để dễ bắt QR ở gần/mép
+      return mode === "hard" ? 0.92 : 0.65;
+    }
+
+    function cropRect(w, h) {
+      if (!USE_ROI) return { sx: 0, sy: 0, sw: w, sh: h };
+
+      const scale = roiScaleForMode();
+      const sw = Math.floor(w * scale);
+      const sh = Math.floor(h * scale);
+      const sx = Math.floor((w - sw) / 2);
+      const sy = Math.floor((h - sh) / 2);
+      return { sx, sy, sw, sh };
+    }
+
+
+    function filterPinkOnly(imageData) {
+      const d = imageData.data;
+
+      for (let i = 0; i < d.length; i += 4) {
+        const r = d[i] / 255;
+        const g = d[i + 1] / 255;
+        const b = d[i + 2] / 255;
+
+        const max = Math.max(r, g, b);
+        const min = Math.min(r, g, b);
+        const delta = max - min;
+
+        let h = 0;
+        if (delta !== 0) {
+          if (max === r) h = ((g - b) / delta) % 6;
+          else if (max === g) h = (b - r) / delta + 2;
+          else h = (r - g) / delta + 4;
+          h *= 60;
+          if (h < 0) h += 360;
+        }
+
+        const s = max === 0 ? 0 : delta / max;
+        const v = max;
+
+        const isPink =
+          (
+            (h >= 300 && h <= 360) ||
+            (h >= 0 && h <= 20)
+          ) &&
+
+        s > 0.18 && v > 0.30;
+
+        if (!isPink) {
+          // loại bỏ pixel không phải hồng
+          d[i] = d[i + 1] = d[i + 2] = 255; // trắng
+        } else {
+          // tăng tương phản cho QR
+          d[i] = d[i + 1] = d[i + 2] = 0; // đen
+        }
+      }
+
+      return imageData;
+    }
+
+    async function decodeOneFrame(videoEl) {
+      const vw = videoEl.videoWidth || 0;
+      const vh = videoEl.videoHeight || 0;
+      if (!vw || !vh) return null;
+
+      const { sx, sy, sw, sh } = cropRect(vw, vh);
+      ensureCanvas(sw, sh);
+      ctx.drawImage(videoEl, sx, sy, sw, sh, 0, 0, sw, sh);
+
+<!--      let img = ctx.getImageData(0,0,sw,sh);-->
+<!--      img = filterPinkOnly(img);-->
+<!--      ctx.putImageData(img,0,0);-->
+
+
+      // decode canvas -> result
+      // Ưu tiên core QRReader nếu có (để set hints TRY_HARDER), fallback browser decodeFromCanvas
+      const isHard = mode === "hard";
+      const hints = buildHints(isHard);
+
+      try {
+        // Nếu có qrReader core: dùng BinaryBitmap pipeline (nhanh và kiểm soát hints tốt)
+        if (qrReader && ZXing.HTMLCanvasElementLuminanceSource) {
+          const source = new ZXing.HTMLCanvasElementLuminanceSource(canvas);
+          const bitmap = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(source));
+          if (hints && qrReader.setHints) qrReader.setHints(hints);
+          const result = qrReader.decode(bitmap, hints || undefined);
+          return result || null;
+        }
+      } catch (e) {
+        // ignore and fallback
+      }
+
+      // Fallback: BrowserQRCodeReader decodeFromCanvas
+      try {
+        // BrowserQRCodeReader không expose hints trực tiếp mọi build
+        const result = await codeReader.decodeFromCanvas(canvas);
+        return result || null;
+      } catch (e) {
+        // NotFoundException là bình thường
+        if (e && (e.name === "NotFoundException" || e.name === "NotFoundError")) return null;
+        // một số build trả ChecksumException/FormatException -> coi như fail frame
+        return null;
+      }
+    }
+
+    function shouldEmit(text) {
+      const t = (text || "").trim();
+      if (t.length < MIN_LEN) return false;
+
+      // stability voting
+      if (REQUIRE_STABLE <= 1) return true;
+
+      if (t === stableText) stableCount++;
+      else { stableText = t; stableCount = 1; }
+
+      return stableCount >= REQUIRE_STABLE;
+    }
+
+    function emitIfOk(result) {
+      if (!result?.text) return;
+
+      const text = String(result.text).trim();
+      const t = now();
+
+      // anti-spam duplicates
+      if (text === lastText && t - lastEmitAt < COOLDOWN_MS) return;
+
+      if (!shouldEmit(text)) return;
+
+      lastText = text;
+      lastEmitAt = t;
+      lastSuccessAt = t;
+
+      const pts = safePoints(result);
+      dispatchQr(text, "", pts);
+    }
+
+    function updateAdaptiveMode() {
+      const t = now();
+
+      // nếu lâu không thấy QR -> hard
+      if (t - lastSuccessAt > SWITCH_TO_HARD) setMode("hard");
+
+      // nếu vừa bắt được QR và đã ổn 1 thời gian -> fast
+      if (mode === "hard" && t - lastSuccessAt < SWITCH_BACK_FAST) {
+        // giữ hard trong lúc vẫn đang bắt liên tục, sau đó loop tự đưa về fast ở nhịp tiếp theo
+        // (đơn giản: khi có success liên tục 1 lúc thì về fast)
+        // Ta dùng điều kiện: nếu success gần đây và đã hard một lúc -> về fast
+        // (để nhẹ, chỉ cần: nếu có success và hard -> về fast sau 1-2s)
+        // làm bằng: nếu success xảy ra và đang hard, hẹn về fast
+        // => thực hiện ở tick sau:
+      }
+    }
+
+    function currentInterval() {
+      return mode === "hard" ? HARD_MS : FAST_MS;
+    }
+
+    async function loopTick(videoEl) {
+      if (!qrLoopRunning) return;
+
+      const t = now();
+      if (t - lastAttemptAt < currentInterval()) {
+        scheduleNext(videoEl);
+        return;
+      }
+      lastAttemptAt = t;
+
+      updateAdaptiveMode();
+
+      const result = await decodeOneFrame(videoEl);
+      if (result) {
+        emitIfOk(result);
+
+        // nếu đang hard mà vừa success -> về fast sau 600ms
+        if (mode === "hard") {
+          setTimeout(() => { if (qrLoopRunning) setMode("fast"); }, 600);
+        }
+      }
+
+      scheduleNext(videoEl);
+    }
+
+    function scheduleNext(videoEl) {
+      if (!qrLoopRunning) return;
+      clearTimeout(loopTimer);
+      loopTimer = setTimeout(() => loopTick(videoEl), 0);
+    }
+
+    // ===============================
+    // PUBLIC API
+    // ===============================
+
+    // Scan once (nhanh + chính xác hơn decodeOnceFromVideoDevice vì không mở lại stream)
+    window.startQrCamera = async function () {
+      try {
+        if (!window.ZXing) throw new Error("ZXing not loaded");
+        if (!codeReader) makeReaders();
+
+        const videoEl = await openCamera("qr-video");
+
+        // 1 shot: chạy hard nhẹ để tăng tỉ lệ bắt
+        const prevMode = mode;
+        setMode("hard");
+        const result = await decodeOneFrame(videoEl);
+        setMode(prevMode);
+
+        if (result?.text) {
+          dispatchQr(String(result.text), "", safePoints(result));
+        } else {
+          dispatchQr("", "Not found", null);
+        }
+      } catch (e) {
+        dispatchQr("", String(e?.message || e), null);
+      }
+    };
+
+    window.stopQrCamera = function () {
+      // chỉ stop camera nếu bạn muốn đóng hẳn
+      closeCamera();
+    };
+
+    window.startQrLoop = async function () {
+      try {
+        if (qrLoopRunning) return;
+        if (!window.ZXing) throw new Error("ZXing not loaded");
+        if (!codeReader) makeReaders();
+
+        const videoEl = await openCamera("qr-video");
+
+        // reset state
+        qrLoopRunning = true;
+        lastText = "";
+        lastEmitAt = 0;
+        stableText = "";
+        stableCount = 0;
+        mode = "fast";
+        lastSuccessAt = 0;
+        lastAttemptAt = 0;
+
+        scheduleNext(videoEl);
+      } catch (e) {
+        qrLoopRunning = false;
+        dispatchQr("", String(e?.message || e), null);
+      }
+    };
+
+    window.stopQrLoop = function () {
+      qrLoopRunning = false;
+      clearTimeout(loopTimer);
+      loopTimer = null;
+
+      // không reset reader liên tục (giữ nhẹ). Nếu muốn giải phóng hẳn:
+      // codeReader = null; qrReader = null;
+
+      // camera: tuỳ bạn muốn tắt luôn hay giữ để mở lại nhanh
+      // closeCamera();
+    };
+</script>
+
+
+
+
+<script src="flutter_bootstrap.js"></script>
+
 </body>
 </html>

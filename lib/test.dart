@@ -288,6 +288,7 @@ class _CameraScreenState extends State<CameraScreen> {
       // ================= REPORT =================
       final reportMap = {
         'userCreate': '${widget.accountCode}_$_employeeName',
+        'qr_key': _qrKey ?? '',
         'plant': _selectedPlant ?? '',
         'type': widget.patrolGroup.name,
         'division': _selectedFac ?? '',
@@ -403,9 +404,13 @@ class _CameraScreenState extends State<CameraScreen> {
       _prob = null;
       _sev = null;
       _needRecheck = false;
+      _qrKey = '';
     });
     _cameraKey.currentState?.clearAll(); // xóa hết ảnh
+    _cameraKey.currentState?.resetQr(); // xóa hết ảnh
   }
+
+  String _qrKey = '';
 
   @override
   Widget build(BuildContext context) {
@@ -558,6 +563,10 @@ class _CameraScreenState extends State<CameraScreen> {
                 group: _selectedGroup,
                 onImagesChanged: (_) => setState(() {}),
                 patrolGroup: widget.patrolGroup,
+                onQrDetected: (qr) {
+                  setState(() => _qrKey = qr); // ✅ nhận về đây
+                  debugPrint("PARENT GOT QR: $qr");
+                },
               ),
 
               const SizedBox(height: 16),

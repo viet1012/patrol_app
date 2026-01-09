@@ -290,7 +290,6 @@ class _AfterPicDetailScreenState extends State<AfterPicDetailScreen> {
             columnSpacing: 6,
             horizontalMargin: 6,
             headingRowHeight: 42,
-
             // ✅ FIX: chỉ set 1 cái để tránh NOT NORMALIZED
             dataRowHeight: 60, // đủ cho Area/Machine/Status xuống dòng
 

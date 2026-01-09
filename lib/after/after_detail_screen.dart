@@ -276,10 +276,9 @@ class _AfterDetailScreenState extends State<AfterDetailScreen> {
 
           child: DataTable(
             // ✅ KÉO GẦN LẠI
-            columnSpacing: 8, //
+            columnSpacing: 8,
             horizontalMargin: 6, //
             checkboxHorizontalMargin: 6,
-
             headingRowHeight: 42,
             dataRowHeight: 40,
 

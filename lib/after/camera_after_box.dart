@@ -382,7 +382,6 @@ class CameraAfterBoxState extends State<CameraAfterBox>
               child: Center(
                 child: GestureDetector(
                   onTap: (!_isCapturing && canUpload) ? _takePhoto : null,
-
                   child: GlassCircleButton(
                     size: 60,
                     showProgress: _isCapturing,
