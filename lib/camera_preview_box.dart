@@ -611,7 +611,7 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(
                           color: _qrFlashCtrl.isAnimating
-                              ? Colors.greenAccent.withOpacity(0.9)
+                              ? Color(0xFF203A43)
                               : Colors.white.withOpacity(0.5),
                           width: 1,
                         ),
@@ -623,27 +623,44 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
                             Icons.qr_code_rounded,
                             size: 20,
                             color: _qrFlashCtrl.isAnimating
-                                ? Colors.greenAccent
+                                ? Color(0xFF203A43)
                                 : Colors.white,
                           ),
                           const SizedBox(width: 8),
 
                           // ✅ Text “nhảy” khi đổi QR
                           AnimatedSwitcher(
-                            duration: const Duration(milliseconds: 180),
-                            transitionBuilder: (child, anim) => FadeTransition(
-                              opacity: anim,
-                              child: SlideTransition(
-                                position: Tween<Offset>(
-                                  begin: const Offset(0, 0.35),
-                                  end: Offset.zero,
-                                ).animate(anim),
-                                child: child,
-                              ),
-                            ),
+                            duration: const Duration(milliseconds: 220),
+                            switchInCurve: Curves.easeOutBack, // 🔥 bounce nhẹ
+                            switchOutCurve: Curves.easeIn,
+                            transitionBuilder: (child, anim) {
+                              final slide = Tween<Offset>(
+                                begin: const Offset(
+                                  0,
+                                  0.6,
+                                ), // 🔥 trượt nhiều hơn
+                                end: Offset.zero,
+                              ).animate(anim);
+
+                              final scale = Tween<double>(
+                                begin: 0.85,
+                                end: 1.0,
+                              ).animate(anim);
+
+                              return FadeTransition(
+                                opacity: anim,
+                                child: SlideTransition(
+                                  position: slide,
+                                  child: ScaleTransition(
+                                    scale: scale,
+                                    child: child,
+                                  ),
+                                ),
+                              );
+                            },
                             child: Text(
                               _lastQr ?? '',
-                              key: ValueKey(_lastQr), // quan trọng
+                              key: ValueKey(_lastQr),
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 13,

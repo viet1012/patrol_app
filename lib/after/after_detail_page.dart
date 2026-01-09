@@ -178,7 +178,7 @@ class _AfterDetailPageState extends State<AfterDetailPage> {
                       ],
                     ),
                   ),
-                  const SizedBox(width: 32),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -241,7 +241,7 @@ class _AfterDetailPageState extends State<AfterDetailPage> {
                         children: [
                           _buildInfoCard(
                             icon: Icons.groups_rounded,
-                            label: "Created at",
+                            label: "Patrol at",
                             color: Colors.white70,
                             value: formatDateTime(widget.report.createdAt),
                           ),
@@ -276,6 +276,7 @@ class _AfterDetailPageState extends State<AfterDetailPage> {
                                     widget.report.riskTotal == "IV")
                                 ? Colors.red
                                 : Colors.white70,
+                            riskTotal: true,
                           ),
                         ],
                       ),
@@ -375,6 +376,7 @@ class _AfterDetailPageState extends State<AfterDetailPage> {
     required String label,
     required String value,
     required Color color,
+    bool riskTotal = false,
   }) {
     return Container(
       padding: const EdgeInsets.all(8),
@@ -409,13 +411,18 @@ class _AfterDetailPageState extends State<AfterDetailPage> {
                   ),
                 ),
                 const SizedBox(height: 3),
-                Text(
-                  value.trim().isEmpty ? '-' : value.trim(),
-                  style: TextStyle(
-                    color: color, // ✅ dùng color
-                    fontSize: 13,
-                    fontWeight: FontWeight.w900,
-                    height: 1.2,
+                Align(
+                  alignment: riskTotal
+                      ? Alignment.center
+                      : Alignment.centerLeft,
+                  child: Text(
+                    value.trim().isEmpty ? '-' : value.trim(),
+                    style: TextStyle(
+                      color: color, // ✅ dùng color
+                      fontSize: 13,
+                      fontWeight: FontWeight.w900,
+                      height: 1.2,
+                    ),
                   ),
                 ),
               ],
