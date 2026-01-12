@@ -350,7 +350,7 @@ class CommonUI {
                               borderRadius: BorderRadius.circular(16),
                             ),
                           ),
-                          onPressed: () => context.go('/home'),
+                          onPressed: () => context.go('/'),
                           child: Text(
                             buttonText,
                             style: const TextStyle(
