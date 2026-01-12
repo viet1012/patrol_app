@@ -177,7 +177,7 @@ class _AfterPatrolState extends State<AfterPatrol> {
           onTap: () {
             final hasQr = (widget.qrCode ?? '').trim().isNotEmpty;
             if (hasQr) {
-              context.go('/');
+              context.go('/home');
             } else {
               Navigator.pop(context, true);
             }

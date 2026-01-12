@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import '../animate/glow_title.dart';
 import '../api/auth_api.dart';
@@ -49,10 +50,12 @@ class _LoginPageState extends State<LoginPage> {
     }
 
     // đi thẳng vào Home
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (_) => PatrolHomeScreen(accountCode: account)),
-    );
+    context.go('/home', extra: {'accountCode': account});
+
+    // Navigator.pushReplacement(
+    //   context,
+    //   MaterialPageRoute(builder: (_) => PatrolHomeScreen(accountCode: account)),
+    // );
   }
 
   @override
@@ -89,10 +92,12 @@ class _LoginPageState extends State<LoginPage> {
 
     if (!mounted) return;
 
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (_) => PatrolHomeScreen(accountCode: code)),
-    );
+    context.go('/home', extra: {'accountCode': code});
+
+    // Navigator.pushReplacement(
+    //   context,
+    //   MaterialPageRoute(builder: (_) => PatrolHomeScreen(accountCode: code)),
+    // );
   }
 
   Future<void> _showRegisterSheet() async {
