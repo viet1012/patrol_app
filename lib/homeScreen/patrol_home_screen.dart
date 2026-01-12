@@ -558,7 +558,7 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
             final safeQr = Uri.encodeComponent(rawQr);
 
             context.go(
-              '/home/after/$safeQr',
+              '/after/$safeQr',
               extra: {
                 'accountCode': widget.accountCode,
                 'qrCode': rawQr,

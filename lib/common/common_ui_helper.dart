@@ -269,7 +269,7 @@ class CommonUI {
               Icons.arrow_back_ios_new_rounded,
               color: Colors.white,
             ),
-            onPressed: () => context.go('/'),
+            onPressed: () => context.go('/home'),
           ),
         ),
         body: Center(
@@ -350,7 +350,8 @@ class CommonUI {
                               borderRadius: BorderRadius.circular(16),
                             ),
                           ),
-                          onPressed: () => context.go('/'),
+
+                          onPressed: () => context.go('/home'),
                           child: Text(
                             buttonText,
                             style: const TextStyle(

@@ -50,12 +50,12 @@ class _LoginPageState extends State<LoginPage> {
     }
 
     // đi thẳng vào Home
-    // context.go('/home', extra: {'accountCode': account});
+    context.go('/home', extra: {'accountCode': account});
 
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (_) => PatrolHomeScreen(accountCode: account)),
-    );
+    // Navigator.pushReplacement(
+    //   context,
+    //   MaterialPageRoute(builder: (_) => PatrolHomeScreen(accountCode: account)),
+    // );
   }
 
   @override
@@ -92,12 +92,12 @@ class _LoginPageState extends State<LoginPage> {
 
     if (!mounted) return;
 
-    // context.go('/home', extra: {'accountCode': code});
+    context.go('/home', extra: {'accountCode': code});
 
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (_) => PatrolHomeScreen(accountCode: code)),
-    );
+    // Navigator.pushReplacement(
+    //   context,
+    //   MaterialPageRoute(builder: (_) => PatrolHomeScreen(accountCode: code)),
+    // );
   }
 
   Future<void> _showRegisterSheet() async {
