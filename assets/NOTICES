@@ -1948,6 +1948,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 --------------------------------------------------------------------------------
 args
+logging
 
 Copyright 2013, the Dart project authors. 
 
@@ -2276,6 +2277,7 @@ file_selector_linux
 file_selector_platform_interface
 file_selector_windows
 flutter_plugin_android_lifecycle
+go_router
 google_fonts
 image_picker_for_web
 image_picker_platform_interface
