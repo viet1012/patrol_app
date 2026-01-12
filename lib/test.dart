@@ -243,7 +243,7 @@ class _CameraScreenState extends State<CameraScreen> {
 
   Future<void> _sendReport() async {
     final images = _cameraKey.currentState?.images ?? [];
-
+    final hasQr = _qrKey.trim().isNotEmpty;
     // ================= VALIDATE =================
 
     if (_selectedMachine == null) {
@@ -289,6 +289,7 @@ class _CameraScreenState extends State<CameraScreen> {
       final reportMap = {
         'userCreate': '${widget.accountCode}_$_employeeName',
         'qr_key': _qrKey ?? '',
+        'qr_scan_sts': hasQr ? 'SUCCESS_1st' : '',
         'plant': _selectedPlant ?? '',
         'type': widget.patrolGroup.name,
         'division': _selectedFac ?? '',

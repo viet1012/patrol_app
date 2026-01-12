@@ -189,17 +189,17 @@ class _LoginPageState extends State<LoginPage> {
                   filterQuality: FilterQuality.high,
                   fit: BoxFit.contain,
                 ),
-                FutureBuilder<String>(
-                  future: getAppVersion(),
-                  builder: (context, snapshot) {
-                    if (!snapshot.hasData) {
-                      return EmbossGlowTitle(text: 'V...', fontSize: 13);
-                    }
-
-                    return EmbossGlowTitle(text: snapshot.data!, fontSize: 13);
-                  },
-                ),
-
+                // FutureBuilder<String>(
+                //   future: getAppVersion(),
+                //   builder: (context, snapshot) {
+                //     if (!snapshot.hasData) {
+                //       return EmbossGlowTitle(text: 'V...', fontSize: 13);
+                //     }
+                //
+                //     return EmbossGlowTitle(text: snapshot.data!, fontSize: 13);
+                //   },
+                // ),
+                EmbossGlowTitle(text: 'V1.3', fontSize: 13),
                 const SizedBox(height: 16),
 
                 const Text(

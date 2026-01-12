@@ -9,16 +9,15 @@ import '../model/patrol_report_model.dart';
 import '../qrCode/after_patrol.dart';
 import '../widget/error_display.dart';
 import '../widget/glass_action_button.dart';
-import 'after_detail_page.dart';
 
-class AfterPicDetailScreen extends StatefulWidget {
+class RecheckPicDetailScreen extends StatefulWidget {
   final String accountCode;
   final String plant;
   final String atStatus; // Wait / Redo / Done (hoặc Wait,Redo)
   final String pic;
   final PatrolGroup patrolGroup;
 
-  const AfterPicDetailScreen({
+  const RecheckPicDetailScreen({
     super.key,
     required this.accountCode,
     required this.plant,
@@ -28,10 +27,10 @@ class AfterPicDetailScreen extends StatefulWidget {
   });
 
   @override
-  State<AfterPicDetailScreen> createState() => _AfterPicDetailScreenState();
+  State<RecheckPicDetailScreen> createState() => _RecheckPicDetailScreenState();
 }
 
-class _AfterPicDetailScreenState extends State<AfterPicDetailScreen> {
+class _RecheckPicDetailScreenState extends State<RecheckPicDetailScreen> {
   Future<List<PatrolReportModel>>? _futureReport;
 
   String? _filterArea;

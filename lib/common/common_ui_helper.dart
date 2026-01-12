@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 class CommonUI {
   CommonUI._(); // ❌ không cho new
@@ -242,5 +243,163 @@ class CommonUI {
     );
 
     return result ?? false;
+  }
+
+  static Widget _baseMessagePage({
+    required BuildContext context,
+    required String message,
+    required String title,
+    required IconData icon,
+    required Color iconColor,
+    required Color backgroundColor,
+    required String buttonText,
+  }) {
+    return WillPopScope(
+      onWillPop: () async {
+        context.go('/'); // back hệ thống → Login
+        return false;
+      },
+      child: Scaffold(
+        backgroundColor: backgroundColor,
+        appBar: AppBar(
+          backgroundColor: backgroundColor,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(
+              Icons.arrow_back_ios_new_rounded,
+              color: Colors.white,
+            ),
+            onPressed: () => context.go('/'),
+          ),
+        ),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(22),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 28,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.55),
+                    borderRadius: BorderRadius.circular(22),
+                    border: Border.all(color: Colors.white.withOpacity(0.15)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.45),
+                        blurRadius: 24,
+                        offset: const Offset(0, 12),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // ICON
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: iconColor.withOpacity(0.15),
+                        ),
+                        child: Icon(icon, color: iconColor, size: 48),
+                      ),
+
+                      const SizedBox(height: 18),
+
+                      // TITLE
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+
+                      const SizedBox(height: 10),
+
+                      // MESSAGE
+                      Text(
+                        message,
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 14,
+                          height: 1.4,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+
+                      const SizedBox(height: 26),
+
+                      // BUTTON
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            elevation: 0,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            backgroundColor: Colors.white.withOpacity(0.9),
+                            foregroundColor: Colors.black,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                          ),
+                          onPressed: () => context.go('/'),
+                          child: Text(
+                            buttonText,
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  static Widget errorPage({
+    required BuildContext context,
+    required String message,
+    String title = 'Something went wrong',
+  }) {
+    return _baseMessagePage(
+      context: context,
+      title: title,
+      message: message,
+      icon: Icons.error_outline_rounded,
+      iconColor: Colors.redAccent,
+      backgroundColor: const Color(0xFF121826),
+      buttonText: 'Back to Login',
+    );
+  }
+
+  static Widget warningPage({
+    required BuildContext context,
+    required String message,
+    String title = 'Warning',
+  }) {
+    return _baseMessagePage(
+      context: context,
+      title: title,
+      message: message,
+      icon: Icons.warning_amber_rounded,
+      iconColor: Colors.orangeAccent,
+      backgroundColor: const Color(0xFF121826),
+      buttonText: 'Go Back',
+    );
   }
 }

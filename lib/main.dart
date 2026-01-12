@@ -1,3 +1,4 @@
+import 'package:chuphinh/routes/router.dart';
 import 'package:chuphinh/table/patrol_report_table.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -45,8 +46,9 @@ class _MyAppState extends State<MyApp> {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return MaterialApp.router(
       title: 'S-Patrol',
+      routerConfig: router,
       locale: _locale,
       supportedLocales: const [Locale('vi'), Locale('en'), Locale('ja')],
       localeResolutionCallback: (locale, supportedLocales) {
@@ -68,7 +70,8 @@ class _MyAppState extends State<MyApp> {
       theme: ThemeData(
         textTheme: GoogleFonts.notoSansTextTheme(Theme.of(context).textTheme),
       ),
-      home: const LoginPage(),
+      // home: const LoginPage(),
+      // home: const PatrolReportTable(),
     );
   }
 }

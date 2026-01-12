@@ -5,7 +5,9 @@ import 'dio_client.dart';
 
 class PatrolReportApi {
   static Future<List<PatrolReportModel>> fetchReports({
-    String? plant, // b?t bu?c
+    String? plant,
+    String? qrKey,
+    int? id,
     String? division,
     String? area,
     String? machine,
@@ -34,6 +36,8 @@ class PatrolReportApi {
         }
       }
 
+      addIfNotEmpty('qrKey', qrKey);
+      if (id != null) queryParams['id'] = id.toString();
       addIfNotEmpty('division', division);
       addIfNotEmpty('area', area);
       addIfNotEmpty('machine', machine);
@@ -48,7 +52,7 @@ class PatrolReportApi {
         '${DioClient.dio.options.baseUrl}$endpoint',
       ).replace(queryParameters: queryParams);
 
-      debugPrint('?? API CALL: $uri');
+      // debugPrint('?? API CALL: $uri');
 
       final response = await DioClient.dio.get(
         endpoint,

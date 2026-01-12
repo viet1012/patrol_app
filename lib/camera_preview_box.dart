@@ -6,6 +6,7 @@ import 'dart:html' as html;
 import 'dart:ui_web' as ui_web;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:js/js.dart';
 import 'package:js/js_util.dart' as js_util;
 
@@ -309,11 +310,16 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
         now.difference(_lastQrAt!) < _qrDedupe) {
       return;
     }
+
+    // ✅ rung đúng lúc: chỉ khi QR mới (qua dedupe)
+    HapticFeedback.mediumImpact();
+
     _lastQr = text;
     _lastQrAt = now;
 
     _qrChangeCount++;
     _playQrChangedFx();
+
     // ✅ points (nếu có)
     final pointsRaw = detail['points'];
     List<Offset>? pts;
@@ -630,29 +636,22 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
 
                           // ✅ Text “nhảy” khi đổi QR
                           AnimatedSwitcher(
-                            duration: const Duration(milliseconds: 220),
-                            switchInCurve: Curves.easeOutBack, // 🔥 bounce nhẹ
+                            duration: const Duration(milliseconds: 300),
+                            switchInCurve: Curves.easeOutBack,
                             switchOutCurve: Curves.easeIn,
                             transitionBuilder: (child, anim) {
-                              final slide = Tween<Offset>(
-                                begin: const Offset(
-                                  0,
-                                  0.6,
-                                ), // 🔥 trượt nhiều hơn
-                                end: Offset.zero,
-                              ).animate(anim);
-
-                              final scale = Tween<double>(
-                                begin: 0.85,
-                                end: 1.0,
-                              ).animate(anim);
-
-                              return FadeTransition(
-                                opacity: anim,
-                                child: SlideTransition(
-                                  position: slide,
-                                  child: ScaleTransition(
-                                    scale: scale,
+                              return SlideTransition(
+                                position: Tween<Offset>(
+                                  begin: const Offset(0, 0.9),
+                                  end: Offset.zero,
+                                ).animate(anim),
+                                child: ScaleTransition(
+                                  scale: Tween<double>(
+                                    begin: 0.75,
+                                    end: 1.08,
+                                  ).animate(anim),
+                                  child: FadeTransition(
+                                    opacity: anim,
                                     child: child,
                                   ),
                                 ),
@@ -664,7 +663,7 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 13,
-                                fontWeight: FontWeight.w600,
+                                fontWeight: FontWeight.w700,
                               ),
                             ),
                           ),

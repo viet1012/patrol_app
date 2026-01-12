@@ -5,7 +5,10 @@ import 'dart:ui';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' hide MultipartFile;
+import '../after/camera_after_box.dart';
+import '../after/replaceable_image_item.dart';
 import '../api/dio_client.dart';
 import '../api/hse_master_service.dart';
 import '../api/patrol_report_api.dart';
@@ -16,26 +19,27 @@ import '../homeScreen/patrol_home_screen.dart';
 import '../model/patrol_report_model.dart';
 import '../translator.dart';
 import '../widget/glass_action_button.dart';
-import 'camera_after_box.dart';
-import 'replaceable_image_item.dart';
 
-class AfterDetailPage extends StatefulWidget {
+class AfterPatrol extends StatefulWidget {
   final String accountCode;
-  final PatrolReportModel report;
+  // final String plant;
+  final int? id; // bắt buộc
+  final String? qrCode; // có thể null
   final PatrolGroup patrolGroup;
 
-  const AfterDetailPage({
+  const AfterPatrol({
     super.key,
     required this.accountCode,
-    required this.report,
+    // required this.plant,
+    this.id,
+    this.qrCode,
     required this.patrolGroup,
   });
-
   @override
-  State<AfterDetailPage> createState() => _AfterDetailPageState();
+  State<AfterPatrol> createState() => _AfterPatrolState();
 }
 
-class _AfterDetailPageState extends State<AfterDetailPage> {
+class _AfterPatrolState extends State<AfterPatrol> {
   final GlobalKey<CameraAfterBoxState> _cameraKey =
       GlobalKey<CameraAfterBoxState>();
 
@@ -53,6 +57,60 @@ class _AfterDetailPageState extends State<AfterDetailPage> {
   String? _selectedPIC; // UI selected
   String? _oldPIC;
 
+  PatrolReportModel? _report;
+  bool _loading = true;
+  String? _error;
+
+  String get _lookupKey {
+    final q = widget.qrCode?.trim();
+    if (q != null && q.isNotEmpty) return q;
+    return widget.id?.toString() ?? 'NO_ID';
+  }
+
+  Future<void> _loadReport() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    try {
+      final q = widget.qrCode?.trim();
+      final list = await PatrolReportApi.fetchReports(
+        qrKey: (q != null && q.isNotEmpty) ? q : null,
+        id: (q == null || q.isEmpty) ? widget.id : null,
+      );
+
+      if (list.isEmpty) {
+        setState(() {
+          _error = 'Không tìm thấy report cho key=$_lookupKey';
+          _loading = false;
+        });
+        return;
+      }
+
+      // nếu API trả nhiều cái, lấy cái đúng nhất
+      final picked = (widget.id != null)
+          ? list.firstWhere((e) => e.id == widget.id, orElse: () => list.first)
+          : list.first;
+
+      final rawPic = picked.pic?.trim();
+      final selected = (rawPic == null || rawPic.isEmpty) ? emptyLabel : rawPic;
+      setState(() {
+        _report = picked;
+        _selectedPIC = selected;
+        _oldPIC = selected;
+        _futurePics = findPicsByPlantFromApi(picked.plant);
+        _loading = false;
+        _enableCamera = true;
+      });
+    } catch (e) {
+      setState(() {
+        _error = e.toString();
+        _loading = false;
+      });
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -61,13 +119,9 @@ class _AfterDetailPageState extends State<AfterDetailPage> {
       widget.accountCode,
     ).then((name) => debugPrint('EMPLOYEE NAME = $name'));
 
-    // ✅ init PIC
-    final rawPic = widget.report.pic?.trim();
-    _selectedPIC = (rawPic == null || rawPic.isEmpty) ? emptyLabel : rawPic;
-    _oldPIC = _selectedPIC;
-
-    // ✅ cache list PIC theo plant
-    _futurePics = findPicsByPlantFromApi(widget.report.plant);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadReport(); // ✅ gọi sau khi build frame đầu
+    });
   }
 
   @override
@@ -103,13 +157,31 @@ class _AfterDetailPageState extends State<AfterDetailPage> {
 
   @override
   Widget build(BuildContext context) {
+    if (_loading) {
+      return const Scaffold(
+        backgroundColor: Color(0xFF121826),
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+    if (_error != null) {
+      return CommonUI.warningPage(context: context, message: _error!);
+    }
+
+    final report = _report!; //  dùng report thay widget.report
     return Scaffold(
       appBar: AppBar(
         centerTitle: false,
         titleSpacing: 4, // 👈 kéo sát về leading
         leading: GlassActionButton(
           icon: Icons.arrow_back_rounded,
-          onTap: () => Navigator.pop(context, true),
+          onTap: () {
+            final hasQr = (widget.qrCode ?? '').trim().isNotEmpty;
+            if (hasQr) {
+              context.go('/');
+            } else {
+              Navigator.pop(context, true);
+            }
+          },
         ),
         backgroundColor: const Color(0xFF121826),
         title: Row(
@@ -127,13 +199,15 @@ class _AfterDetailPageState extends State<AfterDetailPage> {
                   ),
                 ),
                 Text(
-                  widget.report.plant,
+                  report.plant,
                   style: const TextStyle(color: Colors.white70, fontSize: 11),
                 ),
               ],
             ),
             Text(
-              'ID: ${widget.report.id.toString()}',
+              widget.id == null
+                  ? 'QR: ${widget.qrCode ?? "-"}'
+                  : 'ID: ${widget.id}',
               style: const TextStyle(color: Colors.white70, fontSize: 11),
             ),
           ],
@@ -165,14 +239,14 @@ class _AfterDetailPageState extends State<AfterDetailPage> {
                         _buildInfoCard(
                           icon: Icons.groups_rounded,
                           label: "group".tr(context),
-                          value: widget.report.grp,
+                          value: report.grp,
                           color: Colors.blue.shade400,
                         ),
                         const SizedBox(height: 8),
                         _buildInfoCard(
                           icon: Icons.location_on_rounded,
                           label: "area".tr(context),
-                          value: widget.report.area,
+                          value: report.area,
                           color: Colors.orange.shade400,
                         ),
                       ],
@@ -186,7 +260,7 @@ class _AfterDetailPageState extends State<AfterDetailPage> {
                         _buildInfoCard(
                           icon: Icons.business_rounded,
                           label: "fac".tr(context),
-                          value: widget.report.division,
+                          value: report.division,
                           color: Colors.purple.shade400,
                         ),
                         const SizedBox(height: 8),
@@ -194,7 +268,7 @@ class _AfterDetailPageState extends State<AfterDetailPage> {
                         _buildInfoCard(
                           icon: Icons.precision_manufacturing_rounded,
                           label: "machine".tr(context),
-                          value: widget.report.machine,
+                          value: report.machine,
                           color: Colors.teal.shade400,
                         ),
                       ],
@@ -211,7 +285,7 @@ class _AfterDetailPageState extends State<AfterDetailPage> {
                     Expanded(
                       child: _buildSectionCard(
                         title: 'Comment',
-                        content: widget.report.comment,
+                        content: report.comment,
                         icon: Icons.comment_rounded,
                         accentColor: Colors.amber.shade600,
                       ),
@@ -220,7 +294,7 @@ class _AfterDetailPageState extends State<AfterDetailPage> {
                     Expanded(
                       child: _buildSectionCard(
                         title: 'Countermeasure',
-                        content: widget.report.countermeasure,
+                        content: report.countermeasure,
                         icon: Icons.handyman_rounded,
                         accentColor: Colors.green.shade600,
                       ),
@@ -243,13 +317,13 @@ class _AfterDetailPageState extends State<AfterDetailPage> {
                             icon: Icons.groups_rounded,
                             label: "Patrol at",
                             color: Colors.white70,
-                            value: formatDateTime(widget.report.createdAt),
+                            value: formatDateTime(report.createdAt),
                           ),
                           const SizedBox(height: 8),
                           _buildRiskCard(
                             icon: Icons.groups_rounded,
                             label: "Review Similar Cases",
-                            value: widget.report.checkInfo,
+                            value: report.checkInfo,
                             color: Colors.white70,
                           ),
                         ],
@@ -263,17 +337,17 @@ class _AfterDetailPageState extends State<AfterDetailPage> {
                           _buildInfoCard(
                             icon: Icons.groups_rounded,
                             label: "Deadline",
-                            value: formatDateTime(widget.report.dueDate),
+                            value: formatDateTime(report.dueDate),
                             color: Colors.white70,
                           ),
                           const SizedBox(height: 8),
                           _buildRiskCard(
                             icon: Icons.groups_rounded,
                             label: "label_risk".tr(context),
-                            value: widget.report.riskTotal,
+                            value: report.riskTotal,
                             color:
-                                (widget.report.riskTotal == "V" ||
-                                    widget.report.riskTotal == "IV")
+                                (report.riskTotal == "V" ||
+                                    report.riskTotal == "IV")
                                 ? Colors.red
                                 : Colors.white70,
                             riskTotal: true,
@@ -308,9 +382,9 @@ class _AfterDetailPageState extends State<AfterDetailPage> {
               ),
 
               const SizedBox(height: 12),
-              _buildImageGrid(widget.report.imageNames),
+              _buildImageGrid(report.imageNames, report),
               const SizedBox(height: 8),
-              _buildRetakeSection(),
+              _buildRetakeSection(report),
             ],
           ),
         ),
@@ -472,7 +546,7 @@ class _AfterDetailPageState extends State<AfterDetailPage> {
     );
   }
 
-  Widget _buildImageGrid(List<String> images) {
+  Widget _buildImageGrid(List<String> images, PatrolReportModel patrolReport) {
     // ===== CASE 1: chỉ có 1 ảnh → căn giữa =====
     if (images.length == 1) {
       return SizedBox(
@@ -482,9 +556,9 @@ class _AfterDetailPageState extends State<AfterDetailPage> {
             width: 320,
             child: ReplaceableImageItem(
               imageName: images.first,
-              report: widget.report,
+              report: patrolReport,
               patrolGroup: widget.patrolGroup,
-              plant: widget.report.plant,
+              plant: patrolReport.plant,
               onReplaced: (newImage) {
                 setState(() {
                   images[0] = newImage;
@@ -508,9 +582,9 @@ class _AfterDetailPageState extends State<AfterDetailPage> {
             width: 320,
             child: ReplaceableImageItem(
               imageName: images[index],
-              report: widget.report,
+              report: patrolReport,
               patrolGroup: widget.patrolGroup,
-              plant: widget.report.plant,
+              plant: patrolReport.plant,
               onReplaced: (newImage) {
                 setState(() {
                   images[index] = newImage;
@@ -606,11 +680,11 @@ class _AfterDetailPageState extends State<AfterDetailPage> {
         }
 
         final picList = snapshot.data ?? const <String>[];
-
+        final items = <String>{emptyLabel, ...picList}.toList();
         return CommonSearchableDropdown(
           label: "PIC",
           selectedValue: _selectedPIC,
-          items: picList,
+          items: items,
           isRequired: true,
           onChanged: (v) async {
             if (v == null || v == _selectedPIC) return;
@@ -648,7 +722,7 @@ class _AfterDetailPageState extends State<AfterDetailPage> {
     );
   }
 
-  Widget _buildRetakeSection() {
+  Widget _buildRetakeSection(PatrolReportModel report) {
     return Card(
       color: const Color(0xFF121826).withOpacity(.4),
       elevation: 2,
@@ -669,6 +743,7 @@ class _AfterDetailPageState extends State<AfterDetailPage> {
             CameraAfterBox(
               key: _cameraKey,
               size: 320,
+              plant: report.plant,
               patrolGroup: widget.patrolGroup,
               type: "RETAKE",
               onImagesChanged: (_) => setState(() {}),
@@ -722,7 +797,7 @@ class _AfterDetailPageState extends State<AfterDetailPage> {
 
                             await updateAtReport(
                               userAfter: widget.accountCode,
-                              reportId: widget.report.id!,
+                              reportId: report.id!,
                               atPic: '${_msnvCtrl.text.trim()}_$_employeeName',
                               comment: _commentCtrl.text.trim(),
                               images: _cameraKey.currentState!.images,
@@ -783,9 +858,9 @@ class _AfterDetailPageState extends State<AfterDetailPage> {
   Future<void> _onSave() async {
     try {
       const emptyLabel = 'UNKNOWN';
-      final picToApi = (_selectedPIC == emptyLabel) ? null : _selectedPIC;
-
-      await updateReportApi(id: widget.report.id!, pic: picToApi);
+      // final picToApi = (_selectedPIC == emptyLabel) ? null : _selectedPIC;
+      final picToApi = _selectedPIC; // gửi luôn kể cả UNKNOWN
+      await updateReportApi(id: _report!.id!, pic: picToApi);
 
       if (!mounted) return;
 

@@ -293,7 +293,7 @@ class _AfterDetailScreenState extends State<AfterDetailScreen> {
 
             columns: [
               const DataColumn(
-                label: SizedBox(width: 120, child: Text('PIC')),
+                label: SizedBox(width: 100, child: Text('PIC')),
               ), // 👈 PIC rộng vừa đủ
               const DataColumn(
                 label: SizedBox(width: 28, child: Center(child: Text('I'))),
