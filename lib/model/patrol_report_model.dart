@@ -1,6 +1,7 @@
 class PatrolReportModel {
   final int? id;
   final int stt;
+  final String? qr_key;
   final String? type; // thêm type (nullable)
   final String grp;
   final String plant;
@@ -38,6 +39,7 @@ class PatrolReportModel {
     this.id,
     required this.stt,
     this.type,
+    this.qr_key,
     required this.grp,
     required this.plant,
     required this.division,
@@ -88,6 +90,7 @@ class PatrolReportModel {
       stt: json['stt'] ?? 0,
       type: json['type'],
       grp: json['grp'] ?? '',
+      qr_key: json['qr_key'] ?? '',
       plant: json['plant'] ?? '',
       division: json['division'] ?? '',
       area: json['area'] ?? '',

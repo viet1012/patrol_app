@@ -177,8 +177,8 @@ class CameraAfterBoxState extends State<CameraAfterBox>
       final stream = await html.window.navigator.mediaDevices!.getUserMedia({
         'video': {
           'facingMode': 'environment',
-          'width': {'ideal': 4096, 'min': 1080},
-          'height': {'ideal': 4096, 'min': 1080},
+          'width': {'ideal': 1280, 'min': 640},
+          'height': {'ideal': 720, 'min': 480},
         },
       });
 

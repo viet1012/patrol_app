@@ -6,6 +6,8 @@ import 'dart:ui';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' hide MultipartFile;
+import '../after/camera_after_box.dart';
+import '../after/replaceable_image_item.dart';
 import '../api/dio_client.dart';
 import '../api/hse_master_service.dart';
 import '../api/patrol_report_api.dart';
@@ -16,15 +18,13 @@ import '../homeScreen/patrol_home_screen.dart';
 import '../model/patrol_report_model.dart';
 import '../translator.dart';
 import '../widget/glass_action_button.dart';
-import 'camera_after_box.dart';
-import 'replaceable_image_item.dart';
 
-class AfterDetailPage extends StatefulWidget {
+class RecheckDetailPage extends StatefulWidget {
   final String accountCode;
   final PatrolReportModel report;
   final PatrolGroup patrolGroup;
 
-  const AfterDetailPage({
+  const RecheckDetailPage({
     super.key,
     required this.accountCode,
     required this.report,
@@ -32,10 +32,10 @@ class AfterDetailPage extends StatefulWidget {
   });
 
   @override
-  State<AfterDetailPage> createState() => _AfterDetailPageState();
+  State<RecheckDetailPage> createState() => _RecheckDetailPageState();
 }
 
-class _AfterDetailPageState extends State<AfterDetailPage> {
+class _RecheckDetailPageState extends State<RecheckDetailPage> {
   final GlobalKey<CameraAfterBoxState> _cameraKey =
       GlobalKey<CameraAfterBoxState>();
 
@@ -52,6 +52,7 @@ class _AfterDetailPageState extends State<AfterDetailPage> {
   Future<List<String>>? _futurePics;
   String? _selectedPIC; // UI selected
   String? _oldPIC;
+  String? _hseJudge; // "OK" | "NG"
 
   @override
   void initState() {
@@ -118,7 +119,7 @@ class _AfterDetailPageState extends State<AfterDetailPage> {
             Column(
               children: [
                 Text(
-                  'Patrol After',
+                  'Patrol Recheck',
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 13,
@@ -308,8 +309,27 @@ class _AfterDetailPageState extends State<AfterDetailPage> {
               ),
 
               const SizedBox(height: 12),
-              _buildImageGrid(widget.report.imageNames),
-              const SizedBox(height: 8),
+              Column(
+                children: [
+                  _imageSection(
+                    title: 'BEFORE',
+                    images: widget.report.imageNames,
+                    onReplace: (i, newImage) {
+                      setState(() => widget.report.imageNames[i] = newImage);
+                    },
+                  ),
+                  const SizedBox(height: 18), // ✅ ngăn cách rõ ràng
+                  _imageSection(
+                    title: 'AFTER',
+                    images: widget.report.atImageNames,
+                    onReplace: (i, newImage) {
+                      setState(() => widget.report.atImageNames[i] = newImage);
+                    },
+                    isAfter: true,
+                  ),
+                ],
+              ),
+
               _buildRetakeSection(),
             ],
           ),
@@ -474,7 +494,50 @@ class _AfterDetailPageState extends State<AfterDetailPage> {
     );
   }
 
-  Widget _buildImageGrid(List<String> images) {
+  Widget _imageSection({
+    required String title,
+    required List<String> images,
+    required void Function(int index, String newImage) onReplace,
+    bool isAfter = false,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.22),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withOpacity(0.12)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w800,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(height: 10),
+          _buildImageGrid(images: images, onReplace: onReplace),
+          if (isAfter)
+            Center(
+              child: _buildSectionCard(
+                title: 'Comment',
+                content: widget.report.atComment!,
+                icon: Icons.comment_rounded,
+                accentColor: Colors.amber.shade600,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildImageGrid({
+    required List<String> images,
+    required void Function(int index, String newImage) onReplace,
+  }) {
     // ===== CASE 1: chỉ có 1 ảnh → căn giữa =====
     if (images.length == 1) {
       return SizedBox(
@@ -487,11 +550,7 @@ class _AfterDetailPageState extends State<AfterDetailPage> {
               report: widget.report,
               patrolGroup: widget.patrolGroup,
               plant: widget.report.plant,
-              onReplaced: (newImage) {
-                setState(() {
-                  images[0] = newImage;
-                });
-              },
+              onReplaced: (newImage) => onReplace(0, newImage),
             ),
           ),
         ),
@@ -502,6 +561,7 @@ class _AfterDetailPageState extends State<AfterDetailPage> {
     return SizedBox(
       height: 320,
       child: ListView.separated(
+        padding: const EdgeInsets.symmetric(horizontal: 4),
         scrollDirection: Axis.horizontal,
         itemCount: images.length,
         separatorBuilder: (_, __) => const SizedBox(width: 12),
@@ -513,11 +573,7 @@ class _AfterDetailPageState extends State<AfterDetailPage> {
               report: widget.report,
               patrolGroup: widget.patrolGroup,
               plant: widget.report.plant,
-              onReplaced: (newImage) {
-                setState(() {
-                  images[index] = newImage;
-                });
-              },
+              onReplaced: (newImage) => onReplace(index, newImage),
             ),
           );
         },
@@ -559,13 +615,6 @@ class _AfterDetailPageState extends State<AfterDetailPage> {
                   child: GestureDetector(
                     onTap: () {
                       _cameraKey.currentState?.removeImage(idx);
-
-                      // setState(() {
-                      //   _retakeImages.removeAt(idx);
-                      //   if (_retakeImages.isEmpty) {
-                      //     _enableCamera = true;
-                      //   }
-                      // });
                     },
                     child: Container(
                       padding: const EdgeInsets.all(2),
@@ -679,7 +728,7 @@ class _AfterDetailPageState extends State<AfterDetailPage> {
             /// ===== COMMENT =====
             if (_cameraKey.currentState != null &&
                 _cameraKey.currentState!.images.isNotEmpty) ...[
-              const SizedBox(height: 16),
+              const SizedBox(height: 8),
               TextField(
                 controller: _commentCtrl,
                 maxLines: 3,
@@ -704,6 +753,9 @@ class _AfterDetailPageState extends State<AfterDetailPage> {
                   ); // Bắt buộc gọi setState để UI rebuild và nút lưu hiện/ẩn đúng
                 },
               ),
+              const SizedBox(height: 8),
+
+              _buildHseJudgeButtons(),
             ],
 
             const SizedBox(height: 20),
@@ -722,10 +774,11 @@ class _AfterDetailPageState extends State<AfterDetailPage> {
                           try {
                             showLoading(context);
 
-                            await updateAtReport(
-                              userAfter: widget.accountCode,
+                            await updateHseReport(
+                              hseJudge: _hseJudge!,
                               reportId: widget.report.id!,
-                              atPic: '${_msnvCtrl.text.trim()}_$_employeeName',
+                              hseUser:
+                                  '${_msnvCtrl.text.trim()}_$_employeeName',
                               comment: _commentCtrl.text.trim(),
                               images: _cameraKey.currentState!.images,
                             );
@@ -745,7 +798,7 @@ class _AfterDetailPageState extends State<AfterDetailPage> {
                             setState(() => _enableCamera = true);
 
                             _showSnackBar(
-                              'Update AF successful!',
+                              'Update Recheck successful!',
                               Colors.green,
                             );
                           } catch (e) {
@@ -759,6 +812,78 @@ class _AfterDetailPageState extends State<AfterDetailPage> {
                 ),
               ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHseJudgeButtons() {
+    return Row(
+      children: [
+        Expanded(
+          child: _judgeButton(
+            label: 'OK',
+            value: 'OK',
+            color: Colors.greenAccent,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _judgeButton(
+            label: 'NG',
+            value: 'NG',
+            color: Colors.redAccent,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _judgeButton({
+    required String label,
+    required String value,
+    required Color color,
+  }) {
+    final bool selected = _hseJudge == value;
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: () {
+        setState(() {
+          _hseJudge = value;
+        });
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        decoration: BoxDecoration(
+          color: selected
+              ? color.withOpacity(0.9)
+              : Colors.black.withOpacity(0.2),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: selected ? color : Colors.white.withOpacity(0.25),
+            width: 2,
+          ),
+          boxShadow: selected
+              ? [
+                  BoxShadow(
+                    color: color.withOpacity(0.4),
+                    blurRadius: 16,
+                    offset: const Offset(0, 8),
+                  ),
+                ]
+              : [],
+        ),
+        child: Center(
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+              color: selected ? Colors.black : Colors.white,
+            ),
+          ),
         ),
       ),
     );
@@ -858,37 +983,44 @@ class _AfterDetailPageState extends State<AfterDetailPage> {
     Navigator.of(context, rootNavigator: true).pop();
   }
 
-  Future<void> updateAtReport({
-    required String userAfter,
+  Future<void> updateHseReport({
     required int reportId,
-    required String atPic,
-    required String comment,
+    required String hseUser, // accountCode / user login
+    required String hseJudge, // PASS/FAIL/OK/NG...
+    required String comment, // hseComment
     required List<Uint8List> images,
   }) async {
     final dio = DioClient.dio;
 
-    final dataJson = {"atComment": comment, "atPic": atPic};
+    final String atStatus = hseJudge == 'OK' ? 'Completed' : 'Redo';
+
+    final dataJson = {
+      "hseUser": hseUser,
+      "hseJudge": hseJudge,
+      "hseComment": comment,
+      "atStatus": atStatus,
+    };
 
     final formData = FormData();
 
-    // data (JSON STRING)
+    // ✅ data (JSON STRING)
     formData.fields.add(MapEntry('data', jsonEncode(dataJson)));
 
-    // images (BYTES)
+    // ✅ images (BYTES)
     for (int i = 0; i < images.length; i++) {
       formData.files.add(
         MapEntry(
           'images',
           MultipartFile.fromBytes(
             images[i],
-            filename: 'retake_${i + 1}.jpg',
+            filename: 'hse_${i + 1}.jpg',
             contentType: MediaType('image', 'jpeg'),
           ),
         ),
       );
     }
 
-    final url = '/api/patrol_report/$reportId/update_at';
+    final url = '/api/patrol_report/$reportId/hse_recheck'; // ✅ đổi endpoint
 
     debugPrint('Calling PUT $url');
     debugPrint('Base URL: ${dio.options.baseUrl}');

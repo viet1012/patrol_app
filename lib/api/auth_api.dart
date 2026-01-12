@@ -17,7 +17,7 @@ class AuthApi {
 
       /// 🔥 LOG REQUEST
       debugPrint('👉 API CALL: ${DioClient.dio.options.baseUrl}$endpoint');
-      debugPrint('👉 BODY: $body');
+      // debugPrint('👉 BODY: $body');
 
       final response = await DioClient.dio.post(endpoint, data: body);
 
@@ -59,7 +59,7 @@ class AuthApi {
 
       /// 🔥 LOG REQUEST
       debugPrint('👉 API CALL: ${DioClient.dio.options.baseUrl}$endpoint');
-      debugPrint('👉 BODY: $body');
+      // debugPrint('👉 BODY: $body');
 
       final response = await DioClient.dio.post(endpoint, data: body);
 
@@ -106,12 +106,12 @@ class AuthApi {
 
       /// 🔥 LOG REQUEST
       debugPrint('👉 API CALL: ${DioClient.dio.options.baseUrl}$endpoint');
-      debugPrint('👉 BODY: $body');
+      // debugPrint('👉 BODY: $body');
 
       final response = await DioClient.dio.post(endpoint, data: body);
 
       debugPrint('✅ STATUS: ${response.statusCode}');
-      debugPrint('✅ RESPONSE: ${response.data}');
+      // debugPrint('✅ RESPONSE: ${response.data}');
 
       if (response.statusCode == 200 && response.data is Map) {
         return AuthResult(
@@ -143,15 +143,15 @@ class AuthApi {
 
       /// 🔥 LOG REQUEST
       debugPrint('👉 API CALL: ${DioClient.dio.options.baseUrl}$endpoint');
-      debugPrint('👉 PARAMS: account=$account');
+      // debugPrint('👉 PARAMS: account=$account');
 
       final response = await DioClient.dio.get(
         endpoint,
         queryParameters: {'account': account},
       );
 
-      debugPrint('✅ STATUS: ${response.statusCode}');
-      debugPrint('✅ RESPONSE: ${response.data}');
+      // debugPrint('✅ STATUS: ${response.statusCode}');
+      // debugPrint('✅ RESPONSE: ${response.data}');
 
       if (response.statusCode == 200 && response.data is bool) {
         return response.data as bool;

@@ -18,8 +18,8 @@ class SessionStore {
     if (kIsWeb) {
       html.window.localStorage[_kAccount] = account;
       html.window.localStorage[_kPassword] = password;
-      print('✅ SAVED to localStorage: $account / $password');
-      print('🔎 localStorage now: ${html.window.localStorage[_kAccount]}');
+      // print('✅ SAVED to localStorage: $account / $password');
+      // print('🔎 localStorage now: ${html.window.localStorage[_kAccount]}');
     } else {
       await _secureStorage.write(key: _kAccount, value: account);
       await _secureStorage.write(key: _kPassword, value: password);

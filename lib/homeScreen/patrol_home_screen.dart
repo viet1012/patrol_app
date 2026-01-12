@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:chuphinh/widget/glass_action_button.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:shimmer/shimmer.dart';
 
 import '../LanguageFlagButton.dart';
@@ -12,10 +13,13 @@ import '../animate/christmas_title.dart';
 import '../animate/glow_title.dart';
 import '../api/dio_client.dart';
 import '../api/hse_master_service.dart';
+import '../common/animated_glass_action_button.dart';
 import '../common/common_ui_helper.dart';
 import '../login/login_page.dart';
 import '../model/hse_patrol_team_model.dart';
 import '../model/machine_model.dart';
+import '../qrCode/qr_scanner_dialog.dart';
+import '../recheck/recheck_detail_screen.dart';
 import '../session/session_store.dart';
 import '../test.dart';
 import '../translator.dart';
@@ -61,7 +65,8 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
 
   HsePatrolTeamModel? _autoTeam;
   bool _needManualSelect = true;
-
+  bool _qrHandled = false;
+  final _qrDialogKey = GlobalKey<QrScannerDialogState>();
   @override
   void initState() {
     super.initState();
@@ -111,8 +116,6 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
   Future<void> _loadHseMaster() async {
     try {
       final data = await HseMasterService.fetchMachines();
-
-      final plants = getPlantList(data);
 
       setState(() {
         isLoading = true;
@@ -226,26 +229,25 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
         preferredSize: const Size.fromHeight(50),
         child: AppBar(
           centerTitle: true,
-          title: Center(
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(24),
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Image.asset(
-                      'assets/flags/favicon.png',
-                      width: 40,
-                      height: 40,
-                      filterQuality: FilterQuality.high,
-                      fit: BoxFit.contain,
-                    ),
-                    SizedBox(width: 8),
-                    EmbossGlowTitle(text: 'S-PATROL'),
-                    SizedBox(width: 8),
-                  ],
-                ),
+          title: ClipRRect(
+            borderRadius: BorderRadius.circular(24),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Image.asset(
+                    'assets/flags/favicon.png',
+                    width: 40,
+                    height: 40,
+                    filterQuality: FilterQuality.high,
+                    fit: BoxFit.contain,
+                  ),
+                  SizedBox(width: 8),
+                  EmbossGlowTitle(text: 'S-PATROL'),
+                  SizedBox(width: 8),
+                  EmbossGlowTitle(text: 'V1.3', fontSize: 8),
+                ],
               ),
             ),
           ),
@@ -283,7 +285,7 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
               : Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 24,
-                    vertical: 16,
+                    vertical: 8,
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -310,6 +312,7 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
                           ),
                         ],
                       ),
+
                       SizedBox(height: 8),
                       ClipRRect(
                         borderRadius: BorderRadius.circular(16),
@@ -345,9 +348,7 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
                                       size: 30,
                                     ),
                                     decoration: InputDecoration(
-                                      labelText: "plant".tr(
-                                        context,
-                                      ), // 👈 TEXT BẠN MUỐN
+                                      labelText: "plant".tr(context),
                                       filled: true,
                                       fillColor: Colors.white.withOpacity(0.12),
 
@@ -467,35 +468,48 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
                                 ],
                               ),
                       ),
-                      GlassActionButton(
-                        icon: Icons.logout,
-                        onTap: () async {
-                          final confirm = await CommonUI.showGlassConfirm(
-                            context: context,
-                            icon: Icons.logout_rounded,
-                            iconColor: Colors.redAccent,
-                            title: "Logout",
-                            message: "Do you want to logout?",
-                            cancelText: "Cancel",
-                            confirmText: "Logout",
-                            confirmColor: Colors.redAccent,
-                          );
+                      Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          // ⬅️ LOGOUT (LEFT)
+                          Positioned(
+                            left: 0,
+                            child: GlassActionButton(
+                              icon: Icons.logout,
+                              onTap: () async {
+                                final confirm = await CommonUI.showGlassConfirm(
+                                  context: context,
+                                  icon: Icons.logout_rounded,
+                                  iconColor: Colors.redAccent,
+                                  title: "Logout",
+                                  message: "Do you want to logout?",
+                                  cancelText: "Cancel",
+                                  confirmText: "Logout",
+                                  confirmColor: Colors.redAccent,
+                                );
 
-                          if (!confirm) return;
-                          if (!context.mounted) return;
+                                if (!confirm || !context.mounted) return;
 
-                          await SessionStore.clear();
+                                await SessionStore.clear();
+                                if (!context.mounted) return;
 
-                          if (!context.mounted) return;
-
-                          Navigator.pushAndRemoveUntil(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const LoginPage(),
+                                Navigator.pushAndRemoveUntil(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const LoginPage(),
+                                  ),
+                                  (_) => false,
+                                );
+                              },
                             ),
-                            (_) => false,
-                          );
-                        },
+                          ),
+                          Center(
+                            child: QrScanGlassButton(
+                              onTap: _openQrScannerDialog,
+                              duration: Duration(milliseconds: 900),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -503,6 +517,61 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _openQrScannerDialog() async {
+    final dialogKey = GlobalKey<QrScannerDialogState>(); // ✅ tạo mới mỗi lần
+    _qrHandled = false;
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(12),
+        child: QrScannerDialog(
+          key: dialogKey,
+          onDetected: (qr) async {
+            if (_qrHandled) return;
+            _qrHandled = true;
+
+            // final plant = selectedFactory?.trim();
+            // if (plant == null || plant.isEmpty) {
+            //   _qrHandled = false;
+            //   CommonUI.showWarning(
+            //     context: ctx,
+            //     title: 'QR Failed',
+            //     message: 'Please select *${'plant'.tr(context)}',
+            //   );
+            //   return;
+            // }
+
+            await dialogKey.currentState?.stopCamera(); // ✅ dùng key local
+
+            final nav = Navigator.of(ctx, rootNavigator: true);
+            if (nav.canPop()) nav.pop();
+
+            await Future.delayed(const Duration(milliseconds: 150));
+            if (!mounted) return;
+
+            final rawQr = qr.trim();
+            final safeQr = Uri.encodeComponent(rawQr);
+
+            context.go(
+              '/after/$safeQr',
+              extra: {
+                'accountCode': widget.accountCode,
+                'id': null,
+                'qrCode': rawQr,
+                'patrolGroup': PatrolGroup.Patrol,
+              },
+            );
+          },
+        ),
+      ),
+    ).whenComplete(() {
+      _qrHandled = false;
+    });
   }
 
   Widget _animatedCard(int index, Widget child) {
@@ -714,7 +783,21 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
               number: '3)',
               title: 'HSE ReCheck',
               color: color,
-              enabled: false,
+              enabled: true,
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => RecheckDetailScreen(
+                      accountCode: widget.accountCode,
+                      machines: machines,
+                      selectedPlant: selectedFactory,
+                      titleScreen: titleScreen,
+                      patrolGroup: group,
+                    ),
+                  ),
+                );
+              },
             ),
           ],
         ),
