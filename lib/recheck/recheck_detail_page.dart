@@ -510,16 +510,29 @@ class _RecheckDetailPageState extends State<RecheckDetailPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w800,
-              color: Colors.white,
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
+                ),
+              ),
+              if (isAfter)
+                _buildInfoCard(
+                  icon: Icons.groups_rounded,
+                  label: "After PIC:",
+                  color: Colors.white70,
+                  value: widget.report.atPic!,
+                ),
+            ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
           _buildImageGrid(images: images, onReplace: onReplace),
+          const SizedBox(height: 8),
           if (isAfter)
             Center(
               child: _buildSectionCard(
