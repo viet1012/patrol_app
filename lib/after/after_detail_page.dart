@@ -446,28 +446,30 @@ class _AfterDetailPageState extends State<AfterDetailPage> {
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: accentColor.withOpacity(0.25), width: 1),
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min, // ⭐
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 13,
-              fontWeight: FontWeight.bold,
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min, // ⭐
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+              ),
             ),
-          ),
-          const SizedBox(height: 3),
-          Text(
-            content.isEmpty ? '-' : content,
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.85),
-              fontSize: 13,
-              height: 1.4,
+            const SizedBox(height: 3),
+            Text(
+              content.isEmpty ? '-' : content,
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.85),
+                fontSize: 13,
+                height: 1.4,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

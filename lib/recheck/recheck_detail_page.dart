@@ -5,7 +5,6 @@ import 'dart:ui';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' hide MultipartFile;
 import '../after/camera_after_box.dart';
 import '../after/replaceable_image_item.dart';
@@ -20,26 +19,23 @@ import '../model/patrol_report_model.dart';
 import '../translator.dart';
 import '../widget/glass_action_button.dart';
 
-class AfterPatrol extends StatefulWidget {
+class RecheckDetailPage extends StatefulWidget {
   final String accountCode;
-  // final String plant;
-  final int? id; // bắt buộc
-  final String? qrCode; // có thể null
+  final PatrolReportModel report;
   final PatrolGroup patrolGroup;
 
-  const AfterPatrol({
+  const RecheckDetailPage({
     super.key,
     required this.accountCode,
-    // required this.plant,
-    this.id,
-    this.qrCode,
+    required this.report,
     required this.patrolGroup,
   });
+
   @override
-  State<AfterPatrol> createState() => _AfterPatrolState();
+  State<RecheckDetailPage> createState() => _RecheckDetailPageState();
 }
 
-class _AfterPatrolState extends State<AfterPatrol> {
+class _RecheckDetailPageState extends State<RecheckDetailPage> {
   final GlobalKey<CameraAfterBoxState> _cameraKey =
       GlobalKey<CameraAfterBoxState>();
 
@@ -56,60 +52,7 @@ class _AfterPatrolState extends State<AfterPatrol> {
   Future<List<String>>? _futurePics;
   String? _selectedPIC; // UI selected
   String? _oldPIC;
-
-  PatrolReportModel? _report;
-  bool _loading = true;
-  String? _error;
-
-  String get _lookupKey {
-    final q = widget.qrCode?.trim();
-    if (q != null && q.isNotEmpty) return q;
-    return widget.id?.toString() ?? 'NO_ID';
-  }
-
-  Future<void> _loadReport() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
-
-    try {
-      final q = widget.qrCode?.trim();
-      final list = await PatrolReportApi.fetchReports(
-        qrKey: (q != null && q.isNotEmpty) ? q : null,
-        id: (q == null || q.isEmpty) ? widget.id : null,
-      );
-
-      if (list.isEmpty) {
-        setState(() {
-          _error = 'Không tìm thấy report cho key=$_lookupKey';
-          _loading = false;
-        });
-        return;
-      }
-
-      // nếu API trả nhiều cái, lấy cái đúng nhất
-      final picked = (widget.id != null)
-          ? list.firstWhere((e) => e.id == widget.id, orElse: () => list.first)
-          : list.first;
-
-      final rawPic = picked.pic?.trim();
-      final selected = (rawPic == null || rawPic.isEmpty) ? emptyLabel : rawPic;
-      setState(() {
-        _report = picked;
-        _selectedPIC = selected;
-        _oldPIC = selected;
-        _futurePics = findPicsByPlantFromApi(picked.plant);
-        _loading = false;
-        _enableCamera = true;
-      });
-    } catch (e) {
-      setState(() {
-        _error = e.toString();
-        _loading = false;
-      });
-    }
-  }
+  String? _hseJudge; // "OK" | "NG"
 
   @override
   void initState() {
@@ -119,9 +62,13 @@ class _AfterPatrolState extends State<AfterPatrol> {
       widget.accountCode,
     ).then((name) => debugPrint('EMPLOYEE NAME = $name'));
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadReport(); // ✅ gọi sau khi build frame đầu
-    });
+    // ✅ init PIC
+    final rawPic = widget.report.pic?.trim();
+    _selectedPIC = (rawPic == null || rawPic.isEmpty) ? emptyLabel : rawPic;
+    _oldPIC = _selectedPIC;
+
+    // ✅ cache list PIC theo plant
+    _futurePics = findPicsByPlantFromApi(widget.report.plant);
   }
 
   @override
@@ -157,31 +104,13 @@ class _AfterPatrolState extends State<AfterPatrol> {
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) {
-      return const Scaffold(
-        backgroundColor: Color(0xFF121826),
-        body: Center(child: CircularProgressIndicator()),
-      );
-    }
-    if (_error != null) {
-      return CommonUI.warningPage(context: context, message: _error!);
-    }
-
-    final report = _report!; //  dùng report thay widget.report
     return Scaffold(
       appBar: AppBar(
         centerTitle: false,
         titleSpacing: 4, // 👈 kéo sát về leading
         leading: GlassActionButton(
           icon: Icons.arrow_back_rounded,
-          onTap: () {
-            final hasQr = (widget.qrCode ?? '').trim().isNotEmpty;
-            if (hasQr) {
-              context.go('/');
-            } else {
-              Navigator.pop(context, true);
-            }
-          },
+          onTap: () => Navigator.pop(context, true),
         ),
         backgroundColor: const Color(0xFF121826),
         title: Row(
@@ -190,7 +119,7 @@ class _AfterPatrolState extends State<AfterPatrol> {
             Column(
               children: [
                 Text(
-                  'Patrol After',
+                  'Patrol Recheck',
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 13,
@@ -199,15 +128,13 @@ class _AfterPatrolState extends State<AfterPatrol> {
                   ),
                 ),
                 Text(
-                  report.plant,
+                  widget.report.plant,
                   style: const TextStyle(color: Colors.white70, fontSize: 11),
                 ),
               ],
             ),
             Text(
-              widget.id == null
-                  ? 'QR: ${widget.qrCode ?? "-"}'
-                  : 'ID: ${widget.id}',
+              'ID: ${widget.report.id.toString()}',
               style: const TextStyle(color: Colors.white70, fontSize: 11),
             ),
           ],
@@ -239,14 +166,14 @@ class _AfterPatrolState extends State<AfterPatrol> {
                         _buildInfoCard(
                           icon: Icons.groups_rounded,
                           label: "group".tr(context),
-                          value: report.grp,
+                          value: widget.report.grp,
                           color: Colors.blue.shade400,
                         ),
                         const SizedBox(height: 8),
                         _buildInfoCard(
                           icon: Icons.location_on_rounded,
                           label: "area".tr(context),
-                          value: report.area,
+                          value: widget.report.area,
                           color: Colors.orange.shade400,
                         ),
                       ],
@@ -260,7 +187,7 @@ class _AfterPatrolState extends State<AfterPatrol> {
                         _buildInfoCard(
                           icon: Icons.business_rounded,
                           label: "fac".tr(context),
-                          value: report.division,
+                          value: widget.report.division,
                           color: Colors.purple.shade400,
                         ),
                         const SizedBox(height: 8),
@@ -268,7 +195,7 @@ class _AfterPatrolState extends State<AfterPatrol> {
                         _buildInfoCard(
                           icon: Icons.precision_manufacturing_rounded,
                           label: "machine".tr(context),
-                          value: report.machine,
+                          value: widget.report.machine,
                           color: Colors.teal.shade400,
                         ),
                       ],
@@ -285,7 +212,7 @@ class _AfterPatrolState extends State<AfterPatrol> {
                     Expanded(
                       child: _buildSectionCard(
                         title: 'Comment',
-                        content: report.comment,
+                        content: widget.report.comment,
                         icon: Icons.comment_rounded,
                         accentColor: Colors.amber.shade600,
                       ),
@@ -294,7 +221,7 @@ class _AfterPatrolState extends State<AfterPatrol> {
                     Expanded(
                       child: _buildSectionCard(
                         title: 'Countermeasure',
-                        content: report.countermeasure,
+                        content: widget.report.countermeasure,
                         icon: Icons.handyman_rounded,
                         accentColor: Colors.green.shade600,
                       ),
@@ -317,13 +244,13 @@ class _AfterPatrolState extends State<AfterPatrol> {
                             icon: Icons.groups_rounded,
                             label: "Patrol at",
                             color: Colors.white70,
-                            value: formatDateTime(report.createdAt),
+                            value: formatDateTime(widget.report.createdAt),
                           ),
                           const SizedBox(height: 8),
                           _buildRiskCard(
                             icon: Icons.groups_rounded,
                             label: "Review Similar Cases",
-                            value: report.checkInfo,
+                            value: widget.report.checkInfo,
                             color: Colors.white70,
                           ),
                         ],
@@ -337,17 +264,17 @@ class _AfterPatrolState extends State<AfterPatrol> {
                           _buildInfoCard(
                             icon: Icons.groups_rounded,
                             label: "Deadline",
-                            value: formatDateTime(report.dueDate),
+                            value: formatDateTime(widget.report.dueDate),
                             color: Colors.white70,
                           ),
                           const SizedBox(height: 8),
                           _buildRiskCard(
                             icon: Icons.groups_rounded,
                             label: "label_risk".tr(context),
-                            value: report.riskTotal,
+                            value: widget.report.riskTotal,
                             color:
-                                (report.riskTotal == "V" ||
-                                    report.riskTotal == "IV")
+                                (widget.report.riskTotal == "V" ||
+                                    widget.report.riskTotal == "IV")
                                 ? Colors.red
                                 : Colors.white70,
                             riskTotal: true,
@@ -382,9 +309,28 @@ class _AfterPatrolState extends State<AfterPatrol> {
               ),
 
               const SizedBox(height: 12),
-              _buildImageGrid(report.imageNames, report),
-              const SizedBox(height: 8),
-              _buildRetakeSection(report),
+              Column(
+                children: [
+                  _imageSection(
+                    title: 'BEFORE',
+                    images: widget.report.imageNames,
+                    onReplace: (i, newImage) {
+                      setState(() => widget.report.imageNames[i] = newImage);
+                    },
+                  ),
+                  const SizedBox(height: 18), // ✅ ngăn cách rõ ràng
+                  _imageSection(
+                    title: 'AFTER',
+                    images: widget.report.atImageNames,
+                    onReplace: (i, newImage) {
+                      setState(() => widget.report.atImageNames[i] = newImage);
+                    },
+                    isAfter: true,
+                  ),
+                ],
+              ),
+
+              _buildRetakeSection(),
             ],
           ),
         ),
@@ -548,7 +494,50 @@ class _AfterPatrolState extends State<AfterPatrol> {
     );
   }
 
-  Widget _buildImageGrid(List<String> images, PatrolReportModel patrolReport) {
+  Widget _imageSection({
+    required String title,
+    required List<String> images,
+    required void Function(int index, String newImage) onReplace,
+    bool isAfter = false,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.22),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withOpacity(0.12)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w800,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(height: 10),
+          _buildImageGrid(images: images, onReplace: onReplace),
+          if (isAfter)
+            Center(
+              child: _buildSectionCard(
+                title: 'Comment',
+                content: widget.report.atComment!,
+                icon: Icons.comment_rounded,
+                accentColor: Colors.amber.shade600,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildImageGrid({
+    required List<String> images,
+    required void Function(int index, String newImage) onReplace,
+  }) {
     // ===== CASE 1: chỉ có 1 ảnh → căn giữa =====
     if (images.length == 1) {
       return SizedBox(
@@ -558,14 +547,10 @@ class _AfterPatrolState extends State<AfterPatrol> {
             width: 320,
             child: ReplaceableImageItem(
               imageName: images.first,
-              report: patrolReport,
+              report: widget.report,
               patrolGroup: widget.patrolGroup,
-              plant: patrolReport.plant,
-              onReplaced: (newImage) {
-                setState(() {
-                  images[0] = newImage;
-                });
-              },
+              plant: widget.report.plant,
+              onReplaced: (newImage) => onReplace(0, newImage),
             ),
           ),
         ),
@@ -576,6 +561,7 @@ class _AfterPatrolState extends State<AfterPatrol> {
     return SizedBox(
       height: 320,
       child: ListView.separated(
+        padding: const EdgeInsets.symmetric(horizontal: 4),
         scrollDirection: Axis.horizontal,
         itemCount: images.length,
         separatorBuilder: (_, __) => const SizedBox(width: 12),
@@ -584,14 +570,10 @@ class _AfterPatrolState extends State<AfterPatrol> {
             width: 320,
             child: ReplaceableImageItem(
               imageName: images[index],
-              report: patrolReport,
+              report: widget.report,
               patrolGroup: widget.patrolGroup,
-              plant: patrolReport.plant,
-              onReplaced: (newImage) {
-                setState(() {
-                  images[index] = newImage;
-                });
-              },
+              plant: widget.report.plant,
+              onReplaced: (newImage) => onReplace(index, newImage),
             ),
           );
         },
@@ -633,13 +615,6 @@ class _AfterPatrolState extends State<AfterPatrol> {
                   child: GestureDetector(
                     onTap: () {
                       _cameraKey.currentState?.removeImage(idx);
-
-                      // setState(() {
-                      //   _retakeImages.removeAt(idx);
-                      //   if (_retakeImages.isEmpty) {
-                      //     _enableCamera = true;
-                      //   }
-                      // });
                     },
                     child: Container(
                       padding: const EdgeInsets.all(2),
@@ -682,11 +657,11 @@ class _AfterPatrolState extends State<AfterPatrol> {
         }
 
         final picList = snapshot.data ?? const <String>[];
-        final items = <String>{emptyLabel, ...picList}.toList();
+
         return CommonSearchableDropdown(
           label: "PIC",
           selectedValue: _selectedPIC,
-          items: items,
+          items: picList,
           isRequired: true,
           onChanged: (v) async {
             if (v == null || v == _selectedPIC) return;
@@ -724,7 +699,7 @@ class _AfterPatrolState extends State<AfterPatrol> {
     );
   }
 
-  Widget _buildRetakeSection(PatrolReportModel report) {
+  Widget _buildRetakeSection() {
     return Card(
       color: const Color(0xFF121826).withOpacity(.4),
       elevation: 2,
@@ -745,7 +720,6 @@ class _AfterPatrolState extends State<AfterPatrol> {
             CameraAfterBox(
               key: _cameraKey,
               size: 320,
-              plant: report.plant,
               patrolGroup: widget.patrolGroup,
               type: "RETAKE",
               onImagesChanged: (_) => setState(() {}),
@@ -754,7 +728,7 @@ class _AfterPatrolState extends State<AfterPatrol> {
             /// ===== COMMENT =====
             if (_cameraKey.currentState != null &&
                 _cameraKey.currentState!.images.isNotEmpty) ...[
-              const SizedBox(height: 16),
+              const SizedBox(height: 8),
               TextField(
                 controller: _commentCtrl,
                 maxLines: 3,
@@ -779,6 +753,9 @@ class _AfterPatrolState extends State<AfterPatrol> {
                   ); // Bắt buộc gọi setState để UI rebuild và nút lưu hiện/ẩn đúng
                 },
               ),
+              const SizedBox(height: 8),
+
+              _buildHseJudgeButtons(),
             ],
 
             const SizedBox(height: 20),
@@ -797,10 +774,11 @@ class _AfterPatrolState extends State<AfterPatrol> {
                           try {
                             showLoading(context);
 
-                            await updateAtReport(
-                              userAfter: widget.accountCode,
-                              reportId: report.id!,
-                              atPic: '${_msnvCtrl.text.trim()}_$_employeeName',
+                            await updateHseReport(
+                              hseJudge: _hseJudge!,
+                              reportId: widget.report.id!,
+                              hseUser:
+                                  '${_msnvCtrl.text.trim()}_$_employeeName',
                               comment: _commentCtrl.text.trim(),
                               images: _cameraKey.currentState!.images,
                             );
@@ -820,7 +798,7 @@ class _AfterPatrolState extends State<AfterPatrol> {
                             setState(() => _enableCamera = true);
 
                             _showSnackBar(
-                              'Update AF successful!',
+                              'Update Recheck successful!',
                               Colors.green,
                             );
                           } catch (e) {
@@ -834,6 +812,78 @@ class _AfterPatrolState extends State<AfterPatrol> {
                 ),
               ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHseJudgeButtons() {
+    return Row(
+      children: [
+        Expanded(
+          child: _judgeButton(
+            label: 'OK',
+            value: 'OK',
+            color: Colors.greenAccent,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _judgeButton(
+            label: 'NG',
+            value: 'NG',
+            color: Colors.redAccent,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _judgeButton({
+    required String label,
+    required String value,
+    required Color color,
+  }) {
+    final bool selected = _hseJudge == value;
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: () {
+        setState(() {
+          _hseJudge = value;
+        });
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        decoration: BoxDecoration(
+          color: selected
+              ? color.withOpacity(0.9)
+              : Colors.black.withOpacity(0.2),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: selected ? color : Colors.white.withOpacity(0.25),
+            width: 2,
+          ),
+          boxShadow: selected
+              ? [
+                  BoxShadow(
+                    color: color.withOpacity(0.4),
+                    blurRadius: 16,
+                    offset: const Offset(0, 8),
+                  ),
+                ]
+              : [],
+        ),
+        child: Center(
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+              color: selected ? Colors.black : Colors.white,
+            ),
+          ),
         ),
       ),
     );
@@ -860,9 +910,9 @@ class _AfterPatrolState extends State<AfterPatrol> {
   Future<void> _onSave() async {
     try {
       const emptyLabel = 'UNKNOWN';
-      // final picToApi = (_selectedPIC == emptyLabel) ? null : _selectedPIC;
-      final picToApi = _selectedPIC; // gửi luôn kể cả UNKNOWN
-      await updateReportApi(id: _report!.id!, pic: picToApi);
+      final picToApi = (_selectedPIC == emptyLabel) ? null : _selectedPIC;
+
+      await updateReportApi(id: widget.report.id!, pic: picToApi);
 
       if (!mounted) return;
 
@@ -933,37 +983,44 @@ class _AfterPatrolState extends State<AfterPatrol> {
     Navigator.of(context, rootNavigator: true).pop();
   }
 
-  Future<void> updateAtReport({
-    required String userAfter,
+  Future<void> updateHseReport({
     required int reportId,
-    required String atPic,
-    required String comment,
+    required String hseUser, // accountCode / user login
+    required String hseJudge, // PASS/FAIL/OK/NG...
+    required String comment, // hseComment
     required List<Uint8List> images,
   }) async {
     final dio = DioClient.dio;
 
-    final dataJson = {"atComment": comment, "atPic": atPic};
+    final String atStatus = hseJudge == 'OK' ? 'Completed' : 'Redo';
+
+    final dataJson = {
+      "hseUser": hseUser,
+      "hseJudge": hseJudge,
+      "hseComment": comment,
+      "atStatus": atStatus,
+    };
 
     final formData = FormData();
 
-    // data (JSON STRING)
+    // ✅ data (JSON STRING)
     formData.fields.add(MapEntry('data', jsonEncode(dataJson)));
 
-    // images (BYTES)
+    // ✅ images (BYTES)
     for (int i = 0; i < images.length; i++) {
       formData.files.add(
         MapEntry(
           'images',
           MultipartFile.fromBytes(
             images[i],
-            filename: 'retake_${i + 1}.jpg',
+            filename: 'hse_${i + 1}.jpg',
             contentType: MediaType('image', 'jpeg'),
           ),
         ),
       );
     }
 
-    final url = '/api/patrol_report/$reportId/update_at';
+    final url = '/api/patrol_report/$reportId/hse_recheck'; // ✅ đổi endpoint
 
     debugPrint('Calling PUT $url');
     debugPrint('Base URL: ${dio.options.baseUrl}');

@@ -14,7 +14,7 @@ import '../model/pivot_response.dart';
 import '../translator.dart';
 import '../widget/error_display.dart';
 import '../widget/glass_action_button.dart';
-import 'after_pic_detail_screen.dart';
+import 'recheck_pic_detail_screen.dart';
 
 class RecheckDetailScreen extends StatefulWidget {
   final String accountCode;
@@ -422,7 +422,7 @@ class _RecheckDetailScreenState extends State<RecheckDetailScreen> {
         // ... I, II, III giữ nguyên
         DataCell(numCell(r.i, w: 28)),
         DataCell(numCell(r.ii, w: 28)),
-        DataCell(numCell(r.iii, w: 34)),
+        DataCell(numCell(r.iii, w: 28)),
 
         // IV / V / Total nổi bật
         // IV

@@ -1,3 +1,4 @@
+import 'package:chuphinh/recheck/recheck_detail_page.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -337,10 +338,10 @@ class _RecheckPicDetailScreenState extends State<RecheckPicDetailScreen> {
                                       //   report: r,
                                       //   patrolGroup: widget.patrolGroup,
                                       // ),
-                                      builder: (_) => AfterPatrol(
+                                      builder: (_) => RecheckDetailPage(
                                         accountCode: widget.accountCode,
-                                        id: r.id!,
                                         patrolGroup: widget.patrolGroup,
+                                        report: r,
                                       ),
                                     ),
                                   ).then((result) {
