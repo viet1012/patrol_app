@@ -10,6 +10,7 @@ import '../homeScreen/patrol_home_screen.dart';
 import '../model/machine_model.dart';
 import '../model/patrol_report_model.dart';
 import '../model/pivot_response.dart';
+import '../redo/redo_detail_page.dart';
 import '../translator.dart';
 import '../widget/error_display.dart';
 import '../widget/glass_action_button.dart';
@@ -53,12 +54,20 @@ class _AfterDetailScreenState extends State<AfterDetailScreen> {
     }
   }
 
+  List<String> _mapStatusesForApi(String uiStatus) {
+    if (uiStatus == 'Wait') return ['Wait', 'Redo']; // ✅ Wait bao gồm Redo
+    return [uiStatus]; // Done -> Done
+  }
+
   void _loadPivot() {
     if (_selectedPlant == null) return;
+
+    final statuses = _mapStatusesForApi(_atStatus);
+
     setState(() {
       _futurePivot = PatrolPivotApi.fetchPivot(
         plant: _selectedPlant!,
-        atStatus: _atStatus,
+        atStatus: statuses, // ✅ đổi param
       );
     });
   }
@@ -135,7 +144,7 @@ class _AfterDetailScreenState extends State<AfterDetailScreen> {
                 style: const TextStyle(color: Colors.white),
                 items: const [
                   DropdownMenuItem(value: 'Wait', child: Text('Wait')),
-                  DropdownMenuItem(value: 'Redo', child: Text('Redo')),
+                  // DropdownMenuItem(value: 'Redo', child: Text('Redo')),
                   DropdownMenuItem(value: 'Done', child: Text('Done')),
                 ],
                 onChanged: (v) {
@@ -302,7 +311,7 @@ class _AfterDetailScreenState extends State<AfterDetailScreen> {
                 label: SizedBox(width: 28, child: Center(child: Text('II'))),
               ),
               const DataColumn(
-                label: SizedBox(width: 34, child: Center(child: Text('III'))),
+                label: SizedBox(width: 28, child: Center(child: Text('III'))),
               ),
               DataColumn(
                 label: _colHighlight(
@@ -330,7 +339,7 @@ class _AfterDetailScreenState extends State<AfterDetailScreen> {
 
               const DataColumn(
                 label: SizedBox(
-                  width: 46,
+                  width: 40,
                   child: Center(
                     child: Text(
                       'Total',
@@ -386,24 +395,27 @@ class _AfterDetailScreenState extends State<AfterDetailScreen> {
             onTap: isTotal
                 ? null
                 : () async {
+                    // ✅ nếu đang chọn Wait thì detail lấy cả Wait + Redo
+                    final detailStatus = (_atStatus == 'Wait')
+                        ? 'Wait,Redo'
+                        : _atStatus;
+
                     final result = await Navigator.push(
                       context,
                       MaterialPageRoute(
                         builder: (_) => AfterPicDetailScreen(
                           accountCode: widget.accountCode,
                           plant: _selectedPlant!,
-                          atStatus: _atStatus,
+                          atStatus: detailStatus, // ✅ truyền Wait,Redo
                           pic: r.pic,
                           patrolGroup: widget.patrolGroup,
                         ),
                       ),
                     );
 
-                    // ✅ nếu màn detail update gì đó, quay lại reload pivot
-                    if (result == true) {
-                      _loadPivot();
-                    }
+                    if (result == true) _loadPivot();
                   },
+
             child: Row(
               children: [
                 Text(r.pic, style: textStyle),
@@ -422,9 +434,7 @@ class _AfterDetailScreenState extends State<AfterDetailScreen> {
         // ... I, II, III giữ nguyên
         DataCell(numCell(r.i, w: 28)),
         DataCell(numCell(r.ii, w: 28)),
-        DataCell(numCell(r.iii, w: 34)),
-
-        // IV / V / Total nổi bật
+        DataCell(numCell(r.iii, w: 28)),
         // IV
         DataCell(
           _colHighlight(
@@ -463,7 +473,7 @@ class _AfterDetailScreenState extends State<AfterDetailScreen> {
 
         DataCell(
           SizedBox(
-            width: 46,
+            width: 40,
             child: Center(
               child: Text(
                 (r.total == 0) ? '-' : '${r.total}',

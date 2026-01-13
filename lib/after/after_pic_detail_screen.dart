@@ -7,6 +7,7 @@ import '../common/due_date_utils.dart';
 import '../homeScreen/patrol_home_screen.dart';
 import '../model/patrol_report_model.dart';
 import '../qrCode/after_patrol.dart';
+import '../redo/redo_detail_page.dart';
 import '../widget/error_display.dart';
 import '../widget/glass_action_button.dart';
 import 'after_detail_page.dart';
@@ -217,38 +218,6 @@ class _AfterPicDetailScreenState extends State<AfterPicDetailScreen> {
     );
   }
 
-  // (để nhanh) dropdown basic; nếu bạn muốn dùng CommonSearchableDropdown thì thay vào
-  Widget _simpleDropdown({
-    required String label,
-    required String? value,
-    required List<String> items,
-    required ValueChanged<String?> onChanged,
-  }) {
-    return DropdownButtonFormField<String>(
-      value: value,
-      dropdownColor: const Color(0xFF161D23),
-      decoration: InputDecoration(
-        hintText: label,
-        filled: true,
-        fillColor: Colors.white.withOpacity(0.08),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide.none,
-        ),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 10,
-          vertical: 10,
-        ),
-      ),
-      style: const TextStyle(color: Colors.white),
-      items: [
-        const DropdownMenuItem(value: null, child: Text('All')),
-        ...items.map((e) => DropdownMenuItem(value: e, child: Text(e))),
-      ],
-      onChanged: onChanged,
-    );
-  }
-
   Widget _buildReportTable(List<PatrolReportModel> list, double maxWidth) {
     final filtered =
         list.where((r) {
@@ -322,7 +291,7 @@ class _AfterPicDetailScreenState extends State<AfterPicDetailScreen> {
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
                           SizedBox(
-                            width: 30,
+                            width: 32,
                             height: 32,
                             child: Material(
                               color: Colors.white.withOpacity(0.10),
@@ -330,19 +299,10 @@ class _AfterPicDetailScreenState extends State<AfterPicDetailScreen> {
                               child: InkWell(
                                 borderRadius: BorderRadius.circular(8),
                                 onTap: () async {
-                                  Navigator.push(
+                                  await Navigator.push(
                                     context,
                                     MaterialPageRoute(
-                                      // builder: (_) => AfterDetailPage(
-                                      //   accountCode: widget.accountCode,
-                                      //   report: r,
-                                      //   patrolGroup: widget.patrolGroup,
-                                      // ),
-                                      builder: (_) => AfterPatrol(
-                                        accountCode: widget.accountCode,
-                                        id: r.id!,
-                                        patrolGroup: widget.patrolGroup,
-                                      ),
+                                      builder: (_) => buildTarget(r),
                                     ),
                                   ).then((result) {
                                     if (result == true && mounted) {
@@ -350,11 +310,11 @@ class _AfterPicDetailScreenState extends State<AfterPicDetailScreen> {
                                     }
                                   });
                                 },
-                                child: const Center(
+                                child: Center(
                                   child: Icon(
-                                    Icons.visibility_rounded,
-                                    size: 18,
-                                    color: Colors.white,
+                                    _statusIcon(r.atStatus),
+                                    size: 28,
+                                    color: _statusColor(r.atStatus),
                                   ),
                                 ),
                               ),
@@ -498,6 +458,48 @@ class _AfterPicDetailScreenState extends State<AfterPicDetailScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  IconData _statusIcon(String? status) {
+    switch (status) {
+      case 'Redo':
+        return Icons.restart_alt_rounded; // 🔁 redo
+      case 'Wait':
+        return Icons.edit_note_rounded; // ✏️ chờ xử lý
+      case 'Done':
+        return Icons.check_circle_rounded; // ✅ xong
+      default:
+        return Icons.help_outline_rounded;
+    }
+  }
+
+  Color _statusColor(String? status) {
+    switch (status) {
+      case 'Redo':
+        return Colors.orangeAccent;
+      case 'Wait':
+        return Colors.blueAccent;
+      case 'Done':
+        return Colors.greenAccent;
+      default:
+        return Colors.white70;
+    }
+  }
+
+  Widget buildTarget(PatrolReportModel r) {
+    if (r.atStatus == 'Redo') {
+      return RedoDetailPage(
+        accountCode: widget.accountCode,
+        patrolGroup: widget.patrolGroup,
+        report: r,
+      );
+    }
+
+    return AfterPatrol(
+      accountCode: widget.accountCode,
+      id: r.id!,
+      patrolGroup: widget.patrolGroup,
     );
   }
 }
