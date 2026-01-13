@@ -53,12 +53,20 @@ class _RecheckDetailScreenState extends State<RecheckDetailScreen> {
     }
   }
 
+  List<String> _mapStatusesForApi(String uiStatus) {
+    if (uiStatus == 'Wait') return ['Wait', 'Redo']; // ✅ Wait bao gồm Redo
+    return [uiStatus]; // Done -> Done
+  }
+
   void _loadPivot() {
     if (_selectedPlant == null) return;
+
+    final statuses = _mapStatusesForApi(_atStatus);
+
     setState(() {
       _futurePivot = PatrolPivotApi.fetchPivot(
         plant: _selectedPlant!,
-        atStatus: _atStatus,
+        atStatus: statuses, // ✅ đổi param
       );
     });
   }

@@ -177,7 +177,7 @@ class _AfterPatrolState extends State<AfterPatrol> {
           onTap: () {
             final hasQr = (widget.qrCode ?? '').trim().isNotEmpty;
             if (hasQr) {
-              context.go('/');
+              context.go('/home');
             } else {
               Navigator.pop(context, true);
             }
@@ -413,6 +413,7 @@ class _AfterPatrolState extends State<AfterPatrol> {
         ],
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start, // 👈 quan trọng
         children: [
           Text(
             label,
@@ -422,13 +423,20 @@ class _AfterPatrolState extends State<AfterPatrol> {
               fontWeight: FontWeight.w500,
             ),
           ),
-          const SizedBox(width: 8),
-          Text(
-            value.isEmpty ? '-' : value,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 13,
-              fontWeight: FontWeight.bold,
+          const SizedBox(width: 4),
+
+          // 👇 CHO PHÉP XUỐNG DÒNG
+          Expanded(
+            child: Text(
+              value.isEmpty ? '-' : value,
+              softWrap: true,
+              maxLines: null, // 👈 không giới hạn dòng
+              overflow: TextOverflow.visible,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
         ],

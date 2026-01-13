@@ -19,12 +19,12 @@ import '../model/patrol_report_model.dart';
 import '../translator.dart';
 import '../widget/glass_action_button.dart';
 
-class RecheckDetailPage extends StatefulWidget {
+class RedoDetailPage extends StatefulWidget {
   final String accountCode;
   final PatrolReportModel report;
   final PatrolGroup patrolGroup;
 
-  const RecheckDetailPage({
+  const RedoDetailPage({
     super.key,
     required this.accountCode,
     required this.report,
@@ -32,10 +32,10 @@ class RecheckDetailPage extends StatefulWidget {
   });
 
   @override
-  State<RecheckDetailPage> createState() => _RecheckDetailPageState();
+  State<RedoDetailPage> createState() => _RedoDetailPageState();
 }
 
-class _RecheckDetailPageState extends State<RecheckDetailPage> {
+class _RedoDetailPageState extends State<RedoDetailPage> {
   final GlobalKey<CameraAfterBoxState> _cameraKey =
       GlobalKey<CameraAfterBoxState>();
 
@@ -327,6 +327,15 @@ class _RecheckDetailPageState extends State<RecheckDetailPage> {
                     },
                     isAfter: true,
                   ),
+
+                  _imageSection(
+                    title: 'HSE Check',
+                    images: widget.report.hseImageNames,
+                    onReplace: (i, newImage) {
+                      setState(() => widget.report.hseImageNames[i] = newImage);
+                    },
+                    isRedo: true,
+                  ),
                 ],
               ),
 
@@ -499,6 +508,7 @@ class _RecheckDetailPageState extends State<RecheckDetailPage> {
     required List<String> images,
     required void Function(int index, String newImage) onReplace,
     bool isAfter = false,
+    bool isRedo = false,
   }) {
     return Container(
       padding: const EdgeInsets.all(8),
@@ -528,6 +538,13 @@ class _RecheckDetailPageState extends State<RecheckDetailPage> {
                   color: Colors.white70,
                   value: widget.report.atPic!,
                 ),
+              if (isRedo)
+                _buildInfoCard(
+                  icon: Icons.groups_rounded,
+                  label: "HSE Judge:",
+                  color: Colors.white70,
+                  value: widget.report.hseJudge!,
+                ),
             ],
           ),
           const SizedBox(height: 8),
@@ -538,6 +555,15 @@ class _RecheckDetailPageState extends State<RecheckDetailPage> {
               child: _buildSectionCard(
                 title: 'Comment',
                 content: widget.report.atComment!,
+                icon: Icons.comment_rounded,
+                accentColor: Colors.amber.shade600,
+              ),
+            ),
+          if (isRedo)
+            Center(
+              child: _buildSectionCard(
+                title: 'Comment',
+                content: widget.report.hseComment!,
                 icon: Icons.comment_rounded,
                 accentColor: Colors.amber.shade600,
               ),
@@ -766,133 +792,61 @@ class _RecheckDetailPageState extends State<RecheckDetailPage> {
                   ); // Bắt buộc gọi setState để UI rebuild và nút lưu hiện/ẩn đúng
                 },
               ),
-              const SizedBox(height: 8),
-
-              _buildHseJudgeButtons(),
             ],
 
             const SizedBox(height: 20),
 
             /// ===== SAVE =====
-            // if (_commentCtrl.text.trim().isNotEmpty)
-            //   SizedBox(
-            //     width: 60,
-            //     height: 60,
-            //     child: GlassActionButton(
-            //       onTap:
-            //           (_cameraKey.currentState != null &&
-            //               _cameraKey.currentState!.images.isNotEmpty &&
-            //               _msnvCtrl.text.trim().isNotEmpty)
-            //           ? () async {
-            //               try {
-            //                 showLoading(context);
-            //
-            //                 await updateHseReport(
-            //                   hseJudge: _hseJudge!,
-            //                   reportId: widget.report.id!,
-            //                   hseUser:
-            //                       '${_msnvCtrl.text.trim()}_$_employeeName',
-            //                   comment: _commentCtrl.text.trim(),
-            //                   images: _cameraKey.currentState!.images,
-            //                 );
-            //                 hideLoading(context);
-            //
-            //                 /// RESET UI → cho phép chụp lại tiếp
-            //                 setState(() {
-            //                   _commentCtrl.clear();
-            //                   _enableCamera = false;
-            //                 });
-            //                 _cameraKey.currentState?.clearAll(); // xóa hết ảnh
-            //
-            //                 /// FORCE reload camera
-            //                 await Future.delayed(
-            //                   const Duration(milliseconds: 200),
-            //                 );
-            //                 setState(() => _enableCamera = true);
-            //
-            //                 _showSnackBar(
-            //                   'Update Recheck successful!',
-            //                   Colors.green,
-            //                 );
-            //               } catch (e) {
-            //                 debugPrint('Update AT error: $e');
-            //                 _showSnackBar('Server error: $e', Colors.red);
-            //               }
-            //             }
-            //           : null,
-            //       icon: Icons.save,
-            //       backgroundColor: Color(0xFF2665B6),
-            //     ),
-            //   ),
+            if (_commentCtrl.text.trim().isNotEmpty)
+              SizedBox(
+                width: 60,
+                height: 60,
+                child: GlassActionButton(
+                  onTap:
+                      (_cameraKey.currentState != null &&
+                          _cameraKey.currentState!.images.isNotEmpty &&
+                          _msnvCtrl.text.trim().isNotEmpty)
+                      ? () async {
+                          try {
+                            showLoading(context);
+
+                            await updateAtReport(
+                              userAfter: widget.accountCode,
+                              reportId: widget.report.id!,
+                              atPic: '${_msnvCtrl.text.trim()}_$_employeeName',
+                              comment: _commentCtrl.text.trim(),
+                              images: _cameraKey.currentState!.images,
+                            );
+                            hideLoading(context);
+
+                            /// RESET UI → cho phép chụp lại tiếp
+                            setState(() {
+                              _commentCtrl.clear();
+                              _enableCamera = false;
+                            });
+                            _cameraKey.currentState?.clearAll(); // xóa hết ảnh
+
+                            /// FORCE reload camera
+                            await Future.delayed(
+                              const Duration(milliseconds: 200),
+                            );
+                            setState(() => _enableCamera = true);
+
+                            _showSnackBar(
+                              'Update AF successful!',
+                              Colors.green,
+                            );
+                          } catch (e) {
+                            debugPrint('Update AT error: $e');
+                            _showSnackBar('Server error: $e', Colors.red);
+                          }
+                        }
+                      : null,
+                  icon: Icons.save,
+                  backgroundColor: Color(0xFF2665B6),
+                ),
+              ),
           ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildHseJudgeButtons() {
-    return Row(
-      children: [
-        Expanded(
-          child: _judgeButton(
-            label: 'OK',
-            value: 'OK',
-            color: Colors.greenAccent,
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _judgeButton(
-            label: 'NG',
-            value: 'NG',
-            color: Colors.redAccent,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _judgeButton({
-    required String label,
-    required String value,
-    required Color color,
-  }) {
-    final bool selected = _hseJudge == value;
-
-    return InkWell(
-      borderRadius: BorderRadius.circular(16),
-      onTap: () => _submitHseJudge(value), // ✅ SAVE NGAY
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        decoration: BoxDecoration(
-          color: selected
-              ? color.withOpacity(0.9)
-              : Colors.black.withOpacity(0.2),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: selected ? color : Colors.white.withOpacity(0.25),
-            width: 2,
-          ),
-          boxShadow: selected
-              ? [
-                  BoxShadow(
-                    color: color.withOpacity(0.4),
-                    blurRadius: 16,
-                    offset: const Offset(0, 8),
-                  ),
-                ]
-              : [],
-        ),
-        child: Center(
-          child: Text(
-            label,
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w800,
-              color: selected ? Colors.black : Colors.white,
-            ),
-          ),
         ),
       ),
     );
@@ -992,48 +946,41 @@ class _RecheckDetailPageState extends State<RecheckDetailPage> {
     Navigator.of(context, rootNavigator: true).pop();
   }
 
-  Future<void> updateHseReport({
+  Future<void> updateAtReport({
+    required String userAfter,
     required int reportId,
-    required String hseUser, // accountCode / user login
-    required String hseJudge, // PASS/FAIL/OK/NG...
-    required String comment, // hseComment
+    required String atPic,
+    required String comment,
     required List<Uint8List> images,
   }) async {
     final dio = DioClient.dio;
 
-    final String atStatus = hseJudge == 'OK' ? 'Completed' : 'Redo';
-
-    final dataJson = {
-      "hseUser": hseUser,
-      "hseJudge": hseJudge,
-      "hseComment": comment,
-      "atStatus": atStatus,
-    };
+    final dataJson = {"atComment": comment, "atPic": atPic};
 
     final formData = FormData();
 
-    // ✅ data (JSON STRING)
+    // data (JSON STRING)
     formData.fields.add(MapEntry('data', jsonEncode(dataJson)));
 
-    // ✅ images (BYTES)
+    // images (BYTES)
     for (int i = 0; i < images.length; i++) {
       formData.files.add(
         MapEntry(
           'images',
           MultipartFile.fromBytes(
             images[i],
-            filename: 'hse_${i + 1}.jpg',
+            filename: 'retake_${i + 1}.jpg',
             contentType: MediaType('image', 'jpeg'),
           ),
         ),
       );
     }
 
-    final url = '/api/patrol_report/$reportId/hse_recheck'; // ✅ đổi endpoint
+    final url = '/api/patrol_report/$reportId/update_at';
 
-    // debugPrint('Calling PUT $url');
-    // debugPrint('Base URL: ${dio.options.baseUrl}');
-    // debugPrint('Full URL: ${dio.options.baseUrl}$url');
+    debugPrint('Calling PUT $url');
+    debugPrint('Base URL: ${dio.options.baseUrl}');
+    debugPrint('Full URL: ${dio.options.baseUrl}$url');
 
     try {
       final response = await dio.put(
@@ -1046,55 +993,6 @@ class _RecheckDetailPageState extends State<RecheckDetailPage> {
     } catch (e) {
       debugPrint('Error during PUT request: $e');
       rethrow;
-    }
-  }
-
-  Future<void> _submitHseJudge(String value) async {
-    if (_cameraKey.currentState == null ||
-        _cameraKey.currentState!.images.isEmpty) {
-      _showSnackBar('Please take at least one photo', Colors.orange);
-      return;
-    }
-
-    if (_commentCtrl.text.trim().isEmpty) {
-      _showSnackBar('Please enter comment', Colors.orange);
-      return;
-    }
-
-    if (_msnvCtrl.text.trim().isEmpty) {
-      _showSnackBar('Please enter MSNV', Colors.orange);
-      return;
-    }
-
-    try {
-      setState(() => _hseJudge = value);
-      showLoading(context);
-
-      await updateHseReport(
-        hseJudge: value,
-        reportId: widget.report.id!,
-        hseUser: '${_msnvCtrl.text.trim()}_$_employeeName',
-        comment: _commentCtrl.text.trim(),
-        images: _cameraKey.currentState!.images,
-      );
-
-      hideLoading(context);
-
-      /// RESET UI
-      _commentCtrl.clear();
-      _cameraKey.currentState?.clearAll();
-
-      await Future.delayed(const Duration(milliseconds: 200));
-      setState(() {});
-
-      _showSnackBar(
-        'Update ${value == 'OK' ? 'OK' : 'NG'} successful!',
-        Colors.green,
-      );
-    } catch (e) {
-      hideLoading(context);
-      debugPrint('Update HSE error: $e');
-      _showSnackBar('Server error: $e', Colors.red);
     }
   }
 }

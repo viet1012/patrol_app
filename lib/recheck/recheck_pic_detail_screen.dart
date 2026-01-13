@@ -429,69 +429,6 @@ class _RecheckPicDetailScreenState extends State<RecheckPicDetailScreen> {
                       ),
                     ),
                   ),
-
-                  // DataCell(
-                  //   ConstrainedBox(
-                  //     constraints: const BoxConstraints(maxWidth: 170),
-                  //     child: Row(
-                  //       crossAxisAlignment: CrossAxisAlignment.center,
-                  //       children: [
-                  //         SizedBox(
-                  //           width: 32,
-                  //           height: 32,
-                  //           child: Material(
-                  //             color: Colors.white.withOpacity(0.10),
-                  //             borderRadius: BorderRadius.circular(8),
-                  //             child: InkWell(
-                  //               borderRadius: BorderRadius.circular(8),
-                  //               onTap: () async {
-                  //                 Navigator.push(
-                  //                   context,
-                  //                   MaterialPageRoute(
-                  //                     builder: (_) => AfterDetailPage(
-                  //                       accountCode: widget.accountCode,
-                  //                       report: r,
-                  //                       patrolGroup: widget.patrolGroup,
-                  //                     ),
-                  //                   ),
-                  //                 ).then((result) {
-                  //                   if (result == true && mounted) {
-                  //                     _loadReport();
-                  //                   }
-                  //                 });
-                  //
-                  //                 // if (result == true) {
-                  //                 //   _loadReport();
-                  //                 //   Navigator.pop(context, true);
-                  //                 // }
-                  //               },
-                  //               child: const Center(
-                  //                 child: Icon(
-                  //                   Icons.visibility_rounded,
-                  //                   size: 18,
-                  //                   color: Colors.white,
-                  //                 ),
-                  //               ),
-                  //             ),
-                  //           ),
-                  //         ),
-                  //         const SizedBox(width: 6),
-                  //         // Expanded(
-                  //         //   child: Text(
-                  //         //     r.atStatus.toString(),
-                  //         //     softWrap: true,
-                  //         //     maxLines: 3,
-                  //         //     overflow: TextOverflow.visible,
-                  //         //     style: TextStyle(
-                  //         //       color: DueDateUtils.getDueDateColor(r.dueDate),
-                  //         //       fontWeight: FontWeight.w500,
-                  //         //     ),
-                  //         //   ),
-                  //         // ),
-                  //       ],
-                  //     ),
-                  //   ),
-                  // ),
                 ],
               );
             }).toList(),

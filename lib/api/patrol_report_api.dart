@@ -52,7 +52,7 @@ class PatrolReportApi {
         '${DioClient.dio.options.baseUrl}$endpoint',
       ).replace(queryParameters: queryParams);
 
-      // debugPrint('?? API CALL: $uri');
+      debugPrint('?? API CALL: $uri');
 
       final response = await DioClient.dio.get(
         endpoint,
