@@ -123,36 +123,36 @@ class _RecheckDetailScreenState extends State<RecheckDetailScreen> {
             const Spacer(),
 
             /// nếu muốn đổi atStatus nhanh
-            SizedBox(
-              width: 140,
-              child: DropdownButtonFormField<String>(
-                value: _atStatus,
-                dropdownColor: const Color(0xFF161D23),
-                decoration: InputDecoration(
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 10,
-                  ),
-                  filled: true,
-                  fillColor: Colors.white.withOpacity(0.08),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                ),
-                style: const TextStyle(color: Colors.white),
-                items: const [
-                  DropdownMenuItem(value: 'Wait', child: Text('Wait')),
-                  DropdownMenuItem(value: 'Done', child: Text('Done')),
-                  DropdownMenuItem(value: 'Redo', child: Text('Redo')),
-                ],
-                onChanged: (v) {
-                  if (v == null) return;
-                  setState(() => _atStatus = v);
-                  _loadPivot();
-                },
-              ),
-            ),
+            // SizedBox(
+            //   width: 140,
+            //   child: DropdownButtonFormField<String>(
+            //     value: _atStatus,
+            //     dropdownColor: const Color(0xFF161D23),
+            //     decoration: InputDecoration(
+            //       contentPadding: const EdgeInsets.symmetric(
+            //         horizontal: 10,
+            //         vertical: 10,
+            //       ),
+            //       filled: true,
+            //       fillColor: Colors.white.withOpacity(0.08),
+            //       border: OutlineInputBorder(
+            //         borderRadius: BorderRadius.circular(12),
+            //         borderSide: BorderSide.none,
+            //       ),
+            //     ),
+            //     style: const TextStyle(color: Colors.white),
+            //     items: const [
+            //       DropdownMenuItem(value: 'Wait', child: Text('Wait')),
+            //       DropdownMenuItem(value: 'Done', child: Text('Done')),
+            //       DropdownMenuItem(value: 'Redo', child: Text('Redo')),
+            //     ],
+            //     onChanged: (v) {
+            //       if (v == null) return;
+            //       setState(() => _atStatus = v);
+            //       _loadPivot();
+            //     },
+            //   ),
+            // ),
           ],
         ),
       ),

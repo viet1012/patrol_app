@@ -5,10 +5,37 @@ import 'package:go_router/go_router.dart';
 class CommonUI {
   CommonUI._(); // ❌ không cho new
 
+  static int riskToScore(String risk) {
+    switch (risk) {
+      case 'V':
+        return 5;
+      case 'IV':
+        return 4;
+      case 'III':
+        return 3;
+      case 'II':
+        return 2;
+      case 'I':
+        return 1;
+      default:
+        return 0;
+    }
+  }
+
+  static Color riskColor(String risk) {
+    switch (risk) {
+      case 'V':
+        return Colors.red;
+      case 'IV':
+        return Colors.redAccent;
+      default:
+        return Colors.grey;
+    }
+  }
+
   /* =======================================================
    * 🧊 GLASS DIALOG
    * ======================================================= */
-
   static void showGlassDialog({
     required BuildContext context,
     required IconData icon,

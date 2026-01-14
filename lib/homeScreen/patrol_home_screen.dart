@@ -246,7 +246,7 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
                   SizedBox(width: 8),
                   EmbossGlowTitle(text: 'S-PATROL'),
                   SizedBox(width: 8),
-                  EmbossGlowTitle(text: 'V1.3', fontSize: 8),
+                  EmbossGlowTitle(text: 'V1.5', fontSize: 13),
                 ],
               ),
             ),
@@ -648,7 +648,7 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
         child: Container(
-          margin: const EdgeInsets.only(bottom: 24),
+          margin: const EdgeInsets.only(bottom: 16),
           decoration: BoxDecoration(
             color: color.withOpacity(0.12),
             borderRadius: BorderRadius.circular(26),
@@ -666,7 +666,7 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
 
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
-                    vertical: 20,
+                    vertical: 18,
                     horizontal: 22,
                   ),
                   child: Row(
@@ -730,7 +730,7 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
       child: Container(
-        padding: const EdgeInsets.all(18),
+        padding: const EdgeInsets.all(8),
         child: Column(
           children: [
             _patrolButton(
