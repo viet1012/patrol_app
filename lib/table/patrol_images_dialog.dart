@@ -261,7 +261,7 @@ class _ImageTile extends StatelessWidget {
               Positioned.fill(
                 child: Image.network(
                   url,
-                  fit: BoxFit.cover,
+                  fit: BoxFit.contain,
                   errorBuilder: (_, __, ___) => Container(
                     color: Colors.grey.shade200,
                     alignment: Alignment.center,
