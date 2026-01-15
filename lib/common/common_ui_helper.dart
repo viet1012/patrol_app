@@ -5,6 +5,11 @@ import 'package:go_router/go_router.dart';
 class CommonUI {
   CommonUI._(); // ❌ không cho new
 
+  static String fmtDate(DateTime? d) {
+    if (d == null) return '-';
+    return '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+  }
+
   static int riskToScore(String risk) {
     switch (risk) {
       case 'V':

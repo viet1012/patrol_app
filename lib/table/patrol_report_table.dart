@@ -19,16 +19,32 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
   final ScrollController _vCtrl = ScrollController();
 
   // UI state
+  List<PatrolReportModel> _allReports = [];
+
   final TextEditingController _searchCtrl = TextEditingController();
   String _query = '';
   int _rowsPerPage = 30;
   int _page = 0;
   int? _selectedIndex;
 
+  //filter
+  final Map<String, Set<String>> _filterValues = {};
+  String _filterSearch = '';
+
+  final OverlayPortalController _overlayCtrl = OverlayPortalController();
+  String? _activeFilterKey;
+
+  final Map<String, LayerLink> _filterLinks = {};
+
   @override
   void initState() {
     super.initState();
     _futureReports = PatrolReportApi.fetchReports();
+
+    for (final c in _cols) {
+      _filterLinks[c.label] = LayerLink();
+    }
+
     _searchCtrl.addListener(() {
       setState(() {
         _query = _searchCtrl.text.trim().toLowerCase();
@@ -63,6 +79,8 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
             }
 
             final all = snapshot.data ?? [];
+            _allReports = all; // ✅ lưu lại
+
             if (all.isEmpty) return _buildEmpty();
 
             final filtered = _applyFilter(all, _query);
@@ -94,35 +112,141 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
   }
 
   // ===================== FILTER =====================
-  List<PatrolReportModel> _applyFilter(List<PatrolReportModel> src, String q) {
-    if (q.isEmpty) return src;
+  List<String> _getColumnValues(String col, List<PatrolReportModel> all) {
+    final set = <String>{};
 
-    bool hit(PatrolReportModel e) {
-      // Bạn có thể mở rộng thêm field cần search
-      final hay = [
-        e.stt.toString(),
-        e.type ?? '',
-        e.grp,
-        e.plant,
-        e.division,
-        e.area,
-        e.machine,
-        e.comment,
-        e.countermeasure,
-        e.checkInfo,
-        e.pic ?? '',
-        e.atPic ?? '',
-        e.atStatus ?? '',
-        e.atComment ?? '',
-        e.hseJudge ?? '',
-        e.hseComment ?? '',
-        e.loadStatus ?? '',
-      ].join(' ').toLowerCase();
-
-      return hay.contains(q);
+    for (final e in all) {
+      final v = _getCellValue(e, col).trim();
+      if (v.isNotEmpty) {
+        set.add(v);
+      }
     }
 
-    return src.where(hit).toList();
+    return set.toList()..sort();
+  }
+
+  String _getCellValue(PatrolReportModel e, String col) {
+    switch (col) {
+      case 'STT':
+        return e.stt.toString();
+
+      case 'Group':
+        return e.grp;
+
+      case 'Plant':
+        return e.plant;
+
+      case 'Division':
+        return e.division;
+
+      case 'Area':
+        return e.area;
+
+      case 'Machine':
+        return e.machine;
+
+      case 'Risk F':
+        return e.riskFreq;
+
+      case 'Risk P':
+        return e.riskProb;
+
+      case 'Risk S':
+        return e.riskSev;
+
+      case 'Risk T':
+        return e.riskTotal;
+
+      case 'Comment':
+        return e.comment;
+
+      case 'Countermeasure':
+        return e.countermeasure;
+
+      case 'Check Info':
+        return e.checkInfo;
+
+      case 'Created':
+        return CommonUI.fmtDate(e.createdAt);
+
+      case 'Due':
+        return CommonUI.fmtDate(e.dueDate);
+
+      case 'PIC':
+        return e.pic ?? '';
+
+      case 'AT Stt':
+        return e.atStatus ?? '';
+
+      case 'AT PIC':
+        return e.atPic ?? '';
+
+      case 'AT Date':
+        return CommonUI.fmtDate(e.atDate);
+
+      case 'AT Cmt':
+        return e.atComment ?? '';
+
+      case 'HSE J':
+        return e.hseJudge ?? '';
+
+      case 'HSE D':
+        return CommonUI.fmtDate(e.hseDate);
+
+      case 'HSE C':
+        return e.hseComment ?? '';
+
+      case 'Load':
+        return e.loadStatus ?? '';
+
+      default:
+        return '';
+    }
+  }
+
+  List<PatrolReportModel> _applyFilter(List<PatrolReportModel> src, String q) {
+    return src.where((e) {
+      // global search
+      if (q.isNotEmpty) {
+        final hay = [
+          e.stt.toString(),
+          e.type ?? '',
+          e.grp,
+          e.plant,
+          e.division,
+          e.area,
+          e.machine,
+          e.comment,
+          e.countermeasure,
+          e.checkInfo,
+          e.pic ?? '',
+          e.atPic ?? '',
+          e.atStatus ?? '',
+          e.atComment ?? '',
+          e.hseJudge ?? '',
+          e.hseComment ?? '',
+          e.loadStatus ?? '',
+        ].join(' ').toLowerCase();
+
+        if (!hay.contains(q)) return false;
+      }
+
+      // column filters (VALUE based)
+      for (final entry in _filterValues.entries) {
+        final col = entry.key;
+        final allowed = entry.value;
+
+        if (allowed.isEmpty) continue;
+
+        final cellValue = _getCellValue(e, col);
+
+        if (!allowed.contains(cellValue)) {
+          return false;
+        }
+      }
+
+      return true;
+    }).toList();
   }
 
   // ===================== TOP BAR =====================
@@ -207,13 +331,52 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
   }
 
   Widget _buildHeader() {
-    return Container(
-      height: 44,
-      color: Colors.grey.shade200,
-      child: Row(
-        children: _cols.map((c) {
-          return _HCell(c.label, c.w, align: c.align);
-        }).toList(),
+    return OverlayPortal(
+      controller: _overlayCtrl,
+      overlayChildBuilder: (_) {
+        if (_activeFilterKey == null) return const SizedBox();
+
+        return Stack(
+          children: [
+            // 👇 lớp bắt click ngoài popup
+            Positioned.fill(
+              child: GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onTap: () {
+                  setState(() => _activeFilterKey = null);
+                  _overlayCtrl.hide();
+                },
+              ),
+            ),
+
+            // 👇 popup filter
+            _buildFilterPopup(_allReports),
+          ],
+        );
+      },
+      child: Container(
+        height: 44,
+        color: Colors.grey.shade200,
+        child: Row(
+          children: _cols.map((c) {
+            final hasFilter = _filterValues[c.label]?.isNotEmpty == true;
+
+            return _HCellFilter(
+              label: c.label,
+              width: c.w,
+              align: c.align,
+              hasFilter: hasFilter,
+              layerLink: _filterLinks[c.label]!,
+              onFilterTap: () {
+                setState(() {
+                  _activeFilterKey = c.label;
+                  _filterSearch = '';
+                });
+                _overlayCtrl.show();
+              },
+            );
+          }).toList(),
+        ),
       ),
     );
   }
@@ -231,7 +394,6 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
         children: [
           // === GIỮ NGUYÊN TẤT CẢ CỘT ===
           _cell(e.stt.toString(), _w('STT'), align: TextAlign.center),
-          _cell(e.type ?? '-', _w('Type'), tooltip: true),
           _cell(e.grp, _w('Group'), tooltip: true),
           _cell(e.plant, _w('Plant'), tooltip: true),
           _cell(e.division, _w('Division'), tooltip: true),
@@ -479,27 +641,107 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
   }
 
   // ---- helpers ----
+  Widget _buildFilterPopup(List<PatrolReportModel> all) {
+    if (_activeFilterKey == null) return const SizedBox();
 
-  void _showSingleImage(String url, String name) {
-    showDialog(
-      context: context,
-      builder: (_) => Dialog(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(10),
-              child: Text(
-                name,
-                style: const TextStyle(fontWeight: FontWeight.w700),
+    final values = _getColumnValues(_activeFilterKey!, all);
+    final selected = _filterValues[_activeFilterKey!] ?? <String>{};
+
+    final shown = values
+        .where((v) => v.toLowerCase().contains(_filterSearch.toLowerCase()))
+        .toList();
+
+    return CompositedTransformFollower(
+      link: _filterLinks[_activeFilterKey!]!,
+      offset: const Offset(0, 44),
+      child: Material(
+        elevation: 8,
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          width: 240,
+          height: 300,
+          padding: const EdgeInsets.all(8),
+          child: Column(
+            children: [
+              // title
+              Text(
+                'Filter: $_activeFilterKey',
+                style: const TextStyle(fontWeight: FontWeight.bold),
               ),
-            ),
-            Flexible(
-              child: InteractiveViewer(
-                child: Image.network(url, fit: BoxFit.contain),
+
+              // search inside popup
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: TextField(
+                  decoration: const InputDecoration(
+                    isDense: true,
+                    prefixIcon: Icon(Icons.search, size: 16),
+                    hintText: 'Search value',
+                    border: OutlineInputBorder(),
+                  ),
+                  onChanged: (v) => setState(() => _filterSearch = v),
+                ),
               ),
-            ),
-          ],
+
+              const Divider(height: 1),
+
+              // values
+              Expanded(
+                child: ListView.builder(
+                  itemCount: shown.length,
+                  itemBuilder: (_, i) {
+                    final v = shown[i];
+                    final checked = selected.contains(v);
+
+                    return CheckboxListTile(
+                      dense: true,
+                      value: checked,
+                      title: Text(
+                        v,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      controlAffinity: ListTileControlAffinity.leading,
+                      onChanged: (ok) {
+                        setState(() {
+                          final s = _filterValues.putIfAbsent(
+                            _activeFilterKey!,
+                            () => <String>{},
+                          );
+                          ok == true ? s.add(v) : s.remove(v);
+                        });
+                      },
+                    );
+                  },
+                ),
+              ),
+
+              const Divider(height: 1),
+
+              // buttons
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  TextButton(
+                    onPressed: () {
+                      setState(() {
+                        _filterValues.remove(_activeFilterKey);
+                        _activeFilterKey = null;
+                      });
+                      _overlayCtrl.hide();
+                    },
+                    child: const Text('Clear'),
+                  ),
+                  TextButton(
+                    onPressed: () {
+                      _overlayCtrl.hide();
+                    },
+                    child: const Text('Close'),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -567,7 +809,6 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
   // GIỮ nguyên cột, chỉ gom lại để dễ quản lý width/alignment.
   late final List<_Col> _cols = [
     _Col('STT', 50, TextAlign.center),
-    _Col('Type', 60, TextAlign.left),
     _Col('Group', 80, TextAlign.left),
     _Col('Plant', 60, TextAlign.left),
     _Col('Division', 60, TextAlign.left),
@@ -615,28 +856,64 @@ class _Col {
   const _Col(this.label, this.w, this.align);
 }
 
-class _HCell extends StatelessWidget {
-  final String text;
+class _HCellFilter extends StatelessWidget {
+  final String label;
   final double width;
   final TextAlign align;
-  const _HCell(this.text, this.width, {this.align = TextAlign.left});
+  final bool hasFilter;
+  final VoidCallback onFilterTap;
+  final LayerLink layerLink;
+
+  const _HCellFilter({
+    required this.label,
+    required this.width,
+    required this.onFilterTap,
+    required this.layerLink,
+    this.align = TextAlign.left,
+    this.hasFilter = false,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: width,
-      alignment: align == TextAlign.center
-          ? Alignment.center
-          : Alignment.centerLeft,
-      padding: const EdgeInsets.symmetric(horizontal: 8),
-      decoration: BoxDecoration(
-        border: Border(right: BorderSide(color: Colors.grey.shade300)),
-      ),
-      child: Text(
-        text,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+    return CompositedTransformTarget(
+      link: layerLink,
+
+      child: Container(
+        width: width,
+        height: 44,
+        padding: const EdgeInsets.symmetric(horizontal: 6),
+        decoration: BoxDecoration(
+          color: Colors.grey.shade200,
+          border: Border(right: BorderSide(color: Colors.grey.shade300)),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: align,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                ),
+              ),
+            ),
+            InkWell(
+              onTap: onFilterTap,
+              borderRadius: BorderRadius.circular(6),
+              child: Padding(
+                padding: const EdgeInsets.all(4),
+                child: Icon(
+                  hasFilter ? Icons.filter_alt : Icons.filter_alt_outlined,
+                  size: 18,
+                  color: hasFilter ? Colors.blue : Colors.grey,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
