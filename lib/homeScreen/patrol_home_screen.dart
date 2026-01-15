@@ -1,5 +1,6 @@
 import 'dart:ui';
 
+import 'package:chuphinh/table/patrol_report_table.dart';
 import 'package:chuphinh/widget/glass_action_button.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -730,7 +731,6 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
       child: Container(
-        padding: const EdgeInsets.all(8),
         child: Column(
           children: [
             _patrolButton(
@@ -798,6 +798,22 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
                 );
               },
             ),
+            const SizedBox(height: 16),
+
+            _patrolButton(
+              number: '4)',
+              title: 'Table',
+              color: color,
+              enabled: true,
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => PatrolReportTable(patrolGroup: group),
+                  ),
+                );
+              },
+            ),
           ],
         ),
       ),
@@ -823,7 +839,7 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
             duration: const Duration(milliseconds: 400),
             opacity: opacity,
             child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 24),
+              padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 24),
               decoration: BoxDecoration(
                 color: color.withOpacity(0.13),
                 borderRadius: BorderRadius.circular(20),

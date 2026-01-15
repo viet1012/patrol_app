@@ -1,12 +1,15 @@
 import 'package:chuphinh/common/common_ui_helper.dart';
+import 'package:chuphinh/homeScreen/patrol_home_screen.dart';
 import 'package:chuphinh/table/patrol_images_dialog.dart';
 import 'package:flutter/material.dart';
 import '../api/api_config.dart';
 import '../api/patrol_report_api.dart';
 import '../model/patrol_report_model.dart';
+import '../widget/glass_action_button.dart';
 
 class PatrolReportTable extends StatefulWidget {
-  const PatrolReportTable({super.key});
+  final PatrolGroup patrolGroup;
+  const PatrolReportTable({super.key, required this.patrolGroup});
 
   @override
   State<PatrolReportTable> createState() => _PatrolReportTableState();
@@ -39,7 +42,9 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
   @override
   void initState() {
     super.initState();
-    _futureReports = PatrolReportApi.fetchReports();
+    _futureReports = PatrolReportApi.fetchReports(
+      type: widget.patrolGroup.name,
+    );
 
     for (final c in _cols) {
       _filterLinks[c.label] = LayerLink();
@@ -63,7 +68,8 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
 
   @override
   Widget build(BuildContext context) {
-    final bg = Colors.grey.shade100;
+    final bg1 = Colors.grey.shade100;
+    final bg = Color(0xFF0F2027);
 
     return Scaffold(
       backgroundColor: bg,
@@ -75,13 +81,23 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
               return const Center(child: CircularProgressIndicator());
             }
             if (snapshot.hasError) {
-              return _buildError(snapshot.error.toString());
+              return CommonUI.errorPage(
+                message: snapshot.error.toString(),
+                context: context,
+              );
             }
 
             final all = snapshot.data ?? [];
             _allReports = all; // ✅ lưu lại
 
-            if (all.isEmpty) return _buildEmpty();
+            if (all.isEmpty) {
+              return CommonUI.emptyState(
+                context: context,
+                title: 'No reports',
+                message: 'There are no patrol reports yet.',
+                icon: Icons.assignment_outlined,
+              );
+            }
 
             final filtered = _applyFilter(all, _query);
 
@@ -255,6 +271,10 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 6),
       child: Row(
         children: [
+          GlassActionButton(
+            icon: Icons.arrow_back_rounded,
+            onTap: () => Navigator.pop(context, false),
+          ),
           Expanded(
             child: TextField(
               controller: _searchCtrl,
@@ -565,7 +585,7 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
             children: [
               // thumbnail
               if (count > 0)
-                _imageThumb(first, size: 32)
+                _imageThumb(first, size: 40)
               else
                 const Icon(
                   Icons.image_not_supported,
@@ -590,35 +610,50 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
   }
 
   Widget _badgeRisk(String risk, double w) {
-    final r = risk.toUpperCase();
-    Color c = Colors.green.shade700;
-    if (r.contains('HIGH')) c = Colors.red.shade700;
-    if (r.contains('MEDIUM')) c = Colors.orange.shade800;
+    final color = CommonUI.riskColor(risk);
 
     return _boxed(
       width: w,
       align: TextAlign.center,
-      child: Text(
-        risk,
-        style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: c),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.12),
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Text(
+          risk,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+            color: color,
+          ),
+        ),
       ),
     );
   }
 
   Widget _badgeStatus(String? stt, double w) {
-    final text = (stt == null || stt.isEmpty)
-        ? 'Pending'
-        : (stt == 'COMPLETED' ? 'Done' : stt);
-    final c = (stt == 'COMPLETED')
-        ? Colors.green
-        : ((stt == null || stt.isEmpty) ? Colors.grey : Colors.orange);
+    final status = (stt == null || stt.isEmpty) ? 'Wait' : stt;
+    final color = CommonUI.statusColor(status);
 
     return _boxed(
       width: w,
       align: TextAlign.center,
-      child: Text(
-        text,
-        style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: c),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.15),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Text(
+          status,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.bold,
+            color: color,
+          ),
+        ),
       ),
     );
   }
@@ -654,91 +689,188 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
     return CompositedTransformFollower(
       link: _filterLinks[_activeFilterKey!]!,
       offset: const Offset(0, 44),
+      showWhenUnlinked: false,
       child: Material(
-        elevation: 8,
-        borderRadius: BorderRadius.circular(8),
+        color: Colors.transparent,
         child: Container(
-          width: 240,
-          height: 300,
-          padding: const EdgeInsets.all(8),
+          width: 260,
+          height: 340,
+          decoration: BoxDecoration(
+            color: const Color(0xFF172A33).withOpacity(.6), // dark panel
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.white24),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.45),
+                blurRadius: 14,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
           child: Column(
             children: [
-              // title
-              Text(
-                'Filter: $_activeFilterKey',
-                style: const TextStyle(fontWeight: FontWeight.bold),
+              // ================= HEADER =================
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
+                decoration: BoxDecoration(
+                  border: Border(bottom: BorderSide(color: Colors.white24)),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        _activeFilterKey!,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                    InkWell(
+                      onTap: _overlayCtrl.hide,
+                      borderRadius: BorderRadius.circular(20),
+                      child: const Padding(
+                        padding: EdgeInsets.all(4),
+                        child: Icon(
+                          Icons.close,
+                          size: 18,
+                          color: Colors.white70,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
 
-              // search inside popup
+              // ================= SEARCH =================
               Padding(
-                padding: const EdgeInsets.symmetric(vertical: 6),
+                padding: const EdgeInsets.all(10),
                 child: TextField(
-                  decoration: const InputDecoration(
+                  style: const TextStyle(color: Colors.white),
+                  decoration: InputDecoration(
                     isDense: true,
-                    prefixIcon: Icon(Icons.search, size: 16),
                     hintText: 'Search value',
-                    border: OutlineInputBorder(),
+                    hintStyle: const TextStyle(color: Colors.white54),
+                    prefixIcon: const Icon(Icons.search, size: 16),
+                    prefixIconColor: Colors.white54,
+                    filled: true,
+                    fillColor: Colors.black.withOpacity(0.2),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(color: Colors.white24),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(color: Colors.white24),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: const BorderSide(color: Colors.blueAccent),
+                    ),
                   ),
                   onChanged: (v) => setState(() => _filterSearch = v),
                 ),
               ),
 
-              const Divider(height: 1),
-
-              // values
+              // ================= LIST =================
               Expanded(
-                child: ListView.builder(
-                  itemCount: shown.length,
-                  itemBuilder: (_, i) {
-                    final v = shown[i];
-                    final checked = selected.contains(v);
+                child: shown.isEmpty
+                    ? const Center(
+                        child: Text(
+                          'No values',
+                          style: TextStyle(color: Colors.white54),
+                        ),
+                      )
+                    : Scrollbar(
+                        thumbVisibility: true,
+                        child: ListView.builder(
+                          padding: EdgeInsets.zero,
+                          itemCount: shown.length,
+                          itemBuilder: (_, i) {
+                            final v = shown[i];
+                            final checked = selected.contains(v);
 
-                    return CheckboxListTile(
-                      dense: true,
-                      value: checked,
-                      title: Text(
-                        v,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                            return InkWell(
+                              onTap: () {
+                                setState(() {
+                                  final s = _filterValues.putIfAbsent(
+                                    _activeFilterKey!,
+                                    () => <String>{},
+                                  );
+                                  checked ? s.remove(v) : s.add(v);
+                                });
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 6,
+                                ),
+                                child: Row(
+                                  children: [
+                                    Checkbox(
+                                      value: checked,
+                                      onChanged: (ok) {
+                                        setState(() {
+                                          final s = _filterValues.putIfAbsent(
+                                            _activeFilterKey!,
+                                            () => <String>{},
+                                          );
+                                          ok == true ? s.add(v) : s.remove(v);
+                                        });
+                                      },
+                                      checkColor: Colors.white, // màu dấu ✓
+                                      side: const BorderSide(
+                                        color: Colors.white54,
+                                      ), // viền khi unchecked
+                                      materialTapTargetSize:
+                                          MaterialTapTargetSize.shrinkWrap,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Expanded(
+                                      child: Text(
+                                        v,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 13,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
                       ),
-                      controlAffinity: ListTileControlAffinity.leading,
-                      onChanged: (ok) {
-                        setState(() {
-                          final s = _filterValues.putIfAbsent(
-                            _activeFilterKey!,
-                            () => <String>{},
-                          );
-                          ok == true ? s.add(v) : s.remove(v);
-                        });
-                      },
-                    );
-                  },
-                ),
               ),
 
-              const Divider(height: 1),
-
-              // buttons
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  TextButton(
-                    onPressed: () {
-                      setState(() {
-                        _filterValues.remove(_activeFilterKey);
-                        _activeFilterKey = null;
-                      });
-                      _overlayCtrl.hide();
-                    },
-                    child: const Text('Clear'),
-                  ),
-                  TextButton(
-                    onPressed: () {
-                      _overlayCtrl.hide();
-                    },
-                    child: const Text('Close'),
-                  ),
-                ],
+              // ================= FOOTER =================
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  border: Border(top: BorderSide(color: Colors.white24)),
+                ),
+                child: Row(
+                  children: [
+                    GlassActionButton(
+                      icon: Icons.cleaning_services,
+                      onTap: () {
+                        setState(() {
+                          _filterValues.remove(_activeFilterKey);
+                        });
+                      },
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
@@ -749,45 +881,79 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
 
   // ===================== PAGER =====================
   Widget _buildPager({required int totalItems, required int totalPages}) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+    const controlBg = Color(0xFF172A33);
+
+    return Container(
+      color: const Color(0xFF0F2027),
+      // padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
       child: Row(
         children: [
+          // rows info
           Text(
             'Rows: $totalItems',
-            style: TextStyle(color: Colors.grey.shade700),
+            style: const TextStyle(color: Colors.white70),
           ),
+
           const Spacer(),
+
+          // page info
           Text(
             'Page ${_page + 1} / $totalPages',
-            style: const TextStyle(fontWeight: FontWeight.w600),
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w600,
+            ),
           ),
-          const SizedBox(width: 10),
+
+          const SizedBox(width: 12),
+
+          // prev
           IconButton(
             onPressed: _page == 0 ? null : () => setState(() => _page--),
             icon: const Icon(Icons.chevron_left),
+            color: Colors.white,
+            disabledColor: Colors.white38,
           ),
+
+          // next
           IconButton(
             onPressed: (_page + 1 >= totalPages)
                 ? null
                 : () => setState(() => _page++),
             icon: const Icon(Icons.chevron_right),
+            color: Colors.white,
+            disabledColor: Colors.white38,
           ),
-          const SizedBox(width: 10),
-          DropdownButton<int>(
-            value: _rowsPerPage,
-            items: const [15, 30, 50, 100]
-                .map(
-                  (e) => DropdownMenuItem(value: e, child: Text('$e / page')),
-                )
-                .toList(),
-            onChanged: (v) {
-              if (v == null) return;
-              setState(() {
-                _rowsPerPage = v;
-                _page = 0;
-              });
-            },
+
+          const SizedBox(width: 12),
+
+          // rows per page
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            decoration: BoxDecoration(
+              color: controlBg,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.white24),
+            ),
+            child: DropdownButton<int>(
+              value: _rowsPerPage,
+              underline: const SizedBox(),
+              dropdownColor: controlBg,
+              iconEnabledColor: Colors.white,
+              style: const TextStyle(color: Colors.white),
+              items: const [15, 30, 50, 100]
+                  .map(
+                    (e) => DropdownMenuItem(value: e, child: Text('$e / page')),
+                  )
+                  .toList(),
+              onChanged: (v) {
+                if (v == null) return;
+                setState(() {
+                  _rowsPerPage = v;
+                  _page = 0;
+                });
+              },
+            ),
           ),
         ],
       ),
@@ -810,15 +976,15 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
   late final List<_Col> _cols = [
     _Col('STT', 50, TextAlign.center),
     _Col('Group', 80, TextAlign.left),
-    _Col('Plant', 60, TextAlign.left),
-    _Col('Division', 60, TextAlign.left),
+    _Col('Plant', 80, TextAlign.left),
+    _Col('Division', 90, TextAlign.left),
     _Col('Area', 90, TextAlign.left),
-    _Col('Machine', 90, TextAlign.left),
+    _Col('Machine', 100, TextAlign.left),
 
     _Col('Risk F', 100, TextAlign.center),
     _Col('Risk P', 100, TextAlign.center),
     _Col('Risk S', 100, TextAlign.center),
-    _Col('Risk T', 60, TextAlign.center),
+    _Col('Risk T', 90, TextAlign.center),
 
     _Col('Comment', 260, TextAlign.left),
     _Col('Countermeasure', 260, TextAlign.left),
@@ -877,7 +1043,6 @@ class _HCellFilter extends StatelessWidget {
   Widget build(BuildContext context) {
     return CompositedTransformTarget(
       link: layerLink,
-
       child: Container(
         width: width,
         height: 44,

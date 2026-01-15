@@ -59,34 +59,6 @@ class _RecheckPicDetailScreenState extends State<RecheckPicDetailScreen> {
     });
   }
 
-  // int _riskToScore(String risk) {
-  //   switch (risk) {
-  //     case 'V':
-  //       return 5;
-  //     case 'IV':
-  //       return 4;
-  //     case 'III':
-  //       return 3;
-  //     case 'II':
-  //       return 2;
-  //     case 'I':
-  //       return 1;
-  //     default:
-  //       return 0;
-  //   }
-  // }
-  //
-  // Color _riskColor(String risk) {
-  //   switch (risk) {
-  //     case 'V':
-  //       return Colors.red;
-  //     case 'IV':
-  //       return Colors.redAccent;
-  //     default:
-  //       return Colors.grey;
-  //   }
-  // }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(

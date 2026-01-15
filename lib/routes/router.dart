@@ -10,7 +10,7 @@ import '../table/patrol_report_table.dart';
 
 final router = GoRouter(
   routes: [
-    GoRoute(path: '/', builder: (context, state) => const PatrolReportTable()),
+    GoRoute(path: '/', builder: (context, state) => const LoginPage()),
     GoRoute(
       path: '/home',
       builder: (context, state) {

@@ -2,12 +2,29 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../widget/glass_action_button.dart';
+
 class CommonUI {
   CommonUI._(); // ❌ không cho new
 
   static String fmtDate(DateTime? d) {
     if (d == null) return '-';
     return '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+  }
+
+  static Color statusColor(String status) {
+    switch (status) {
+      case 'Wait':
+        return Colors.grey;
+      case 'Redo':
+        return Colors.red;
+      case 'Done':
+        return Colors.blue;
+      case 'Completed':
+        return Colors.green;
+      default:
+        return Colors.grey;
+    }
   }
 
   static int riskToScore(String risk) {
@@ -416,7 +433,72 @@ class CommonUI {
       icon: Icons.error_outline_rounded,
       iconColor: Colors.redAccent,
       backgroundColor: const Color(0xFF121826),
-      buttonText: 'Back to Login',
+      buttonText: 'Back',
+    );
+  }
+
+  static Widget emptyState({
+    String title = 'No data',
+    String message = 'No items found',
+    IconData icon = Icons.inbox_outlined,
+    Color iconColor = Colors.white70,
+    required BuildContext context,
+  }) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.45),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: Colors.white.withOpacity(0.15)),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: iconColor.withOpacity(0.15),
+                    ),
+                    child: Icon(icon, color: iconColor, size: 48),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    message,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Colors.white70,
+                      fontSize: 14,
+                      height: 1.4,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  GlassActionButton(
+                    icon: Icons.arrow_back_rounded,
+                    onTap: () => Navigator.pop(context, false),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 
