@@ -802,7 +802,7 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
 
             _patrolButton(
               number: '4)',
-              title: 'Table',
+              title: 'Data Table',
               color: color,
               enabled: true,
               onTap: () {
