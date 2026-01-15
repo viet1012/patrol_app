@@ -1,3 +1,5 @@
+import 'package:chuphinh/common/common_ui_helper.dart';
+import 'package:chuphinh/table/patrol_images_dialog.dart';
 import 'package:flutter/material.dart';
 import '../api/api_config.dart';
 import '../api/patrol_report_api.dart';
@@ -165,7 +167,6 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
 
   // ===================== TABLE =====================
   Widget _buildTable(BuildContext context, List<PatrolReportModel> reports) {
-    // Tính tổng width từ danh sách cột (không hardcode 4000)
     final totalWidth = _cols.fold<double>(0, (s, c) => s + c.w);
 
     return Card(
@@ -246,33 +247,68 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
           _cell(e.countermeasure, _w('Countermeasure'), tooltip: true),
           _cell(e.checkInfo, _w('Check Info'), tooltip: true),
 
-          _cell(fmtDate(e.createdAt), _w('Created'), align: TextAlign.center),
-          _cell(fmtDate(e.dueDate), _w('Due'), align: TextAlign.center),
+          _cell(
+            CommonUI.fmtDate(e.createdAt),
+            _w('Created'),
+            align: TextAlign.center,
+          ),
+          _cell(
+            CommonUI.fmtDate(e.dueDate),
+            _w('Due'),
+            align: TextAlign.center,
+          ),
           _cell(e.pic ?? '-', _w('PIC'), tooltip: true),
 
           _imgCell(
             names: e.imageNames,
             width: _w('Img(B)'),
-            onTap: () => _showImagesDialog('Before images', e.imageNames),
+            onTap: () => PatrolImagesDialog.show(
+              context: context,
+              title: 'Before',
+              e: e,
+              names: e.imageNames,
+              baseUrl: ApiConfig.baseUrl,
+            ),
           ),
 
           _badgeStatus(e.atStatus, _w('AT Stt')),
           _cell(e.atPic ?? '-', _w('AT PIC'), tooltip: true),
-          _cell(fmtDate(e.atDate), _w('AT Date'), align: TextAlign.center),
+          _cell(
+            CommonUI.fmtDate(e.atDate),
+            _w('AT Date'),
+            align: TextAlign.center,
+          ),
           _cell(e.atComment ?? '-', _w('AT Cmt'), tooltip: true),
           _imgCell(
             names: e.atImageNames,
             width: _w('Img(A)'),
-            onTap: () => _showImagesDialog('After images', e.atImageNames),
+            // onTap: () => _showImagesDialog('After images', e, e.atImageNames),
+            onTap: () => PatrolImagesDialog.show(
+              context: context,
+              title: 'After',
+              e: e,
+              names: e.atImageNames,
+              baseUrl: ApiConfig.baseUrl,
+            ),
           ),
 
           _cell(e.hseJudge ?? '-', _w('HSE J'), align: TextAlign.center),
-          _cell(fmtDate(e.hseDate), _w('HSE D'), align: TextAlign.center),
+          _cell(
+            CommonUI.fmtDate(e.hseDate),
+            _w('HSE D'),
+            align: TextAlign.center,
+          ),
           _cell(e.hseComment ?? '-', _w('HSE C'), tooltip: true),
           _imgCell(
             names: e.hseImageNames,
             width: _w('Img(H)'),
-            onTap: () => _showImagesDialog('HSE images', e.hseImageNames),
+            onTap: () => PatrolImagesDialog.show(
+              context: context,
+              title: 'HSE',
+              e: e,
+              names: e.hseImageNames,
+              baseUrl: ApiConfig.baseUrl,
+            ),
           ),
 
           _cell(e.loadStatus ?? '-', _w('Load'), align: TextAlign.center),
@@ -442,58 +478,7 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
     );
   }
 
-  // ===================== DIALOG (placeholder) =====================
-  void _showImagesDialog(String title, List<String> names) {
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: Text(title),
-        content: SizedBox(
-          width: 700,
-          child: names.isEmpty
-              ? const Text('No images')
-              : GridView.builder(
-                  shrinkWrap: true,
-                  itemCount: names.length,
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 4,
-                    crossAxisSpacing: 8,
-                    mainAxisSpacing: 8,
-                  ),
-                  itemBuilder: (_, i) {
-                    final name = names[i];
-                    final url = '${ApiConfig.baseUrl}/images/$name';
-                    print("url: $url");
-                    return InkWell(
-                      onTap: () => _showSingleImage(url, name),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: Image.network(
-                          url,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => Container(
-                            color: Colors.grey.shade200,
-                            alignment: Alignment.center,
-                            child: const Icon(
-                              Icons.broken_image,
-                              color: Colors.red,
-                            ),
-                          ),
-                        ),
-                      ),
-                    );
-                  },
-                ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
-          ),
-        ],
-      ),
-    );
-  }
+  // ---- helpers ----
 
   void _showSingleImage(String url, String name) {
     showDialog(
@@ -622,10 +607,6 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
 }
 
 // ===================== UTIL =====================
-String fmtDate(DateTime? d) {
-  if (d == null) return '-';
-  return '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
-}
 
 class _Col {
   final String label;
