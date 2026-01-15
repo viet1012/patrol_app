@@ -1,5 +1,6 @@
 import 'dart:ui';
 
+import 'package:chuphinh/table/patrol_report_table.dart';
 import 'package:chuphinh/widget/glass_action_button.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -246,7 +247,7 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
                   SizedBox(width: 8),
                   EmbossGlowTitle(text: 'S-PATROL'),
                   SizedBox(width: 8),
-                  EmbossGlowTitle(text: 'V1.3', fontSize: 8),
+                  EmbossGlowTitle(text: 'V1.5', fontSize: 13),
                 ],
               ),
             ),
@@ -648,7 +649,7 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
         child: Container(
-          margin: const EdgeInsets.only(bottom: 24),
+          margin: const EdgeInsets.only(bottom: 16),
           decoration: BoxDecoration(
             color: color.withOpacity(0.12),
             borderRadius: BorderRadius.circular(26),
@@ -666,7 +667,7 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
 
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
-                    vertical: 20,
+                    vertical: 18,
                     horizontal: 22,
                   ),
                   child: Row(
@@ -730,7 +731,6 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
       child: Container(
-        padding: const EdgeInsets.all(18),
         child: Column(
           children: [
             _patrolButton(
@@ -798,6 +798,22 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
                 );
               },
             ),
+            const SizedBox(height: 16),
+
+            _patrolButton(
+              number: '4)',
+              title: 'Data Table',
+              color: color,
+              enabled: true,
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => PatrolReportTable(patrolGroup: group),
+                  ),
+                );
+              },
+            ),
           ],
         ),
       ),
@@ -823,7 +839,7 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
             duration: const Duration(milliseconds: 400),
             opacity: opacity,
             child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 24),
+              padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 24),
               decoration: BoxDecoration(
                 color: color.withOpacity(0.13),
                 borderRadius: BorderRadius.circular(20),

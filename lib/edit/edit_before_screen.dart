@@ -4,6 +4,7 @@ import 'package:dropdown_search/dropdown_search.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../api/patrol_report_api.dart';
+import '../common/common_ui_helper.dart';
 import '../homeScreen/patrol_home_screen.dart';
 import '../model/machine_model.dart';
 import '../model/patrol_report_model.dart';
@@ -45,34 +46,34 @@ class _EditBeforeScreenState extends State<EditBeforeScreen> {
 
   Future<List<PatrolReportModel>>? _futureReport;
 
-  int _riskToScore(String risk) {
-    switch (risk) {
-      case 'V':
-        return 5;
-      case 'IV':
-        return 4;
-      case 'III':
-        return 3;
-      case 'II':
-        return 2;
-      case 'I':
-        return 1;
-      default:
-        return 0;
-    }
-  }
+  // int _riskToScore(String risk) {
+  //   switch (risk) {
+  //     case 'V':
+  //       return 5;
+  //     case 'IV':
+  //       return 4;
+  //     case 'III':
+  //       return 3;
+  //     case 'II':
+  //       return 2;
+  //     case 'I':
+  //       return 1;
+  //     default:
+  //       return 0;
+  //   }
+  // }
 
-  Color _riskColor(String risk) {
-    switch (risk) {
-      case 'V':
-        return Colors.red;
-      case 'IV':
-        return Colors.redAccent;
-
-      default:
-        return Colors.grey;
-    }
-  }
+  // Color _riskColor(String risk) {
+  //   switch (risk) {
+  //     case 'V':
+  //       return Colors.red;
+  //     case 'IV':
+  //       return Colors.redAccent;
+  //
+  //     default:
+  //       return Colors.grey;
+  //   }
+  // }
 
   void _loadReport() async {
     setState(() {
@@ -297,9 +298,9 @@ class _EditBeforeScreenState extends State<EditBeforeScreen> {
           return true;
         }).toList()..sort((a, b) {
           // 1️⃣ So sánh risk trước
-          final riskCompare = _riskToScore(
+          final riskCompare = CommonUI.riskToScore(
             b.riskTotal,
-          ).compareTo(_riskToScore(a.riskTotal));
+          ).compareTo(CommonUI.riskToScore(a.riskTotal));
           if (riskCompare != 0) return riskCompare;
 
           // 2️⃣ Cùng risk → so sánh dueDate
@@ -353,7 +354,8 @@ class _EditBeforeScreenState extends State<EditBeforeScreen> {
             DataColumn(label: Text('Details')),
           ],
           rows: filtered.map((r) {
-            final color = _riskColor(r.riskTotal);
+            final color = CommonUI.riskColor(r.riskTotal);
+
             return DataRow(
               cells: [
                 DataCell(

@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 
 import '../api/patrol_report_api.dart';
 import '../common/common_searchable_dropdown.dart';
+import '../common/common_ui_helper.dart';
 import '../common/due_date_utils.dart';
 import '../homeScreen/patrol_home_screen.dart';
 import '../model/patrol_report_model.dart';
@@ -58,34 +59,34 @@ class _AfterPicDetailScreenState extends State<AfterPicDetailScreen> {
       );
     });
   }
-
-  int _riskToScore(String risk) {
-    switch (risk) {
-      case 'V':
-        return 5;
-      case 'IV':
-        return 4;
-      case 'III':
-        return 3;
-      case 'II':
-        return 2;
-      case 'I':
-        return 1;
-      default:
-        return 0;
-    }
-  }
-
-  Color _riskColor(String risk) {
-    switch (risk) {
-      case 'V':
-        return Colors.red;
-      case 'IV':
-        return Colors.redAccent;
-      default:
-        return Colors.grey;
-    }
-  }
+  //
+  // int _riskToScore(String risk) {
+  //   switch (risk) {
+  //     case 'V':
+  //       return 5;
+  //     case 'IV':
+  //       return 4;
+  //     case 'III':
+  //       return 3;
+  //     case 'II':
+  //       return 2;
+  //     case 'I':
+  //       return 1;
+  //     default:
+  //       return 0;
+  //   }
+  // }
+  //
+  // Color _riskColor(String risk) {
+  //   switch (risk) {
+  //     case 'V':
+  //       return Colors.red;
+  //     case 'IV':
+  //       return Colors.redAccent;
+  //     default:
+  //       return Colors.grey;
+  //   }
+  // }
 
   @override
   Widget build(BuildContext context) {
@@ -225,9 +226,9 @@ class _AfterPicDetailScreenState extends State<AfterPicDetailScreen> {
           if (_filterRisk != null && r.riskTotal != _filterRisk) return false;
           return true;
         }).toList()..sort((a, b) {
-          final riskCompare = _riskToScore(
+          final riskCompare = CommonUI.riskToScore(
             b.riskTotal,
-          ).compareTo(_riskToScore(a.riskTotal));
+          ).compareTo(CommonUI.riskToScore(a.riskTotal));
           if (riskCompare != 0) return riskCompare;
 
           final now = DateTime.now();
@@ -251,7 +252,6 @@ class _AfterPicDetailScreenState extends State<AfterPicDetailScreen> {
 
     return SingleChildScrollView(
       scrollDirection: Axis.vertical,
-
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: ConstrainedBox(
@@ -280,7 +280,7 @@ class _AfterPicDetailScreenState extends State<AfterPicDetailScreen> {
               DataColumn(label: Text('Deadline')),
             ],
             rows: filtered.map((r) {
-              final color = _riskColor(r.riskTotal);
+              final color = CommonUI.riskColor(r.riskTotal);
 
               return DataRow(
                 cells: [

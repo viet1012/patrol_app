@@ -6,6 +6,7 @@ import '../homeScreen/patrol_home_screen.dart';
 import '../login/login_page.dart';
 import '../qrCode/after_patrol.dart';
 import '../session/session_store.dart';
+import '../table/patrol_report_table.dart';
 
 final router = GoRouter(
   routes: [

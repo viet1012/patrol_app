@@ -524,7 +524,7 @@ class _RecheckDetailPageState extends State<RecheckDetailPage> {
               if (isAfter)
                 _buildInfoCard(
                   icon: Icons.groups_rounded,
-                  label: "After PIC:",
+                  label: "PIC:",
                   color: Colors.white70,
                   value: widget.report.atPic!,
                 ),
