@@ -19,7 +19,7 @@ class PatrolReportModel {
   final String? pic;
   final DateTime? dueDate;
   final List<String> imageNames;
-
+  final String? patrol_user;
   // PATROL_AFTER fields
   final List<String> atImageNames;
   final String? atComment;
@@ -55,6 +55,7 @@ class PatrolReportModel {
     this.createdAt,
     this.pic,
     this.dueDate,
+    this.patrol_user,
     required this.imageNames,
     required this.atImageNames,
     this.atComment,
@@ -116,6 +117,7 @@ class PatrolReportModel {
       hseComment: json['hse_comment'],
       hseDate: parseDate(json['hse_date']),
       loadStatus: json['load_status'],
+      patrol_user: json['patrol_user'],
     );
   }
 }

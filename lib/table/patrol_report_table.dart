@@ -146,6 +146,12 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
       case 'STT':
         return e.stt.toString();
 
+      case 'QR':
+        return e.qr_key.toString();
+
+      case 'Patrol User':
+        return e.patrol_user.toString();
+
       case 'Group':
         return e.grp;
 
@@ -414,11 +420,14 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
         children: [
           // === GIỮ NGUYÊN TẤT CẢ CỘT ===
           _cell(e.stt.toString(), _w('STT'), align: TextAlign.center),
+          _cell(e.qr_key.toString(), _w('QR'), align: TextAlign.center),
+
           _cell(e.grp, _w('Group'), tooltip: true),
           _cell(e.plant, _w('Plant'), tooltip: true),
           _cell(e.division, _w('Division'), tooltip: true),
           _cell(e.area, _w('Area'), tooltip: true),
           _cell(e.machine, _w('Machine'), tooltip: true),
+          _cell(e.patrol_user!, _w('Patrol User'), tooltip: true),
 
           _imgCell(
             names: e.imageNames,
@@ -430,14 +439,11 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
               names: e.imageNames,
             ),
           ),
-          _cell(e.riskFreq, _w('Risk F'), align: TextAlign.center),
-          _cell(e.riskProb, _w('Risk P'), align: TextAlign.center),
-          _cell(e.riskSev, _w('Risk S'), align: TextAlign.center),
+
           _badgeRisk(e.riskTotal, _w('Risk T')),
 
           _cell(e.comment, _w('Comment'), tooltip: true),
           _cell(e.countermeasure, _w('Countermeasure'), tooltip: true),
-          _cell(e.checkInfo, _w('Check Info'), tooltip: true),
 
           _cell(
             CommonUI.fmtDate(e.createdAt),
@@ -450,7 +456,10 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
             align: TextAlign.center,
           ),
           _cell(e.pic ?? '-', _w('PIC'), tooltip: true),
-
+          _cell(e.checkInfo, _w('Check Info'), tooltip: true),
+          _cell(e.riskFreq, _w('Risk F'), align: TextAlign.center),
+          _cell(e.riskProb, _w('Risk P'), align: TextAlign.center),
+          _cell(e.riskSev, _w('Risk S'), align: TextAlign.center),
           _badgeStatus(e.atStatus, _w('AT Stt')),
           _cell(e.atPic ?? '-', _w('AT PIC'), tooltip: true),
           _cell(
@@ -505,11 +514,11 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
     final value = text.trim().isEmpty ? '-' : text.trim();
 
     final child = Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 2),
       child: Text(
         value,
-        maxLines: 2,
-        overflow: TextOverflow.ellipsis,
+        // maxLines: 3,
+        // overflow: TextOverflow.ellipsis,
         style: const TextStyle(fontSize: 13),
         textAlign: align,
       ),
@@ -966,27 +975,29 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
   // ===================== COLUMN DEFINITIONS =====================
   // GIỮ nguyên cột, chỉ gom lại để dễ quản lý width/alignment.
   late final List<_Col> _cols = [
-    _Col('STT', 50, TextAlign.center),
+    _Col('STT', 70, TextAlign.center),
+    _Col('QR', 70, TextAlign.center),
     _Col('Group', 70, TextAlign.left),
     _Col('Plant', 70, TextAlign.left),
     _Col('Division', 90, TextAlign.left),
     _Col('Area', 120, TextAlign.left),
     _Col('Machine', 100, TextAlign.left),
+    _Col('Patrol User', 110, TextAlign.left),
 
     _Col('Img(B)', 90, TextAlign.center),
 
-    _Col('Risk F', 120, TextAlign.center),
-    _Col('Risk P', 100, TextAlign.center),
-    _Col('Risk S', 100, TextAlign.center),
     _Col('Risk T', 90, TextAlign.center),
 
     _Col('Comment', 260, TextAlign.left),
     _Col('Countermeasure', 260, TextAlign.left),
-    _Col('Check Info', 120, TextAlign.left),
 
     _Col('Created', 100, TextAlign.center),
     _Col('Due', 100, TextAlign.center),
     _Col('PIC', 90, TextAlign.left),
+    _Col('Check Info', 120, TextAlign.left),
+    _Col('Risk F', 120, TextAlign.center),
+    _Col('Risk P', 100, TextAlign.center),
+    _Col('Risk S', 100, TextAlign.center),
 
     _Col('AT Stt', 70, TextAlign.center),
     _Col('AT PIC', 90, TextAlign.left),

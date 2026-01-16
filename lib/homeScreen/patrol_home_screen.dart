@@ -12,6 +12,7 @@ import '../after/after_detail_screen.dart';
 import '../animate/call_to_action_arrow.dart';
 import '../animate/christmas_title.dart';
 import '../animate/glow_title.dart';
+import '../api/api_config.dart';
 import '../api/dio_client.dart';
 import '../api/hse_master_service.dart';
 import '../common/animated_glass_action_button.dart';
@@ -247,7 +248,7 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
                   SizedBox(width: 8),
                   EmbossGlowTitle(text: 'S-PATROL'),
                   SizedBox(width: 8),
-                  EmbossGlowTitle(text: 'V1.5', fontSize: 13),
+                  EmbossGlowTitle(text: ApiConfig.version, fontSize: 13),
                 ],
               ),
             ),
