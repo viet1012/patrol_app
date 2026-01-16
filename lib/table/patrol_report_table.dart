@@ -514,42 +514,36 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
       width: w,
       align: TextAlign.center,
       child: hasQr
-          ? Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                // ===== QR ICON BOX =====
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: Colors.blueGrey.shade50,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.blueGrey.shade200),
+          ? Container(
+              margin: const EdgeInsets.only(bottom: 6),
+              width: 50,
+              height: 50,
+              decoration: BoxDecoration(
+                color: Colors.blueGrey.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.blueGrey.shade200),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(
+                    Icons.qr_code_2_rounded,
+                    size: 24,
+                    color: Colors.blueGrey,
                   ),
-                  child: const Center(
-                    child: Icon(
-                      Icons.qr_code_2_rounded,
-                      size: 22,
-                      color: Colors.blueGrey,
+                  const SizedBox(height: 2),
+                  Text(
+                    value,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.grey.shade800,
+                      height: 1,
                     ),
                   ),
-                ),
-
-                const SizedBox(height: 4),
-
-                // ===== QR TEXT =====
-                Text(
-                  value,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.grey.shade800,
-                    height: 1.1,
-                  ),
-                ),
-              ],
+                ],
+              ),
             )
           : const Text('-'),
     );
