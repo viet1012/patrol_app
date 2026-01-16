@@ -407,7 +407,7 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
     final bg = isSelected ? Colors.lightBlue.shade50 : base;
 
     return _HoverableRow(
-      height: 46,
+      height: 100,
       background: bg,
       onTap: () => setState(() => _selectedIndex = index),
       child: Row(
@@ -420,6 +420,16 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
           _cell(e.area, _w('Area'), tooltip: true),
           _cell(e.machine, _w('Machine'), tooltip: true),
 
+          _imgCell(
+            names: e.imageNames,
+            width: _w('Img(B)'),
+            onTap: () => PatrolImagesDialog.show(
+              context: context,
+              title: 'Before',
+              e: e,
+              names: e.imageNames,
+            ),
+          ),
           _cell(e.riskFreq, _w('Risk F'), align: TextAlign.center),
           _cell(e.riskProb, _w('Risk P'), align: TextAlign.center),
           _cell(e.riskSev, _w('Risk S'), align: TextAlign.center),
@@ -441,18 +451,6 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
           ),
           _cell(e.pic ?? '-', _w('PIC'), tooltip: true),
 
-          _imgCell(
-            names: e.imageNames,
-            width: _w('Img(B)'),
-            onTap: () => PatrolImagesDialog.show(
-              context: context,
-              title: 'Before',
-              e: e,
-              names: e.imageNames,
-              baseUrl: ApiConfig.baseUrl,
-            ),
-          ),
-
           _badgeStatus(e.atStatus, _w('AT Stt')),
           _cell(e.atPic ?? '-', _w('AT PIC'), tooltip: true),
           _cell(
@@ -470,7 +468,6 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
               title: 'After',
               e: e,
               names: e.atImageNames,
-              baseUrl: ApiConfig.baseUrl,
             ),
           ),
 
@@ -489,7 +486,6 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
               title: 'HSE',
               e: e,
               names: e.hseImageNames,
-              baseUrl: ApiConfig.baseUrl,
             ),
           ),
 
@@ -512,7 +508,7 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
       padding: const EdgeInsets.symmetric(horizontal: 8),
       child: Text(
         value,
-        maxLines: 1,
+        maxLines: 2,
         overflow: TextOverflow.ellipsis,
         style: const TextStyle(fontSize: 13),
         textAlign: align,
@@ -541,7 +537,7 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
       );
     }
 
-    final url = '${ApiConfig.baseUrl}/images/$imageName';
+    final url = '${ApiConfig.imgUrl}/images/$imageName';
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(4),
@@ -578,32 +574,28 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
       child: InkWell(
         onTap: (count > 0) ? onTap : null,
         borderRadius: BorderRadius.circular(8),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              // thumbnail
-              if (count > 0)
-                _imageThumb(first, size: 40)
-              else
-                const Icon(
-                  Icons.image_not_supported,
-                  size: 18,
-                  color: Colors.grey,
-                ),
-              const SizedBox(width: 6),
-              // count
-              Text(
-                '$count',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: count > 0 ? Colors.blueGrey.shade800 : Colors.grey,
-                ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // thumbnail
+            if (count > 0)
+              Expanded(child: _imageThumb(first, size: 80))
+            else
+              const Icon(
+                Icons.image_not_supported,
+                size: 18,
+                color: Colors.grey,
               ),
-            ],
-          ),
+            // count
+            Text(
+              '$count',
+              style: TextStyle(
+                fontSize: 8,
+                fontWeight: FontWeight.w700,
+                color: count > 0 ? Colors.blueGrey.shade800 : Colors.grey,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -975,13 +967,15 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
   // GIỮ nguyên cột, chỉ gom lại để dễ quản lý width/alignment.
   late final List<_Col> _cols = [
     _Col('STT', 50, TextAlign.center),
-    _Col('Group', 80, TextAlign.left),
-    _Col('Plant', 80, TextAlign.left),
+    _Col('Group', 70, TextAlign.left),
+    _Col('Plant', 70, TextAlign.left),
     _Col('Division', 90, TextAlign.left),
-    _Col('Area', 90, TextAlign.left),
+    _Col('Area', 120, TextAlign.left),
     _Col('Machine', 100, TextAlign.left),
 
-    _Col('Risk F', 100, TextAlign.center),
+    _Col('Img(B)', 90, TextAlign.center),
+
+    _Col('Risk F', 120, TextAlign.center),
     _Col('Risk P', 100, TextAlign.center),
     _Col('Risk S', 100, TextAlign.center),
     _Col('Risk T', 90, TextAlign.center),
@@ -993,8 +987,6 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
     _Col('Created', 100, TextAlign.center),
     _Col('Due', 100, TextAlign.center),
     _Col('PIC', 90, TextAlign.left),
-
-    _Col('Img(B)', 90, TextAlign.center),
 
     _Col('AT Stt', 70, TextAlign.center),
     _Col('AT PIC', 90, TextAlign.left),

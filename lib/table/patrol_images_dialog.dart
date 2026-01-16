@@ -1,6 +1,7 @@
 import 'package:chuphinh/table/patrol_report_table.dart';
 import 'package:flutter/material.dart';
 
+import '../api/api_config.dart';
 import '../common/common_ui_helper.dart';
 import '../model/patrol_report_model.dart';
 
@@ -10,7 +11,6 @@ class PatrolImagesDialog {
     required String title,
     required PatrolReportModel e,
     required List<String> names,
-    required String baseUrl, // ApiConfig.baseUrl
     String emptyText = 'No images',
   }) {
     if (names.isEmpty) {
@@ -28,7 +28,7 @@ class PatrolImagesDialog {
         title: title,
         e: e,
         names: names,
-        baseUrl: baseUrl,
+        baseUrl: ApiConfig.imgUrl,
       ),
     );
   }
@@ -60,9 +60,11 @@ class _PatrolImagesDialogView extends StatelessWidget {
     return Dialog(
       insetPadding: const EdgeInsets.all(10),
       clipBehavior: Clip.antiAlias,
-      child: SizedBox(
+      child: Container(
         width: size.width * 0.96,
         height: size.height * 0.96,
+        color: Colors.black,
+
         child: Column(
           children: [
             // ===== Top bar =====
@@ -136,7 +138,7 @@ class _PatrolImagesDialogView extends StatelessWidget {
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(12),
                 child: Container(
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(12),
@@ -178,7 +180,7 @@ class _PatrolImagesDialogView extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Expanded(
-                            flex: 3,
+                            flex: 2,
                             child: Column(
                               children: [
                                 _InfoRow2('QR Code', e.qr_key ?? '-'),
@@ -188,29 +190,13 @@ class _PatrolImagesDialogView extends StatelessWidget {
                                 _InfoRow2('Area', e.area),
                                 _InfoRow2('Machine', e.machine),
                                 _InfoRow2('PIC', e.pic ?? '-'),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 18),
-                          Expanded(
-                            flex: 3,
-                            child: Column(
-                              children: [
-                                _InfoRow2(
-                                  'Created',
-                                  CommonUI.fmtDate(e.createdAt),
-                                ),
                                 _InfoRow2('Due', CommonUI.fmtDate(e.dueDate)),
-                                _InfoRow2('Check Info', e.checkInfo),
-                                _InfoRow2('Risk F', e.riskFreq),
-                                _InfoRow2('Risk P', e.riskProb),
-                                _InfoRow2('Risk S', e.riskSev),
                               ],
                             ),
                           ),
                           const SizedBox(width: 18),
                           Expanded(
-                            flex: 4,
+                            flex: 5,
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
@@ -221,7 +207,7 @@ class _PatrolImagesDialogView extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(width: 18),
-                          Expanded(flex: 2, child: _RiskTotalCard(e.riskTotal)),
+                          Expanded(flex: 1, child: _RiskTotalCard(e.riskTotal)),
                         ],
                       );
                     },
@@ -348,28 +334,23 @@ class _RiskTotalCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final r = risk.toUpperCase();
+    final r = risk.trim().toUpperCase();
 
-    Color bg = Colors.green.shade50;
-    Color c = Colors.green.shade700;
+    final Color mainColor = CommonUI.riskColor(r);
 
-    if (r.contains('HIGH')) {
-      bg = Colors.red.shade50;
-      c = Colors.red.shade700;
-    } else if (r.contains('MEDIUM')) {
-      bg = Colors.orange.shade50;
-      c = Colors.orange.shade800;
-    }
+    // background nhẹ theo màu risk
+    final Color bg = mainColor.withOpacity(0.08);
+    final Color border = mainColor.withOpacity(0.9);
 
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 12),
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: c, width: 2),
+        border: Border.all(color: border, width: 2),
         boxShadow: [
           BoxShadow(
-            color: c.withOpacity(0.15),
+            color: mainColor.withOpacity(0.25),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -381,17 +362,18 @@ class _RiskTotalCard extends StatelessWidget {
           Text(
             'RISK TOTAL',
             style: TextStyle(
-              color: c,
+              color: mainColor,
+              fontSize: 20,
               fontWeight: FontWeight.w900,
               letterSpacing: 1,
             ),
           ),
           const SizedBox(height: 12),
           Text(
-            risk,
+            r.isEmpty ? '-' : r,
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: c,
+              color: mainColor,
               fontSize: 28,
               fontWeight: FontWeight.w900,
             ),
@@ -411,22 +393,27 @@ class _InfoRow2 extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final value = v.trim().isEmpty ? '-' : v.trim();
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
+
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: Colors.grey.withOpacity(0.4))),
+      ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
-            width: 115,
+            width: 110,
             child: Text(
-              k,
+              k.toUpperCase(),
               style: TextStyle(
-                color: Colors.grey.shade700,
-                fontWeight: FontWeight.w800,
+                fontSize: 16,
+                color: Colors.grey.shade800,
+                fontWeight: FontWeight.w900,
               ),
             ),
           ),
-          Expanded(child: Text(value)),
+          Expanded(child: Text(value, style: const TextStyle(fontSize: 16))),
         ],
       ),
     );
@@ -448,6 +435,7 @@ class _InfoBlock extends StatelessWidget {
         Text(
           k,
           style: TextStyle(
+            fontSize: 16,
             color: Colors.grey.shade800,
             fontWeight: FontWeight.w900,
           ),
@@ -455,13 +443,13 @@ class _InfoBlock extends StatelessWidget {
         const SizedBox(height: 6),
         Container(
           width: double.infinity,
-          padding: const EdgeInsets.all(10),
+          padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
             color: Colors.grey.shade50,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: Colors.grey.shade300),
           ),
-          child: SelectableText(value),
+          child: SelectableText(value, style: TextStyle(fontSize: 20)),
         ),
       ],
     );
