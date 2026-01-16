@@ -420,7 +420,8 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
         children: [
           // === GIỮ NGUYÊN TẤT CẢ CỘT ===
           _cell(e.stt.toString(), _w('STT'), align: TextAlign.center),
-          _cell(e.qr_key.toString(), _w('QR'), align: TextAlign.center),
+          // _cell(e.qr_key.toString(), _w('QR'), align: TextAlign.center),
+          _qrCell(e.qr_key, _w('QR')),
 
           _cell(e.grp, _w('Group'), tooltip: true),
           _cell(e.plant, _w('Plant'), tooltip: true),
@@ -505,6 +506,55 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
   }
 
   // ===================== CELLS =====================
+  Widget _qrCell(String? qr, double w) {
+    final value = (qr ?? '').trim();
+    final hasQr = value.isNotEmpty;
+
+    return _boxed(
+      width: w,
+      align: TextAlign.center,
+      child: hasQr
+          ? Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // ===== QR ICON BOX =====
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: Colors.blueGrey.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.blueGrey.shade200),
+                  ),
+                  child: const Center(
+                    child: Icon(
+                      Icons.qr_code_2_rounded,
+                      size: 22,
+                      color: Colors.blueGrey,
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 4),
+
+                // ===== QR TEXT =====
+                Text(
+                  value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.grey.shade800,
+                    height: 1.1,
+                  ),
+                ),
+              ],
+            )
+          : const Text('-'),
+    );
+  }
+
   Widget _cell(
     String text,
     double w, {
@@ -959,17 +1009,6 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
         ],
       ),
     );
-  }
-
-  // ===================== STATES =====================
-  Widget _buildError(String msg) {
-    return Center(
-      child: Text(msg, style: const TextStyle(color: Colors.red)),
-    );
-  }
-
-  Widget _buildEmpty() {
-    return const Center(child: Text('No data'));
   }
 
   // ===================== COLUMN DEFINITIONS =====================
