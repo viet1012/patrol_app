@@ -1,3 +1,4 @@
+import 'package:chuphinh/api/api_config.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -204,7 +205,7 @@ class _LoginPageState extends State<LoginPage> {
                 //     return EmbossGlowTitle(text: snapshot.data!, fontSize: 13);
                 //   },
                 // ),
-                EmbossGlowTitle(text: 'V1.3', fontSize: 13),
+                EmbossGlowTitle(text: ApiConfig.version, fontSize: 13),
                 const SizedBox(height: 16),
 
                 const Text(
