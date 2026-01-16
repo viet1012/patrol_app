@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import '../model/auth_result.dart';
 import 'dio_client.dart';
 
 class AuthApi {
@@ -12,14 +13,18 @@ class AuthApi {
   }) async {
     try {
       final endpoint = '$_basePath/login';
-
       final body = {'account': account, 'password': password};
 
-      /// 🔥 LOG REQUEST
       debugPrint('👉 API CALL: ${DioClient.dio.options.baseUrl}$endpoint');
-      // debugPrint('👉 BODY: $body');
 
-      final response = await DioClient.dio.post(endpoint, data: body);
+      final response = await DioClient.dio.post(
+        endpoint,
+        data: body,
+        options: Options(
+          sendTimeout: const Duration(seconds: 5),
+          receiveTimeout: const Duration(seconds: 5),
+        ),
+      );
 
       debugPrint('✅ STATUS: ${response.statusCode}');
       debugPrint('✅ RESPONSE: ${response.data}');
@@ -31,19 +36,37 @@ class AuthApi {
         );
       }
 
-      return AuthResult(success: false, message: 'Invalid response format');
-    } on DioException catch (e) {
-      debugPrint('❌ LOGIN ERROR: ${e.message}');
-      debugPrint('❌ RESPONSE: ${e.response?.data}');
-
       return AuthResult(
         success: false,
-        message:
-            e.response?.data?['message'] ??
-            'Unable to login. Please try again.',
+        message: 'Invalid server response',
+        isServerError: true,
+      );
+    } on DioException catch (e) {
+      debugPrint('❌ LOGIN ERROR: ${e.type}');
+      debugPrint('❌ MESSAGE: ${e.message}');
+      debugPrint('❌ RESPONSE: ${e.response?.data}');
+
+      // ❗ KHÔNG CÓ RESPONSE → SERVER / NETWORK
+      if (e.response == null) {
+        return AuthResult(
+          success: false,
+          isServerError: true,
+          message: _mapDioError(e),
+        );
+      }
+
+      // ❗ CÓ RESPONSE → backend trả lỗi (401 / 403 / 400)
+      return AuthResult(
+        success: false,
+        message: e.response?.data?['message'] ?? 'Invalid account or password',
+        isServerError: false,
       );
     } catch (e) {
-      return AuthResult(success: false, message: e.toString());
+      return AuthResult(
+        success: false,
+        isServerError: true,
+        message: 'Unexpected error: $e',
+      );
     }
   }
 
@@ -168,12 +191,18 @@ class AuthApi {
       return false;
     }
   }
-}
 
-/// ===================== RESULT MODEL =====================
-class AuthResult {
-  final bool success;
-  final String message;
-
-  AuthResult({required this.success, required this.message});
+  static String _mapDioError(DioException e) {
+    switch (e.type) {
+      case DioExceptionType.connectionTimeout:
+      case DioExceptionType.receiveTimeout:
+        return 'Server timeout. Please try again later.';
+      case DioExceptionType.connectionError:
+        return 'Cannot connect to server.';
+      case DioExceptionType.badResponse:
+        return 'Server error (${e.response?.statusCode}).';
+      default:
+        return 'Network error.';
+    }
+  }
 }
