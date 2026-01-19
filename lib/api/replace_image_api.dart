@@ -136,12 +136,19 @@ Future<void> updateReportApi({
   String? comment,
   String? countermeasure,
   String? pic,
+
   // ✅ meta fields
   String? grp,
   String? plant,
   String? division,
   String? area,
   String? machine,
+
+  // ✅ risk fields (NEW)
+  String? riskFreq,
+  String? riskProb,
+  String? riskSev,
+  String? riskTotal,
 
   // ✅ audit
   String? editUser,
@@ -152,7 +159,6 @@ Future<void> updateReportApi({
 }) async {
   final path = '/api/patrol_report/$id/edit';
 
-  // ✅ dto: field nào null thì BE sẽ giữ nguyên
   final dto = <String, dynamic>{
     if (comment != null) 'comment': comment,
     if (countermeasure != null) 'countermeasure': countermeasure,
@@ -164,14 +170,18 @@ Future<void> updateReportApi({
     if (area != null) 'area': area,
     if (machine != null) 'machine': machine,
 
-    if (editUser != null) 'editUser': editUser,
+    // ✅ risk (NEW)
+    if (riskFreq != null) 'riskFreq': riskFreq,
+    if (riskProb != null) 'riskProb': riskProb,
+    if (riskSev != null) 'riskSev': riskSev,
+    if (riskTotal != null) 'riskTotal': riskTotal,
 
+    if (editUser != null) 'editUser': editUser,
     if (deleteImages != null) 'deleteImages': deleteImages,
   };
 
   final formData = FormData.fromMap({
     'data': jsonEncode(dto),
-
     if (images != null && images.isNotEmpty)
       'images': images
           .map(

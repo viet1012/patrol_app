@@ -312,30 +312,6 @@ class _EditDetailPageState extends State<EditDetailPage> {
     );
   }
 
-  Widget _infoItem(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: RichText(
-        text: TextSpan(
-          style: Theme.of(context).textTheme.bodyMedium,
-          children: [
-            TextSpan(
-              text: '$label: ',
-              style: const TextStyle(
-                fontWeight: FontWeight.w600,
-                color: Colors.white,
-              ),
-            ),
-            TextSpan(
-              text: value,
-              style: TextStyle(color: Colors.white.withOpacity(0.85)),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Future<void> _onSave() async {
     try {
       // ⏳ Có thể show loading nếu muốn

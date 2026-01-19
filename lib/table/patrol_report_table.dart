@@ -8,6 +8,7 @@ import '../api/api_config.dart';
 import '../api/patrol_report_api.dart';
 import '../model/patrol_report_model.dart';
 import '../widget/glass_action_button.dart';
+import 'edit_report_dialog.dart';
 
 class PatrolReportTable extends StatefulWidget {
   final String? patrolGroup;
@@ -112,9 +113,13 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
             }
 
             final all = snapshot.data ?? [];
-            _allReports = all; // ✅ lưu lại
 
-            if (all.isEmpty) {
+            // Chỉ gán 1 lần khi data load xong
+            if (_allReports.isEmpty) {
+              _allReports = List.from(all); // copy list cho an toàn
+            }
+
+            if (_allReports.isEmpty) {
               return CommonUI.emptyState(
                 context: context,
                 title: 'No reports',
@@ -122,8 +127,7 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
                 icon: Icons.assignment_outlined,
               );
             }
-
-            final filtered = _applyFilter(all, _query);
+            final filtered = _applyFilter(_allReports, _query);
 
             final totalPages = (filtered.length / _rowsPerPage).ceil().clamp(
               1,
@@ -456,14 +460,25 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
     return _HoverableRow(
       height: 100,
       background: bg,
-      onTap: () => setState(() => _selectedIndex = index),
+      onTap: () async {
+        setState(() => _selectedIndex = index);
+
+        final updated = await EditReportDialog.show(context, model: e);
+
+        if (updated == null) return;
+        if (!mounted) return;
+
+        setState(() {
+          final idx = _allReports.indexWhere((x) => x.id == updated.id);
+          if (idx != -1) _allReports[idx] = updated;
+        });
+      },
+
       child: Row(
         children: [
           // === GIỮ NGUYÊN TẤT CẢ CỘT ===
           _cell(e.stt.toString(), _w('STT'), align: TextAlign.center),
-          // _cell(e.qr_key.toString(), _w('QR'), align: TextAlign.center),
           _qrCell(e.qr_key, _w('QR')),
-
           _cell(e.grp, _w('Group'), tooltip: true),
           _cell(e.plant, _w('Plant'), tooltip: true),
           _cell(e.division, _w('Division'), tooltip: true),
@@ -710,7 +725,7 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
         child: Text(
           risk,
           style: TextStyle(
-            fontSize: 14,
+            fontSize: 18,
             fontWeight: FontWeight.bold,
             color: color,
           ),

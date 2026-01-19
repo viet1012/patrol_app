@@ -16,9 +16,6 @@ class PatrolRiskSummarySfPage extends StatefulWidget {
 class _PatrolRiskSummarySfPageState extends State<PatrolRiskSummarySfPage> {
   late final PatrolApi api;
 
-  // demo params
-  String fromD = '2026-01-02';
-  String toD = '2026-01-15';
   String fac = 'Fac_2';
   String type = 'Patrol';
 
@@ -27,8 +24,8 @@ class _PatrolRiskSummarySfPageState extends State<PatrolRiskSummarySfPage> {
   late TextEditingController _fromCtrl;
   late TextEditingController _toCtrl;
 
-  DateTime _fromDate = DateTime(2026, 1, 2);
-  DateTime _toDate = DateTime(2026, 1, 15);
+  late DateTime _fromDate;
+  late DateTime _toDate;
 
   String _fmt(DateTime d) =>
       '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
@@ -47,11 +44,12 @@ class _PatrolRiskSummarySfPageState extends State<PatrolRiskSummarySfPage> {
       baseUrl: 'http://192.168.122.15:9299',
     );
 
+    final now = DateTime.now();
+    _toDate = DateTime(now.year, now.month, now.day);
+    _fromDate = DateTime(now.year, now.month, 1);
+
     _fromCtrl = TextEditingController(text: _fmt(_fromDate));
     _toCtrl = TextEditingController(text: _fmt(_toDate));
-
-    fromD = _fromCtrl.text;
-    toD = _toCtrl.text;
 
     future = _load();
   }
@@ -64,7 +62,12 @@ class _PatrolRiskSummarySfPageState extends State<PatrolRiskSummarySfPage> {
   }
 
   Future<List<RiskSummary>> _load() {
-    return api.fetchRiskSummary(fromD: fromD, toD: toD, fac: fac, type: type);
+    return api.fetchRiskSummary(
+      fromD: _fmt(_fromDate),
+      toD: _fmt(_toDate),
+      fac: fac,
+      type: type,
+    );
   }
 
   void _reload() {
@@ -99,7 +102,6 @@ class _PatrolRiskSummarySfPageState extends State<PatrolRiskSummarySfPage> {
     final t = DateTime(_toDate.year, _toDate.month, _toDate.day);
 
     if (f.isAfter(t)) {
-      // nếu bạn có CommonUI.showWarning thì dùng luôn
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('From date must be <= To date')),
       );
@@ -107,8 +109,8 @@ class _PatrolRiskSummarySfPageState extends State<PatrolRiskSummarySfPage> {
     }
 
     setState(() {
-      fromD = _fromCtrl.text;
-      toD = _toCtrl.text;
+      _fromCtrl.text = _fmt(_fromDate);
+      _toCtrl.text = _fmt(_toDate);
       future = _load();
     });
   }
