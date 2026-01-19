@@ -7,10 +7,22 @@ import '../login/login_page.dart';
 import '../qrCode/after_patrol.dart';
 import '../session/session_store.dart';
 import '../table/patrol_report_table.dart';
+import '../table/patrol_summary_chart_page.dart';
 
 final router = GoRouter(
   routes: [
     GoRoute(path: '/', builder: (context, state) => const LoginPage()),
+    GoRoute(
+      path: '/home/summary',
+      builder: (context, state) {
+        final group = state.uri.queryParameters['group'];
+
+        return PatrolReportTable(
+          patrolGroup: group, // có thể null
+        );
+      },
+    ),
+
     GoRoute(
       path: '/home',
       builder: (context, state) {

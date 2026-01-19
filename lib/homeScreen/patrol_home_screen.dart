@@ -1,4 +1,5 @@
 import 'dart:ui';
+import 'dart:html' as html;
 
 import 'package:chuphinh/table/patrol_report_table.dart';
 import 'package:chuphinh/widget/glass_action_button.dart';
@@ -800,21 +801,31 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
               },
             ),
             const SizedBox(height: 16),
-
             _patrolButton(
               number: '4)',
               title: 'Data Table',
               color: color,
               enabled: true,
               onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => PatrolReportTable(patrolGroup: group),
-                  ),
+                final url =
+                    '/home/summary?group=${Uri.encodeComponent(group.name)}';
+
+                html.window.open(
+                  url,
+                  '_blank', // 👈 tab mới
                 );
               },
             ),
+
+            // _patrolButton(
+            //   number: '4)',
+            //   title: 'Data Table',
+            //   color: color,
+            //   enabled: true,
+            //   onTap: () {
+            //     context.go('/home/summary?group=${group.name}');
+            //   },
+            // ),
           ],
         ),
       ),

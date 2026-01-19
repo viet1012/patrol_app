@@ -1,14 +1,16 @@
 import 'package:chuphinh/common/common_ui_helper.dart';
 import 'package:chuphinh/homeScreen/patrol_home_screen.dart';
 import 'package:chuphinh/table/patrol_images_dialog.dart';
+import 'package:chuphinh/table/patrol_summary_chart_page.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../api/api_config.dart';
 import '../api/patrol_report_api.dart';
 import '../model/patrol_report_model.dart';
 import '../widget/glass_action_button.dart';
 
 class PatrolReportTable extends StatefulWidget {
-  final PatrolGroup patrolGroup;
+  final String? patrolGroup;
   const PatrolReportTable({super.key, required this.patrolGroup});
 
   @override
@@ -39,12 +41,12 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
 
   final Map<String, LayerLink> _filterLinks = {};
 
+  bool _showSummary = true;
+
   @override
   void initState() {
     super.initState();
-    _futureReports = PatrolReportApi.fetchReports(
-      type: widget.patrolGroup.name,
-    );
+    _futureReports = PatrolReportApi.fetchReports(type: widget.patrolGroup);
 
     for (final c in _cols) {
       _filterLinks[c.label] = LayerLink();
@@ -66,9 +68,31 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
     super.dispose();
   }
 
+  Widget _buildSummaryToggle() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 6, 12, 0),
+      child: Row(
+        children: [
+          const Text('Summary', style: TextStyle(fontWeight: FontWeight.w700)),
+          const Spacer(),
+          TextButton.icon(
+            onPressed: () {
+              setState(() => _showSummary = !_showSummary);
+            },
+            icon: Icon(
+              _showSummary
+                  ? Icons.expand_less_rounded
+                  : Icons.expand_more_rounded,
+            ),
+            label: Text(_showSummary ? 'Hide' : 'Show'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final bg1 = Colors.grey.shade100;
     final bg = Color(0xFF0F2027);
 
     return Scaffold(
@@ -113,8 +137,25 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
 
             return Column(
               children: [
+                _buildSummaryToggle(),
+
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 250),
+                  switchInCurve: Curves.easeOut,
+                  switchOutCurve: Curves.easeIn,
+                  child: _showSummary
+                      ? const Padding(
+                          key: ValueKey('summary'),
+                          padding: EdgeInsets.only(bottom: 8),
+                          child: PatrolRiskSummarySfPage(),
+                        )
+                      : const SizedBox(key: ValueKey('summary_empty')),
+                ),
+
                 _buildTopBar(total: all.length, shown: filtered.length),
+
                 Expanded(child: _buildTable(context, pageItems)),
+
                 _buildPager(
                   totalItems: filtered.length,
                   totalPages: totalPages,
@@ -274,12 +315,12 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
   // ===================== TOP BAR =====================
   Widget _buildTopBar({required int total, required int shown}) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 12, 12, 6),
+      padding: const EdgeInsets.fromLTRB(12, 5, 12, 5),
       child: Row(
         children: [
           GlassActionButton(
             icon: Icons.arrow_back_rounded,
-            onTap: () => Navigator.pop(context, false),
+            onTap: () => context.go('/home'),
           ),
           Expanded(
             child: TextField(
