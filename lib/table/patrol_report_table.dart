@@ -322,10 +322,10 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
       padding: const EdgeInsets.fromLTRB(12, 5, 12, 5),
       child: Row(
         children: [
-          GlassActionButton(
-            icon: Icons.arrow_back_rounded,
-            onTap: () => context.go('/home'),
-          ),
+          // GlassActionButton(
+          //   icon: Icons.arrow_back_rounded,
+          //   onTap: () => context.go('/home'),
+          // ),
           Expanded(
             child: TextField(
               controller: _searchCtrl,

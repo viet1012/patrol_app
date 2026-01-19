@@ -43,6 +43,7 @@ class _EditReportDialogState extends State<EditReportDialog> {
   String? _selectedDivision; // fac
   String? _selectedArea;
   String? _selectedMachine;
+
   String? _riskFreq;
   String? _riskProb;
   String? _riskSev;
@@ -52,12 +53,21 @@ class _EditReportDialogState extends State<EditReportDialog> {
   bool _loadingMaster = false;
   String? _masterError;
 
+  bool _dirty = false;
+
+  void _markDirty() {
+    if (_dirty) return;
+    setState(() => _dirty = true);
+  }
+
   @override
   void initState() {
     super.initState();
 
     _commentCtrl.text = widget.report.comment;
     _counterCtrl.text = widget.report.countermeasure;
+    _commentCtrl.addListener(_markDirty);
+    _counterCtrl.addListener(_markDirty);
 
     _selectedGroup = widget.report.grp;
     _selectedDivision = widget.report.division;
@@ -334,7 +344,11 @@ class _EditReportDialogState extends State<EditReportDialog> {
                   label: "Group",
                   selectedValue: _selectedGroup,
                   items: groupList,
-                  onChanged: (v) => setState(() => _selectedGroup = v),
+                  onChanged: (v) {
+                    setState(() => _selectedGroup = v);
+                    _markDirty();
+                  },
+
                   isRequired: true,
                 ),
               ),
@@ -367,6 +381,7 @@ class _EditReportDialogState extends State<EditReportDialog> {
                             if (macs.length == 1) _selectedMachine = macs.first;
                           }
                         });
+                        _markDirty();
                       },
                       isRequired: true,
                     ),
@@ -402,6 +417,7 @@ class _EditReportDialogState extends State<EditReportDialog> {
                           );
                           if (macs.length == 1) _selectedMachine = macs.first;
                         });
+                        _markDirty();
                       },
                       isRequired: true,
                     ),
@@ -418,7 +434,10 @@ class _EditReportDialogState extends State<EditReportDialog> {
                       label: "Machine",
                       selectedValue: _selectedMachine,
                       items: machineList,
-                      onChanged: (v) => setState(() => _selectedMachine = v),
+                      onChanged: (v) {
+                        setState(() => _selectedMachine = v);
+                        _markDirty();
+                      },
                       isRequired: true,
                     ),
                   ),
@@ -429,68 +448,96 @@ class _EditReportDialogState extends State<EditReportDialog> {
 
           const SizedBox(height: 16),
 
-          CommonRiskDropdown(
-            labelKey: "label_freq",
-            valueKey: _riskFreq,
-            items: frequencyOptions, // List<RiskOption>
-            onChanged: (v) => setState(() => _riskFreq = v),
+          Row(
+            children: [
+              Expanded(
+                child: CommonRiskDropdown(
+                  labelKey: "label_freq",
+                  valueKey: _riskFreq,
+                  items: frequencyOptions, // List<RiskOption>
+                  onChanged: (v) {
+                    setState(() => _riskFreq = v);
+                    _markDirty();
+                  },
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: CommonRiskDropdown(
+                  labelKey: "label_prob",
+                  valueKey: _riskProb,
+                  items: probabilityOptions,
+                  onChanged: (v) {
+                    setState(() => _riskProb = v);
+                    _markDirty();
+                  },
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 12),
-          CommonRiskDropdown(
-            labelKey: "label_prob",
-            valueKey: _riskProb,
-            items: probabilityOptions,
-            onChanged: (v) => setState(() => _riskProb = v),
-          ),
-          const SizedBox(height: 12),
-          CommonRiskDropdown(
-            labelKey: "label_sev",
-            valueKey: _riskSev,
-            items: severityOptions,
-            onChanged: (v) => setState(() => _riskSev = v),
-          ),
-          const SizedBox(height: 12),
 
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.06),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.white.withOpacity(0.10)),
-            ),
-            child: Row(
-              children: [
-                Text(
-                  "label_risk".tr(context),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w600,
-                  ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: CommonRiskDropdown(
+                  labelKey: "label_sev",
+                  valueKey: _riskSev,
+                  items: severityOptions,
+                  onChanged: (v) {
+                    setState(() => _riskSev = v);
+                    _markDirty();
+                  },
                 ),
-                SizedBox(width: 8),
-                Container(
-                  width: 64,
-                  height: 64,
-                  alignment: Alignment.center,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.25),
-                    shape: BoxShape.circle, // 👈 QUAN TRỌNG
-                    border: Border.all(color: Colors.white.withOpacity(0.15)),
+                    color: Colors.white.withOpacity(0.06),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.white.withOpacity(0.10)),
                   ),
-                  child: Text(
-                    _riskScoreSymbol.isEmpty ? "-" : _riskScoreSymbol,
-                    style: TextStyle(
-                      color:
-                          (_riskScoreSymbol == "V" || _riskScoreSymbol == "IV")
-                          ? Colors.redAccent
-                          : Colors.white,
-                      fontWeight: FontWeight.w800,
-                      fontSize: 28,
-                    ),
+                  child: Row(
+                    children: [
+                      Text(
+                        "label_risk".tr(context),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      SizedBox(width: 8),
+                      Container(
+                        width: 50,
+                        height: 50,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.25),
+                          shape: BoxShape.circle, // 👈 QUAN TRỌNG
+                          border: Border.all(
+                            color: Colors.white.withOpacity(0.15),
+                          ),
+                        ),
+                        child: Text(
+                          _riskScoreSymbol.isEmpty ? "-" : _riskScoreSymbol,
+                          style: TextStyle(
+                            color:
+                                (_riskScoreSymbol == "V" ||
+                                    _riskScoreSymbol == "IV")
+                                ? Colors.redAccent
+                                : Colors.white,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 28,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ],
       ),
@@ -634,6 +681,8 @@ class _EditReportDialogState extends State<EditReportDialog> {
 
   @override
   void dispose() {
+    _commentCtrl.removeListener(_markDirty);
+    _counterCtrl.removeListener(_markDirty);
     _commentCtrl.dispose();
     _counterCtrl.dispose();
     super.dispose();
@@ -715,10 +764,20 @@ class _EditReportDialogState extends State<EditReportDialog> {
                         ],
                       ),
                     ),
-                    GlassActionButton(
-                      icon: Icons.save_rounded,
-                      onTap: _canSave ? _onSave : _showInvalidToast,
-                    ),
+                    if (_dirty)
+                      GlassActionButton(
+                        icon: Icons.save_rounded,
+                        onTap: _canSave ? _onSave : _showInvalidToast,
+                      )
+                    else
+                      Opacity(
+                        opacity: 0.3,
+                        child: GlassActionButton(
+                          icon: Icons.save_rounded,
+                          onTap:
+                              null, // hoặc () {} nếu widget bắt buộc non-null
+                        ),
+                      ),
                   ],
                 ),
               ),
