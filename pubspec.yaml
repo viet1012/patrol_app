@@ -60,6 +60,7 @@ dependencies:
   js: ^0.6.7
   qr_code_vision: ^0.1.2
   go_router: ^17.0.1
+  syncfusion_flutter_charts: ^32.1.23
 dev_dependencies:
   flutter_test:
     sdk: flutter

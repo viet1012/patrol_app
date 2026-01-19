@@ -16,13 +16,22 @@ class PatrolRiskSummarySfPage extends StatefulWidget {
 class _PatrolRiskSummarySfPageState extends State<PatrolRiskSummarySfPage> {
   late final PatrolApi api;
 
-  // demo params (bạn có thể thay bằng date picker/dropdown)
+  // demo params
   String fromD = '2026-01-02';
   String toD = '2026-01-15';
   String fac = 'Fac_2';
   String type = 'Patrol';
 
   late Future<List<RiskSummary>> future;
+
+  late TextEditingController _fromCtrl;
+  late TextEditingController _toCtrl;
+
+  DateTime _fromDate = DateTime(2026, 1, 2);
+  DateTime _toDate = DateTime(2026, 1, 15);
+
+  String _fmt(DateTime d) =>
+      '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
   @override
   void initState() {
@@ -38,7 +47,20 @@ class _PatrolRiskSummarySfPageState extends State<PatrolRiskSummarySfPage> {
       baseUrl: 'http://192.168.122.15:9299',
     );
 
+    _fromCtrl = TextEditingController(text: _fmt(_fromDate));
+    _toCtrl = TextEditingController(text: _fmt(_toDate));
+
+    fromD = _fromCtrl.text;
+    toD = _toCtrl.text;
+
     future = _load();
+  }
+
+  @override
+  void dispose() {
+    _fromCtrl.dispose();
+    _toCtrl.dispose();
+    super.dispose();
   }
 
   Future<List<RiskSummary>> _load() {
@@ -49,82 +71,139 @@ class _PatrolRiskSummarySfPageState extends State<PatrolRiskSummarySfPage> {
     setState(() => future = _load());
   }
 
+  Future<void> _pickDate({required bool isFrom}) async {
+    final initial = isFrom ? _fromDate : _toDate;
+
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime(2020, 1, 1),
+      lastDate: DateTime(2100, 12, 31),
+    );
+
+    if (picked == null) return;
+
+    setState(() {
+      if (isFrom) {
+        _fromDate = picked;
+        _fromCtrl.text = _fmt(picked);
+      } else {
+        _toDate = picked;
+        _toCtrl.text = _fmt(picked);
+      }
+    });
+  }
+
+  void _applyFilter() {
+    final f = DateTime(_fromDate.year, _fromDate.month, _fromDate.day);
+    final t = DateTime(_toDate.year, _toDate.month, _toDate.day);
+
+    if (f.isAfter(t)) {
+      // nếu bạn có CommonUI.showWarning thì dùng luôn
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('From date must be <= To date')),
+      );
+      return;
+    }
+
+    setState(() {
+      fromD = _fromCtrl.text;
+      toD = _toCtrl.text;
+      future = _load();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF7F8FA),
-      appBar: AppBar(
-        title: const Text('Risk Summary'),
-        actions: [
-          IconButton(onPressed: _reload, icon: const Icon(Icons.refresh)),
-        ],
-      ),
-      body: FutureBuilder<List<RiskSummary>>(
-        future: future,
-        builder: (context, snap) {
-          if (snap.connectionState != ConnectionState.done) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snap.hasError) {
-            return _ErrorView(message: snap.error.toString(), onRetry: _reload);
-          }
+    return FutureBuilder<List<RiskSummary>>(
+      future: future,
+      builder: (context, snap) {
+        if (snap.connectionState != ConnectionState.done) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snap.hasError) {
+          return _ErrorView(message: snap.error.toString(), onRetry: _reload);
+        }
 
-          final items = snap.data ?? const <RiskSummary>[];
-          if (items.isEmpty) {
-            return _EmptyView(onRetry: _reload);
-          }
+        final items = snap.data ?? const <RiskSummary>[];
+        if (items.isEmpty) {
+          return _EmptyView(onRetry: _reload);
+        }
 
-          return Padding(
-            padding: const EdgeInsets.all(12),
-            child: Card(
-              elevation: 1.5,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    GlassActionButton(
-                      icon: Icons.arrow_back_rounded,
-                      onTap: () => Navigator.pop(context, false),
-                    ),
-                    // header nhỏ gọn
-                    Row(
-                      children: [
-                        const Icon(Icons.stacked_bar_chart_rounded, size: 18),
-                        const SizedBox(width: 8),
-                        const Text(
-                          'Patrol Summary',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w800,
+        return Padding(
+          padding: const EdgeInsets.all(12),
+          child: Card(
+            elevation: 1.5,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // header nhỏ gọn
+                  Row(
+                    children: [
+                      const Icon(Icons.stacked_bar_chart_rounded, size: 18),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'Patrol Summary',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const Spacer(),
+
+                      // From
+                      _DateField(
+                        ctrl: _fromCtrl,
+                        label: 'From',
+                        onTap: () => _pickDate(isFrom: true),
+                      ),
+                      const SizedBox(width: 8),
+
+                      // To
+                      _DateField(
+                        ctrl: _toCtrl,
+                        label: 'To',
+                        onTap: () => _pickDate(isFrom: false),
+                      ),
+                      const SizedBox(width: 8),
+
+                      ElevatedButton.icon(
+                        onPressed: _applyFilter,
+                        icon: const Icon(Icons.check, size: 18),
+                        label: const Text('Apply'),
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 10,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
                           ),
                         ),
-                        const Spacer(),
-                        _MiniChip('$fromD → $toD'),
-                        const SizedBox(width: 8),
-                        _MiniChip(fac),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    SizedBox(
-                      height: items.length * 20 + 80,
-                      child: _RiskStackedBarChart(
-                        key: ValueKey(
-                          'sf_chart_${items.length}_${items.hashCode}',
-                        ),
-                        items: items,
                       ),
+                    ],
+                  ),
+
+                  SizedBox(
+                    height: items.length * 20 + 80,
+                    child: _RiskStackedBarChart(
+                      key: ValueKey(
+                        'sf_chart_${items.length}_${items.hashCode}',
+                      ),
+                      items: items,
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
-          );
-        },
-      ),
+          ),
+        );
+      },
     );
   }
 }
@@ -293,6 +372,42 @@ class _ErrorView extends StatelessWidget {
               label: const Text('Retry'),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DateField extends StatelessWidget {
+  final TextEditingController ctrl;
+  final String label;
+  final VoidCallback onTap;
+
+  const _DateField({
+    required this.ctrl,
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 130,
+      height: 38,
+      child: TextField(
+        controller: ctrl,
+        readOnly: true,
+        onTap: onTap,
+        style: const TextStyle(fontSize: 12),
+        decoration: InputDecoration(
+          labelText: label,
+          isDense: true,
+          suffixIcon: const Icon(Icons.calendar_month, size: 18),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 10,
+            vertical: 8,
+          ),
         ),
       ),
     );
