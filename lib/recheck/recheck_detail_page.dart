@@ -526,7 +526,9 @@ class _RecheckDetailPageState extends State<RecheckDetailPage> {
                   icon: Icons.groups_rounded,
                   label: "PIC:",
                   color: Colors.white70,
-                  value: widget.report.atPic!,
+                  value: (widget.report.atPic?.trim().isNotEmpty ?? false)
+                      ? widget.report.atPic!.trim()
+                      : '-',
                 ),
             ],
           ),
@@ -537,7 +539,9 @@ class _RecheckDetailPageState extends State<RecheckDetailPage> {
             Center(
               child: _buildSectionCard(
                 title: 'Comment',
-                content: widget.report.atComment!,
+                content: (widget.report.atComment?.trim().isNotEmpty ?? false)
+                    ? widget.report.atComment!.trim()
+                    : '-',
                 icon: Icons.comment_rounded,
                 accentColor: Colors.amber.shade600,
               ),
@@ -739,91 +743,38 @@ class _RecheckDetailPageState extends State<RecheckDetailPage> {
             ),
 
             /// ===== COMMENT =====
-            if (_cameraKey.currentState != null &&
-                _cameraKey.currentState!.images.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              TextField(
-                controller: _commentCtrl,
-                maxLines: 3,
-                decoration: InputDecoration(
-                  labelText: 'Comment',
-                  labelStyle: const TextStyle(color: Colors.white70),
-                  enabledBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: Colors.white54),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: Colors.blueAccent.shade200),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  filled: true,
-                  fillColor: Colors.white.withOpacity(0.12),
+            // if (_cameraKey.currentState != null &&
+            //     _cameraKey.currentState!.images.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            TextField(
+              controller: _commentCtrl,
+              maxLines: 3,
+              decoration: InputDecoration(
+                labelText: 'Comment',
+                labelStyle: const TextStyle(color: Colors.white70),
+                enabledBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: Colors.white54),
+                  borderRadius: BorderRadius.circular(8),
                 ),
-                style: const TextStyle(color: Colors.white),
-                onChanged: (value) {
-                  setState(
-                    () {},
-                  ); // Bắt buộc gọi setState để UI rebuild và nút lưu hiện/ẩn đúng
-                },
+                focusedBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: Colors.blueAccent.shade200),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                filled: true,
+                fillColor: Colors.white.withOpacity(0.12),
               ),
-              const SizedBox(height: 8),
+              style: const TextStyle(color: Colors.white),
+              onChanged: (value) {
+                setState(
+                  () {},
+                ); // Bắt buộc gọi setState để UI rebuild và nút lưu hiện/ẩn đúng
+              },
+            ),
+            const SizedBox(height: 8),
 
-              _buildHseJudgeButtons(),
-            ],
+            _buildHseJudgeButtons(),
 
-            const SizedBox(height: 20),
-
-            /// ===== SAVE =====
-            // if (_commentCtrl.text.trim().isNotEmpty)
-            //   SizedBox(
-            //     width: 60,
-            //     height: 60,
-            //     child: GlassActionButton(
-            //       onTap:
-            //           (_cameraKey.currentState != null &&
-            //               _cameraKey.currentState!.images.isNotEmpty &&
-            //               _msnvCtrl.text.trim().isNotEmpty)
-            //           ? () async {
-            //               try {
-            //                 showLoading(context);
-            //
-            //                 await updateHseReport(
-            //                   hseJudge: _hseJudge!,
-            //                   reportId: widget.report.id!,
-            //                   hseUser:
-            //                       '${_msnvCtrl.text.trim()}_$_employeeName',
-            //                   comment: _commentCtrl.text.trim(),
-            //                   images: _cameraKey.currentState!.images,
-            //                 );
-            //                 hideLoading(context);
-            //
-            //                 /// RESET UI → cho phép chụp lại tiếp
-            //                 setState(() {
-            //                   _commentCtrl.clear();
-            //                   _enableCamera = false;
-            //                 });
-            //                 _cameraKey.currentState?.clearAll(); // xóa hết ảnh
-            //
-            //                 /// FORCE reload camera
-            //                 await Future.delayed(
-            //                   const Duration(milliseconds: 200),
-            //                 );
-            //                 setState(() => _enableCamera = true);
-            //
-            //                 _showSnackBar(
-            //                   'Update Recheck successful!',
-            //                   Colors.green,
-            //                 );
-            //               } catch (e) {
-            //                 debugPrint('Update AT error: $e');
-            //                 _showSnackBar('Server error: $e', Colors.red);
-            //               }
-            //             }
-            //           : null,
-            //       icon: Icons.save,
-            //       backgroundColor: Color(0xFF2665B6),
-            //     ),
-            //   ),
+            // ],
           ],
         ),
       ),
@@ -1050,21 +1001,21 @@ class _RecheckDetailPageState extends State<RecheckDetailPage> {
   }
 
   Future<void> _submitHseJudge(String value) async {
-    if (_cameraKey.currentState == null ||
-        _cameraKey.currentState!.images.isEmpty) {
-      _showSnackBar('Please take at least one photo', Colors.orange);
-      return;
-    }
-
-    if (_commentCtrl.text.trim().isEmpty) {
-      _showSnackBar('Please enter comment', Colors.orange);
-      return;
-    }
-
-    if (_msnvCtrl.text.trim().isEmpty) {
-      _showSnackBar('Please enter MSNV', Colors.orange);
-      return;
-    }
+    // if (_cameraKey.currentState == null ||
+    //     _cameraKey.currentState!.images.isEmpty) {
+    //   _showSnackBar('Please take at least one photo', Colors.orange);
+    //   return;
+    // }
+    //
+    // if (_commentCtrl.text.trim().isEmpty) {
+    //   _showSnackBar('Please enter comment', Colors.orange);
+    //   return;
+    // }
+    //
+    // if (_msnvCtrl.text.trim().isEmpty) {
+    //   _showSnackBar('Please enter MSNV', Colors.orange);
+    //   return;
+    // }
 
     try {
       setState(() => _hseJudge = value);
