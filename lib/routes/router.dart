@@ -11,9 +11,10 @@ import '../table/patrol_summary_chart_page.dart';
 
 final router = GoRouter(
   routes: [
-    GoRoute(path: '/', builder: (context, state) => const LoginPage()),
+    // GoRoute(path: '/', builder: (context, state) => const LoginPage()),
     GoRoute(
-      path: '/home/summary',
+      // path: '/home/summary',
+      path: '/',
       builder: (context, state) {
         final group = state.uri.queryParameters['group'];
 

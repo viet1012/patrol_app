@@ -8,6 +8,7 @@ import '../api/api_config.dart';
 import '../api/patrol_report_api.dart';
 import '../model/patrol_report_model.dart';
 import '../widget/glass_action_button.dart';
+import 'edit_report_dialog.dart';
 
 class PatrolReportTable extends StatefulWidget {
   final String? patrolGroup;
@@ -35,6 +36,7 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
   //filter
   final Map<String, Set<String>> _filterValues = {};
   String _filterSearch = '';
+  final ScrollController _filterCtrl = ScrollController();
 
   final OverlayPortalController _overlayCtrl = OverlayPortalController();
   String? _activeFilterKey;
@@ -57,6 +59,10 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
         _query = _searchCtrl.text.trim().toLowerCase();
         _page = 0;
       });
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_vCtrl.hasClients) _vCtrl.jumpTo(0);
+      });
     });
   }
 
@@ -64,6 +70,7 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
   void dispose() {
     _hCtrl.dispose();
     _vCtrl.dispose();
+    _filterCtrl.dispose();
     _searchCtrl.dispose();
     super.dispose();
   }
@@ -112,9 +119,13 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
             }
 
             final all = snapshot.data ?? [];
-            _allReports = all; // ✅ lưu lại
 
-            if (all.isEmpty) {
+            // Chỉ gán 1 lần khi data load xong
+            if (_allReports.isEmpty) {
+              _allReports = List.from(all); // copy list cho an toàn
+            }
+
+            if (_allReports.isEmpty) {
               return CommonUI.emptyState(
                 context: context,
                 title: 'No reports',
@@ -122,8 +133,7 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
                 icon: Icons.assignment_outlined,
               );
             }
-
-            final filtered = _applyFilter(all, _query);
+            final filtered = _applyFilter(_allReports, _query);
 
             final totalPages = (filtered.length / _rowsPerPage).ceil().clamp(
               1,
@@ -301,7 +311,7 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
 
         if (allowed.isEmpty) continue;
 
-        final cellValue = _getCellValue(e, col);
+        final cellValue = _getCellValue(e, col).trim();
 
         if (!allowed.contains(cellValue)) {
           return false;
@@ -318,10 +328,10 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
       padding: const EdgeInsets.fromLTRB(12, 5, 12, 5),
       child: Row(
         children: [
-          GlassActionButton(
-            icon: Icons.arrow_back_rounded,
-            onTap: () => context.go('/home'),
-          ),
+          // GlassActionButton(
+          //   icon: Icons.arrow_back_rounded,
+          //   onTap: () => context.go('/home'),
+          // ),
           Expanded(
             child: TextField(
               controller: _searchCtrl,
@@ -379,13 +389,18 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
                 _buildHeader(),
                 const Divider(height: 1, thickness: 1),
                 Expanded(
-                  child: Scrollbar(
+                  child: PrimaryScrollController(
                     controller: _vCtrl,
-                    thumbVisibility: true,
-                    child: ListView.builder(
+                    child: Scrollbar(
                       controller: _vCtrl,
-                      itemCount: reports.length,
-                      itemBuilder: (_, i) => _buildRow(reports[i], i),
+                      thumbVisibility: true,
+                      child: ListView.builder(
+                        controller: _vCtrl,
+                        primary:
+                            false, // ✅ tránh dùng Primary mặc định ngoài ý muốn
+                        itemCount: reports.length,
+                        itemBuilder: (_, i) => _buildRow(reports[i], i),
+                      ),
                     ),
                   ),
                 ),
@@ -439,6 +454,12 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
                   _activeFilterKey = c.label;
                   _filterSearch = '';
                 });
+
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (_filterCtrl.hasClients)
+                    _filterCtrl.jumpTo(0); // ✅ reset popup list
+                });
+
                 _overlayCtrl.show();
               },
             );
@@ -456,14 +477,25 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
     return _HoverableRow(
       height: 100,
       background: bg,
-      onTap: () => setState(() => _selectedIndex = index),
+      onTap: () async {
+        setState(() => _selectedIndex = index);
+
+        final updated = await EditReportDialog.show(context, model: e);
+
+        if (updated == null) return;
+        if (!mounted) return;
+
+        setState(() {
+          final idx = _allReports.indexWhere((x) => x.id == updated.id);
+          if (idx != -1) _allReports[idx] = updated;
+        });
+      },
+
       child: Row(
         children: [
           // === GIỮ NGUYÊN TẤT CẢ CỘT ===
           _cell(e.stt.toString(), _w('STT'), align: TextAlign.center),
-          // _cell(e.qr_key.toString(), _w('QR'), align: TextAlign.center),
           _qrCell(e.qr_key, _w('QR')),
-
           _cell(e.grp, _w('Group'), tooltip: true),
           _cell(e.plant, _w('Plant'), tooltip: true),
           _cell(e.division, _w('Division'), tooltip: true),
@@ -710,7 +742,7 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
         child: Text(
           risk,
           style: TextStyle(
-            fontSize: 14,
+            fontSize: 18,
             fontWeight: FontWeight.bold,
             color: color,
           ),
@@ -762,6 +794,12 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
   }
 
   // ---- helpers ----
+
+  Widget _vScrollbar({required Widget child}) {
+    if (!_vCtrl.hasClients) return child; // ✅ chưa attach thì đừng vẽ scrollbar
+    return Scrollbar(controller: _vCtrl, thumbVisibility: true, child: child);
+  }
+
   Widget _buildFilterPopup(List<PatrolReportModel> all) {
     if (_activeFilterKey == null) return const SizedBox();
 
@@ -872,8 +910,11 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
                         ),
                       )
                     : Scrollbar(
+                        controller: _filterCtrl,
                         thumbVisibility: true,
                         child: ListView.builder(
+                          controller: _filterCtrl, // ✅ gắn controller
+                          primary: false, // ✅ không dùng Primary
                           padding: EdgeInsets.zero,
                           itemCount: shown.length,
                           itemBuilder: (_, i) {
@@ -888,8 +929,16 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
                                     () => <String>{},
                                   );
                                   checked ? s.remove(v) : s.add(v);
+                                  _page = 0; // ✅ reset page luôn
+                                });
+
+                                WidgetsBinding.instance.addPostFrameCallback((
+                                  _,
+                                ) {
+                                  if (_vCtrl.hasClients) _vCtrl.jumpTo(0);
                                 });
                               },
+
                               child: Container(
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: 12,
@@ -906,8 +955,16 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
                                             () => <String>{},
                                           );
                                           ok == true ? s.add(v) : s.remove(v);
+                                          _page = 0; // ✅ reset page
                                         });
+
+                                        WidgetsBinding.instance
+                                            .addPostFrameCallback((_) {
+                                              if (_vCtrl.hasClients)
+                                                _vCtrl.jumpTo(0);
+                                            });
                                       },
+
                                       checkColor: Colors.white, // màu dấu ✓
                                       side: const BorderSide(
                                         color: Colors.white54,
@@ -952,6 +1009,11 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
                       onTap: () {
                         setState(() {
                           _filterValues.remove(_activeFilterKey);
+                          _page = 0; // ✅ reset page
+                        });
+
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          if (_vCtrl.hasClients) _vCtrl.jumpTo(0);
                         });
                       },
                     ),

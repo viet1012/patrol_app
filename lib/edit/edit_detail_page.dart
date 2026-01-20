@@ -6,8 +6,11 @@ import 'package:auto_size_text/auto_size_text.dart';
 import 'package:dropdown_search/dropdown_search.dart';
 import 'package:flutter/material.dart';
 import '../api/replace_image_api.dart';
+import '../common/common_risk_dropdown.dart';
 import '../common/common_ui_helper.dart';
 import '../model/machine_model.dart';
+import '../model/reason_model.dart';
+import '../model/risk_score_calculator.dart';
 import '../translator.dart';
 import 'edit_image_item.dart';
 import '../homeScreen/patrol_home_screen.dart';
@@ -42,6 +45,10 @@ class _EditDetailPageState extends State<EditDetailPage> {
   String? _selectedArea;
   String? _selectedMachine;
 
+  String? _riskFreq;
+  String? _riskProb;
+  String? _riskSev;
+
   @override
   void initState() {
     super.initState();
@@ -52,10 +59,61 @@ class _EditDetailPageState extends State<EditDetailPage> {
     _selectedDivision = widget.report.division; // nếu division == fac
     _selectedArea = widget.report.area;
 
+    _riskFreq = widget.report.riskFreq;
+    _riskProb = widget.report.riskProb;
+    _riskSev = widget.report.riskSev;
+
     final m = widget.report.machine.trim();
     _selectedMachine = (m == "<Null>" || m.isEmpty) ? null : m;
 
     _autoFixInvalidSelections();
+  }
+
+  String? _ensureRiskKey(
+    String? raw,
+    List<RiskOption> options,
+    BuildContext ctx,
+  ) {
+    if (raw == null) return null;
+
+    // Normalize: tách theo newline, trim, bỏ rỗng
+    final parts = raw
+        .split(RegExp(r'[\r\n]+'))
+        .map((s) => s.trim())
+        .where((s) => s.isNotEmpty)
+        .toList();
+
+    // Nếu chỉ có 1 dòng thì vẫn hoạt động như cũ
+    // 1) raw/parts đã là key
+    for (final p in parts) {
+      final byKey = options.where((e) => e.labelKey == p);
+      if (byKey.length == 1) return p;
+    }
+
+    // 2) raw/parts là text đã dịch -> map ngược về key
+    for (final p in parts) {
+      final byText = options.where((e) => e.labelKey.tr(ctx) == p);
+      if (byText.length == 1) return byText.first.labelKey;
+    }
+
+    return null;
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    _riskFreq = _ensureRiskKey(
+      widget.report.riskFreq,
+      frequencyOptions,
+      context,
+    );
+    _riskProb = _ensureRiskKey(
+      widget.report.riskProb,
+      probabilityOptions,
+      context,
+    );
+    _riskSev = _ensureRiskKey(widget.report.riskSev, severityOptions, context);
   }
 
   List<String> get groupList => List.generate(10, (i) => 'Group ${i + 1}');
@@ -117,6 +175,15 @@ class _EditDetailPageState extends State<EditDetailPage> {
       _selectedMachine = machineList.isNotEmpty ? machineList.first : null;
     }
   }
+
+  String get _riskScoreSymbol => RiskScoreCalculator.scoreSymbol(
+    freqKey: _riskFreq,
+    probKey: _riskProb,
+    sevKey: _riskSev,
+    frequencyOptions: frequencyOptions,
+    probabilityOptions: probabilityOptions,
+    severityOptions: severityOptions,
+  );
 
   Widget _buildEditableMeta() {
     final plant = widget.report.plant;
@@ -220,6 +287,90 @@ class _EditDetailPageState extends State<EditDetailPage> {
               ),
             ],
           ),
+          const SizedBox(height: 16),
+
+          Row(
+            children: [
+              Expanded(
+                child: CommonRiskDropdown(
+                  labelKey: "label_freq",
+                  valueKey: _riskFreq,
+                  items: frequencyOptions, // List<RiskOption>
+                  onChanged: (v) => setState(() => _riskFreq = v),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: CommonRiskDropdown(
+                  labelKey: "label_prob",
+                  valueKey: _riskProb,
+                  items: probabilityOptions,
+                  onChanged: (v) => setState(() => _riskProb = v),
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: CommonRiskDropdown(
+                  labelKey: "label_sev",
+                  valueKey: _riskSev,
+                  items: severityOptions,
+                  onChanged: (v) => setState(() => _riskSev = v),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.06),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.white.withOpacity(0.10)),
+                  ),
+                  child: Row(
+                    children: [
+                      Text(
+                        "label_risk".tr(context),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      SizedBox(width: 8),
+                      Container(
+                        width: 50,
+                        height: 50,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.25),
+                          shape: BoxShape.circle, // 👈 QUAN TRỌNG
+                          border: Border.all(
+                            color: Colors.white.withOpacity(0.15),
+                          ),
+                        ),
+                        child: Text(
+                          _riskScoreSymbol.isEmpty ? "-" : _riskScoreSymbol,
+                          style: TextStyle(
+                            color:
+                                (_riskScoreSymbol == "V" ||
+                                    _riskScoreSymbol == "IV")
+                                ? Colors.redAccent
+                                : Colors.white,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 28,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
@@ -312,30 +463,6 @@ class _EditDetailPageState extends State<EditDetailPage> {
     );
   }
 
-  Widget _infoItem(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: RichText(
-        text: TextSpan(
-          style: Theme.of(context).textTheme.bodyMedium,
-          children: [
-            TextSpan(
-              text: '$label: ',
-              style: const TextStyle(
-                fontWeight: FontWeight.w600,
-                color: Colors.white,
-              ),
-            ),
-            TextSpan(
-              text: value,
-              style: TextStyle(color: Colors.white.withOpacity(0.85)),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Future<void> _onSave() async {
     try {
       // ⏳ Có thể show loading nếu muốn
@@ -343,17 +470,27 @@ class _EditDetailPageState extends State<EditDetailPage> {
       //   context: context,
       //   message: 'Saving...',
       // );
+      final freqKey = _riskFreq ?? '';
+      final probKey = _riskProb ?? '';
+      final sevKey = _riskSev ?? '';
 
+      // ✅ text song ngữ VN + JP (dùng extension của bạn)
+      final freqBi = ''.combinedViJa(context, freqKey);
+      final probBi = ''.combinedViJa(context, probKey);
+      final sevBi = ''.combinedViJa(context, sevKey);
       await updateReportApi(
         id: widget.report.id!,
         comment: _commentCtrl.text.trim(),
         countermeasure: _counterCtrl.text.trim(),
-
         grp: _selectedGroup,
         plant: widget.report.plant,
         division: _selectedDivision,
         area: _selectedArea,
         machine: _selectedMachine,
+        riskFreq: freqBi,
+        riskProb: probBi,
+        riskSev: sevBi,
+        riskTotal: _riskScoreSymbol,
       );
 
       if (!mounted) return;
