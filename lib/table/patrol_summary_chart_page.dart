@@ -71,7 +71,9 @@ class _PatrolRiskSummarySfPageState extends State<PatrolRiskSummarySfPage> {
   }
 
   void _reload() {
-    setState(() => future = _load());
+    setState(() {
+      future = _load(); // ✅
+    });
   }
 
   Future<void> _pickDate({required bool isFrom}) async {
@@ -86,14 +88,32 @@ class _PatrolRiskSummarySfPageState extends State<PatrolRiskSummarySfPage> {
 
     if (picked == null) return;
 
+    // update date
+    DateTime newFrom = _fromDate;
+    DateTime newTo = _toDate;
+
+    if (isFrom) {
+      newFrom = DateTime(picked.year, picked.month, picked.day);
+    } else {
+      newTo = DateTime(picked.year, picked.month, picked.day);
+    }
+
+    // validate
+    if (newFrom.isAfter(newTo)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('From date must be <= To date')),
+      );
+      return;
+    }
+
     setState(() {
-      if (isFrom) {
-        _fromDate = picked;
-        _fromCtrl.text = _fmt(picked);
-      } else {
-        _toDate = picked;
-        _toCtrl.text = _fmt(picked);
-      }
+      _fromDate = newFrom;
+      _toDate = newTo;
+      _fromCtrl.text = _fmt(_fromDate);
+      _toCtrl.text = _fmt(_toDate);
+
+      // ✅ gọi API ngay
+      future = _load();
     });
   }
 
@@ -171,22 +191,6 @@ class _PatrolRiskSummarySfPageState extends State<PatrolRiskSummarySfPage> {
                         ctrl: _toCtrl,
                         label: 'To',
                         onTap: () => _pickDate(isFrom: false),
-                      ),
-                      const SizedBox(width: 8),
-
-                      ElevatedButton.icon(
-                        onPressed: _applyFilter,
-                        icon: const Icon(Icons.check, size: 18),
-                        label: const Text('Apply'),
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 10,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
                       ),
                     ],
                   ),
@@ -296,27 +300,6 @@ class _RiskStackedBarChart extends StatelessWidget {
 
 // ====== UI helpers nhỏ gọn ======
 
-class _MiniChip extends StatelessWidget {
-  final String text;
-  const _MiniChip(this.text);
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Colors.black12),
-      ),
-      child: Text(
-        text,
-        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
-      ),
-    );
-  }
-}
-
 class _EmptyView extends StatelessWidget {
   final VoidCallback onRetry;
   const _EmptyView({required this.onRetry});
@@ -329,7 +312,10 @@ class _EmptyView extends StatelessWidget {
         children: [
           const Icon(Icons.inbox_rounded, size: 46, color: Colors.grey),
           const SizedBox(height: 10),
-          const Text('No data', style: TextStyle(fontWeight: FontWeight.w700)),
+          const Text(
+            'No data',
+            style: TextStyle(fontWeight: FontWeight.w700, color: Colors.white),
+          ),
           const SizedBox(height: 10),
           ElevatedButton.icon(
             onPressed: onRetry,
