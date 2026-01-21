@@ -7,6 +7,88 @@ import '../widget/glass_action_button.dart';
 class CommonUI {
   CommonUI._(); // ❌ không cho new
 
+  static Widget exportLoadingBanner({
+    String title = 'Exporting Excel',
+    String subtitle = 'Large dataset detected, please wait…',
+    EdgeInsets padding = const EdgeInsets.symmetric(
+      horizontal: 12,
+      vertical: 8,
+    ),
+    EdgeInsets contentPadding = const EdgeInsets.symmetric(
+      horizontal: 16,
+      vertical: 14,
+    ),
+    Color accentColor = Colors.amber,
+  }) {
+    return Padding(
+      padding: padding,
+      child: Container(
+        padding: contentPadding,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              Colors.white.withOpacity(0.08),
+              Colors.white.withOpacity(0.03),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: Colors.white.withOpacity(0.12)),
+        ),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 22,
+              height: 22,
+              child: CircularProgressIndicator(
+                strokeWidth: 2.8,
+                valueColor: AlwaysStoppedAnimation<Color>(accentColor),
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: Colors.white70, fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  static OverlayEntry? _overlay;
+
+  static void showLoading(BuildContext context) {
+    if (_overlay != null) return;
+
+    _overlay = OverlayEntry(builder: (_) => const GlobalLoading());
+
+    Overlay.of(context, rootOverlay: true).insert(_overlay!);
+  }
+
+  static void hideLoading() {
+    _overlay?.remove();
+    _overlay = null;
+  }
+
   static String fmtDate(DateTime? d) {
     if (d == null) return '-';
     return '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
@@ -502,6 +584,32 @@ class CommonUI {
     );
   }
 
+  static void showSuccessSnack(
+    BuildContext context, {
+    required String message,
+    Duration duration = const Duration(seconds: 3),
+  }) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.check_circle, color: Colors.white),
+              const SizedBox(width: 10),
+              Expanded(child: Text(message)),
+            ],
+          ),
+          backgroundColor: Colors.green.shade600,
+          duration: duration,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+      );
+  }
+
   static Widget warningPage({
     required BuildContext context,
     required String message,
@@ -515,6 +623,20 @@ class CommonUI {
       iconColor: Colors.orangeAccent,
       backgroundColor: const Color(0xFF121826),
       buttonText: 'Go Back',
+    );
+  }
+}
+
+class GlobalLoading extends StatelessWidget {
+  const GlobalLoading({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: Colors.black45,
+      child: const Center(
+        child: CircularProgressIndicator(color: Colors.white),
+      ),
     );
   }
 }

@@ -2,13 +2,19 @@ import 'package:chuphinh/common/common_ui_helper.dart';
 import 'package:chuphinh/homeScreen/patrol_home_screen.dart';
 import 'package:chuphinh/table/patrol_images_dialog.dart';
 import 'package:chuphinh/table/patrol_summary_chart_page.dart';
+import 'package:dio/dio.dart';
+import 'package:file_saver/file_saver.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../api/api_config.dart';
 import '../api/patrol_report_api.dart';
+import '../api/patrol_report_download_api.dart';
+import '../model/patrol_export_query.dart';
 import '../model/patrol_report_model.dart';
 import '../widget/glass_action_button.dart';
 import 'edit_report_dialog.dart';
+import 'package:excel/excel.dart' as ex;
+import 'dart:typed_data';
 
 class PatrolReportTable extends StatefulWidget {
   final String? patrolGroup;
@@ -26,6 +32,39 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
 
   // UI state
   List<PatrolReportModel> _allReports = [];
+  // UI column label -> backend query key
+  static const Map<String, String> _uiColToQueryKey = {
+    'Plant': 'plant',
+    'Division': 'division',
+    'Area': 'area',
+    'Machine': 'machine',
+    'Group': 'grp',
+    'PIC': 'pic',
+    'Patrol User': 'patrolUser',
+    'QR': 'qrKey',
+    'AT Stt': 'afStatus',
+  };
+
+  PatrolExportQuery _buildExportQueryFromUi() {
+    // lấy params từ filterValues
+    final Map<String, String> params = {};
+
+    _filterValues.forEach((uiCol, values) {
+      if (values.isEmpty) return;
+      final key = _uiColToQueryKey[uiCol];
+      if (key == null) return;
+
+      // nếu user chọn nhiều -> join bằng dấu phẩy
+      params[key] = values.join(',');
+    });
+
+    // luôn kèm type từ screen (patrolGroup)
+    if (widget.patrolGroup != null && widget.patrolGroup!.trim().isNotEmpty) {
+      params['type'] = widget.patrolGroup!.trim();
+    }
+
+    return PatrolExportQuery.fromMap(params);
+  }
 
   final TextEditingController _searchCtrl = TextEditingController();
   String _query = '';
@@ -163,6 +202,12 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
                 ),
 
                 _buildTopBar(total: all.length, shown: filtered.length),
+                if (_downloading)
+                  CommonUI.exportLoadingBanner(
+                    accentColor: Colors.amber,
+                    title: 'Exporting Excel',
+                    subtitle: 'Large dataset detected, please wait…',
+                  ),
 
                 Expanded(child: _buildTable(context, pageItems)),
 
@@ -176,6 +221,47 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
         ),
       ),
     );
+  }
+
+  // ===================== EXCEL =====================
+  bool _downloading = false;
+
+  Future<void> _downloadExcel() async {
+    if (_downloading) return;
+
+    setState(() => _downloading = true);
+
+    try {
+      final query = _buildExportQueryFromUi();
+
+      final downloader = PatrolReportDownloadService(
+        dio: Dio(),
+        baseUrl: ApiConfig.baseUrl,
+      );
+
+      await downloader.downloadExportExcel(
+        query: query,
+        fileName: 'patrol_reports.xlsx',
+      );
+
+      if (!mounted) return;
+
+      // ✅ THÔNG BÁO THÀNH CÔNG
+      CommonUI.showSuccessSnack(
+        context,
+        message: 'Excel file downloaded successfully',
+      );
+    } catch (e) {
+      if (!mounted) return;
+      CommonUI.showWarning(
+        context: context,
+        title: 'Warning',
+        message: 'Download failed: $e',
+      );
+    } finally {
+      if (!mounted) return;
+      setState(() => _downloading = false);
+    }
   }
 
   // ===================== FILTER =====================
@@ -328,10 +414,18 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
       padding: const EdgeInsets.fromLTRB(12, 5, 12, 5),
       child: Row(
         children: [
-          // GlassActionButton(
-          //   icon: Icons.arrow_back_rounded,
-          //   onTap: () => context.go('/home'),
-          // ),
+          GlassActionButton(
+            icon: Icons.arrow_back_rounded,
+            onTap: () => context.go('/home'),
+          ),
+          IconButton(
+            icon: const Icon(Icons.download_rounded, color: Colors.greenAccent),
+            onPressed: () {
+              final filtered = _applyFilter(_allReports, _query);
+              // _exportExcel(filtered);
+              _downloadExcel();
+            },
+          ),
           Expanded(
             child: TextField(
               controller: _searchCtrl,
@@ -794,11 +888,6 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
   }
 
   // ---- helpers ----
-
-  Widget _vScrollbar({required Widget child}) {
-    if (!_vCtrl.hasClients) return child; // ✅ chưa attach thì đừng vẽ scrollbar
-    return Scrollbar(controller: _vCtrl, thumbVisibility: true, child: child);
-  }
 
   Widget _buildFilterPopup(List<PatrolReportModel> all) {
     if (_activeFilterKey == null) return const SizedBox();
