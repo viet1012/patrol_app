@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import '../animate/glow_title.dart';
 import '../api/auth_api.dart';
+import '../common/app_version_text.dart';
 import '../homeScreen/patrol_home_screen.dart';
 import '../register/register_page.dart';
 import '../session/session_store.dart';
@@ -205,7 +206,8 @@ class _LoginPageState extends State<LoginPage> {
                 //     return EmbossGlowTitle(text: snapshot.data!, fontSize: 13);
                 //   },
                 // ),
-                EmbossGlowTitle(text: ApiConfig.version, fontSize: 13),
+                // EmbossGlowTitle(text: ApiConfig.version, fontSize: 13),
+                const AppVersionText(),
                 const SizedBox(height: 16),
 
                 const Text(
