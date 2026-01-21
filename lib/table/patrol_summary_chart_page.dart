@@ -3,11 +3,11 @@ import 'package:dio/dio.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
 
 import '../model/risk_summary.dart';
-import '../widget/glass_action_button.dart';
 
 class PatrolRiskSummarySfPage extends StatefulWidget {
-  const PatrolRiskSummarySfPage({super.key});
+  final void Function(String grp, String division)? onSelect;
 
+  const PatrolRiskSummarySfPage({super.key, this.onSelect});
   @override
   State<PatrolRiskSummarySfPage> createState() =>
       _PatrolRiskSummarySfPageState();
@@ -254,6 +254,7 @@ class _PatrolRiskSummarySfPageState extends State<PatrolRiskSummarySfPage> {
                     'sf_chart_${shownItems.length}_${shownItems.hashCode}',
                   ),
                   items: shownItems,
+                  onSelect: widget.onSelect, // ⭐ đẩy ngược lên
                 ),
               ),
             ],
@@ -266,7 +267,8 @@ class _PatrolRiskSummarySfPageState extends State<PatrolRiskSummarySfPage> {
 
 class _RiskStackedBarChart extends StatelessWidget {
   final List<RiskSummary> items;
-  const _RiskStackedBarChart({super.key, required this.items});
+  final void Function(String grp, String division)? onSelect;
+  const _RiskStackedBarChart({super.key, required this.items, this.onSelect});
 
   static const Color cMinus = Color(0xFFE5E7EB);
   static const Color cI = Color(0xFFD1FAE5);
@@ -281,7 +283,6 @@ class _RiskStackedBarChart extends StatelessWidget {
       tooltipBehavior: TooltipBehavior(enable: true),
       plotAreaBorderWidth: 0,
       margin: const EdgeInsets.fromLTRB(6, 8, 8, 6),
-
       legend: const Legend(
         isVisible: true,
         position: LegendPosition.bottom,
@@ -328,17 +329,23 @@ class _RiskStackedBarChart extends StatelessWidget {
     return StackedBarSeries<RiskSummary, String>(
       name: name,
       dataSource: items,
-      // ✅ category nằm trên trục X
-      xValueMapper: (e, _) => e.shortLabel, // "Group 1 (Fac_A)"
-      // ✅ số nằm trên trục Y
+
+      xValueMapper: (e, _) => e.shortLabel,
       yValueMapper: (e, _) => v(e),
-      dataLabelMapper: (e, _) {
-        final value = v(e);
-        return value > 0 ? value.toString() : null;
+
+      onPointTap: (ChartPointDetails details) {
+        final idx = details.pointIndex;
+        if (idx == null) return;
+
+        final e = items[idx];
+
+        onSelect?.call(e.grp, e.division); // 🔥 callback ngược lên
       },
+
       color: color,
       enableTooltip: true,
       width: 0.5,
+
       dataLabelSettings: const DataLabelSettings(
         isVisible: true,
         labelAlignment: ChartDataLabelAlignment.middle,
