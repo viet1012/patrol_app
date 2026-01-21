@@ -106,6 +106,10 @@ class _PatrolImagesDialogView extends StatelessWidget {
                               child: _ImageTile(
                                 name: names[i],
                                 baseUrl: baseUrl,
+                                e: e,
+                                title: title,
+                                index: i,
+                                total: names.length,
                               ),
                             ),
                             if (i != names.length - 1)
@@ -124,8 +128,14 @@ class _PatrolImagesDialogView extends StatelessWidget {
                           mainAxisSpacing: 10,
                           childAspectRatio: cols == 1 ? 16 / 10 : 4 / 3,
                         ),
-                        itemBuilder: (_, i) =>
-                            _ImageTile(name: names[i], baseUrl: baseUrl),
+                        itemBuilder: (_, i) => _ImageTile(
+                          name: names[i],
+                          baseUrl: baseUrl,
+                          e: e,
+                          title: title,
+                          index: i,
+                          total: names.length,
+                        ),
                       ),
               ),
             ),
@@ -225,15 +235,33 @@ class _PatrolImagesDialogView extends StatelessWidget {
 class _ImageTile extends StatelessWidget {
   final String name;
   final String baseUrl;
+  final PatrolReportModel e; // ✅ thêm
+  final String title; // ✅ thêm
+  final int index; // ✅ thêm
+  final int total; // ✅ thêm
 
-  const _ImageTile({required this.name, required this.baseUrl});
+  const _ImageTile({
+    required this.name,
+    required this.baseUrl,
+    required this.e,
+    required this.title,
+    required this.index,
+    required this.total,
+  });
 
   @override
   Widget build(BuildContext context) {
     final url = '$baseUrl/images/$name';
 
     return InkWell(
-      onTap: () => FullImageDialog.show(context: context, imageUrl: url),
+      onTap: () => FullImageDialog.show(
+        context: context,
+        imageUrl: url,
+        e: e,
+        title: title,
+        index: index,
+        total: total,
+      ),
       child: Container(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
@@ -273,51 +301,138 @@ class _ImageTile extends StatelessWidget {
 }
 
 class FullImageDialog {
-  static void show({required BuildContext context, required String imageUrl}) {
+  static void show({
+    required BuildContext context,
+    required String imageUrl,
+    required PatrolReportModel e,
+    required String title,
+    required int index,
+    required int total,
+  }) {
     showDialog(
       context: context,
+      barrierDismissible: true,
       builder: (_) => Dialog(
-        insetPadding: const EdgeInsets.all(12),
+        insetPadding: const EdgeInsets.all(10),
         clipBehavior: Clip.antiAlias,
-        child: SizedBox(
-          width: MediaQuery.of(context).size.width * 0.95,
-          height: MediaQuery.of(context).size.height * 0.92,
+        child: Container(
+          color: Colors.black,
+          width: MediaQuery.of(context).size.width * 0.98,
+          height: MediaQuery.of(context).size.height * 0.96,
           child: Column(
             children: [
+              // ===== Top bar =====
               Container(
-                padding: const EdgeInsets.fromLTRB(5, 5, 5, 5),
+                padding: const EdgeInsets.fromLTRB(14, 6, 6, 6),
                 color: Colors.grey.shade50,
-                child: Align(
-                  alignment: Alignment.bottomRight,
-                  child: IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.close),
-                  ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        '$title • Image ${index + 1}/$total',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w900,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.pop(context),
+                      icon: const Icon(Icons.close),
+                    ),
+                  ],
                 ),
               ),
               const Divider(height: 1),
+
+              // ===== Body =====
               Expanded(
-                child: Container(
-                  color: Colors.black.withOpacity(0.03),
-                  child: InteractiveViewer(
-                    minScale: 0.5,
-                    maxScale: 8,
-                    child: Image.network(
-                      imageUrl,
-                      fit: BoxFit.contain,
-                      errorBuilder: (_, __, ___) => Center(
-                        child: Text(
-                          'Cannot load image\n$imageUrl',
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(color: Colors.red),
+                child: LayoutBuilder(
+                  builder: (context, c) {
+                    final isWide = c.maxWidth >= 1100;
+
+                    Widget imageView = Container(
+                      color: Colors.black,
+                      child: Center(
+                        child: InteractiveViewer(
+                          minScale: 0.5,
+                          maxScale: 8,
+                          child: Image.network(
+                            imageUrl,
+                            fit: BoxFit.contain,
+                            errorBuilder: (_, __, ___) => Center(
+                              child: Text(
+                                'Cannot load image\n$imageUrl',
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(color: Colors.red),
+                              ),
+                            ),
+                            loadingBuilder: (_, w, p) {
+                              if (p == null) return w;
+                              return const Center(
+                                child: CircularProgressIndicator(),
+                              );
+                            },
+                          ),
                         ),
                       ),
-                      loadingBuilder: (_, w, p) {
-                        if (p == null) return w;
-                        return const Center(child: CircularProgressIndicator());
-                      },
-                    ),
-                  ),
+                    );
+
+                    Widget leftInfo = _InfoPanelLeft(e: e);
+                    Widget rightInfo = _InfoPanelRight(e: e);
+
+                    if (!isWide) {
+                      return Column(
+                        children: [
+                          Expanded(flex: 6, child: imageView),
+                          const Divider(height: 1),
+                          Expanded(
+                            flex: 4,
+                            child: SingleChildScrollView(
+                              padding: const EdgeInsets.all(12),
+                              child: Column(
+                                children: [
+                                  leftInfo,
+                                  const SizedBox(height: 12),
+                                  rightInfo,
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      );
+                    }
+
+                    return Row(
+                      children: [
+                        // LEFT
+                        SizedBox(
+                          width: 320,
+                          child: SingleChildScrollView(
+                            padding: const EdgeInsets.all(12),
+                            child: leftInfo,
+                          ),
+                        ),
+                        const VerticalDivider(width: 1),
+
+                        // IMAGE
+                        Expanded(child: imageView),
+
+                        const VerticalDivider(width: 1),
+
+                        // RIGHT
+                        SizedBox(
+                          width: 380,
+                          child: SingleChildScrollView(
+                            padding: const EdgeInsets.all(12),
+                            child: rightInfo,
+                          ),
+                        ),
+                      ],
+                    );
+                  },
                 ),
               ),
             ],
@@ -326,6 +441,77 @@ class FullImageDialog {
       ),
     );
   }
+}
+
+/// ===== Left panel: info nhanh =====
+class _InfoPanelLeft extends StatelessWidget {
+  final PatrolReportModel e;
+  const _InfoPanelLeft({required this.e});
+
+  @override
+  Widget build(BuildContext context) {
+    return _panel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _InfoRow2('QR Code', e.qr_key ?? '-'),
+          _InfoRow2('Group', e.grp),
+          _InfoRow2('Plant', e.plant),
+          _InfoRow2('Division', e.division),
+          _InfoRow2('Area', e.area),
+          _InfoRow2('Machine', e.machine),
+          _InfoRow2('Patrol User', e.patrol_user ?? '-'),
+          _InfoRow2('PIC', e.pic ?? '-'),
+          const Divider(height: 22),
+          _InfoRow2('Created', CommonUI.fmtDate(e.createdAt)),
+          _InfoRow2('Due', CommonUI.fmtDate(e.dueDate)),
+          _InfoRow2('Check Info', e.checkInfo),
+          const Divider(height: 22),
+          _InfoRow2('Risk F', e.riskFreq),
+          _InfoRow2('Risk P', e.riskProb),
+          _InfoRow2('Risk S', e.riskSev),
+        ],
+      ),
+    );
+  }
+}
+
+/// ===== Right panel: risk + comment =====
+class _InfoPanelRight extends StatelessWidget {
+  final PatrolReportModel e;
+  const _InfoPanelRight({required this.e});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        _panel(child: _RiskTotalCard(e.riskTotal)),
+        const SizedBox(height: 18),
+        _panel(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _InfoBlock('Comment', e.comment),
+              const SizedBox(height: 12),
+              _InfoBlock('Countermeasure', e.countermeasure),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+Widget _panel({required Widget child}) {
+  return Container(
+    padding: const EdgeInsets.all(10),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: Colors.grey.shade300),
+    ),
+    child: child,
+  );
 }
 
 class _RiskTotalCard extends StatelessWidget {
@@ -360,7 +546,7 @@ class _RiskTotalCard extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Text(
-            'RISK TOTAL',
+            'RISK LEVEL',
             style: TextStyle(
               color: mainColor,
               fontSize: 20,
@@ -374,8 +560,8 @@ class _RiskTotalCard extends StatelessWidget {
             textAlign: TextAlign.center,
             style: TextStyle(
               color: mainColor,
-              fontSize: 28,
-              fontWeight: FontWeight.w900,
+              fontSize: 32,
+              fontWeight: FontWeight.bold,
             ),
           ),
         ],
@@ -445,11 +631,14 @@ class _InfoBlock extends StatelessWidget {
           width: double.infinity,
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: Colors.grey.shade50,
+            color: Colors.brown.shade100,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: Colors.grey.shade300),
           ),
-          child: SelectableText(value, style: TextStyle(fontSize: 20)),
+          child: SelectableText(
+            value,
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+          ),
         ),
       ],
     );

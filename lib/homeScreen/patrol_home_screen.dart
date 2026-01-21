@@ -801,30 +801,30 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
               },
             ),
             const SizedBox(height: 16),
-            _patrolButton(
-              number: '4)',
-              title: 'Data Table',
-              color: color,
-              enabled: true,
-              onTap: () {
-                final url =
-                    'http://192.168.122.16:64644/?group=${Uri.encodeComponent(group.name)}';
-
-                html.window.open(
-                  url,
-                  '_blank', // ?? m? tab m?i
-                );
-              },
-            ),
             // _patrolButton(
             //   number: '4)',
             //   title: 'Data Table',
             //   color: color,
             //   enabled: true,
             //   onTap: () {
-            //     context.go('/home/summary?group=${group.name}');
+            //     final url =
+            //         'http://192.168.122.16:64644/?group=${Uri.encodeComponent(group.name)}';
+            //
+            //     html.window.open(
+            //       url,
+            //       '_blank', // ?? m? tab m?i
+            //     );
             //   },
             // ),
+            _patrolButton(
+              number: '4)',
+              title: 'Data Table',
+              color: color,
+              enabled: true,
+              onTap: () {
+                context.go('/home/summary?group=${group.name}');
+              },
+            ),
           ],
         ),
       ),
