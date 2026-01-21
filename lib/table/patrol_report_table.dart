@@ -13,8 +13,6 @@ import '../model/patrol_export_query.dart';
 import '../model/patrol_report_model.dart';
 import '../widget/glass_action_button.dart';
 import 'edit_report_dialog.dart';
-import 'package:excel/excel.dart' as ex;
-import 'dart:typed_data';
 
 class PatrolReportTable extends StatefulWidget {
   final String? patrolGroup;
@@ -193,10 +191,12 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
                   switchInCurve: Curves.easeOut,
                   switchOutCurve: Curves.easeIn,
                   child: _showSummary
-                      ? const Padding(
-                          key: ValueKey('summary'),
-                          padding: EdgeInsets.only(bottom: 8),
-                          child: PatrolRiskSummarySfPage(),
+                      ? Padding(
+                          key: const ValueKey('summary'),
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: PatrolRiskSummarySfPage(
+                            onSelect: _applySummaryFilter,
+                          ),
                         )
                       : const SizedBox(key: ValueKey('summary_empty')),
                 ),
@@ -265,6 +265,16 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
   }
 
   // ===================== FILTER =====================
+  void _applySummaryFilter(String grp, String division) {
+    setState(() {
+      _filterValues['Group'] = {grp};
+      _filterValues['Division'] = {division};
+      _page = 0;
+    });
+
+    CommonUI.showSuccessSnack(context, message: 'Filtered by $grp / $division');
+  }
+
   List<String> _getColumnValues(String col, List<PatrolReportModel> all) {
     final set = <String>{};
 
@@ -408,43 +418,78 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
     }).toList();
   }
 
+  void _clearAll() {
+    setState(() {
+      // 1) clear search
+      _searchCtrl.clear();
+      _query = '';
+
+      // 2) clear filters
+      _filterValues.clear();
+      _filterSearch = '';
+      _activeFilterKey = null;
+
+      // 3) reset paging + selection
+      _page = 0;
+      _selectedIndex = null;
+    });
+
+    // 4) đóng overlay filter nếu đang mở
+    try {
+      _overlayCtrl.hide();
+    } catch (_) {}
+
+    // 5) reset scroll về đầu
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_vCtrl.hasClients) _vCtrl.jumpTo(0);
+      if (_hCtrl.hasClients) _hCtrl.jumpTo(0);
+    });
+
+    // (tuỳ chọn) thông báo nhẹ
+    // CommonUI.showInfoSnack(context, message: 'Cleared filters');
+  }
+
   // ===================== TOP BAR =====================
   Widget _buildTopBar({required int total, required int shown}) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 5, 12, 5),
-      child: Row(
-        children: [
-          GlassActionButton(
-            icon: Icons.arrow_back_rounded,
-            onTap: () => context.go('/home'),
-          ),
-          IconButton(
-            icon: const Icon(Icons.download_rounded, color: Colors.greenAccent),
-            onPressed: () {
-              final filtered = _applyFilter(_allReports, _query);
-              // _exportExcel(filtered);
-              _downloadExcel();
-            },
-          ),
-          Expanded(
-            child: TextField(
-              controller: _searchCtrl,
-              decoration: InputDecoration(
-                hintText: 'Search (stt, type, group, comment, PIC...)',
-                prefixIcon: const Icon(Icons.search),
-                isDense: true,
-                filled: true,
-                fillColor: Colors.white,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
+    return Row(
+      children: [
+        GlassActionButton(
+          icon: Icons.arrow_back_rounded,
+          onTap: () => context.go('/home'),
+        ),
+
+        IconButton(
+          icon: const Icon(Icons.download_rounded, color: Colors.greenAccent),
+          onPressed: () {
+            final filtered = _applyFilter(_allReports, _query);
+            // _exportExcel(filtered);
+            _downloadExcel();
+          },
+        ),
+        Expanded(
+          child: TextField(
+            controller: _searchCtrl,
+            decoration: InputDecoration(
+              hintText: 'Search (stt, type, group, comment, PIC...)',
+              prefixIcon: const Icon(Icons.search),
+              isDense: true,
+              filled: true,
+              fillColor: Colors.white,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
               ),
             ),
           ),
-          const SizedBox(width: 10),
-          _chip('$shown / $total'),
-        ],
-      ),
+        ),
+        IconButton(
+          icon: const Icon(Icons.cleaning_services, color: Colors.greenAccent),
+          onPressed: (_query.isEmpty && _filterValues.isEmpty)
+              ? null
+              : _clearAll,
+        ),
+        const SizedBox(width: 10),
+        _chip('$shown / $total'),
+      ],
     );
   }
 
