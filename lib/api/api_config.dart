@@ -1,5 +1,5 @@
 class ApiConfig {
-  static const String version = 'V1.9.3';
+  static const String version = 'V1.9.4';
 
   // static const String domain = 'plumular-rollickingly-kannon.ngrok-free.dev';
   // static const String domain = '192.168.122.16:8002';
