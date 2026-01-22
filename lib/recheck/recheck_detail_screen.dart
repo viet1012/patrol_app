@@ -67,6 +67,7 @@ class _RecheckDetailScreenState extends State<RecheckDetailScreen> {
       _futurePivot = PatrolPivotApi.fetchPivot(
         plant: _selectedPlant!,
         atStatus: statuses, // ✅ đổi param
+        type: widget.patrolGroup.name,
       );
     });
   }
