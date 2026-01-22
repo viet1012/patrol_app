@@ -287,6 +287,15 @@ class _RecheckDetailPageState extends State<RecheckDetailPage> {
               ),
 
               const SizedBox(height: 12),
+              IntrinsicHeight(
+                child: _buildInfoCard(
+                  icon: Icons.groups_rounded,
+                  label: "Patrol User",
+                  color: Colors.white70,
+                  value: widget.report.patrol_user!,
+                ),
+              ),
+              const SizedBox(height: 12),
               Align(
                 alignment: Alignment.centerLeft,
 
