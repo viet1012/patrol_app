@@ -284,7 +284,14 @@ class _AfterDetailPageState extends State<AfterDetailPage> {
                   ],
                 ),
               ),
-
+              Expanded(
+                child: _buildInfoCard(
+                  icon: Icons.groups_rounded,
+                  label: "Patrol User",
+                  color: Colors.white70,
+                  value: widget.report.patrol_user!,
+                ),
+              ),
               const SizedBox(height: 12),
               Align(
                 alignment: Alignment.centerLeft,
