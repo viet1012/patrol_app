@@ -9,7 +9,8 @@ class AppVersionText extends StatelessWidget {
   Future<String> _getVersion() async {
     final info = await PackageInfo.fromPlatform();
     // info.version = 1.9.4, info.buildNumber = 58
-    return 'V${info.version}+${info.buildNumber}';
+    // return 'V${info.version}+${info.buildNumber}';
+    return 'V${info.version}';
   }
 
   @override
