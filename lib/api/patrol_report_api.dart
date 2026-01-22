@@ -16,6 +16,8 @@ class PatrolReportApi {
     String? grp,
     String? pic,
     String? patrolUser,
+    String? fromD,
+    String? toD,
   }) async {
     try {
       final endpoint = '/api/patrol_report/filter';
@@ -46,6 +48,8 @@ class PatrolReportApi {
       addIfNotEmpty('grp', grp);
       addEvenIfEmpty('pic', pic);
       addIfNotEmpty('patrolUser', patrolUser);
+      addIfNotEmpty('fromD', fromD);
+      addIfNotEmpty('toD', toD);
 
       /// ?? DEBUG
       final uri = Uri.parse(
