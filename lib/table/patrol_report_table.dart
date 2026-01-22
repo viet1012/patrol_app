@@ -15,8 +15,13 @@ import '../widget/glass_action_button.dart';
 import 'edit_report_dialog.dart';
 
 class PatrolReportTable extends StatefulWidget {
-  final String? patrolGroup;
-  const PatrolReportTable({super.key, required this.patrolGroup});
+  final String patrolGroup;
+  final String plant;
+  const PatrolReportTable({
+    super.key,
+    required this.patrolGroup,
+    required this.plant,
+  });
 
   @override
   State<PatrolReportTable> createState() => _PatrolReportTableState();
@@ -43,22 +48,29 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
     'AT Stt': 'afStatus',
   };
 
+  DateTime? _fromD;
+  DateTime? _toD;
+
+  String _fmt(DateTime d) =>
+      '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
   PatrolExportQuery _buildExportQueryFromUi() {
-    // lấy params từ filterValues
     final Map<String, String> params = {};
 
+    // 1) params từ filter columns
     _filterValues.forEach((uiCol, values) {
       if (values.isEmpty) return;
+
       final key = _uiColToQueryKey[uiCol];
       if (key == null) return;
 
-      // nếu user chọn nhiều -> join bằng dấu phẩy
-      params[key] = values.join(',');
+      params[key] = values.join(','); // multi values
     });
 
-    // luôn kèm type từ screen (patrolGroup)
-    if (widget.patrolGroup != null && widget.patrolGroup!.trim().isNotEmpty) {
-      params['type'] = widget.patrolGroup!.trim();
+    // 2) luôn kèm type từ screen (patrolGroup)
+    final type = widget.patrolGroup?.trim();
+    if (type != null && type.isNotEmpty) {
+      params['type'] = type;
     }
 
     return PatrolExportQuery.fromMap(params);
@@ -85,7 +97,10 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
   @override
   void initState() {
     super.initState();
-    _futureReports = PatrolReportApi.fetchReports(type: widget.patrolGroup);
+    _futureReports = PatrolReportApi.fetchReports(
+      type: widget.patrolGroup,
+      plant: widget.plant,
+    );
 
     for (final c in _cols) {
       _filterLinks[c.label] = LayerLink();
@@ -170,7 +185,7 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
                 icon: Icons.assignment_outlined,
               );
             }
-            final filtered = _applyFilter(_allReports, _query);
+            final filtered = _applyFilterExcluding(_allReports, _query);
 
             final totalPages = (filtered.length / _rowsPerPage).ceil().clamp(
               1,
@@ -196,6 +211,9 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
                           padding: const EdgeInsets.only(bottom: 8),
                           child: PatrolRiskSummarySfPage(
                             onSelect: _applySummaryFilter,
+                            onDateChanged: _applySummaryDate,
+                            plant: widget.plant,
+                            patrolGroup: widget.patrolGroup,
                           ),
                         )
                       : const SizedBox(key: ValueKey('summary_empty')),
@@ -373,7 +391,28 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
     }
   }
 
-  List<PatrolReportModel> _applyFilter(List<PatrolReportModel> src, String q) {
+  void _applySummaryDate(DateTime from, DateTime to) {
+    setState(() {
+      _fromD = from;
+      _toD = to;
+      _page = 0;
+    });
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_vCtrl.hasClients) _vCtrl.jumpTo(0);
+    });
+
+    CommonUI.showSuccessSnack(
+      context,
+      message: 'Date: ${_fmt(from)} → ${_fmt(to)}',
+    );
+  }
+
+  List<PatrolReportModel> _applyFilterExcluding(
+    List<PatrolReportModel> src,
+    String q, {
+    String? excludeCol,
+  }) {
     return src.where((e) {
       // global search
       if (q.isNotEmpty) {
@@ -400,18 +439,40 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
         if (!hay.contains(q)) return false;
       }
 
-      // column filters (VALUE based)
+      // date filter
+      if (_fromD != null) {
+        final created = e.createdAt; // giả sử DateTime
+        if (created == null ||
+            created.isBefore(
+              DateTime(_fromD!.year, _fromD!.month, _fromD!.day),
+            )) {
+          return false;
+        }
+      }
+
+      if (_toD != null) {
+        final created = e.createdAt;
+        final endExclusive = DateTime(
+          _toD!.year,
+          _toD!.month,
+          _toD!.day,
+        ).add(const Duration(days: 1));
+        if (created == null || !created.isBefore(endExclusive)) {
+          return false;
+        }
+      }
+
+      // column filters
       for (final entry in _filterValues.entries) {
         final col = entry.key;
-        final allowed = entry.value;
+        if (excludeCol != null && col == excludeCol)
+          continue; // ✅ bỏ qua cột đang mở
 
+        final allowed = entry.value;
         if (allowed.isEmpty) continue;
 
         final cellValue = _getCellValue(e, col).trim();
-
-        if (!allowed.contains(cellValue)) {
-          return false;
-        }
+        if (!allowed.contains(cellValue)) return false;
       }
 
       return true;
@@ -461,8 +522,6 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
         IconButton(
           icon: const Icon(Icons.download_rounded, color: Colors.greenAccent),
           onPressed: () {
-            final filtered = _applyFilter(_allReports, _query);
-            // _exportExcel(filtered);
             _downloadExcel();
           },
         ),
@@ -595,8 +654,9 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
                 });
 
                 WidgetsBinding.instance.addPostFrameCallback((_) {
-                  if (_filterCtrl.hasClients)
+                  if (_filterCtrl.hasClients) {
                     _filterCtrl.jumpTo(0); // ✅ reset popup list
+                  }
                 });
 
                 _overlayCtrl.show();
@@ -935,17 +995,31 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
   // ---- helpers ----
 
   Widget _buildFilterPopup(List<PatrolReportModel> all) {
-    if (_activeFilterKey == null) return const SizedBox();
+    final col = _activeFilterKey;
+    if (col == null) return const SizedBox();
 
-    final values = _getColumnValues(_activeFilterKey!, all);
-    final selected = _filterValues[_activeFilterKey!] ?? <String>{};
+    // ✅ 1) base = data sau khi áp search + tất cả filter KHÁC cột đang mở
+    final base = _applyFilterExcluding(all, _query, excludeCol: col);
 
-    final shown = values
+    // ✅ 2) values = chỉ những value tồn tại trong base
+    final valuesInBase = _getColumnValues(col, base);
+
+    // ✅ selected hiện tại của cột này
+    final selected = _filterValues[col] ?? <String>{};
+
+    // ✅ 3) bonus: vẫn show selected dù không còn trong base (để user bỏ tick)
+    final mergedValues = <String>[
+      ...selected.where((v) => !valuesInBase.contains(v)),
+      ...valuesInBase,
+    ];
+
+    // search trong popup
+    final shown = mergedValues
         .where((v) => v.toLowerCase().contains(_filterSearch.toLowerCase()))
         .toList();
 
     return CompositedTransformFollower(
-      link: _filterLinks[_activeFilterKey!]!,
+      link: _filterLinks[col]!,
       offset: const Offset(0, 44),
       showWhenUnlinked: false,
       child: Material(
@@ -954,7 +1028,7 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
           width: 260,
           height: 340,
           decoration: BoxDecoration(
-            color: const Color(0xFF172A33).withOpacity(.6), // dark panel
+            color: const Color(0xFF172A33).withOpacity(.6),
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: Colors.white24),
             boxShadow: [
@@ -980,7 +1054,7 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
                   children: [
                     Expanded(
                       child: Text(
-                        _activeFilterKey!,
+                        col,
                         style: const TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.w700,
@@ -989,7 +1063,10 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
                       ),
                     ),
                     InkWell(
-                      onTap: _overlayCtrl.hide,
+                      onTap: () {
+                        setState(() => _activeFilterKey = null);
+                        _overlayCtrl.hide();
+                      },
                       borderRadius: BorderRadius.circular(20),
                       child: const Padding(
                         padding: EdgeInsets.all(4),
@@ -1047,32 +1124,31 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
                         controller: _filterCtrl,
                         thumbVisibility: true,
                         child: ListView.builder(
-                          controller: _filterCtrl, // ✅ gắn controller
-                          primary: false, // ✅ không dùng Primary
+                          controller: _filterCtrl,
+                          primary: false,
                           padding: EdgeInsets.zero,
                           itemCount: shown.length,
                           itemBuilder: (_, i) {
                             final v = shown[i];
                             final checked = selected.contains(v);
 
+                            void toggle(bool next) {
+                              setState(() {
+                                final s = _filterValues.putIfAbsent(
+                                  col,
+                                  () => <String>{},
+                                );
+                                next ? s.add(v) : s.remove(v);
+                                _page = 0;
+                              });
+
+                              WidgetsBinding.instance.addPostFrameCallback((_) {
+                                if (_vCtrl.hasClients) _vCtrl.jumpTo(0);
+                              });
+                            }
+
                             return InkWell(
-                              onTap: () {
-                                setState(() {
-                                  final s = _filterValues.putIfAbsent(
-                                    _activeFilterKey!,
-                                    () => <String>{},
-                                  );
-                                  checked ? s.remove(v) : s.add(v);
-                                  _page = 0; // ✅ reset page luôn
-                                });
-
-                                WidgetsBinding.instance.addPostFrameCallback((
-                                  _,
-                                ) {
-                                  if (_vCtrl.hasClients) _vCtrl.jumpTo(0);
-                                });
-                              },
-
+                              onTap: () => toggle(!checked),
                               child: Container(
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: 12,
@@ -1082,27 +1158,11 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
                                   children: [
                                     Checkbox(
                                       value: checked,
-                                      onChanged: (ok) {
-                                        setState(() {
-                                          final s = _filterValues.putIfAbsent(
-                                            _activeFilterKey!,
-                                            () => <String>{},
-                                          );
-                                          ok == true ? s.add(v) : s.remove(v);
-                                          _page = 0; // ✅ reset page
-                                        });
-
-                                        WidgetsBinding.instance
-                                            .addPostFrameCallback((_) {
-                                              if (_vCtrl.hasClients)
-                                                _vCtrl.jumpTo(0);
-                                            });
-                                      },
-
-                                      checkColor: Colors.white, // màu dấu ✓
+                                      onChanged: (ok) => toggle(ok == true),
+                                      checkColor: Colors.white,
                                       side: const BorderSide(
                                         color: Colors.white54,
-                                      ), // viền khi unchecked
+                                      ),
                                       materialTapTargetSize:
                                           MaterialTapTargetSize.shrinkWrap,
                                     ),
@@ -1142,8 +1202,8 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
                       icon: Icons.cleaning_services,
                       onTap: () {
                         setState(() {
-                          _filterValues.remove(_activeFilterKey);
-                          _page = 0; // ✅ reset page
+                          _filterValues.remove(col);
+                          _page = 0;
                         });
 
                         WidgetsBinding.instance.addPostFrameCallback((_) {

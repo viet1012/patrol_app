@@ -14,10 +14,12 @@ final router = GoRouter(
       path: '/home/summary',
       // path: '/',
       builder: (context, state) {
-        final group = state.uri.queryParameters['group'];
+        final group = state.uri.queryParameters['group'] ?? '';
+        final plant = state.uri.queryParameters['plant'] ?? '';
 
         return PatrolReportTable(
           patrolGroup: group, // có thể null
+          plant: plant,
         );
       },
     ),
