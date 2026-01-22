@@ -1,25 +1,44 @@
 $pubspec = "pubspec.yaml"
-$content = Get-Content $pubspec -Raw
 
-# Tìm version: x.y.z+N
-$pattern = "version:\s*([0-9]+\.[0-9]+\.[0-9]+)\+([0-9]+)"
-$m = [regex]::Match($content, $pattern)
+# ?? luôn ép thành array
+$lines = @(Get-Content $pubspec)
 
-if (-not $m.Success) {
-    Write-Host "❌ Không tìm thấy version trong pubspec.yaml (format: version: x.y.z+N)"
+$idx = -1
+for ($i = 0; $i -lt $lines.Count; $i++) {
+    if ($lines[$i] -match '^\s*version:\s*') {
+        $idx = $i
+        break
+    }
+}
+
+if ($idx -lt 0) {
+    Write-Host "? Không tìm th?y dòng version:"
     exit 1
 }
 
-$ver = $m.Groups[1].Value
-$build = [int]$m.Groups[2].Value
-$newBuild = $build + 1
+# match version: x.y.z (cho phép có +N nhung không dùng)
+if ($lines[$idx] -notmatch '^\s*version:\s*([0-9]+)\.([0-9]+)\.([0-9]+)(\+([0-9]+))?\s*$') {
+    Write-Host "? Dòng version không dúng format:"
+    Write-Host "   $($lines[$idx])"
+    exit 1
+}
 
-$newLine = "version: $ver+$newBuild"
-$newContent = [regex]::Replace($content, $pattern, $newLine, 1)
+$major = [int]$Matches[1]
+$minor = [int]$Matches[2]
+$patch = [int]$Matches[3]
 
-Set-Content $pubspec $newContent -NoNewline
+$old = "$major.$minor.$patch"
 
-Write-Host "✅ Version bumped: $ver+$build → $ver+$newBuild"
+# ?? bump patch
+$patch++
+$new = "$major.$minor.$patch"
+
+$lines[$idx] = "version: $new"
+
+# ? ghi l?i file, gi? newline dúng YAML
+Set-Content -Path $pubspec -Value $lines -Encoding UTF8
+
+Write-Host "? Version bumped: $old ? $new"
 
 flutter clean
 flutter pub get

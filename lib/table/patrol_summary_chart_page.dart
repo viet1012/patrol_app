@@ -2,12 +2,24 @@ import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
 
+import '../common/common_ui_helper.dart';
 import '../model/risk_summary.dart';
 
 class PatrolRiskSummarySfPage extends StatefulWidget {
-  final void Function(String grp, String division)? onSelect;
+  final String plant;
+  final String patrolGroup;
 
-  const PatrolRiskSummarySfPage({super.key, this.onSelect});
+  final void Function(String grp, String division)? onSelect;
+  final void Function(DateTime from, DateTime to)? onDateChanged; // ✅
+
+  const PatrolRiskSummarySfPage({
+    super.key,
+    this.onSelect,
+    this.onDateChanged,
+    required this.plant,
+    required this.patrolGroup,
+  });
+
   @override
   State<PatrolRiskSummarySfPage> createState() =>
       _PatrolRiskSummarySfPageState();
@@ -16,8 +28,8 @@ class PatrolRiskSummarySfPage extends StatefulWidget {
 class _PatrolRiskSummarySfPageState extends State<PatrolRiskSummarySfPage> {
   late final PatrolApi api;
 
-  String fac = 'Fac_2';
-  String type = 'Patrol';
+  // String fac = 'Fac_2';
+  // String type = 'Patrol';
 
   late TextEditingController _fromCtrl;
   late TextEditingController _toCtrl;
@@ -83,8 +95,8 @@ class _PatrolRiskSummarySfPageState extends State<PatrolRiskSummarySfPage> {
       final res = await api.fetchRiskSummary(
         fromD: _fmt(_fromDate),
         toD: _fmt(_toDate),
-        fac: fac,
-        type: type,
+        fac: widget.plant,
+        type: widget.patrolGroup,
       );
 
       if (!mounted) return;
@@ -153,7 +165,8 @@ class _PatrolRiskSummarySfPageState extends State<PatrolRiskSummarySfPage> {
       _fromCtrl.text = _fmt(_fromDate);
       _toCtrl.text = _fmt(_toDate);
     });
-
+    // ✅ báo cho parent biết ngày mới
+    widget.onDateChanged?.call(_fromDate, _toDate);
     _fetch(); // ✅ gọi API ngay
   }
 
@@ -185,6 +198,12 @@ class _PatrolRiskSummarySfPageState extends State<PatrolRiskSummarySfPage> {
 
     // ✅ shownItems: ưu tiên kết quả mới, rỗng thì fallback lastGood
     final shownItems = _items.isNotEmpty ? _items : _lastGoodItems;
+    final totalItem = shownItems.cast<RiskSummary?>().firstWhere(
+      (e) => e?.grp == 'TOTAL',
+      orElse: () => null,
+    );
+
+    final chartItems = shownItems.where((e) => e.grp != 'TOTAL').toList();
 
     if (shownItems.isEmpty) {
       return _EmptyView(onRetry: _reload);
@@ -206,7 +225,7 @@ class _PatrolRiskSummarySfPageState extends State<PatrolRiskSummarySfPage> {
                   const SizedBox(width: 8),
                   const Text(
                     'Patrol Summary',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
                   ),
                   const Spacer(),
                   _DateField(
@@ -222,6 +241,10 @@ class _PatrolRiskSummarySfPageState extends State<PatrolRiskSummarySfPage> {
                   ),
                 ],
               ),
+              if (totalItem != null) ...[
+                const SizedBox(height: 10),
+                _TotalRiskBar(totalItem),
+              ],
 
               if (_noData) ...[
                 const SizedBox(height: 10),
@@ -240,21 +263,22 @@ class _PatrolRiskSummarySfPageState extends State<PatrolRiskSummarySfPage> {
                       TextButton.icon(
                         onPressed: _revertToLastGood,
                         icon: const Icon(Icons.history),
-                        label: const Text('Quay lại'),
+                        label: const Text('Back'),
                       ),
                     ],
                   ),
                 ),
               ],
+              const SizedBox(height: 8),
 
               SizedBox(
-                height: shownItems.length * 20 + 80,
+                height: chartItems.length * 20 + 80,
                 child: _RiskStackedBarChart(
-                  key: ValueKey(
-                    'sf_chart_${shownItems.length}_${shownItems.hashCode}',
-                  ),
-                  items: shownItems,
-                  onSelect: widget.onSelect, // ⭐ đẩy ngược lên
+                  // key: ValueKey(
+                  //   'sf_chart_${chartItems.length}_${chartItems.hashCode}',
+                  // ),
+                  items: chartItems,
+                  onSelect: widget.onSelect,
                 ),
               ),
             ],
@@ -329,9 +353,13 @@ class _RiskStackedBarChart extends StatelessWidget {
     return StackedBarSeries<RiskSummary, String>(
       name: name,
       dataSource: items,
-
+      // animationDuration: 0,
       xValueMapper: (e, _) => e.shortLabel,
       yValueMapper: (e, _) => v(e),
+      dataLabelMapper: (e, _) {
+        final value = v(e);
+        return value == 0 ? '' : value.toString();
+      },
 
       onPointTap: (ChartPointDetails details) {
         final idx = details.pointIndex;
@@ -454,6 +482,64 @@ class _DateField extends StatelessWidget {
             vertical: 8,
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _TotalRiskBar extends StatelessWidget {
+  final RiskSummary t;
+  const _TotalRiskBar(this.t);
+
+  int get total => (t.minus) + t.i + t.ii + t.iii + t.iv + t.v;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget chip(String label, int v) => Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.06),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: CommonUI.riskColor(label)),
+      ),
+      child: Text(
+        '$label: $v',
+        style: TextStyle(
+          fontWeight: FontWeight.w700,
+          color: CommonUI.riskColor(label),
+        ),
+      ),
+    );
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.blueGrey.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.blueGrey.withOpacity(0.25)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.summarize_rounded, size: 18),
+          const SizedBox(width: 8),
+          Text(
+            'Total Risk: $total',
+            style: const TextStyle(fontWeight: FontWeight.w900),
+          ),
+          const Spacer(),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              chip('-', t.minus),
+              chip('I', t.i),
+              chip('II', t.ii),
+              chip('III', t.iii),
+              chip('IV', t.iv),
+              chip('V', t.v),
+            ],
+          ),
+        ],
       ),
     );
   }

@@ -356,7 +356,6 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
                                       labelText: "plant".tr(context),
                                       filled: true,
                                       fillColor: Colors.white.withOpacity(0.12),
-
                                       border: OutlineInputBorder(
                                         borderRadius: BorderRadius.circular(14),
                                         borderSide: BorderSide(
@@ -455,6 +454,7 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
                                       group: PatrolGroup.Audit,
                                       title: 'SRG Safety Audit',
                                       icon: Icons.groups,
+                                      enabled: true,
                                       prefix: 'Audit',
                                       titleScreen: 'Safety Audit',
                                     ),
@@ -466,7 +466,7 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
                                       title: 'QA Quality Patrol',
                                       icon: Icons.verified,
                                       prefix: 'QA Patrol',
-                                      enabled: false,
+                                      enabled: true,
                                       titleScreen: 'QA Patrol',
                                     ),
                                   ),
@@ -604,7 +604,7 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
       case PatrolGroup.Audit:
         return Colors.green.shade400; // SRG Safety Audit
       case PatrolGroup.QualityPatrol:
-        return Colors.purpleAccent.shade400; // QA Quality Audit
+        return Colors.purpleAccent.shade100; // QA Quality Audit
     }
   }
 
@@ -734,101 +734,101 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
   }) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
-      child: Container(
-        child: Column(
-          children: [
-            _patrolButton(
-              number: '1)',
-              title: '$prefix Before',
-              color: color,
-              enabled: true,
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => CameraScreen(
-                      machines: machines,
-                      patrolTeams: teams,
-                      lang: currentLang,
-                      selectedPlant: selectedFactory,
-                      patrolGroup: group,
-                      titleScreen: titleScreen,
-                      accountCode: widget.accountCode,
-                      autoTeam: _autoTeam,
-                    ),
+      child: Column(
+        children: [
+          _patrolButton(
+            number: '1)',
+            title: '$prefix Before',
+            color: color,
+            enabled: true,
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => CameraScreen(
+                    machines: machines,
+                    patrolTeams: teams,
+                    lang: currentLang,
+                    selectedPlant: selectedFactory,
+                    patrolGroup: group,
+                    titleScreen: titleScreen,
+                    accountCode: widget.accountCode,
+                    autoTeam: _autoTeam,
                   ),
-                );
-              },
-            ),
-            const SizedBox(height: 16),
-            _patrolButton(
-              number: '2)',
-              title: 'Action After',
-              color: color,
-              enabled: true,
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => AfterDetailScreen(
-                      accountCode: widget.accountCode,
-                      machines: machines,
-                      selectedPlant: selectedFactory,
-                      titleScreen: titleScreen,
-                      patrolGroup: group,
-                    ),
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 16),
+          _patrolButton(
+            number: '2)',
+            title: 'Action After',
+            color: color,
+            enabled: true,
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => AfterDetailScreen(
+                    accountCode: widget.accountCode,
+                    machines: machines,
+                    selectedPlant: selectedFactory,
+                    titleScreen: titleScreen,
+                    patrolGroup: group,
                   ),
-                );
-              },
-            ),
-            const SizedBox(height: 16),
-            _patrolButton(
-              number: '3)',
-              title: 'HSE ReCheck',
-              color: color,
-              enabled: true,
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => RecheckDetailScreen(
-                      accountCode: widget.accountCode,
-                      machines: machines,
-                      selectedPlant: selectedFactory,
-                      titleScreen: titleScreen,
-                      patrolGroup: group,
-                    ),
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 16),
+          _patrolButton(
+            number: '3)',
+            title: 'HSE ReCheck',
+            color: color,
+            enabled: true,
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => RecheckDetailScreen(
+                    accountCode: widget.accountCode,
+                    machines: machines,
+                    selectedPlant: selectedFactory,
+                    titleScreen: titleScreen,
+                    patrolGroup: group,
                   ),
-                );
-              },
-            ),
-            const SizedBox(height: 16),
-            // _patrolButton(
-            //   number: '4)',
-            //   title: 'Data Table',
-            //   color: color,
-            //   enabled: true,
-            //   onTap: () {
-            //     final url =
-            //         'http://192.168.122.16:64644/?group=${Uri.encodeComponent(group.name)}';
-            //
-            //     html.window.open(
-            //       url,
-            //       '_blank', // ?? m? tab m?i
-            //     );
-            //   },
-            // ),
-            _patrolButton(
-              number: '4)',
-              title: 'Data Table',
-              color: color,
-              enabled: true,
-              onTap: () {
-                context.go('/home/summary?group=${group.name}');
-              },
-            ),
-          ],
-        ),
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 16),
+          // _patrolButton(
+          //   number: '4)',
+          //   title: 'Data Table',
+          //   color: color,
+          //   enabled: true,
+          //   onTap: () {
+          //     final url =
+          //         'http://192.168.122.16:64644/?group=${Uri.encodeComponent(group.name)}';
+          //
+          //     html.window.open(
+          //       url,
+          //       '_blank', // ?? m? tab m?i
+          //     );
+          //   },
+          // ),
+          _patrolButton(
+            number: '4)',
+            title: 'Data Table',
+            color: color,
+            enabled: true,
+            onTap: () {
+              context.go(
+                '/home/summary?group=${group.name}&plant=$selectedFactory',
+              );
+            },
+          ),
+        ],
       ),
     );
   }
