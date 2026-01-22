@@ -361,13 +361,11 @@ class _AfterPatrolState extends State<AfterPatrol> {
               const SizedBox(height: 12),
 
               IntrinsicHeight(
-                child: Expanded(
-                  child: _buildInfoCard(
-                    icon: Icons.groups_rounded,
-                    label: "Patrol User",
-                    color: Colors.white70,
-                    value: report.patrol_user!,
-                  ),
+                child: _buildInfoCard(
+                  icon: Icons.groups_rounded,
+                  label: "Patrol User",
+                  color: Colors.white70,
+                  value: report.patrol_user!,
                 ),
               ),
 

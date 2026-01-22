@@ -42,7 +42,7 @@ class _AfterDetailScreenState extends State<AfterDetailScreen> {
 
   // filter input
   String? _selectedPlant;
-  String _atStatus = 'Wait'; // hoặc 'Wait,Redo' tùy BE bạn định nghĩa
+  String _atStatus = 'Wait'; // 'Wait,Redo'
 
   @override
   void initState() {
@@ -68,6 +68,7 @@ class _AfterDetailScreenState extends State<AfterDetailScreen> {
       _futurePivot = PatrolPivotApi.fetchPivot(
         plant: _selectedPlant!,
         atStatus: statuses, // ✅ đổi param
+        type: widget.patrolGroup.name,
       );
     });
   }
