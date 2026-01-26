@@ -145,8 +145,8 @@ class _AfterDetailScreenState extends State<AfterDetailScreen> {
                 style: const TextStyle(color: Colors.white),
                 items: const [
                   DropdownMenuItem(value: 'Wait', child: Text('Wait')),
-                  // DropdownMenuItem(value: 'Redo', child: Text('Redo')),
-                  DropdownMenuItem(value: 'Done', child: Text('Done')),
+                  DropdownMenuItem(value: 'Redo', child: Text('Redo')),
+                  // DropdownMenuItem(value: 'Done', child: Text('Done')),
                 ],
                 onChanged: (v) {
                   if (v == null) return;
