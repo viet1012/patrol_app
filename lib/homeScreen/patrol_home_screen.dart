@@ -454,7 +454,7 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
                                       group: PatrolGroup.Audit,
                                       title: 'SRG Safety Audit',
                                       icon: Icons.groups,
-                                      enabled: true,
+                                      enabled: false,
                                       prefix: 'Audit',
                                       titleScreen: 'Safety Audit',
                                     ),
@@ -783,7 +783,7 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
           const SizedBox(height: 16),
           _patrolButton(
             number: '3)',
-            title: 'HSE ReCheck',
+            title: group.name == 'Patrol' ? 'HSE ReCheck' : 'QA Recheck',
             color: color,
             enabled: true,
             onTap: () {

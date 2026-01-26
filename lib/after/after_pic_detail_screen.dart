@@ -494,12 +494,12 @@ class _AfterPicDetailScreenState extends State<AfterPicDetailScreen> {
         patrolGroup: widget.patrolGroup,
         report: r,
       );
+    } else {
+      return AfterPatrol(
+        accountCode: widget.accountCode,
+        id: r.id!,
+        patrolGroup: widget.patrolGroup,
+      );
     }
-
-    return AfterPatrol(
-      accountCode: widget.accountCode,
-      id: r.id!,
-      patrolGroup: widget.patrolGroup,
-    );
   }
 }
