@@ -862,7 +862,7 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
       );
     }
 
-    final url = '${ApiConfig.imgUrl}/images/$imageName';
+    final url = '${ApiConfig.baseUrl}/images/$imageName';
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(4),
