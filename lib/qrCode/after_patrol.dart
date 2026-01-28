@@ -22,6 +22,7 @@ import '../widget/glass_action_button.dart';
 
 class AfterPatrol extends StatefulWidget {
   final String accountCode;
+
   // final String plant;
   final int? id; // bắt buộc
   final String? qrCode; // có thể null
@@ -35,6 +36,7 @@ class AfterPatrol extends StatefulWidget {
     this.qrCode,
     required this.patrolGroup,
   });
+
   @override
   State<AfterPatrol> createState() => _AfterPatrolState();
 }
@@ -124,7 +126,6 @@ class _AfterPatrolState extends State<AfterPatrol> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadReport(); // ✅ gọi sau khi build frame đầu
     });
-
   }
 
   @override
@@ -176,7 +177,8 @@ class _AfterPatrolState extends State<AfterPatrol> {
     return Scaffold(
       appBar: AppBar(
         centerTitle: false,
-        titleSpacing: 4, // 👈 kéo sát về leading
+        titleSpacing: 4,
+        // 👈 kéo sát về leading
         leading: GlassActionButton(
           icon: Icons.arrow_back_rounded,
           onTap: () {
@@ -398,9 +400,15 @@ class _AfterPatrolState extends State<AfterPatrol> {
 
               Row(
                 children: [
-                  Expanded(child: _sectionInlineEdit('Comment', _commentAfStatusCtrl)),
-                  GlassActionButton(icon: Icons.update, onTap: _onSaveUpdateAfStatus),
-
+                  Expanded(
+                    child: _sectionInlineEdit('Comment', _commentAfStatusCtrl),
+                  ),
+                  if (_commentAfStatusCtrl.text.trim().isNotEmpty)
+                    GlassActionButton(
+                      icon: Icons.browser_updated,
+                      onTap: _onSaveUpdateAfStatus,
+                      backgroundColor: Colors.lightBlue,
+                    ),
                 ],
               ),
 
@@ -757,7 +765,6 @@ class _AfterPatrolState extends State<AfterPatrol> {
 
   Future<void> _onSaveUpdateAfStatus() async {
     try {
-
       await updateReportApi(
         id: _report!.id!,
         atComment: _commentAfStatusCtrl.text.trim(),
@@ -792,7 +799,7 @@ class _AfterPatrolState extends State<AfterPatrol> {
         context: context,
         title: 'Update Failed',
         message:
-        'Unable to update the report.\nPlease check your connection or try again.',
+            'Unable to update the report.\nPlease check your connection or try again.',
       );
     }
   }
@@ -823,6 +830,11 @@ class _AfterPatrolState extends State<AfterPatrol> {
               borderSide: BorderSide.none,
             ),
           ),
+          onChanged: (value) {
+            setState(
+              () {},
+            ); // Bắt buộc gọi setState để UI rebuild và nút lưu hiện/ẩn đúng
+          },
         ),
       ],
     );
@@ -856,39 +868,37 @@ class _AfterPatrolState extends State<AfterPatrol> {
             ),
 
             /// ===== COMMENT =====
-            // if (_cameraKey.currentState != null &&
-            //     _cameraKey.currentState!.images.isNotEmpty) ...[
-            //   const SizedBox(height: 16),
-            //   TextField(
-            //     controller: _commentCtrl,
-            //     maxLines: 3,
-            //     decoration: InputDecoration(
-            //       labelText: 'Comment',
-            //       labelStyle: const TextStyle(color: Colors.white70),
-            //       enabledBorder: OutlineInputBorder(
-            //         borderSide: BorderSide(color: Colors.white54),
-            //         borderRadius: BorderRadius.circular(8),
-            //       ),
-            //       focusedBorder: OutlineInputBorder(
-            //         borderSide: BorderSide(color: Colors.blueAccent.shade200),
-            //         borderRadius: BorderRadius.circular(8),
-            //       ),
-            //       filled: true,
-            //       fillColor: Colors.white.withOpacity(0.12),
-            //     ),
-            //     style: const TextStyle(color: Colors.white),
-            //     onChanged: (value) {
-            //       setState(
-            //         () {},
-            //       ); // Bắt buộc gọi setState để UI rebuild và nút lưu hiện/ẩn đúng
-            //     },
-            //   ),
-            // ],
+            if (_cameraKey.currentState != null &&
+                _cameraKey.currentState!.images.isNotEmpty) ...[
+              //   const SizedBox(height: 16),
+              //   TextField(
+              //     controller: _commentCtrl,
+              //     maxLines: 3,
+              //     decoration: InputDecoration(
+              //       labelText: 'Comment',
+              //       labelStyle: const TextStyle(color: Colors.white70),
+              //       enabledBorder: OutlineInputBorder(
+              //         borderSide: BorderSide(color: Colors.white54),
+              //         borderRadius: BorderRadius.circular(8),
+              //       ),
+              //       focusedBorder: OutlineInputBorder(
+              //         borderSide: BorderSide(color: Colors.blueAccent.shade200),
+              //         borderRadius: BorderRadius.circular(8),
+              //       ),
+              //       filled: true,
+              //       fillColor: Colors.white.withOpacity(0.12),
+              //     ),
+              //     style: const TextStyle(color: Colors.white),
+              //     onChanged: (value) {
+              //       setState(
+              //         () {},
+              //       ); // Bắt buộc gọi setState để UI rebuild và nút lưu hiện/ẩn đúng
+              //     },
+              //   ),
+              const SizedBox(height: 20),
 
-            const SizedBox(height: 20),
-
-            /// ===== SAVE =====
-            if (_commentAfStatusCtrl.text.trim().isNotEmpty)
+              /// ===== SAVE =====
+              // if (_commentAfStatusCtrl.text.trim().isNotEmpty)
               SizedBox(
                 width: 60,
                 height: 60,
@@ -898,6 +908,14 @@ class _AfterPatrolState extends State<AfterPatrol> {
                           _cameraKey.currentState!.images.isNotEmpty &&
                           _msnvCtrl.text.trim().isNotEmpty)
                       ? () async {
+                          if (_commentAfStatusCtrl.text.trim().isEmpty) {
+                            _showSnackBar(
+                              'Please enter comment before saving.',
+                              Colors.orange,
+                            );
+                            return;
+                          }
+
                           try {
                             showLoading(context);
 
@@ -939,6 +957,7 @@ class _AfterPatrolState extends State<AfterPatrol> {
                   backgroundColor: Color(0xFF2665B6),
                 ),
               ),
+            ],
           ],
         ),
       ),

@@ -1,11 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
-import 'dart:ui';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' hide MultipartFile;
+
 import '../after/camera_after_box.dart';
 import '../after/replaceable_image_item.dart';
 import '../api/dio_client.dart';
@@ -107,7 +107,8 @@ class _RecheckDetailPageState extends State<RecheckDetailPage> {
     return Scaffold(
       appBar: AppBar(
         centerTitle: false,
-        titleSpacing: 4, // 👈 kéo sát về leading
+        titleSpacing: 4,
+        // 👈 kéo sát về leading
         leading: GlassActionButton(
           icon: Icons.arrow_back_rounded,
           onTap: () => Navigator.pop(context, true),
@@ -826,9 +827,7 @@ class _RecheckDetailPageState extends State<RecheckDetailPage> {
         duration: const Duration(milliseconds: 180),
         padding: const EdgeInsets.symmetric(vertical: 14),
         decoration: BoxDecoration(
-          color: selected
-              ? color.withOpacity(0.9)
-              : Colors.black.withOpacity(0.2),
+          color: selected ? color.withOpacity(0.9) : color.withOpacity(0.2),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: selected ? color : Colors.white.withOpacity(0.25),
