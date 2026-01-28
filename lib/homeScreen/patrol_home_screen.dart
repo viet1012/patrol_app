@@ -454,7 +454,7 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
                                       group: PatrolGroup.Audit,
                                       title: 'SRG Safety Audit',
                                       icon: Icons.groups,
-                                      enabled: false,
+                                      enabled: true,
                                       prefix: 'Audit',
                                       titleScreen: 'Safety Audit',
                                     ),
@@ -540,17 +540,6 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
             if (_qrHandled) return;
             _qrHandled = true;
 
-            // final plant = selectedFactory?.trim();
-            // if (plant == null || plant.isEmpty) {
-            //   _qrHandled = false;
-            //   CommonUI.showWarning(
-            //     context: ctx,
-            //     title: 'QR Failed',
-            //     message: 'Please select *${'plant'.tr(context)}',
-            //   );
-            //   return;
-            // }
-
             await dialogKey.currentState?.stopCamera(); // ✅ dùng key local
 
             final nav = Navigator.of(ctx, rootNavigator: true);
@@ -576,6 +565,17 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
     ).whenComplete(() {
       _qrHandled = false;
     });
+  }
+
+  String _recheckTitle(PatrolGroup group) {
+    switch (group) {
+      case PatrolGroup.Patrol:
+        return 'HSE ReCheck';
+      case PatrolGroup.Audit:
+        return 'SRG Recheck';
+      case PatrolGroup.QualityPatrol:
+        return 'QA Recheck';
+    }
   }
 
   Widget _animatedCard(int index, Widget child) {
@@ -783,7 +783,7 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
           const SizedBox(height: 16),
           _patrolButton(
             number: '3)',
-            title: group.name == 'Patrol' ? 'HSE ReCheck' : 'QA Recheck',
+            title: _recheckTitle(group),
             color: color,
             enabled: true,
             onTap: () {

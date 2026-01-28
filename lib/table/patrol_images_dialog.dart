@@ -28,7 +28,7 @@ class PatrolImagesDialog {
         title: title,
         e: e,
         names: names,
-        baseUrl: ApiConfig.imgUrl,
+        baseUrl: ApiConfig.baseUrl,
       ),
     );
   }

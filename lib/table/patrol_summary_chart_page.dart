@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
 
+import '../api/api_config.dart';
 import '../common/common_ui_helper.dart';
 import '../model/risk_summary.dart';
 
@@ -63,7 +64,9 @@ class _PatrolRiskSummarySfPageState extends State<PatrolRiskSummarySfPage> {
           receiveTimeout: const Duration(seconds: 12),
         ),
       ),
-      baseUrl: 'http://192.168.122.15:9299',
+      // baseUrl: 'http://192.168.122.15:9299',
+      baseUrl: ApiConfig.baseUrl,
+
     );
 
     final now = DateTime.now();
