@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../session/session_store.dart';
 import '../widget/glass_action_button.dart';
 
 class CommonUI {
@@ -464,6 +465,7 @@ class CommonUI {
                     const SizedBox(height: 26),
 
                     // BUTTON
+                    // BUTTON
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
@@ -476,8 +478,12 @@ class CommonUI {
                             borderRadius: BorderRadius.circular(16),
                           ),
                         ),
-
-                        onPressed: () => context.go('/home'),
+                        onPressed: () async {
+                          // ✅ clear session + về login
+                          await SessionStore.clear();
+                          if (!context.mounted) return;
+                          context.go('/');
+                        },
                         child: Text(
                           buttonText,
                           style: const TextStyle(
@@ -487,6 +493,30 @@ class CommonUI {
                         ),
                       ),
                     ),
+
+                    // SizedBox(
+                    //   width: double.infinity,
+                    //   child: ElevatedButton(
+                    //     style: ElevatedButton.styleFrom(
+                    //       elevation: 0,
+                    //       padding: const EdgeInsets.symmetric(vertical: 14),
+                    //       backgroundColor: Colors.white.withOpacity(0.9),
+                    //       foregroundColor: Colors.black,
+                    //       shape: RoundedRectangleBorder(
+                    //         borderRadius: BorderRadius.circular(16),
+                    //       ),
+                    //     ),
+                    //
+                    //     onPressed: () => context.go('/home'),
+                    //     child: Text(
+                    //       buttonText,
+                    //       style: const TextStyle(
+                    //         fontSize: 15,
+                    //         fontWeight: FontWeight.w700,
+                    //       ),
+                    //     ),
+                    //   ),
+                    // ),
                   ],
                 ),
               ),
@@ -567,7 +597,10 @@ class CommonUI {
                   const SizedBox(height: 8),
                   GlassActionButton(
                     icon: Icons.arrow_back_rounded,
-                    onTap: () => Navigator.pop(context, false),
+                    onTap: () {
+                      // ✅ về Home bằng go_router
+                      context.go('/home');
+                    },
                   ),
                 ],
               ),

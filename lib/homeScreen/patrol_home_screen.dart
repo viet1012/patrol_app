@@ -280,13 +280,10 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
                   ),
                 )
               : errorMessage != null && errorMessage!.isNotEmpty
-              ? ErrorDisplay(
-                  errorMessage: errorMessage!,
-                  onRetry: () {
-                    _loadHseMaster();
-                    _loadTeams();
-                  },
-                )
+              ? CommonUI.errorPage(
+            message:errorMessage.toString(),
+            context: context,
+          )
               : Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 24,
