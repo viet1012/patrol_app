@@ -498,14 +498,34 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
                                 await SessionStore.clear();
                                 if (!context.mounted) return;
 
-                                Navigator.pushAndRemoveUntil(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => const LoginPage(),
-                                  ),
-                                  (_) => false,
-                                );
+                                context.go('/'); // ✅ QUAY VỀ LOGIN
                               },
+
+                              // onTap: () async {
+                              //   final confirm = await CommonUI.showGlassConfirm(
+                              //     context: context,
+                              //     icon: Icons.logout_rounded,
+                              //     iconColor: Colors.redAccent,
+                              //     title: "Logout",
+                              //     message: "Do you want to logout?",
+                              //     cancelText: "Cancel",
+                              //     confirmText: "Logout",
+                              //     confirmColor: Colors.redAccent,
+                              //   );
+                              //
+                              //   if (!confirm || !context.mounted) return;
+                              //
+                              //   await SessionStore.clear();
+                              //   if (!context.mounted) return;
+                              //
+                              //   Navigator.pushAndRemoveUntil(
+                              //     context,
+                              //     MaterialPageRoute(
+                              //       builder: (_) => const LoginPage(),
+                              //     ),
+                              //     (_) => false,
+                              //   );
+                              // },
                             ),
                           ),
                           Center(

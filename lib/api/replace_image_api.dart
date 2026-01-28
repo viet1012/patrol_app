@@ -156,6 +156,10 @@ Future<void> updateReportApi({
   // ✅ images
   List<Uint8List>? images,
   List<String>? deleteImages,
+
+  String ? atComment,
+  String ? atStatus
+
 }) async {
   final path = '/api/patrol_report/$id/edit';
 
@@ -178,6 +182,10 @@ Future<void> updateReportApi({
 
     if (editUser != null) 'editUser': editUser,
     if (deleteImages != null) 'deleteImages': deleteImages,
+
+    if (atComment != null) 'atComment': atComment,
+    if (atStatus != null) 'atStatus': atStatus,
+
   };
 
   final formData = FormData.fromMap({
