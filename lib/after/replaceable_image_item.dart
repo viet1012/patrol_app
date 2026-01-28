@@ -179,6 +179,7 @@ class _ReplaceableImageItemState extends State<ReplaceableImageItem> {
   // ================= UI =================
   @override
   Widget build(BuildContext context) {
+    print('imgURL: $imageUrl');
     return AspectRatio(
       aspectRatio: 280 / 320,
       child: Stack(
