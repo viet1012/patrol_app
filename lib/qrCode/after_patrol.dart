@@ -44,7 +44,7 @@ class _AfterPatrolState extends State<AfterPatrol> {
       GlobalKey<CameraAfterBoxState>();
 
   bool _enableCamera = false;
-
+  final TextEditingController _commentAfStatusCtrl = TextEditingController();
   final TextEditingController _commentCtrl = TextEditingController();
   final TextEditingController _msnvCtrl = TextEditingController();
   String? _employeeName;
@@ -103,6 +103,7 @@ class _AfterPatrolState extends State<AfterPatrol> {
         _loading = false;
         _enableCamera = true;
       });
+      _commentAfStatusCtrl.text = _report?.atComment ?? '';
     } catch (e) {
       setState(() {
         _error = e.toString();
@@ -114,6 +115,7 @@ class _AfterPatrolState extends State<AfterPatrol> {
   @override
   void initState() {
     super.initState();
+
     _msnvCtrl.text = widget.accountCode;
     fetchEmployeeName(
       widget.accountCode,
@@ -122,11 +124,14 @@ class _AfterPatrolState extends State<AfterPatrol> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadReport(); // ✅ gọi sau khi build frame đầu
     });
+
   }
 
   @override
   void dispose() {
     _debounce?.cancel();
+    _commentAfStatusCtrl.dispose();
+
     _commentCtrl.dispose();
     _msnvCtrl.dispose();
     super.dispose();
@@ -388,6 +393,15 @@ class _AfterPatrolState extends State<AfterPatrol> {
                     ],
                   ),
                 ),
+              ),
+              const SizedBox(height: 12),
+
+              Row(
+                children: [
+                  Expanded(child: _sectionInlineEdit('Comment', _commentAfStatusCtrl)),
+                  GlassActionButton(icon: Icons.update, onTap: _onSaveUpdateAfStatus),
+
+                ],
               ),
 
               const SizedBox(height: 12),
@@ -741,6 +755,79 @@ class _AfterPatrolState extends State<AfterPatrol> {
     );
   }
 
+  Future<void> _onSaveUpdateAfStatus() async {
+    try {
+
+      await updateReportApi(
+        id: _report!.id!,
+        atComment: _commentAfStatusCtrl.text.trim(),
+        atStatus: 'Wait',
+      );
+
+      if (!mounted) return;
+
+      /// ✅ THÀNH CÔNG → dialog glass
+      CommonUI.showGlassDialog(
+        context: context,
+        icon: Icons.check_circle_rounded,
+        iconColor: Colors.greenAccent,
+        title: 'Update Successful',
+        message: 'The report has been updated successfully.',
+        buttonText: 'OK',
+      );
+
+      /// ⏳ đợi dialog đóng rồi pop
+      await Future.delayed(const Duration(milliseconds: 500));
+
+      if (!mounted) return;
+      Navigator.pop(context, true); // báo màn trước reload API
+    } catch (e, s) {
+      debugPrint('❌ UPDATE FAILED: $e');
+      debugPrintStack(stackTrace: s);
+
+      if (!mounted) return;
+
+      /// ❌ THẤT BẠI → warning dialog
+      CommonUI.showWarning(
+        context: context,
+        title: 'Update Failed',
+        message:
+        'Unable to update the report.\nPlease check your connection or try again.',
+      );
+    }
+  }
+
+  Widget _sectionInlineEdit(String title, TextEditingController ctrl) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: const TextStyle(
+            fontWeight: FontWeight.w600,
+            color: Colors.white,
+          ),
+        ),
+        const SizedBox(height: 6),
+        TextField(
+          controller: ctrl,
+          maxLines: 6,
+          style: const TextStyle(color: Colors.white),
+          decoration: InputDecoration(
+            hintText: 'Enter $title',
+            hintStyle: TextStyle(color: Colors.white38),
+            filled: true,
+            fillColor: Colors.white.withOpacity(0.05),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide.none,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildRetakeSection(PatrolReportModel report) {
     return Card(
       color: const Color(0xFF121826).withOpacity(.4),
@@ -769,39 +856,39 @@ class _AfterPatrolState extends State<AfterPatrol> {
             ),
 
             /// ===== COMMENT =====
-            if (_cameraKey.currentState != null &&
-                _cameraKey.currentState!.images.isNotEmpty) ...[
-              const SizedBox(height: 16),
-              TextField(
-                controller: _commentCtrl,
-                maxLines: 3,
-                decoration: InputDecoration(
-                  labelText: 'Comment',
-                  labelStyle: const TextStyle(color: Colors.white70),
-                  enabledBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: Colors.white54),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: Colors.blueAccent.shade200),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  filled: true,
-                  fillColor: Colors.white.withOpacity(0.12),
-                ),
-                style: const TextStyle(color: Colors.white),
-                onChanged: (value) {
-                  setState(
-                    () {},
-                  ); // Bắt buộc gọi setState để UI rebuild và nút lưu hiện/ẩn đúng
-                },
-              ),
-            ],
+            // if (_cameraKey.currentState != null &&
+            //     _cameraKey.currentState!.images.isNotEmpty) ...[
+            //   const SizedBox(height: 16),
+            //   TextField(
+            //     controller: _commentCtrl,
+            //     maxLines: 3,
+            //     decoration: InputDecoration(
+            //       labelText: 'Comment',
+            //       labelStyle: const TextStyle(color: Colors.white70),
+            //       enabledBorder: OutlineInputBorder(
+            //         borderSide: BorderSide(color: Colors.white54),
+            //         borderRadius: BorderRadius.circular(8),
+            //       ),
+            //       focusedBorder: OutlineInputBorder(
+            //         borderSide: BorderSide(color: Colors.blueAccent.shade200),
+            //         borderRadius: BorderRadius.circular(8),
+            //       ),
+            //       filled: true,
+            //       fillColor: Colors.white.withOpacity(0.12),
+            //     ),
+            //     style: const TextStyle(color: Colors.white),
+            //     onChanged: (value) {
+            //       setState(
+            //         () {},
+            //       ); // Bắt buộc gọi setState để UI rebuild và nút lưu hiện/ẩn đúng
+            //     },
+            //   ),
+            // ],
 
             const SizedBox(height: 20),
 
             /// ===== SAVE =====
-            if (_commentCtrl.text.trim().isNotEmpty)
+            if (_commentAfStatusCtrl.text.trim().isNotEmpty)
               SizedBox(
                 width: 60,
                 height: 60,
@@ -818,7 +905,9 @@ class _AfterPatrolState extends State<AfterPatrol> {
                               userAfter: widget.accountCode,
                               reportId: report.id!,
                               atPic: '${_msnvCtrl.text.trim()}_$_employeeName',
-                              comment: _commentCtrl.text.trim(),
+                              // comment: _commentCtrl.text.trim(),
+                              comment: _commentAfStatusCtrl.text.trim(),
+
                               images: _cameraKey.currentState!.images,
                             );
                             hideLoading(context);

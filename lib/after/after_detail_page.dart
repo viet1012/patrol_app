@@ -41,6 +41,8 @@ class _AfterDetailPageState extends State<AfterDetailPage> {
 
   bool _enableCamera = false;
 
+  final TextEditingController _commentAfStatusCtrl = TextEditingController();
+
   final TextEditingController _commentCtrl = TextEditingController();
   final TextEditingController _msnvCtrl = TextEditingController();
   String? _employeeName;
@@ -56,6 +58,10 @@ class _AfterDetailPageState extends State<AfterDetailPage> {
   @override
   void initState() {
     super.initState();
+
+    _commentAfStatusCtrl.text = widget.report.atComment ?? '';
+
+
     _msnvCtrl.text = widget.accountCode;
     fetchEmployeeName(
       widget.accountCode,
@@ -73,6 +79,7 @@ class _AfterDetailPageState extends State<AfterDetailPage> {
   @override
   void dispose() {
     _debounce?.cancel();
+    _commentAfStatusCtrl.dispose();
     _commentCtrl.dispose();
     _msnvCtrl.dispose();
     super.dispose();
@@ -316,6 +323,8 @@ class _AfterDetailPageState extends State<AfterDetailPage> {
 
               const SizedBox(height: 12),
               _buildImageGrid(widget.report.imageNames),
+              const SizedBox(height: 12),
+              _buildUpdatePIC(),
               const SizedBox(height: 8),
               _buildRetakeSection(),
             ],
@@ -656,6 +665,108 @@ class _AfterDetailPageState extends State<AfterDetailPage> {
       },
     );
   }
+  Widget _sectionInlineEdit(String title, TextEditingController ctrl) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: const TextStyle(
+            fontWeight: FontWeight.w600,
+            color: Colors.white,
+          ),
+        ),
+        const SizedBox(height: 6),
+        TextField(
+          controller: ctrl,
+          maxLines: 6,
+          style: const TextStyle(color: Colors.white),
+          decoration: InputDecoration(
+            hintText: 'Enter $title',
+            hintStyle: TextStyle(color: Colors.white38),
+            filled: true,
+            fillColor: Colors.white.withOpacity(0.05),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide.none,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+  Widget _buildUpdatePIC() {
+    return Card(
+      color: const Color(0xFF121826).withOpacity(.4),
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+
+            /// ===== COMMENT =====
+            Expanded(child: _sectionInlineEdit('Comment', _commentCtrl)),
+
+
+            const SizedBox(height: 20),
+
+            /// ===== SAVE =====
+              SizedBox(
+                width: 60,
+                height: 60,
+                child: GlassActionButton(
+                  onTap:
+                  (_cameraKey.currentState != null &&
+                      _cameraKey.currentState!.images.isNotEmpty &&
+                      _msnvCtrl.text.trim().isNotEmpty)
+                      ? () async {
+                    try {
+                      showLoading(context);
+
+                      await updateAtReport(
+                        userAfter: widget.accountCode,
+                        reportId: widget.report.id!,
+                        atPic: '${_msnvCtrl.text.trim()}_$_employeeName',
+                        comment: _commentCtrl.text.trim(),
+                        images: _cameraKey.currentState!.images,
+                      );
+                      hideLoading(context);
+
+                      /// RESET UI → cho phép chụp lại tiếp
+                      setState(() {
+                        _commentCtrl.clear();
+                        _enableCamera = false;
+                      });
+                      _cameraKey.currentState?.clearAll(); // xóa hết ảnh
+
+                      /// FORCE reload camera
+                      await Future.delayed(
+                        const Duration(milliseconds: 200),
+                      );
+                      setState(() => _enableCamera = true);
+
+                      _showSnackBar(
+                        'Update AF successful!',
+                        Colors.green,
+                      );
+                    } catch (e) {
+                      debugPrint('Update AT error: $e');
+                      _showSnackBar('Server error: $e', Colors.red);
+                    }
+                  }
+                      : null,
+                  icon: Icons.save,
+                  backgroundColor: Color(0xFF2665B6),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
 
   Widget _buildRetakeSection() {
     return Card(
@@ -793,6 +904,8 @@ class _AfterDetailPageState extends State<AfterDetailPage> {
     try {
       const emptyLabel = 'UNKNOWN';
       final picToApi = (_selectedPIC == emptyLabel) ? null : _selectedPIC;
+
+      final atStatus = (_selectedPIC == emptyLabel) ? null : _selectedPIC;
 
       await updateReportApi(id: widget.report.id!, pic: picToApi);
 
