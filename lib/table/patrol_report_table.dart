@@ -99,6 +99,11 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
   @override
   void initState() {
     super.initState();
+
+    final now = DateTime.now();
+    _toD = now;
+    _fromD = DateTime(now.year, now.month, 1); // đầu tháng
+
     _futureReports = PatrolReportApi.fetchReports(
       type: widget.patrolGroup,
       plant: widget.plant,
@@ -130,16 +135,16 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
   }
 
   Widget _buildSummaryToggle() {
-    final fromD = _fromD == null ? null : _fmt(_fromD!);
-    final toD = _toD == null ? null : _fmt(_toD!);
     final fac = widget.plant;
     final type = widget.patrolGroup;
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 6, 12, 0),
       child: Row(
         children: [
           const Text('Summary', style: TextStyle(fontWeight: FontWeight.w700)),
           const Spacer(),
+
           TextButton.icon(
             onPressed: () {
               setState(() => _showSummary = !_showSummary);
@@ -152,17 +157,27 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
             ),
             label: Text(_showSummary ? 'Hide' : 'Show'),
           ),
+
           TextButton.icon(
             onPressed: () async {
+              final now = DateTime.now();
+              final from = _fromD ?? DateTime(now.year, now.month, 1);
+              final to = _toD ?? DateTime(now.year, now.month, now.day);
+
+              // ✅ setState chỉ trong callback
+              setState(() {
+                _fromD = from;
+                _toD = to;
+              });
+
               await BeforeAfterSummaryDialog.show(
                 context,
-                fromD: fromD!,
-                toD: toD!,
+                fromD: _fmt(from),
+                toD: _fmt(to),
                 fac: fac,
                 type: type,
               );
             },
-
             icon: const Icon(Icons.analytics_outlined, color: Colors.white),
             label: const Text('Open'),
           ),
@@ -232,7 +247,14 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
                           padding: const EdgeInsets.only(bottom: 8),
                           child: PatrolRiskSummarySfPage(
                             onSelect: _applySummaryFilter,
-                            onDateChanged: _applySummaryDate,
+                            onDateChanged: (from, to) {
+                              setState(() {
+                                _fromD = from;
+                                _toD = to;
+                              });
+                            },
+                            fromD: _fromD,
+                            toD: _toD,
                             plant: widget.plant,
                             patrolGroup: widget.patrolGroup,
                           ),
