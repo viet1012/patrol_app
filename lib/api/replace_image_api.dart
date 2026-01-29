@@ -1,9 +1,9 @@
 import 'dart:convert';
 import 'dart:typed_data';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/cupertino.dart';
 
-import '../model/patrol_edit_model.dart';
 import 'api_config.dart';
 import 'dio_client.dart';
 
@@ -157,9 +157,9 @@ Future<void> updateReportApi({
   List<Uint8List>? images,
   List<String>? deleteImages,
 
-  String ? atComment,
-  String ? atStatus
-
+  String? atComment,
+  String? atStatus,
+  String? atUser,
 }) async {
   final path = '/api/patrol_report/$id/edit';
 
@@ -185,7 +185,7 @@ Future<void> updateReportApi({
 
     if (atComment != null) 'atComment': atComment,
     if (atStatus != null) 'atStatus': atStatus,
-
+    if (atUser != null) 'atUser': atUser,
   };
 
   final formData = FormData.fromMap({

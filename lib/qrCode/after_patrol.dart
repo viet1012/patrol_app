@@ -1,12 +1,12 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
-import 'dart:ui';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' hide MultipartFile;
+
 import '../after/camera_after_box.dart';
 import '../after/replaceable_image_item.dart';
 import '../api/dio_client.dart';
@@ -768,6 +768,7 @@ class _AfterPatrolState extends State<AfterPatrol> {
       await updateReportApi(
         id: _report!.id!,
         atComment: _commentAfStatusCtrl.text.trim(),
+        atUser: widget.accountCode,
         atStatus: 'Wait',
       );
 
