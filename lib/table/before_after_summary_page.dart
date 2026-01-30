@@ -717,7 +717,7 @@ class _BeforeAfterSummaryDialogState extends State<BeforeAfterSummaryDialog> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'BEFORE / AFTER (${widget.fac})',
+                            'HSE PATROL SUMMARY → ${widget.fac}',
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 14,
