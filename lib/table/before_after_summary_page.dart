@@ -671,9 +671,9 @@ class _BeforeAfterSummaryDialogState extends State<BeforeAfterSummaryDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final maxW = 980.0;
+    final maxW = 1700.0; // ⬅ tăng lên
     final w = MediaQuery.of(context).size.width;
-    final dialogW = w < 520 ? w - 24 : (w < maxW ? w - 48 : maxW);
+    final dialogW = w < 600 ? w - 24 : (w < maxW ? w - 64 : maxW);
 
     return Dialog(
       backgroundColor: Colors.transparent,
@@ -734,10 +734,6 @@ class _BeforeAfterSummaryDialogState extends State<BeforeAfterSummaryDialog> {
                         ],
                       ),
                     ),
-                    GlassActionButton(
-                      icon: Icons.refresh_rounded,
-                      onTap: _refresh,
-                    ),
                   ],
                 ),
               ),
@@ -797,7 +793,7 @@ class _BeforeAfterSummaryDialogState extends State<BeforeAfterSummaryDialog> {
                             child: Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                SizedBox(width: 450, child: before),
+                                SizedBox(width: 400, child: before),
                                 const SizedBox(width: 12),
                                 Expanded(child: after),
                               ],
@@ -991,7 +987,7 @@ class _AfterCard extends StatelessWidget {
                     ),
                     _groupHeader(
                       'Finished (HSE recheck)',
-                      Colors.greenAccent,
+                      Colors.blueAccent,
                       _wNum * 6,
                     ),
                     _groupHeader('Remain', Colors.redAccent, _wNum * 6),
@@ -1002,6 +998,12 @@ class _AfterCard extends StatelessWidget {
                     _RowHeader(
                       cells: const [
                         _CellSpec('Area', w: _wDiv, align: TextAlign.left),
+                      ],
+                    ),
+                    _RowHeader(
+                      bg: const Color(0xFF8FEFA0),
+                      cells: const [
+                        // _CellSpec('Area', w: _wDiv, align: TextAlign.left),
                         _CellSpec('TTL', w: _wNum),
                         _CellSpec('I', w: _wNum),
                         _CellSpec('II', w: _wNum),
@@ -1011,6 +1013,7 @@ class _AfterCard extends StatelessWidget {
                       ],
                     ),
                     _RowHeader(
+                      bg: const Color(0xFF72C7F4),
                       cells: const [
                         _CellSpec('TTL', w: _wNum),
                         _CellSpec('I', w: _wNum),
@@ -1021,6 +1024,7 @@ class _AfterCard extends StatelessWidget {
                       ],
                     ),
                     _RowHeader(
+                      bg: const Color(0xFFF89292),
                       cells: const [
                         _CellSpec('TTL', w: _wNum),
                         _CellSpec('I', w: _wNum),
@@ -1038,13 +1042,17 @@ class _AfterCard extends StatelessWidget {
                   return Row(
                     children: [
                       _RowLine(
-                        bg: const Color(0xFFBFF2C8),
                         cells: [
                           _CellSpec(
                             r.division,
                             w: _wDiv,
                             align: TextAlign.left,
                           ),
+                        ],
+                      ),
+                      _RowLine(
+                        bg: const Color(0xFFBFF2C8),
+                        cells: [
                           _CellSpec('${r.proDoneTtl}', w: _wNum),
                           _CellSpec('${r.proDoneI}', w: _wNum),
                           _CellSpec('${r.proDoneII}', w: _wNum),
@@ -1054,7 +1062,7 @@ class _AfterCard extends StatelessWidget {
                         ],
                       ),
                       _RowLine(
-                        bg: const Color(0xFFBFF2C8),
+                        bg: const Color(0xFFBFE0F2),
                         cells: [
                           _CellSpec('${r.hseDoneTtl}', w: _wNum),
                           _CellSpec('${r.hseDoneI}', w: _wNum),
@@ -1082,10 +1090,42 @@ class _AfterCard extends StatelessWidget {
                 const SizedBox(height: 10),
                 Row(
                   children: [
+                    const Icon(
+                      Icons.check_circle,
+                      size: 16,
+                      color: Colors.green,
+                    ),
+                    const SizedBox(width: 4),
+                    const Text(
+                      'Done',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
                     _badgeNumber(totals.done, bg: Colors.yellow),
                     const SizedBox(width: 8),
                     _badgePercent(totals.donePct),
+
                     const SizedBox(width: 24),
+
+                    const Icon(
+                      Icons.hourglass_bottom,
+                      size: 16,
+                      color: Colors.orange,
+                    ),
+                    const SizedBox(width: 4),
+                    const Text(
+                      'Remain',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
                     _badgeNumber(totals.sumRemain, bg: Colors.yellow),
                     const SizedBox(width: 8),
                     _badgePercent(totals.remainPct),
@@ -1124,12 +1164,15 @@ class _Glass extends StatelessWidget {
 
 class _RowHeader extends StatelessWidget {
   final List<_CellSpec> cells;
+  final Color? bg;
 
-  const _RowHeader({required this.cells});
+  const _RowHeader({required this.cells, this.bg});
 
   @override
   Widget build(BuildContext context) {
-    return Row(children: cells.map((c) => _cell(c, header: true)).toList());
+    return Row(
+      children: cells.map((c) => _cell(c, header: true, bg: bg)).toList(),
+    );
   }
 }
 
@@ -1147,10 +1190,13 @@ class _RowLine extends StatelessWidget {
 
 Widget _cell(_CellSpec c, {bool header = false, Color? bg}) {
   final textColor = header ? Colors.black : Colors.black87;
-  final baseBg = header
-      ? const Color(0xFFDDDDDD)
-      : (bg ?? const Color(0xFFEFEFEF));
+  // final baseBg = header
+  //     ? const Color(0xFFDDDDDD)
+  //     : (bg ?? const Color(0xFFEFEFEF));
 
+  final baseBg = header
+      ? (bg ?? const Color(0xFFDDDDDD)) // ✅ header cũng dùng bg nếu truyền vào
+      : (bg ?? const Color(0xFFEFEFEF));
   return Container(
     width: c.w,
     height: header ? 34 : 38,

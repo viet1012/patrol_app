@@ -1,5 +1,3 @@
-
-
 class DivisionSummary {
   final String division;
 
