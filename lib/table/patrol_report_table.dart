@@ -1,22 +1,23 @@
 import 'package:chuphinh/common/common_ui_helper.dart';
-import 'package:chuphinh/homeScreen/patrol_home_screen.dart';
 import 'package:chuphinh/table/patrol_images_dialog.dart';
 import 'package:chuphinh/table/patrol_summary_chart_page.dart';
 import 'package:dio/dio.dart';
-import 'package:file_saver/file_saver.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+
 import '../api/api_config.dart';
 import '../api/patrol_report_api.dart';
 import '../api/patrol_report_download_api.dart';
 import '../model/patrol_export_query.dart';
 import '../model/patrol_report_model.dart';
 import '../widget/glass_action_button.dart';
+import 'before_after_summary_page.dart';
 import 'edit_report_dialog.dart';
 
 class PatrolReportTable extends StatefulWidget {
   final String patrolGroup;
   final String plant;
+
   const PatrolReportTable({
     super.key,
     required this.patrolGroup,
@@ -35,6 +36,7 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
 
   // UI state
   List<PatrolReportModel> _allReports = [];
+
   // UI column label -> backend query key
   static const Map<String, String> _uiColToQueryKey = {
     'Plant': 'plant',
@@ -97,6 +99,11 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
   @override
   void initState() {
     super.initState();
+
+    final now = DateTime.now();
+    _toD = now;
+    _fromD = DateTime(now.year, now.month, 1); // đầu tháng
+
     _futureReports = PatrolReportApi.fetchReports(
       type: widget.patrolGroup,
       plant: widget.plant,
@@ -128,12 +135,16 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
   }
 
   Widget _buildSummaryToggle() {
+    final fac = widget.plant;
+    final type = widget.patrolGroup;
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 6, 12, 0),
       child: Row(
         children: [
           const Text('Summary', style: TextStyle(fontWeight: FontWeight.w700)),
           const Spacer(),
+
           TextButton.icon(
             onPressed: () {
               setState(() => _showSummary = !_showSummary);
@@ -142,8 +153,33 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
               _showSummary
                   ? Icons.expand_less_rounded
                   : Icons.expand_more_rounded,
+              color: Colors.white,
             ),
             label: Text(_showSummary ? 'Hide' : 'Show'),
+          ),
+
+          TextButton.icon(
+            onPressed: () async {
+              final now = DateTime.now();
+              final from = _fromD ?? DateTime(now.year, now.month, 1);
+              final to = _toD ?? DateTime(now.year, now.month, now.day);
+
+              // ✅ setState chỉ trong callback
+              setState(() {
+                _fromD = from;
+                _toD = to;
+              });
+
+              await BeforeAfterSummaryDialog.show(
+                context,
+                fromD: _fmt(from),
+                toD: _fmt(to),
+                fac: fac,
+                type: type,
+              );
+            },
+            icon: const Icon(Icons.analytics_outlined, color: Colors.white),
+            label: const Text('Open'),
           ),
         ],
       ),
@@ -211,7 +247,14 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
                           padding: const EdgeInsets.only(bottom: 8),
                           child: PatrolRiskSummarySfPage(
                             onSelect: _applySummaryFilter,
-                            onDateChanged: _applySummaryDate,
+                            onDateChanged: (from, to) {
+                              setState(() {
+                                _fromD = from;
+                                _toD = to;
+                              });
+                            },
+                            fromD: _fromD,
+                            toD: _toD,
                             plant: widget.plant,
                             patrolGroup: widget.patrolGroup,
                           ),
@@ -1352,6 +1395,7 @@ class _Col {
   final String label;
   final double w;
   final TextAlign align;
+
   const _Col(this.label, this.w, this.align);
 }
 

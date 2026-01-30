@@ -1,5 +1,5 @@
-import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
+import 'package:flutter/material.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
 
 import '../api/api_config.dart';
@@ -10,8 +10,14 @@ class PatrolRiskSummarySfPage extends StatefulWidget {
   final String plant;
   final String patrolGroup;
 
+  /// ✅ range từ parent (PatrolReportTable)
+  final DateTime? fromD;
+  final DateTime? toD;
+
   final void Function(String grp, String division)? onSelect;
-  final void Function(DateTime from, DateTime to)? onDateChanged; // ✅
+
+  /// ✅ báo ngược lên parent khi user đổi ngày trong Summary
+  final void Function(DateTime from, DateTime to)? onDateChanged;
 
   const PatrolRiskSummarySfPage({
     super.key,
@@ -19,6 +25,8 @@ class PatrolRiskSummarySfPage extends StatefulWidget {
     this.onDateChanged,
     required this.plant,
     required this.patrolGroup,
+    this.fromD,
+    this.toD,
   });
 
   @override
@@ -28,9 +36,6 @@ class PatrolRiskSummarySfPage extends StatefulWidget {
 
 class _PatrolRiskSummarySfPageState extends State<PatrolRiskSummarySfPage> {
   late final PatrolApi api;
-
-  // String fac = 'Fac_2';
-  // String type = 'Patrol';
 
   late TextEditingController _fromCtrl;
   late TextEditingController _toCtrl;
@@ -64,19 +69,77 @@ class _PatrolRiskSummarySfPageState extends State<PatrolRiskSummarySfPage> {
           receiveTimeout: const Duration(seconds: 12),
         ),
       ),
-      // baseUrl: 'http://192.168.122.15:9299',
       baseUrl: ApiConfig.baseUrl,
-
     );
 
+    // ✅ 1) init range ưu tiên từ parent, nếu null thì default
     final now = DateTime.now();
-    _toDate = DateTime(now.year, now.month, now.day);
-    _fromDate = DateTime(now.year, now.month, 1);
+    final defaultTo = DateTime(now.year, now.month, now.day);
+    final defaultFrom = DateTime(now.year, now.month, 1);
+
+    _fromDate = _normalize(widget.fromD) ?? defaultFrom;
+    _toDate = _normalize(widget.toD) ?? defaultTo;
+
+    // ✅ đảm bảo from <= to
+    if (_fromDate.isAfter(_toDate)) {
+      _fromDate = defaultFrom;
+      _toDate = defaultTo;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        widget.onDateChanged?.call(_fromDate, _toDate);
+      });
+    }
 
     _fromCtrl = TextEditingController(text: _fmt(_fromDate));
     _toCtrl = TextEditingController(text: _fmt(_toDate));
 
     _fetch();
+  }
+
+  /// ✅ 2) parent đổi from/to => child sync lại + gọi API
+  @override
+  void didUpdateWidget(covariant PatrolRiskSummarySfPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    final newFrom = _normalize(widget.fromD);
+    final newTo = _normalize(widget.toD);
+
+    final oldFrom = _normalize(oldWidget.fromD);
+    final oldTo = _normalize(oldWidget.toD);
+
+    final changed =
+        (newFrom != null && !_sameDay(newFrom, oldFrom)) ||
+        (newTo != null && !_sameDay(newTo, oldTo));
+
+    if (changed) {
+      final now = DateTime.now();
+      final fallbackTo = DateTime(now.year, now.month, now.day);
+      final fallbackFrom = DateTime(now.year, now.month, 1);
+
+      final from = newFrom ?? fallbackFrom;
+      final to = newTo ?? fallbackTo;
+
+      if (from.isAfter(to)) return; // parent truyền sai thì bỏ qua
+
+      setState(() {
+        _fromDate = from;
+        _toDate = to;
+        _fromCtrl.text = _fmt(_fromDate);
+        _toCtrl.text = _fmt(_toDate);
+      });
+
+      _fetch();
+    }
+  }
+
+  DateTime? _normalize(DateTime? d) {
+    if (d == null) return null;
+    return DateTime(d.year, d.month, d.day);
+  }
+
+  bool _sameDay(DateTime? a, DateTime? b) {
+    if (a == null && b == null) return true;
+    if (a == null || b == null) return false;
+    return a.year == b.year && a.month == b.month && a.day == b.day;
   }
 
   @override
@@ -105,12 +168,11 @@ class _PatrolRiskSummarySfPageState extends State<PatrolRiskSummarySfPage> {
       if (!mounted) return;
 
       if (res.isEmpty) {
-        // ✅ không phá dữ liệu cũ
         setState(() {
           _loading = false;
           _noData = true;
           _noDataMsg = 'Không có dữ liệu cho khoảng ngày đã chọn';
-          _items = const []; // để shownItems tự fallback về lastGood
+          _items = const [];
         });
         return;
       }
@@ -149,10 +211,12 @@ class _PatrolRiskSummarySfPageState extends State<PatrolRiskSummarySfPage> {
     DateTime newFrom = _fromDate;
     DateTime newTo = _toDate;
 
+    final p = DateTime(picked.year, picked.month, picked.day);
+
     if (isFrom) {
-      newFrom = DateTime(picked.year, picked.month, picked.day);
+      newFrom = p;
     } else {
-      newTo = DateTime(picked.year, picked.month, picked.day);
+      newTo = p;
     }
 
     if (newFrom.isAfter(newTo)) {
@@ -168,14 +232,19 @@ class _PatrolRiskSummarySfPageState extends State<PatrolRiskSummarySfPage> {
       _fromCtrl.text = _fmt(_fromDate);
       _toCtrl.text = _fmt(_toDate);
     });
-    // ✅ báo cho parent biết ngày mới
+
+    // ✅ báo cho parent biết (để Dialog Open dùng chung)
     widget.onDateChanged?.call(_fromDate, _toDate);
-    _fetch(); // ✅ gọi API ngay
+
+    _fetch();
   }
 
   void _revertToLastGood() {
-    if (_lastGoodFrom == null || _lastGoodTo == null || _lastGoodItems.isEmpty)
+    if (_lastGoodFrom == null ||
+        _lastGoodTo == null ||
+        _lastGoodItems.isEmpty) {
       return;
+    }
 
     setState(() {
       _fromDate = _lastGoodFrom!;
@@ -188,6 +257,9 @@ class _PatrolRiskSummarySfPageState extends State<PatrolRiskSummarySfPage> {
       _noDataMsg = '';
       _error = null;
     });
+
+    // ✅ sync parent lại theo lastGood
+    widget.onDateChanged?.call(_fromDate, _toDate);
   }
 
   @override
@@ -199,7 +271,6 @@ class _PatrolRiskSummarySfPageState extends State<PatrolRiskSummarySfPage> {
       return _ErrorView(message: _error!, onRetry: _reload);
     }
 
-    // ✅ shownItems: ưu tiên kết quả mới, rỗng thì fallback lastGood
     final shownItems = _items.isNotEmpty ? _items : _lastGoodItems;
     final totalItem = shownItems.cast<RiskSummary?>().firstWhere(
       (e) => e?.grp == 'TOTAL',
@@ -248,7 +319,6 @@ class _PatrolRiskSummarySfPageState extends State<PatrolRiskSummarySfPage> {
                 const SizedBox(height: 10),
                 _TotalRiskBar(totalItem),
               ],
-
               if (_noData) ...[
                 const SizedBox(height: 10),
                 Container(
@@ -273,13 +343,9 @@ class _PatrolRiskSummarySfPageState extends State<PatrolRiskSummarySfPage> {
                 ),
               ],
               const SizedBox(height: 8),
-
               SizedBox(
                 height: chartItems.length * 20 + 80,
                 child: _RiskStackedBarChart(
-                  // key: ValueKey(
-                  //   'sf_chart_${chartItems.length}_${chartItems.hashCode}',
-                  // ),
                   items: chartItems,
                   onSelect: widget.onSelect,
                 ),
@@ -295,6 +361,7 @@ class _PatrolRiskSummarySfPageState extends State<PatrolRiskSummarySfPage> {
 class _RiskStackedBarChart extends StatelessWidget {
   final List<RiskSummary> items;
   final void Function(String grp, String division)? onSelect;
+
   const _RiskStackedBarChart({super.key, required this.items, this.onSelect});
 
   static const Color cMinus = Color(0xFFE5E7EB);
@@ -390,6 +457,7 @@ class _RiskStackedBarChart extends StatelessWidget {
 
 class _EmptyView extends StatelessWidget {
   final VoidCallback onRetry;
+
   const _EmptyView({required this.onRetry});
 
   @override
@@ -419,6 +487,7 @@ class _EmptyView extends StatelessWidget {
 class _ErrorView extends StatelessWidget {
   final String message;
   final VoidCallback onRetry;
+
   const _ErrorView({required this.message, required this.onRetry});
 
   @override
@@ -492,6 +561,7 @@ class _DateField extends StatelessWidget {
 
 class _TotalRiskBar extends StatelessWidget {
   final RiskSummary t;
+
   const _TotalRiskBar(this.t);
 
   int get total => (t.minus) + t.i + t.ii + t.iii + t.iv + t.v;
