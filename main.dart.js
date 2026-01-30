@@ -60366,7 +60366,7 @@ p=A.b([new A.bI(2,B.S,A.G(89,B.j.k()>>>16&255,B.j.k()>>>8&255,B.j.k()&255),B.m,2
 o=A.dG(k,!0,B.pe,B.au,new A.aM2(a))
 n=this.a
 m=t.p
-n=A.ay(A.b([o,B.as,A.aC(A.ax(A.b([A.V("BEFORE / AFTER ("+n.e+")",k,k,k,k,k,k,k,B.mZ,k,k,k,k),A.V(n.c+" \u2192 "+n.d+"   \u2022   "+n.f,k,k,k,k,k,k,k,B.bZ,k,k,k,k)],m),B.D,B.i,B.l),1)],m),B.n,B.i,B.l,0,k)
+n=A.ay(A.b([o,B.as,A.aC(A.ax(A.b([A.V("HSE PATROL SUMMARY \u2192 "+n.e,k,k,k,k,k,k,k,B.mZ,k,k,k,k),A.V(n.c+" \u2192 "+n.d+"   \u2022   "+n.f,k,k,k,k,k,k,k,B.bZ,k,k,k,k)],m),B.D,B.i,B.l),1)],m),B.n,B.i,B.l,0,k)
 o=A.aoq(A.G(20,B.c.k()>>>16&255,B.c.k()>>>8&255,B.c.k()&255),1,k)
 l=this.e
 l===$&&A.a()
