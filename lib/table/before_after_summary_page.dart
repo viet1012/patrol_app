@@ -671,7 +671,7 @@ class _BeforeAfterSummaryDialogState extends State<BeforeAfterSummaryDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final maxW = 1700.0; // ⬅ tăng lên
+    final maxW = 1600.0; // ⬅ tăng lên
     final w = MediaQuery.of(context).size.width;
     final dialogW = w < 600 ? w - 24 : (w < maxW ? w - 64 : maxW);
 
@@ -793,7 +793,7 @@ class _BeforeAfterSummaryDialogState extends State<BeforeAfterSummaryDialog> {
                             child: Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                SizedBox(width: 400, child: before),
+                                // SizedBox(width: 400, child: before),
                                 const SizedBox(width: 12),
                                 Expanded(child: after),
                               ],
@@ -881,6 +881,7 @@ class _BeforeCard extends StatelessWidget {
   static const double _wArea = 170;
   static const double _wPic = 120;
   static const double _wTotal = 70;
+  static const double _wNum = 56;
 
   @override
   Widget build(BuildContext context) {
@@ -958,7 +959,7 @@ class _AfterCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tableWidth = _wDiv + (_wNum * 18);
+    final tableWidth = _wDiv + (_wNum * 24);
 
     return _Glass(
       child: Scrollbar(
@@ -973,17 +974,20 @@ class _AfterCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _TitleBar(
-                  text: 'AFTER',
+                  text: 'SUMMARY',
                   color: const Color(0xFFD8F5C7),
                   width: tableWidth,
                 ),
                 const SizedBox(height: 6),
+
                 Row(
                   children: [
+                    const SizedBox(width: _wDiv), // chừa cột Area
+                    _groupHeader('Before', Colors.yellow, _wNum * 6),
                     _groupHeader(
                       'Finished (Pro)',
                       Colors.greenAccent,
-                      _wDiv + _wNum * 6,
+                      _wNum * 6,
                     ),
                     _groupHeader(
                       'Finished (HSE recheck)',
@@ -993,6 +997,7 @@ class _AfterCard extends StatelessWidget {
                     _groupHeader('Remain', Colors.redAccent, _wNum * 6),
                   ],
                 ),
+
                 Row(
                   children: [
                     _RowHeader(
@@ -1001,9 +1006,19 @@ class _AfterCard extends StatelessWidget {
                       ],
                     ),
                     _RowHeader(
+                      bg: const Color(0xFFEFE28F),
+                      cells: const [
+                        _CellSpec('TTL', w: _wNum),
+                        _CellSpec('I', w: _wNum),
+                        _CellSpec('II', w: _wNum),
+                        _CellSpec('III', w: _wNum),
+                        _CellSpec('IV', w: _wNum),
+                        _CellSpec('V', w: _wNum),
+                      ],
+                    ),
+                    _RowHeader(
                       bg: const Color(0xFF8FEFA0),
                       cells: const [
-                        // _CellSpec('Area', w: _wDiv, align: TextAlign.left),
                         _CellSpec('TTL', w: _wNum),
                         _CellSpec('I', w: _wNum),
                         _CellSpec('II', w: _wNum),
@@ -1051,6 +1066,17 @@ class _AfterCard extends StatelessWidget {
                         ],
                       ),
                       _RowLine(
+                        bg: const Color(0xFFF1E6A7),
+                        cells: [
+                          _CellSpec('${r.allTtl}', w: _wNum),
+                          _CellSpec('${r.allI}', w: _wNum),
+                          _CellSpec('${r.allII}', w: _wNum),
+                          _CellSpec('${r.allIII}', w: _wNum),
+                          _CellSpec('${r.allIV}', w: _wNum),
+                          _CellSpec('${r.allV}', w: _wNum),
+                        ],
+                      ),
+                      _RowLine(
                         bg: const Color(0xFFBFF2C8),
                         cells: [
                           _CellSpec('${r.proDoneTtl}', w: _wNum),
@@ -1090,6 +1116,20 @@ class _AfterCard extends StatelessWidget {
                 const SizedBox(height: 10),
                 Row(
                   children: [
+                    const Icon(Icons.camera_alt, size: 16, color: Colors.green),
+                    const SizedBox(width: 4),
+                    const Text(
+                      'Before',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    _badgeNumber(totals.sumAll, bg: Colors.yellow),
+                    const SizedBox(width: 24),
+
                     const Icon(
                       Icons.check_circle,
                       size: 16,

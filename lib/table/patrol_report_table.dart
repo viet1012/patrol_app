@@ -155,7 +155,10 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
                   : Icons.expand_more_rounded,
               color: Colors.white,
             ),
-            label: Text(_showSummary ? 'Hide' : 'Show'),
+            label: Text(
+              _showSummary ? 'Hide' : 'Show',
+              style: TextStyle(color: Colors.white70),
+            ),
           ),
 
           TextButton.icon(
@@ -179,7 +182,7 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
               );
             },
             icon: const Icon(Icons.analytics_outlined, color: Colors.white),
-            label: const Text('Open'),
+            label: const Text('Open', style: TextStyle(color: Colors.white70)),
           ),
         ],
       ),
