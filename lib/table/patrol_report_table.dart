@@ -71,8 +71,8 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
 
     // 2) luôn kèm type từ screen (patrolGroup)
     final fac = (widget.plant ?? '').trim();
-    final type = widget.patrolGroup?.trim();
-    if (type != null && type.isNotEmpty) {
+    final type = widget.patrolGroup.trim();
+    if (type.isNotEmpty) {
       params['type'] = type;
     }
     // ✅ 3) thêm from/to
