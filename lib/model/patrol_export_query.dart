@@ -9,7 +9,8 @@ class PatrolExportQuery {
   final String? pic;
   final String? patrolUser;
   final String? qrKey;
-
+  final String? from; // yyyy-MM-dd
+  final String? to; // yyyy-MM-d
   const PatrolExportQuery({
     this.plant,
     this.division,
@@ -21,6 +22,8 @@ class PatrolExportQuery {
     this.pic,
     this.patrolUser,
     this.qrKey,
+    this.from,
+    this.to,
   });
 
   /// ✅ FROM MAP (backend query params)
@@ -36,6 +39,8 @@ class PatrolExportQuery {
       pic: map['pic'],
       patrolUser: map['patrolUser'],
       qrKey: map['qrKey'],
+      from: map['from'],
+      to: map['to'],
     );
   }
 
@@ -58,7 +63,8 @@ class PatrolExportQuery {
     put('pic', pic);
     put('patrolUser', patrolUser);
     put('qrKey', qrKey);
-
+    put('from', from);
+    put('to', to);
     return m;
   }
 }
