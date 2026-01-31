@@ -765,66 +765,63 @@ class _BeforeAfterSummaryDialogState extends State<BeforeAfterSummaryDialog> {
 
               // ===== Body =====
               Expanded(
-                child: FutureBuilder<List<DivisionSummary>>(
-                  future: _future,
-                  builder: (context, snap) {
-                    if (snap.connectionState == ConnectionState.waiting) {
-                      return const Center(child: CircularProgressIndicator());
-                    }
-                    if (snap.hasError) {
-                      return Center(
-                        child: Text(
-                          'Load failed: ${snap.error}',
-                          style: const TextStyle(color: Colors.redAccent),
-                          textAlign: TextAlign.center,
-                        ),
-                      );
-                    }
-
-                    final rows = snap.data ?? [];
-                    if (rows.isEmpty) {
-                      return const Center(
-                        child: Text(
-                          'No data',
-                          style: TextStyle(color: Colors.white70),
-                        ),
-                      );
-                    }
-
-                    final totals = _Totals.from(rows);
-
-                    return LayoutBuilder(
-                      builder: (context, c) {
-                        final isWide = c.maxWidth >= 900;
-
-                        final after = _AfterCard(
-                          rows: rows,
-                          totals: totals,
-                          controller: _afterHCtrl,
-                        );
-
-                        return SingleChildScrollView(
-                          padding: const EdgeInsets.all(12),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              after, // ✅ đúng
-                              const SizedBox(height: 12),
-                              _PicSummaryTable(
-                                title: 'PIC SUMMARY (I / II / III / -)',
-                                future: _futurePicLow,
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // 1) SUMMARY
+                      FutureBuilder<List<DivisionSummary>>(
+                        future: _future,
+                        builder: (context, snap) {
+                          if (snap.connectionState == ConnectionState.waiting) {
+                            return const Center(
+                              child: Padding(
+                                padding: EdgeInsets.all(24),
+                                child: CircularProgressIndicator(),
                               ),
-                              const SizedBox(height: 12),
-                              _PicSummaryTable(
-                                title: 'PIC SUMMARY (IV / V)',
-                                future: _futurePicHigh,
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                    );
-                  },
+                            );
+                          }
+                          if (snap.hasError) {
+                            return Text(
+                              'Load failed: ${snap.error}',
+                              style: const TextStyle(color: Colors.redAccent),
+                            );
+                          }
+                          final rows = snap.data ?? [];
+                          if (rows.isEmpty) {
+                            return const Text(
+                              'No data',
+                              style: TextStyle(color: Colors.white70),
+                            );
+                          }
+
+                          final totals = _Totals.from(rows);
+                          return _AfterCard(
+                            rows: rows,
+                            totals: totals,
+                            controller: _afterHCtrl,
+                          );
+                        },
+                      ),
+
+                      const SizedBox(height: 12),
+
+                      // 2) PIC LOW
+                      _PicSummaryTable(
+                        title: 'PIC SUMMARY (I / II / III / -)',
+                        future: _futurePicLow,
+                      ),
+
+                      const SizedBox(height: 12),
+
+                      // 3) PIC HIGH
+                      _PicSummaryTable(
+                        title: 'PIC SUMMARY (IV / V)',
+                        future: _futurePicHigh,
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],
