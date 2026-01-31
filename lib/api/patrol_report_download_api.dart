@@ -2,8 +2,8 @@ import 'dart:async';
 import 'dart:html' as html;
 import 'dart:typed_data';
 
-import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 
 import '../model/patrol_export_query.dart';
 
@@ -21,7 +21,8 @@ class PatrolReportDownloadService {
     final uri = Uri.parse(
       '$baseUrl/api/patrol-reports/export-excel',
     ).replace(queryParameters: query.toQueryParams());
-
+    debugPrint('Export Excel URL: ${uri.toString()}');
+    debugPrint('Export Excel params: ${uri.queryParameters}');
     late Uint8List bytes;
 
     if (kIsWeb) {
