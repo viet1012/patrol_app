@@ -1,7 +1,8 @@
 import 'package:dio/dio.dart';
 
 import '../api/dio_client.dart';
-import '../model/division_summary.dart'; // bạn đổi path theo project
+import '../model/division_summary.dart';
+import '../model/pic_summary.dart'; // bạn đổi path theo project
 
 class SummaryApi {
   const SummaryApi();
@@ -41,5 +42,47 @@ class SummaryApi {
       requestOptions: res.requestOptions,
       error: 'Invalid response format: ${data.runtimeType}',
     );
+  }
+
+  Future<List<PicSummary>> fetchPicSummary({
+    required String fromD,
+    required String toD,
+    required String fac,
+    required String type,
+    required List<String> lvls,
+  }) async {
+    final uri = Uri.parse('http://localhost:9299/api/patrol_report/pic-summary')
+        .replace(
+          queryParameters: {
+            'fromD': fromD,
+            'toD': toD,
+            'fac': fac,
+            'type': type,
+            // query param trùng key: lvls=I&lvls=II...
+            // Uri.replace không hỗ trợ multi-value trực tiếp, nên ta build thủ công:
+          },
+        );
+
+    // build query multi lvls
+    final q = <String>[
+      'fromD=$fromD',
+      'toD=$toD',
+      'fac=$fac',
+      'type=$type',
+      ...lvls.map((e) => 'lvls=${Uri.encodeQueryComponent(e)}'),
+    ].join('&');
+
+    final url = Uri.parse(
+      'http://localhost:9299/api/patrol_report/pic-summary?$q',
+    );
+
+    // dùng http/dio tùy project bạn
+    final res = await Dio().getUri(url);
+    final data = res.data;
+
+    final list = (data is List) ? data : (data['data'] as List? ?? const []);
+    return list
+        .map((e) => PicSummary.fromJson(Map<String, dynamic>.from(e)))
+        .toList();
   }
 }

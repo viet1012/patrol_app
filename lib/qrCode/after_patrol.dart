@@ -63,6 +63,8 @@ class _AfterPatrolState extends State<AfterPatrol> {
   bool _loading = true;
   String? _error;
 
+  String? patrolUser;
+
   String get _lookupKey {
     final q = widget.qrCode?.trim();
     if (q != null && q.isNotEmpty) return q;
@@ -106,6 +108,7 @@ class _AfterPatrolState extends State<AfterPatrol> {
         _enableCamera = true;
       });
       _commentAfStatusCtrl.text = _report?.atComment ?? '';
+      patrolUser = _report?.atPic;
     } catch (e) {
       setState(() {
         _error = e.toString();
@@ -403,6 +406,7 @@ class _AfterPatrolState extends State<AfterPatrol> {
                   Expanded(
                     child: _sectionInlineEdit('Comment', _commentAfStatusCtrl),
                   ),
+
                   if (_commentAfStatusCtrl.text.trim().isNotEmpty)
                     GlassActionButton(
                       icon: Icons.browser_updated,
@@ -768,7 +772,7 @@ class _AfterPatrolState extends State<AfterPatrol> {
       await updateReportApi(
         id: _report!.id!,
         atComment: _commentAfStatusCtrl.text.trim(),
-        atUser: widget.accountCode,
+        atUser: '${_msnvCtrl.text.trim()}_$_employeeName',
         atStatus: 'Wait',
       );
 
@@ -809,12 +813,26 @@ class _AfterPatrolState extends State<AfterPatrol> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          title,
-          style: const TextStyle(
-            fontWeight: FontWeight.w600,
-            color: Colors.white,
-          ),
+        Row(
+          children: [
+            Text(
+              title,
+              style: const TextStyle(
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+              ),
+            ),
+            SizedBox(width: 16),
+            if (patrolUser != null && patrolUser!.trim().isNotEmpty)
+              Text(
+                patrolUser!,
+                style: const TextStyle(
+                  color: Colors.white70,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+          ],
         ),
         const SizedBox(height: 6),
         TextField(

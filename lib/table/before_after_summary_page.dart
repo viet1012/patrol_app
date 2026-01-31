@@ -596,6 +596,7 @@ import 'package:flutter/material.dart';
 
 import '../api/summary_api.dart';
 import '../model/division_summary.dart';
+import '../model/pic_summary.dart';
 import '../widget/glass_action_button.dart'; // bạn đang dùng
 // nếu không có GlassActionButton thì thay bằng IconButton bình thường
 
@@ -640,6 +641,8 @@ class BeforeAfterSummaryDialog extends StatefulWidget {
 class _BeforeAfterSummaryDialogState extends State<BeforeAfterSummaryDialog> {
   final SummaryApi _api = const SummaryApi();
   late Future<List<DivisionSummary>> _future;
+  late Future<List<PicSummary>> _futurePicLow; // I/II/III/-
+  late Future<List<PicSummary>> _futurePicHigh; // IV/V
 
   // scroll controllers
   final ScrollController _afterHCtrl = ScrollController();
@@ -649,6 +652,8 @@ class _BeforeAfterSummaryDialogState extends State<BeforeAfterSummaryDialog> {
   void initState() {
     super.initState();
     _future = _load();
+    _futurePicLow = _loadPicLow();
+    _futurePicHigh = _loadPicHigh();
   }
 
   Future<List<DivisionSummary>> _load() {
@@ -660,7 +665,25 @@ class _BeforeAfterSummaryDialogState extends State<BeforeAfterSummaryDialog> {
     );
   }
 
-  void _refresh() => setState(() => _future = _load());
+  Future<List<PicSummary>> _loadPicLow() {
+    return _api.fetchPicSummary(
+      fromD: widget.fromD,
+      toD: widget.toD,
+      fac: widget.fac,
+      type: widget.type,
+      lvls: const ['I', 'II', 'III', '-'],
+    );
+  }
+
+  Future<List<PicSummary>> _loadPicHigh() {
+    return _api.fetchPicSummary(
+      fromD: widget.fromD,
+      toD: widget.toD,
+      fac: widget.fac,
+      type: widget.type,
+      lvls: const ['IV', 'V'],
+    );
+  }
 
   @override
   void dispose() {
@@ -671,13 +694,13 @@ class _BeforeAfterSummaryDialogState extends State<BeforeAfterSummaryDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final maxW = 1600.0; // ⬅ tăng lên
+    final maxW = 1700.0; // ⬅ tăng lên
     final w = MediaQuery.of(context).size.width;
     final dialogW = w < 600 ? w - 24 : (w < maxW ? w - 64 : maxW);
 
     return Dialog(
       backgroundColor: Colors.transparent,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
       child: ConstrainedBox(
         constraints: BoxConstraints(
           maxWidth: dialogW,
@@ -713,8 +736,8 @@ class _BeforeAfterSummaryDialogState extends State<BeforeAfterSummaryDialog> {
                     ),
                     const SizedBox(width: 8),
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
                             'HSE PATROL SUMMARY → ${widget.fac}',
@@ -738,7 +761,6 @@ class _BeforeAfterSummaryDialogState extends State<BeforeAfterSummaryDialog> {
                 ),
               ),
 
-              const SizedBox(height: 8),
               Divider(color: Colors.white.withOpacity(0.08), height: 1),
 
               // ===== Body =====
@@ -775,40 +797,28 @@ class _BeforeAfterSummaryDialogState extends State<BeforeAfterSummaryDialog> {
                       builder: (context, c) {
                         final isWide = c.maxWidth >= 900;
 
-                        final before = _BeforeCard(
-                          rows: rows,
-                          sumAll: totals.sumAll,
-                          controller: _beforeHCtrl,
-                        );
-
                         final after = _AfterCard(
                           rows: rows,
                           totals: totals,
                           controller: _afterHCtrl,
                         );
 
-                        if (isWide) {
-                          return Padding(
-                            padding: const EdgeInsets.all(12),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                // SizedBox(width: 400, child: before),
-                                const SizedBox(width: 12),
-                                Expanded(child: after),
-                              ],
-                            ),
-                          );
-                        }
-
-                        // màn hình nhỏ: xếp dọc + scroll dọc
                         return SingleChildScrollView(
                           padding: const EdgeInsets.all(12),
                           child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              before,
+                              after, // ✅ đúng
                               const SizedBox(height: 12),
-                              after,
+                              _PicSummaryTable(
+                                title: 'PIC SUMMARY (I / II / III / -)',
+                                future: _futurePicLow,
+                              ),
+                              const SizedBox(height: 12),
+                              _PicSummaryTable(
+                                title: 'PIC SUMMARY (IV / V)',
+                                future: _futurePicHigh,
+                              ),
                             ],
                           ),
                         );
@@ -841,7 +851,8 @@ class _Totals {
     required this.sumRemain,
   });
 
-  int get done => sumPro + sumHse;
+  // int get done => sumPro + sumHse;
+  int get done => sumPro;
 
   int get donePct => (sumAll == 0) ? 0 : ((done / sumAll) * 100).round();
 
@@ -860,82 +871,6 @@ class _Totals {
       sumPro: sumPro,
       sumHse: sumHse,
       sumRemain: sumRemain,
-    );
-  }
-}
-
-// =======================
-// BEFORE card
-// =======================
-class _BeforeCard extends StatelessWidget {
-  final List<DivisionSummary> rows;
-  final int sumAll;
-  final ScrollController controller;
-
-  const _BeforeCard({
-    required this.rows,
-    required this.sumAll,
-    required this.controller,
-  });
-
-  static const double _wArea = 170;
-  static const double _wPic = 120;
-  static const double _wTotal = 70;
-  static const double _wNum = 56;
-
-  @override
-  Widget build(BuildContext context) {
-    final tableWidth = _wArea + _wPic + _wTotal;
-
-    return _Glass(
-      child: Scrollbar(
-        controller: controller,
-        thumbVisibility: true,
-        child: SingleChildScrollView(
-          controller: controller,
-          scrollDirection: Axis.horizontal,
-          child: SizedBox(
-            width: tableWidth,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const _TitleBar(
-                  text: 'BEFORE',
-                  color: Colors.redAccent,
-                  width: double.infinity,
-                ),
-                const SizedBox(height: 10),
-                _RowHeader(
-                  cells: const [
-                    _CellSpec(
-                      'Patrolled Area',
-                      w: _wArea,
-                      align: TextAlign.left,
-                    ),
-                    _CellSpec('PIC', w: _wPic),
-                    _CellSpec('Total', w: _wTotal, bold: true),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                ...rows.map(
-                  (r) => _RowLine(
-                    cells: [
-                      _CellSpec(r.division, w: _wArea, align: TextAlign.left),
-                      const _CellSpec('-', w: _wPic),
-                      _CellSpec('${r.allTtl}', w: _wTotal, bold: true),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: _badgeNumber(sumAll, bg: Colors.yellow),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
     );
   }
 }
@@ -989,12 +924,13 @@ class _AfterCard extends StatelessWidget {
                       Colors.greenAccent,
                       _wNum * 6,
                     ),
+                    _groupHeader('Remain', Colors.redAccent, _wNum * 6),
+
                     _groupHeader(
                       'Finished (HSE recheck)',
                       Colors.blueAccent,
                       _wNum * 6,
                     ),
-                    _groupHeader('Remain', Colors.redAccent, _wNum * 6),
                   ],
                 ),
 
@@ -1027,8 +963,9 @@ class _AfterCard extends StatelessWidget {
                         _CellSpec('V', w: _wNum),
                       ],
                     ),
+
                     _RowHeader(
-                      bg: const Color(0xFF72C7F4),
+                      bg: const Color(0xFFF89292),
                       cells: const [
                         _CellSpec('TTL', w: _wNum),
                         _CellSpec('I', w: _wNum),
@@ -1039,7 +976,7 @@ class _AfterCard extends StatelessWidget {
                       ],
                     ),
                     _RowHeader(
-                      bg: const Color(0xFFF89292),
+                      bg: const Color(0xFF72C7F4),
                       cells: const [
                         _CellSpec('TTL', w: _wNum),
                         _CellSpec('I', w: _wNum),
@@ -1087,17 +1024,7 @@ class _AfterCard extends StatelessWidget {
                           _CellSpec('${r.proDoneV}', w: _wNum),
                         ],
                       ),
-                      _RowLine(
-                        bg: const Color(0xFFBFE0F2),
-                        cells: [
-                          _CellSpec('${r.hseDoneTtl}', w: _wNum),
-                          _CellSpec('${r.hseDoneI}', w: _wNum),
-                          _CellSpec('${r.hseDoneII}', w: _wNum),
-                          _CellSpec('${r.hseDoneIII}', w: _wNum),
-                          _CellSpec('${r.hseDoneIV}', w: _wNum),
-                          _CellSpec('${r.hseDoneV}', w: _wNum),
-                        ],
-                      ),
+
                       _RowLine(
                         bg: const Color(0xFFFFC2C2),
                         cells: [
@@ -1107,6 +1034,17 @@ class _AfterCard extends StatelessWidget {
                           _CellSpec('${r.remainIII}', w: _wNum),
                           _CellSpec('${r.remainIV}', w: _wNum),
                           _CellSpec('${r.remainV}', w: _wNum),
+                        ],
+                      ),
+                      _RowLine(
+                        bg: const Color(0xFFBFE0F2),
+                        cells: [
+                          _CellSpec('${r.hseDoneTtl}', w: _wNum),
+                          _CellSpec('${r.hseDoneI}', w: _wNum),
+                          _CellSpec('${r.hseDoneII}', w: _wNum),
+                          _CellSpec('${r.hseDoneIII}', w: _wNum),
+                          _CellSpec('${r.hseDoneIV}', w: _wNum),
+                          _CellSpec('${r.hseDoneV}', w: _wNum),
                         ],
                       ),
                     ],
@@ -1230,9 +1168,6 @@ class _RowLine extends StatelessWidget {
 
 Widget _cell(_CellSpec c, {bool header = false, Color? bg}) {
   final textColor = header ? Colors.black : Colors.black87;
-  // final baseBg = header
-  //     ? const Color(0xFFDDDDDD)
-  //     : (bg ?? const Color(0xFFEFEFEF));
 
   final baseBg = header
       ? (bg ?? const Color(0xFFDDDDDD)) // ✅ header cũng dùng bg nếu truyền vào
@@ -1358,4 +1293,225 @@ class _CellSpec {
     this.bold = false,
     this.align = TextAlign.center,
   });
+}
+
+class _PicSummaryTable extends StatelessWidget {
+  final String title;
+  final Future<List<PicSummary>> future;
+
+  const _PicSummaryTable({required this.title, required this.future});
+
+  static const double _wPic = 170;
+  static const double _wNum = 56; // giống _AfterCard
+
+  @override
+  Widget build(BuildContext context) {
+    // 1 group = 5 cột (TTL/OK/NG/NY/NY%)
+    double groupW() => _wNum * 5;
+    final tableW = _wPic + groupW() * 5; // ALL + A + B + C + Outside
+
+    return _Glass(
+      child: FutureBuilder<List<PicSummary>>(
+        future: future,
+        builder: (context, snap) {
+          if (snap.connectionState == ConnectionState.waiting) {
+            return const Padding(
+              padding: EdgeInsets.all(12),
+              child: Center(child: CircularProgressIndicator()),
+            );
+          }
+          if (snap.hasError) {
+            return Padding(
+              padding: const EdgeInsets.all(12),
+              child: Text(
+                'Load failed: ${snap.error}',
+                style: const TextStyle(color: Colors.redAccent),
+              ),
+            );
+          }
+
+          final rows = snap.data ?? [];
+          if (rows.isEmpty) {
+            return const Padding(
+              padding: EdgeInsets.all(12),
+              child: Text('No data', style: TextStyle(color: Colors.white70)),
+            );
+          }
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _TitleBar(
+                text: title,
+                color: const Color(0xFFE0E7FF),
+                width: tableW,
+              ),
+              const SizedBox(height: 8),
+
+              // group header
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: SizedBox(
+                  width: tableW,
+                  child: Column(
+                    children: [
+                      Row(
+                        children: [
+                          const SizedBox(width: _wPic),
+                          _groupHeader('ALL', Colors.amberAccent, groupW()),
+                          _groupHeader('Fac_A', Colors.greenAccent, groupW()),
+                          _groupHeader(
+                            'Fac_B',
+                            Colors.lightGreenAccent,
+                            groupW(),
+                          ),
+                          _groupHeader('Fac_C', Colors.blueAccent, groupW()),
+                          _groupHeader(
+                            'Outside',
+                            Colors.lightBlue.shade200,
+                            groupW(),
+                          ),
+                        ],
+                      ),
+
+                      // header row
+                      Row(
+                        children: [
+                          _RowHeader(
+                            cells: const [
+                              _CellSpec('PIC', w: _wPic, align: TextAlign.left),
+                            ],
+                          ),
+                          _RowHeader(
+                            bg: const Color(0xFFFFF3BF),
+                            cells: const [
+                              _CellSpec('TTL', w: _wNum),
+                              _CellSpec('OK', w: _wNum),
+                              _CellSpec('NG', w: _wNum),
+                              _CellSpec('NY', w: _wNum),
+                              _CellSpec('NY%', w: _wNum),
+                            ],
+                          ),
+                          _RowHeader(
+                            bg: const Color(0xFFBFF2C8),
+                            cells: const [
+                              _CellSpec('TTL', w: _wNum),
+                              _CellSpec('OK', w: _wNum),
+                              _CellSpec('NG', w: _wNum),
+                              _CellSpec('NY', w: _wNum),
+                              _CellSpec('NY%', w: _wNum),
+                            ],
+                          ),
+                          _RowHeader(
+                            bg: const Color(0xFFD7F7DA),
+                            cells: const [
+                              _CellSpec('TTL', w: _wNum),
+                              _CellSpec('OK', w: _wNum),
+                              _CellSpec('NG', w: _wNum),
+                              _CellSpec('NY', w: _wNum),
+                              _CellSpec('NY%', w: _wNum),
+                            ],
+                          ),
+                          _RowHeader(
+                            bg: const Color(0xFFBFE0F2),
+                            cells: const [
+                              _CellSpec('TTL', w: _wNum),
+                              _CellSpec('OK', w: _wNum),
+                              _CellSpec('NG', w: _wNum),
+                              _CellSpec('NY', w: _wNum),
+                              _CellSpec('NY%', w: _wNum),
+                            ],
+                          ),
+                          _RowHeader(
+                            bg: const Color(0xFFA7DCF1),
+                            cells: const [
+                              _CellSpec('TTL', w: _wNum),
+                              _CellSpec('OK', w: _wNum),
+                              _CellSpec('NG', w: _wNum),
+                              _CellSpec('NY', w: _wNum),
+                              _CellSpec('NY%', w: _wNum),
+                            ],
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 6),
+
+                      // data rows
+                      ...rows.map((r) {
+                        return Row(
+                          children: [
+                            _RowLine(
+                              cells: [
+                                _CellSpec(
+                                  r.pic,
+                                  w: _wPic,
+                                  align: TextAlign.left,
+                                ),
+                              ],
+                            ),
+
+                            _RowLine(
+                              bg: const Color(0xFFFFF3BF),
+                              cells: [
+                                _CellSpec('${r.allTtl}', w: _wNum),
+                                _CellSpec('${r.allOk}', w: _wNum),
+                                _CellSpec('${r.allNg}', w: _wNum),
+                                _CellSpec('${r.allNy}', w: _wNum),
+                                _CellSpec('${r.allNyPct}%', w: _wNum),
+                              ],
+                            ),
+                            _RowLine(
+                              bg: const Color(0xFFBFF2C8),
+                              cells: [
+                                _CellSpec('${r.facATtl}', w: _wNum),
+                                _CellSpec('${r.facAOk}', w: _wNum),
+                                _CellSpec('${r.facANg}', w: _wNum),
+                                _CellSpec('${r.facANy}', w: _wNum),
+                                _CellSpec('${r.facANyPct}%', w: _wNum),
+                              ],
+                            ),
+                            _RowLine(
+                              bg: const Color(0xFFD7F7DA),
+                              cells: [
+                                _CellSpec('${r.facBTtl}', w: _wNum),
+                                _CellSpec('${r.facBOk}', w: _wNum),
+                                _CellSpec('${r.facBNg}', w: _wNum),
+                                _CellSpec('${r.facBNy}', w: _wNum),
+                                _CellSpec('${r.facBNyPct}%', w: _wNum),
+                              ],
+                            ),
+                            _RowLine(
+                              bg: const Color(0xFFBFE0F2),
+                              cells: [
+                                _CellSpec('${r.facCTtl}', w: _wNum),
+                                _CellSpec('${r.facCOk}', w: _wNum),
+                                _CellSpec('${r.facCNg}', w: _wNum),
+                                _CellSpec('${r.facCNy}', w: _wNum),
+                                _CellSpec('${r.facCNyPct}%', w: _wNum),
+                              ],
+                            ),
+                            _RowLine(
+                              bg: const Color(0xFFB5E0EF),
+                              cells: [
+                                _CellSpec('${r.outsideTtl}', w: _wNum),
+                                _CellSpec('${r.outsideOk}', w: _wNum),
+                                _CellSpec('${r.outsideNg}', w: _wNum),
+                                _CellSpec('${r.outsideNy}', w: _wNum),
+                                _CellSpec('${r.outsideNyPct}%', w: _wNum),
+                              ],
+                            ),
+                          ],
+                        );
+                      }),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
 }
