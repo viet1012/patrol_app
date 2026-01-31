@@ -70,10 +70,19 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
     });
 
     // 2) luôn kèm type từ screen (patrolGroup)
+    final fac = (widget.plant ?? '').trim();
     final type = widget.patrolGroup?.trim();
     if (type != null && type.isNotEmpty) {
       params['type'] = type;
     }
+    // ✅ 3) thêm from/to
+    final now = DateTime.now();
+    final from = _fromD ?? DateTime(now.year, now.month, 1);
+    final to = _toD ?? DateTime(now.year, now.month, now.day);
+    params['plant'] = fac;
+
+    params['from'] = _fmt(from);
+    params['to'] = _fmt(to);
 
     return PatrolExportQuery.fromMap(params);
   }
@@ -435,23 +444,6 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
       default:
         return '';
     }
-  }
-
-  void _applySummaryDate(DateTime from, DateTime to) {
-    setState(() {
-      _fromD = from;
-      _toD = to;
-      _page = 0;
-    });
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_vCtrl.hasClients) _vCtrl.jumpTo(0);
-    });
-
-    CommonUI.showSuccessSnack(
-      context,
-      message: 'Date: ${_fmt(from)} → ${_fmt(to)}',
-    );
   }
 
   List<PatrolReportModel> _applyFilterExcluding(
