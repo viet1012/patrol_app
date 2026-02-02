@@ -595,6 +595,8 @@ class _EditReportDialogState extends State<EditReportDialog> {
               ),
             ],
           ),
+          const SizedBox(height: 12),
+
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -634,26 +636,6 @@ class _EditReportDialogState extends State<EditReportDialog> {
                       ),
                       const SizedBox(width: 8),
                       Expanded(child: _buildAfStatusDropdown()),
-                      // Expanded(
-                      //   child: AbsorbPointer(
-                      //     absorbing: disabled,
-                      //     // nếu đang loading master thì disable
-                      //     child: Opacity(
-                      //       opacity: disabled ? 0.6 : 1,
-                      //       child: CommonSearchableDropdown(
-                      //         label: "AT Status",
-                      //         selectedValue: _selectedAtStatus,
-                      //         items: atStatusOptions,
-                      //         isRequired: false,
-                      //         // tùy bạn
-                      //         onChanged: (v) {
-                      //           setState(() => _selectedAtStatus = v);
-                      //           _markDirty();
-                      //         },
-                      //       ),
-                      //     ),
-                      //   ),
-                      // ),
                     ],
                   ),
                 ),
