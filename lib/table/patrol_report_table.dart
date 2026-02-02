@@ -1367,7 +1367,7 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
     _Col('Risk P', 100, TextAlign.center),
     _Col('Risk S', 100, TextAlign.center),
 
-    _Col('AT Stt', 70, TextAlign.center),
+    _Col('AT Stt', 100, TextAlign.center),
     _Col('AT PIC', 90, TextAlign.left),
     _Col('AT Date', 100, TextAlign.center),
     _Col('AT Cmt', 260, TextAlign.left),
