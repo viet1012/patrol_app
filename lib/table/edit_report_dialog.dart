@@ -1,19 +1,22 @@
 import 'package:flutter/material.dart';
+
 import '../api/hse_master_service.dart';
+import '../api/patrol_report_api.dart';
 import '../api/replace_image_api.dart';
 import '../common/common_risk_dropdown.dart';
 import '../common/common_searchable_dropdown.dart';
 import '../common/common_ui_helper.dart';
 import '../model/machine_model.dart';
 import '../model/patrol_report_model.dart';
+import '../model/reason_model.dart';
 import '../model/risk_score_calculator.dart';
 import '../translator.dart';
 import '../widget/glass_action_button.dart';
-import '../model/reason_model.dart';
 
 class EditReportDialog extends StatefulWidget {
   final PatrolReportModel report;
   final BuildContext parentContext;
+
   const EditReportDialog({
     super.key,
     required this.report,
@@ -55,6 +58,21 @@ class _EditReportDialogState extends State<EditReportDialog> {
 
   bool _dirty = false;
 
+  // ✅ PIC dropdown
+  List<String> _picItems = [];
+  bool _loadingPic = false;
+  String? _picError;
+
+  static const String emptyLabel = 'UNKNOWN';
+  Future<List<String>>? _futurePics;
+  String? _selectedPIC; // UI selected
+  String? _oldPIC;
+
+  // ✅ AT Status dropdown
+  static const List<String> atStatusOptions = ['Wait', 'Done', 'Completed'];
+  String? _selectedAtStatus;
+  String? _oldAtStatus;
+
   void _markDirty() {
     if (_dirty) return;
     setState(() => _dirty = true);
@@ -77,8 +95,25 @@ class _EditReportDialogState extends State<EditReportDialog> {
     _riskProb = widget.report.riskProb;
     _riskSev = widget.report.riskSev;
 
-    final m = widget.report.machine.trim();
-    _selectedMachine = (m == "<Null>" || m.isEmpty) ? null : m;
+    // final m = widget.report.machine.trim();
+    // _selectedMachine = (m == "<Null>" || m.isEmpty) ? null : m;
+    _selectedMachine = _norm(widget.report.machine);
+    if (_selectedMachine!.isEmpty || _selectedMachine == "<Null>") {
+      _selectedMachine = null;
+    }
+
+    _selectedPIC = widget.report.pic;
+
+    _selectedAtStatus = _norm(widget.report.atStatus);
+    if (_selectedAtStatus!.isEmpty || _selectedAtStatus == '<Null>') {
+      _selectedAtStatus = null;
+    }
+
+    // nếu giá trị lạ (không nằm trong list) thì set null hoặc fallback
+    if (_selectedAtStatus != null &&
+        !atStatusOptions.contains(_selectedAtStatus)) {
+      _selectedAtStatus = null;
+    }
 
     _loadHseMaster();
   }
@@ -141,30 +176,70 @@ class _EditReportDialogState extends State<EditReportDialog> {
   List<String> get groupList => List.generate(10, (i) => 'Group ${i + 1}');
 
   String _norm(String? s) => (s ?? '').trim();
+
   bool _eq(String? a, String? b) => _norm(a) == _norm(b);
 
   Future<void> _loadHseMaster() async {
     setState(() {
       _loadingMaster = true;
+      _loadingPic = true;
       _masterError = null;
+      _picError = null;
     });
 
     try {
-      final data = await HseMasterService.fetchMachines();
+      final plant = widget.report.plant;
+
+      // ✅ chạy song song
+      final results = await Future.wait([
+        HseMasterService.fetchMachines(), // returns List<MachineModel>
+        findPicsByPlantFromApi(plant), // returns List<String>
+      ]);
+
       if (!mounted) return;
 
+      final master = results[0] as List<MachineModel>;
+      final pics = results[1] as List<String>;
+
       setState(() {
-        machines = data;
+        machines = master;
+
+        // build items PIC
+        _picItems = {emptyLabel, ...pics}.toList();
+
         _loadingMaster = false;
-        _autoFixInvalidSelections();
+        _loadingPic = false;
+
+        // nếu bạn muốn auto-fix selection sau khi có master:
+        // _autoFixInvalidSelections();
       });
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _loadingMaster = false;
+        _loadingPic = false;
+
+        // tùy bạn: tách error ra 2 cái hay gộp
         _masterError = e.toString();
+        _picError = e.toString();
       });
     }
+  }
+
+  Future<List<String>> findPicsByPlantFromApi(String plant) async {
+    final reports = await PatrolReportApi.fetchReports(plant: plant);
+    final Set<String> uniquePics = {};
+    final List<String> pics = [];
+
+    for (final r in reports) {
+      final rawPic = r.pic?.trim();
+      final pic = (rawPic == null || rawPic.isEmpty) ? emptyLabel : rawPic;
+
+      if (uniquePics.add(pic)) {
+        pics.add(pic);
+      }
+    }
+    return pics;
   }
 
   List<String> getFacByPlant(String plant) {
@@ -194,7 +269,7 @@ class _EditReportDialogState extends State<EditReportDialog> {
         .where((m) => _eq(m.plant?.toString(), plant))
         .where((m) => _eq(m.fac?.toString(), fac))
         .where((m) => _eq(m.area?.toString(), area))
-        .map((m) => _norm(m.macId?.toString()))
+        .map((m) => _norm(m.macId?.toString())) // <-- dùng name
         .where((s) => s.isNotEmpty)
         .where(unique.add)
         .toList();
@@ -229,25 +304,6 @@ class _EditReportDialogState extends State<EditReportDialog> {
       _selectedArea = areaList.first;
     } else {
       _selectedArea = areaList.firstWhere((a) => _eq(a, _selectedArea));
-    }
-
-    final machineList = getMachineByArea(
-      plant,
-      _selectedDivision!,
-      _selectedArea!,
-    );
-    if (machineList.isEmpty) {
-      _selectedMachine = null;
-      return;
-    }
-
-    if (_selectedMachine == null ||
-        !machineList.any((x) => _eq(x, _selectedMachine))) {
-      _selectedMachine = machineList.first;
-    } else {
-      _selectedMachine = machineList.firstWhere(
-        (x) => _eq(x, _selectedMachine),
-      );
     }
   }
 
@@ -427,9 +483,9 @@ class _EditReportDialogState extends State<EditReportDialog> {
               const SizedBox(width: 8),
               Expanded(
                 child: AbsorbPointer(
-                  absorbing: disabled || _selectedArea == null,
+                  absorbing: disabled,
                   child: Opacity(
-                    opacity: (disabled || _selectedArea == null) ? 0.6 : 1,
+                    opacity: (disabled) ? 0.6 : 1,
                     child: CommonSearchableDropdown(
                       label: "Machine",
                       selectedValue: _selectedMachine,
@@ -539,6 +595,71 @@ class _EditReportDialogState extends State<EditReportDialog> {
               ),
             ],
           ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Align(
+                alignment: Alignment.centerLeft,
+                child: SizedBox(
+                  width: 160,
+                  child: Row(
+                    children: [
+                      Text(
+                        'PIC',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(child: _buildPicDropdown()),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+
+              Align(
+                alignment: Alignment.centerLeft,
+                child: SizedBox(
+                  width: 220,
+                  child: Row(
+                    children: [
+                      const Text(
+                        'AT Status',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(child: _buildAfStatusDropdown()),
+                      // Expanded(
+                      //   child: AbsorbPointer(
+                      //     absorbing: disabled,
+                      //     // nếu đang loading master thì disable
+                      //     child: Opacity(
+                      //       opacity: disabled ? 0.6 : 1,
+                      //       child: CommonSearchableDropdown(
+                      //         label: "AT Status",
+                      //         selectedValue: _selectedAtStatus,
+                      //         items: atStatusOptions,
+                      //         isRequired: false,
+                      //         // tùy bạn
+                      //         onChanged: (v) {
+                      //           setState(() => _selectedAtStatus = v);
+                      //           _markDirty();
+                      //         },
+                      //       ),
+                      //     ),
+                      //   ),
+                      // ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
@@ -575,6 +696,74 @@ class _EditReportDialogState extends State<EditReportDialog> {
     );
   }
 
+  Widget _buildPicDropdown() {
+    return CommonSearchableDropdown(
+      label: "PIC",
+      selectedValue: _selectedPIC,
+      items: _picItems,
+      isRequired: true,
+      onChanged: (v) async {
+        if (v == null || v == _selectedPIC) return;
+
+        final prev = _selectedPIC;
+        setState(() => _selectedPIC = v);
+
+        final ok = await CommonUI.showGlassConfirm(
+          context: context,
+          icon: Icons.help_outline_rounded,
+          iconColor: Colors.orangeAccent,
+          title: "Confirm update",
+          message: 'Update PIC to "$v" ?',
+          cancelText: "Cancel",
+          confirmText: "Update",
+          confirmColor: const Color(0xFF22C55E),
+        );
+
+        if (!ok) {
+          setState(() => _selectedPIC = prev);
+          return;
+        }
+
+        await _onSave();
+        _oldPIC = _selectedPIC;
+      },
+    );
+  }
+
+  Widget _buildAfStatusDropdown() {
+    return CommonSearchableDropdown(
+      label: "At_Status",
+      selectedValue: _selectedAtStatus,
+      items: atStatusOptions,
+      isRequired: true,
+      onChanged: (v) async {
+        if (v == null || v == _selectedAtStatus) return;
+
+        final prev = _selectedAtStatus;
+        setState(() => _selectedAtStatus = v);
+
+        final ok = await CommonUI.showGlassConfirm(
+          context: context,
+          icon: Icons.help_outline_rounded,
+          iconColor: Colors.orangeAccent,
+          title: "Confirm update",
+          message: 'Update Af_Status to "$v" ?',
+          cancelText: "Cancel",
+          confirmText: "Update",
+          confirmColor: const Color(0xFF22C55E),
+        );
+
+        if (!ok) {
+          setState(() => _selectedAtStatus = prev);
+          return;
+        }
+
+        await _onSave();
+        _oldAtStatus = _selectedAtStatus;
+      },
+    );
+  }
+
   Future<void> _onSave() async {
     if (!_canSave) return;
 
@@ -601,6 +790,8 @@ class _EditReportDialogState extends State<EditReportDialog> {
         riskProb: probBi,
         riskSev: sevBi,
         riskTotal: _riskScoreSymbol,
+        atStatus: _selectedAtStatus,
+        pic: _selectedPIC,
       );
 
       if (!mounted) return;
@@ -613,7 +804,8 @@ class _EditReportDialogState extends State<EditReportDialog> {
         qr_key: widget.report.qr_key,
 
         grp: _selectedGroup ?? widget.report.grp,
-        plant: widget.report.plant, // plant b?n không cho s?a
+        plant: widget.report.plant,
+        // plant b?n không cho s?a
         division: _selectedDivision ?? widget.report.division,
         area: _selectedArea ?? widget.report.area,
         machine: _selectedMachine ?? widget.report.machine,
@@ -628,7 +820,7 @@ class _EditReportDialogState extends State<EditReportDialog> {
         checkInfo: widget.report.checkInfo,
 
         createdAt: widget.report.createdAt,
-        pic: widget.report.pic,
+        pic: _selectedPIC ?? widget.report.pic,
         dueDate: widget.report.dueDate,
         patrol_user: widget.report.patrol_user,
 
@@ -637,7 +829,7 @@ class _EditReportDialogState extends State<EditReportDialog> {
         atComment: widget.report.atComment,
         atDate: widget.report.atDate,
         atPic: widget.report.atPic,
-        atStatus: widget.report.atStatus,
+        atStatus: _selectedAtStatus ?? widget.report.atStatus,
 
         hseJudge: widget.report.hseJudge,
         hseImageNames: widget.report.hseImageNames,

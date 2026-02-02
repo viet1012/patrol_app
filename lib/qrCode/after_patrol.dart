@@ -141,7 +141,7 @@ class _AfterPatrolState extends State<AfterPatrol> {
     super.dispose();
   }
 
-  Future<List<String>> findPicsByPlantFromApi(String plant) async {
+  static Future<List<String>> findPicsByPlantFromApi(String plant) async {
     debugPrint('🔍 Fetch reports for plant = [$plant]');
 
     final reports = await PatrolReportApi.fetchReports(plant: plant);
