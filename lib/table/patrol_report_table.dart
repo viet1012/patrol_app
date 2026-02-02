@@ -111,7 +111,7 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
 
     final now = DateTime.now();
     _toD = now;
-    _fromD = DateTime(now.year, now.month, 1); // đầu tháng
+    _fromD = DateTime(now.year, now.month - 1, 1); // đầu tháng
 
     _futureReports = PatrolReportApi.fetchReports(
       type: widget.patrolGroup,
