@@ -316,7 +316,7 @@
 //                     _RowHeader(
 //                       cells: const [
 //                         _CellSpec('Area', w: _wDiv, align: TextAlign.left),
-//                         _CellSpec('TTL', w: _wNum),
+//                         _CellSpec('TTL', w: _wNum, bold: true),
 //                         _CellSpec('I', w: _wNum),
 //                         _CellSpec('II', w: _wNum),
 //                         _CellSpec('III', w: _wNum),
@@ -326,7 +326,7 @@
 //                     ),
 //                     _RowHeader(
 //                       cells: const [
-//                         _CellSpec('TTL', w: _wNum),
+//                         _CellSpec('TTL', w: _wNum, bold: true),
 //                         _CellSpec('I', w: _wNum),
 //                         _CellSpec('II', w: _wNum),
 //                         _CellSpec('III', w: _wNum),
@@ -336,7 +336,7 @@
 //                     ),
 //                     _RowHeader(
 //                       cells: const [
-//                         _CellSpec('TTL', w: _wNum),
+//                         _CellSpec('TTL', w: _wNum, bold: true),
 //                         _CellSpec('I', w: _wNum),
 //                         _CellSpec('II', w: _wNum),
 //                         _CellSpec('III', w: _wNum),
@@ -836,33 +836,42 @@ class _BeforeAfterSummaryDialogState extends State<BeforeAfterSummaryDialog> {
 // Totals helper
 // =======================
 class _Totals {
-  final int sumAll;
-  final int sumPro;
-  final int sumHse;
-  final int sumRemain;
+  final double sumAll;
+  final double sumPro;
+  final double sumHse;
+  final double sumRemain;
 
-  _Totals({
+  const _Totals({
     required this.sumAll,
     required this.sumPro,
     required this.sumHse,
     required this.sumRemain,
   });
 
-  // int get done => sumPro + sumHse;
-  int get done => sumPro;
+  /// DONE = ProDone (nếu muốn Pro + HSE thì đổi ở đây)
+  double get done => sumPro;
 
-  int get donePct => (sumAll == 0) ? 0 : ((done / sumAll) * 100).round();
+  // double get done => sumPro + sumHse;
 
-  int get remainPct => (sumAll == 0) ? 0 : ((sumRemain / sumAll) * 100).round();
+  /// % DONE (2 chữ số thập phân)
+  double get donePct => sumAll == 0 ? 0 : _round2((done / sumAll) * 100);
+
+  /// % REMAIN (2 chữ số thập phân)
+  double get remainPct => sumAll == 0 ? 0 : _round2((sumRemain / sumAll) * 100);
 
   static _Totals from(List<DivisionSummary> rows) {
-    var sumAll = 0, sumPro = 0, sumHse = 0, sumRemain = 0;
+    double sumAll = 0;
+    double sumPro = 0;
+    double sumHse = 0;
+    double sumRemain = 0;
+
     for (final r in rows) {
       sumAll += r.allTtl;
       sumPro += r.proDoneTtl;
       sumHse += r.hseDoneTtl;
       sumRemain += r.remainTtl;
     }
+
     return _Totals(
       sumAll: sumAll,
       sumPro: sumPro,
@@ -870,6 +879,9 @@ class _Totals {
       sumRemain: sumRemain,
     );
   }
+
+  /// helper: làm tròn 2 chữ số
+  static double _round2(double v) => double.parse(v.toStringAsFixed(2));
 }
 
 // =======================
@@ -941,7 +953,7 @@ class _AfterCard extends StatelessWidget {
                     _RowHeader(
                       bg: const Color(0xFFEFE28F),
                       cells: const [
-                        _CellSpec('TTL', w: _wNum),
+                        _CellSpec('TTL', w: _wNum, bold: true),
                         _CellSpec('I', w: _wNum),
                         _CellSpec('II', w: _wNum),
                         _CellSpec('III', w: _wNum),
@@ -952,7 +964,7 @@ class _AfterCard extends StatelessWidget {
                     _RowHeader(
                       bg: const Color(0xFF8FEFA0),
                       cells: const [
-                        _CellSpec('TTL', w: _wNum),
+                        _CellSpec('TTL', w: _wNum, bold: true),
                         _CellSpec('I', w: _wNum),
                         _CellSpec('II', w: _wNum),
                         _CellSpec('III', w: _wNum),
@@ -964,7 +976,7 @@ class _AfterCard extends StatelessWidget {
                     _RowHeader(
                       bg: const Color(0xFFF89292),
                       cells: const [
-                        _CellSpec('TTL', w: _wNum),
+                        _CellSpec('TTL', w: _wNum, bold: true),
                         _CellSpec('I', w: _wNum),
                         _CellSpec('II', w: _wNum),
                         _CellSpec('III', w: _wNum),
@@ -975,7 +987,7 @@ class _AfterCard extends StatelessWidget {
                     _RowHeader(
                       bg: const Color(0xFF72C7F4),
                       cells: const [
-                        _CellSpec('TTL', w: _wNum),
+                        _CellSpec('TTL', w: _wNum, bold: true),
                         _CellSpec('I', w: _wNum),
                         _CellSpec('II', w: _wNum),
                         _CellSpec('III', w: _wNum),
@@ -1002,7 +1014,7 @@ class _AfterCard extends StatelessWidget {
                       _RowLine(
                         bg: const Color(0xFFF1E6A7),
                         cells: [
-                          _CellSpec('${r.allTtl}', w: _wNum),
+                          _CellSpec('${r.allTtl}', w: _wNum, bold: true),
                           _CellSpec('${r.allI}', w: _wNum),
                           _CellSpec('${r.allII}', w: _wNum),
                           _CellSpec('${r.allIII}', w: _wNum),
@@ -1013,7 +1025,7 @@ class _AfterCard extends StatelessWidget {
                       _RowLine(
                         bg: const Color(0xFFBFF2C8),
                         cells: [
-                          _CellSpec('${r.proDoneTtl}', w: _wNum),
+                          _CellSpec('${r.proDoneTtl}', w: _wNum, bold: true),
                           _CellSpec('${r.proDoneI}', w: _wNum),
                           _CellSpec('${r.proDoneII}', w: _wNum),
                           _CellSpec('${r.proDoneIII}', w: _wNum),
@@ -1025,7 +1037,7 @@ class _AfterCard extends StatelessWidget {
                       _RowLine(
                         bg: const Color(0xFFFFC2C2),
                         cells: [
-                          _CellSpec('${r.remainTtl}', w: _wNum),
+                          _CellSpec('${r.remainTtl}', w: _wNum, bold: true),
                           _CellSpec('${r.remainI}', w: _wNum),
                           _CellSpec('${r.remainII}', w: _wNum),
                           _CellSpec('${r.remainIII}', w: _wNum),
@@ -1036,7 +1048,7 @@ class _AfterCard extends StatelessWidget {
                       _RowLine(
                         bg: const Color(0xFFBFE0F2),
                         cells: [
-                          _CellSpec('${r.hseDoneTtl}', w: _wNum),
+                          _CellSpec('${r.hseDoneTtl}', w: _wNum, bold: true),
                           _CellSpec('${r.hseDoneI}', w: _wNum),
                           _CellSpec('${r.hseDoneII}', w: _wNum),
                           _CellSpec('${r.hseDoneIII}', w: _wNum),
@@ -1049,63 +1061,63 @@ class _AfterCard extends StatelessWidget {
                 }),
 
                 const SizedBox(height: 10),
-                Row(
-                  children: [
-                    const Icon(Icons.camera_alt, size: 16, color: Colors.green),
-                    const SizedBox(width: 4),
-                    const Text(
-                      'Before',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 13,
-                        color: Colors.white,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    _badgeNumber(totals.sumAll, bg: Colors.yellow),
-                    const SizedBox(width: 24),
-
-                    const Icon(
-                      Icons.check_circle,
-                      size: 16,
-                      color: Colors.green,
-                    ),
-                    const SizedBox(width: 4),
-                    const Text(
-                      'Done',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 13,
-                        color: Colors.white,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    _badgeNumber(totals.done, bg: Colors.yellow),
-                    const SizedBox(width: 8),
-                    _badgePercent(totals.donePct),
-
-                    const SizedBox(width: 24),
-
-                    const Icon(
-                      Icons.hourglass_bottom,
-                      size: 16,
-                      color: Colors.orange,
-                    ),
-                    const SizedBox(width: 4),
-                    const Text(
-                      'Remain',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 13,
-                        color: Colors.white,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    _badgeNumber(totals.sumRemain, bg: Colors.yellow),
-                    const SizedBox(width: 8),
-                    _badgePercent(totals.remainPct),
-                  ],
-                ),
+                // Row(
+                //   children: [
+                //     const Icon(Icons.camera_alt, size: 16, color: Colors.green),
+                //     const SizedBox(width: 4),
+                //     const Text(
+                //       'Before',
+                //       style: TextStyle(
+                //         fontWeight: FontWeight.w700,
+                //         fontSize: 13,
+                //         color: Colors.white,
+                //       ),
+                //     ),
+                //     const SizedBox(width: 6),
+                //     _badgeNumber(totals.sumAll, bg: Colors.yellow),
+                //     const SizedBox(width: 24),
+                //
+                //     const Icon(
+                //       Icons.check_circle,
+                //       size: 16,
+                //       color: Colors.green,
+                //     ),
+                //     const SizedBox(width: 4),
+                //     const Text(
+                //       'Done',
+                //       style: TextStyle(
+                //         fontWeight: FontWeight.w700,
+                //         fontSize: 13,
+                //         color: Colors.white,
+                //       ),
+                //     ),
+                //     const SizedBox(width: 6),
+                //     _badgeNumber(totals.done, bg: Colors.yellow),
+                //     const SizedBox(width: 8),
+                //     _badgePercent(totals.donePct),
+                //
+                //     const SizedBox(width: 24),
+                //
+                //     const Icon(
+                //       Icons.hourglass_bottom,
+                //       size: 16,
+                //       color: Colors.orange,
+                //     ),
+                //     const SizedBox(width: 4),
+                //     const Text(
+                //       'Remain',
+                //       style: TextStyle(
+                //         fontWeight: FontWeight.w700,
+                //         fontSize: 13,
+                //         color: Colors.white,
+                //       ),
+                //     ),
+                //     const SizedBox(width: 6),
+                //     _badgeNumber(totals.sumRemain, bg: Colors.yellow),
+                //     const SizedBox(width: 8),
+                //     _badgePercent(totals.remainPct),
+                //   ],
+                // ),
               ],
             ),
           ),
@@ -1184,7 +1196,7 @@ Widget _cell(_CellSpec c, {bool header = false, Color? bg}) {
       style: TextStyle(
         color: textColor,
         fontSize: 14,
-        fontWeight: c.bold ? FontWeight.w800 : FontWeight.w600,
+        fontWeight: c.bold ? FontWeight.bold : FontWeight.w400,
       ),
     ),
   );
@@ -1213,7 +1225,7 @@ Widget _groupHeader(String title, Color c, double width) {
   );
 }
 
-Widget _badgeNumber(int v, {required Color bg}) {
+Widget _badgeNumber(double v, {required Color bg}) {
   return Container(
     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
     decoration: BoxDecoration(
@@ -1231,7 +1243,7 @@ Widget _badgeNumber(int v, {required Color bg}) {
   );
 }
 
-Widget _badgePercent(int pct) {
+Widget _badgePercent(double pct) {
   return Container(
     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
     decoration: BoxDecoration(
@@ -1382,7 +1394,7 @@ class _PicSummaryTable extends StatelessWidget {
                           _RowHeader(
                             bg: const Color(0xFFFFF3BF),
                             cells: const [
-                              _CellSpec('TTL', w: _wNum),
+                              _CellSpec('TTL', w: _wNum, bold: true),
                               _CellSpec('OK', w: _wNum),
                               _CellSpec('NG', w: _wNum),
                               _CellSpec('NY', w: _wNum),
@@ -1392,7 +1404,7 @@ class _PicSummaryTable extends StatelessWidget {
                           _RowHeader(
                             bg: const Color(0xFFBFF2C8),
                             cells: const [
-                              _CellSpec('TTL', w: _wNum),
+                              _CellSpec('TTL', w: _wNum, bold: true),
                               _CellSpec('OK', w: _wNum),
                               _CellSpec('NG', w: _wNum),
                               _CellSpec('NY', w: _wNum),
@@ -1402,7 +1414,7 @@ class _PicSummaryTable extends StatelessWidget {
                           _RowHeader(
                             bg: const Color(0xFFD7F7DA),
                             cells: const [
-                              _CellSpec('TTL', w: _wNum),
+                              _CellSpec('TTL', w: _wNum, bold: true),
                               _CellSpec('OK', w: _wNum),
                               _CellSpec('NG', w: _wNum),
                               _CellSpec('NY', w: _wNum),
@@ -1412,7 +1424,7 @@ class _PicSummaryTable extends StatelessWidget {
                           _RowHeader(
                             bg: const Color(0xFFBFE0F2),
                             cells: const [
-                              _CellSpec('TTL', w: _wNum),
+                              _CellSpec('TTL', w: _wNum, bold: true),
                               _CellSpec('OK', w: _wNum),
                               _CellSpec('NG', w: _wNum),
                               _CellSpec('NY', w: _wNum),
@@ -1422,7 +1434,7 @@ class _PicSummaryTable extends StatelessWidget {
                           _RowHeader(
                             bg: const Color(0xFFA7DCF1),
                             cells: const [
-                              _CellSpec('TTL', w: _wNum),
+                              _CellSpec('TTL', w: _wNum, bold: true),
                               _CellSpec('OK', w: _wNum),
                               _CellSpec('NG', w: _wNum),
                               _CellSpec('NY', w: _wNum),
@@ -1451,7 +1463,7 @@ class _PicSummaryTable extends StatelessWidget {
                             _RowLine(
                               bg: const Color(0xFFFFF3BF),
                               cells: [
-                                _CellSpec('${r.allTtl}', w: _wNum),
+                                _CellSpec('${r.allTtl}', w: _wNum, bold: true),
                                 _CellSpec('${r.allOk}', w: _wNum),
                                 _CellSpec('${r.allNg}', w: _wNum),
                                 _CellSpec('${r.allNy}', w: _wNum),
@@ -1461,7 +1473,7 @@ class _PicSummaryTable extends StatelessWidget {
                             _RowLine(
                               bg: const Color(0xFFBFF2C8),
                               cells: [
-                                _CellSpec('${r.facATtl}', w: _wNum),
+                                _CellSpec('${r.facATtl}', w: _wNum, bold: true),
                                 _CellSpec('${r.facAOk}', w: _wNum),
                                 _CellSpec('${r.facANg}', w: _wNum),
                                 _CellSpec('${r.facANy}', w: _wNum),
@@ -1471,7 +1483,7 @@ class _PicSummaryTable extends StatelessWidget {
                             _RowLine(
                               bg: const Color(0xFFD7F7DA),
                               cells: [
-                                _CellSpec('${r.facBTtl}', w: _wNum),
+                                _CellSpec('${r.facBTtl}', w: _wNum, bold: true),
                                 _CellSpec('${r.facBOk}', w: _wNum),
                                 _CellSpec('${r.facBNg}', w: _wNum),
                                 _CellSpec('${r.facBNy}', w: _wNum),
@@ -1481,7 +1493,7 @@ class _PicSummaryTable extends StatelessWidget {
                             _RowLine(
                               bg: const Color(0xFFBFE0F2),
                               cells: [
-                                _CellSpec('${r.facCTtl}', w: _wNum),
+                                _CellSpec('${r.facCTtl}', w: _wNum, bold: true),
                                 _CellSpec('${r.facCOk}', w: _wNum),
                                 _CellSpec('${r.facCNg}', w: _wNum),
                                 _CellSpec('${r.facCNy}', w: _wNum),
@@ -1491,7 +1503,11 @@ class _PicSummaryTable extends StatelessWidget {
                             _RowLine(
                               bg: const Color(0xFFB5E0EF),
                               cells: [
-                                _CellSpec('${r.outsideTtl}', w: _wNum),
+                                _CellSpec(
+                                  '${r.outsideTtl}',
+                                  w: _wNum,
+                                  bold: true,
+                                ),
                                 _CellSpec('${r.outsideOk}', w: _wNum),
                                 _CellSpec('${r.outsideNg}', w: _wNum),
                                 _CellSpec('${r.outsideNy}', w: _wNum),
