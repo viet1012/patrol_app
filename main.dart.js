@@ -61114,7 +61114,7 @@ return new A.azQ(k.h(0,"plant"),k.h(0,"division"),k.h(0,"area"),k.h(0,"machine")
 aB(){var s,r,q,p,o=this,n=null
 o.aP()
 s=o.x=new A.bZ(Date.now(),0,!1)
-o.w=A.c2(A.bc(s),A.bb(s),1,0,0,0,0)
+o.w=A.c2(A.bc(s),A.bb(s)-1,1,0,0,0,0)
 r=o.a
 q=r.c
 o.d=A.nl(n,n,n,n,r.d,n,q)
