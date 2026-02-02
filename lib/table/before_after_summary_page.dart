@@ -694,7 +694,7 @@ class _BeforeAfterSummaryDialogState extends State<BeforeAfterSummaryDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final maxW = 1700.0; // ⬅ tăng lên
+    final maxW = 1800.0; // ⬅ tăng lên
     final w = MediaQuery.of(context).size.width;
     final dialogW = w < 600 ? w - 24 : (w < maxW ? w - 64 : maxW);
 
@@ -881,7 +881,7 @@ class _Totals {
   }
 
   /// helper: làm tròn 2 chữ số
-  static double _round2(double v) => double.parse(v.toStringAsFixed(2));
+  static double _round2(double v) => double.parse(v.toStringAsFixed(1));
 }
 
 // =======================
@@ -898,8 +898,8 @@ class _AfterCard extends StatelessWidget {
     required this.controller,
   });
 
-  static const double _wDiv = 170;
-  static const double _wNum = 56;
+  static const double _wDiv = 100;
+  static const double _wNum = 68;
 
   @override
   Widget build(BuildContext context) {
@@ -1000,6 +1000,15 @@ class _AfterCard extends StatelessWidget {
                 const SizedBox(height: 6),
 
                 ...rows.map((r) {
+                  final isSum = r.division == 'SUM';
+                  final isPct = r.division == '%';
+
+                  // màu cho row SUM (toàn hàng)
+                  const sumBg = Color(0xFFDDD6FE);
+
+                  // màu cho ô TTL ở row %
+                  const pctTtlBg = Color(0xFFBA94E1);
+
                   return Row(
                     children: [
                       _RowLine(
@@ -1008,52 +1017,97 @@ class _AfterCard extends StatelessWidget {
                             r.division,
                             w: _wDiv,
                             align: TextAlign.left,
+                            bold: isSum || isPct,
                           ),
-                        ],
-                      ),
-                      _RowLine(
-                        bg: const Color(0xFFF1E6A7),
-                        cells: [
-                          _CellSpec('${r.allTtl}', w: _wNum, bold: true),
-                          _CellSpec('${r.allI}', w: _wNum),
-                          _CellSpec('${r.allII}', w: _wNum),
-                          _CellSpec('${r.allIII}', w: _wNum),
-                          _CellSpec('${r.allIV}', w: _wNum),
-                          _CellSpec('${r.allV}', w: _wNum),
-                        ],
-                      ),
-                      _RowLine(
-                        bg: const Color(0xFFBFF2C8),
-                        cells: [
-                          _CellSpec('${r.proDoneTtl}', w: _wNum, bold: true),
-                          _CellSpec('${r.proDoneI}', w: _wNum),
-                          _CellSpec('${r.proDoneII}', w: _wNum),
-                          _CellSpec('${r.proDoneIII}', w: _wNum),
-                          _CellSpec('${r.proDoneIV}', w: _wNum),
-                          _CellSpec('${r.proDoneV}', w: _wNum),
                         ],
                       ),
 
                       _RowLine(
-                        bg: const Color(0xFFFFC2C2),
+                        bg: isSum
+                            ? sumBg
+                            : (isPct ? null : const Color(0xFFF1E6A7)),
+                        // SUM tô cả hàng, còn lại như cũ
                         cells: [
-                          _CellSpec('${r.remainTtl}', w: _wNum, bold: true),
-                          _CellSpec('${r.remainI}', w: _wNum),
-                          _CellSpec('${r.remainII}', w: _wNum),
-                          _CellSpec('${r.remainIII}', w: _wNum),
-                          _CellSpec('${r.remainIV}', w: _wNum),
-                          _CellSpec('${r.remainV}', w: _wNum),
+                          // TTL
+                          _CellSpec(
+                            isPct ? fmtPct(r.allTtl) : fmtNum(r.allTtl),
+                            w: _wNum,
+                            bold: true,
+                            bg: isPct
+                                ? pctTtlBg
+                                : null, // ✅ chỉ TTL row % có màu riêng
+                          ),
+                          // I..V: nếu row % thì để trống
+                          _CellSpec(isPct ? '' : fmtNum(r.allI), w: _wNum),
+                          _CellSpec(isPct ? '' : fmtNum(r.allII), w: _wNum),
+                          _CellSpec(isPct ? '' : fmtNum(r.allIII), w: _wNum),
+                          _CellSpec(isPct ? '' : fmtNum(r.allIV), w: _wNum),
+                          _CellSpec(isPct ? '' : fmtNum(r.allV), w: _wNum),
                         ],
                       ),
+
                       _RowLine(
-                        bg: const Color(0xFFBFE0F2),
+                        // bg: isSum ? sumBg : const Color(0xFFBFF2C8),
+                        bg: isSum
+                            ? sumBg
+                            : (isPct ? null : const Color(0xFFBFF2C8)),
                         cells: [
-                          _CellSpec('${r.hseDoneTtl}', w: _wNum, bold: true),
-                          _CellSpec('${r.hseDoneI}', w: _wNum),
-                          _CellSpec('${r.hseDoneII}', w: _wNum),
-                          _CellSpec('${r.hseDoneIII}', w: _wNum),
-                          _CellSpec('${r.hseDoneIV}', w: _wNum),
-                          _CellSpec('${r.hseDoneV}', w: _wNum),
+                          _CellSpec(
+                            isPct ? fmtPct(r.proDoneTtl) : fmtNum(r.proDoneTtl),
+                            w: _wNum,
+                            bold: true,
+                            bg: isPct ? pctTtlBg : null,
+                          ),
+                          _CellSpec(isPct ? '' : fmtNum(r.proDoneI), w: _wNum),
+                          _CellSpec(isPct ? '' : fmtNum(r.proDoneII), w: _wNum),
+                          _CellSpec(
+                            isPct ? '' : fmtNum(r.proDoneIII),
+                            w: _wNum,
+                          ),
+                          _CellSpec(isPct ? '' : fmtNum(r.proDoneIV), w: _wNum),
+                          _CellSpec(isPct ? '' : fmtNum(r.proDoneV), w: _wNum),
+                        ],
+                      ),
+
+                      _RowLine(
+                        bg: isSum
+                            ? sumBg
+                            : (isPct ? null : const Color(0xFFFFC2C2)),
+                        cells: [
+                          _CellSpec(
+                            isPct ? fmtPct(r.remainTtl) : fmtNum(r.remainTtl),
+                            w: _wNum,
+                            bold: true,
+                            bg: isPct ? pctTtlBg : null,
+                          ),
+                          _CellSpec(isPct ? '' : fmtNum(r.remainI), w: _wNum),
+                          _CellSpec(isPct ? '' : fmtNum(r.remainII), w: _wNum),
+                          _CellSpec(isPct ? '' : fmtNum(r.remainIII), w: _wNum),
+                          _CellSpec(isPct ? '' : fmtNum(r.remainIV), w: _wNum),
+                          _CellSpec(isPct ? '' : fmtNum(r.remainV), w: _wNum),
+                        ],
+                      ),
+
+                      _RowLine(
+                        // bg: isSum ? sumBg : const Color(0xFFBFE0F2),
+                        bg: isSum
+                            ? sumBg
+                            : (isPct ? null : const Color(0xFFBFE0F2)),
+                        cells: [
+                          _CellSpec(
+                            isPct ? fmtPct(r.hseDoneTtl) : fmtNum(r.hseDoneTtl),
+                            w: _wNum,
+                            bold: true,
+                            bg: isPct ? pctTtlBg : null,
+                          ),
+                          _CellSpec(isPct ? '' : fmtNum(r.hseDoneI), w: _wNum),
+                          _CellSpec(isPct ? '' : fmtNum(r.hseDoneII), w: _wNum),
+                          _CellSpec(
+                            isPct ? '' : fmtNum(r.hseDoneIII),
+                            w: _wNum,
+                          ),
+                          _CellSpec(isPct ? '' : fmtNum(r.hseDoneIV), w: _wNum),
+                          _CellSpec(isPct ? '' : fmtNum(r.hseDoneV), w: _wNum),
                         ],
                       ),
                     ],
@@ -1175,12 +1229,28 @@ class _RowLine extends StatelessWidget {
   }
 }
 
+String fmtNum(double v) {
+  // nếu là số nguyên thì in gọn: 414.0 => 414
+  if (v % 1 == 0) return v.toInt().toString();
+  return v.toStringAsFixed(1);
+}
+
+String fmtPct(double v) => '${v.toStringAsFixed(1)}%';
+
+bool _isTtlCol(int idxInGroup) =>
+    idxInGroup == 0; // TTL là cột đầu của mỗi group (TTL, I, II, III, IV, V)
+
 Widget _cell(_CellSpec c, {bool header = false, Color? bg}) {
   final textColor = header ? Colors.black : Colors.black87;
 
-  final baseBg = header
-      ? (bg ?? const Color(0xFFDDDDDD)) // ✅ header cũng dùng bg nếu truyền vào
-      : (bg ?? const Color(0xFFEFEFEF));
+  final baseBg =
+      c
+          .bg // ✅ ưu tiên bg riêng của cell
+          ??
+      (header
+          ? (bg ?? const Color(0xFFDDDDDD))
+          : (bg ?? const Color(0xFFEFEFEF)));
+
   return Container(
     width: c.w,
     height: header ? 34 : 38,
@@ -1196,7 +1266,7 @@ Widget _cell(_CellSpec c, {bool header = false, Color? bg}) {
       style: TextStyle(
         color: textColor,
         fontSize: 14,
-        fontWeight: c.bold ? FontWeight.bold : FontWeight.w400,
+        fontWeight: c.bold ? FontWeight.w800 : FontWeight.w600,
       ),
     ),
   );
@@ -1295,12 +1365,14 @@ class _CellSpec {
   final double w;
   final bool bold;
   final TextAlign align;
+  final Color? bg; // ✅ thêm
 
   const _CellSpec(
     this.text, {
     required this.w,
     this.bold = false,
     this.align = TextAlign.center,
+    this.bg,
   });
 }
 
