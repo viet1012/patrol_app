@@ -105,4 +105,40 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get counterMeasureHint => 'Đối sách...';
+
+  @override
+  String get label_5m => '5M phát sinh';
+
+  @override
+  String get m_material => 'Material';
+
+  @override
+  String get m_machine => 'Machine';
+
+  @override
+  String get m_man => 'Man';
+
+  @override
+  String get m_method => 'Method';
+
+  @override
+  String get m_measuring => 'Measuring';
+
+  @override
+  String get m_df_5s => 'DF_5S';
+
+  @override
+  String get label_quality_impact => 'Mức độ ảnh hưởng đến chất lượng sản phẩm';
+
+  @override
+  String get impact_claim => 'Phát sinh claim';
+
+  @override
+  String get impact_defect_in_process => 'Phát sinh phế phẩm trong công đoạn';
+
+  @override
+  String get impact_accident_risk => 'Có rủi ro phát sinh tai nạn lao động';
+
+  @override
+  String get impact_gauge_damage => 'Phát sinh hư hỏng dụng cụ kiểm tra';
 }

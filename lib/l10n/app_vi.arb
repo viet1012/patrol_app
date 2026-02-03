@@ -1,50 +1,52 @@
 {
   "@@locale": "vi",
-
   "plant": "Nhà máy",
   "group": "Nhóm",
   "fac": "Phân xưởng",
   "area": "Khu vực",
   "machine": "Máy móc",
   "search_or_add_new": "Tìm kiếm hoặc nhập mới...",
-
   "label_freq": "Tần suất phát sinh",
   "label_prob": "Khả năng phát sinh",
   "label_sev": "Mức độ chấn thương",
   "label_risk": "Mức độ rủi ro",
-
   "frequency_often": "Thường xuyên",
   "frequency_sometimes": "Thỉnh thoảng",
   "frequency_rare": "Hầu như không",
-
   "probability_certain": "Chắc chắn",
   "probability_high": "Khả năng cao",
   "probability_possible": "Có khả năng",
   "probability_rare": "Hầu như không",
-
   "severity_critical": "Vết thương chí mạng",
   "severity_severe": "Chấn thương nghiêm trọng",
   "severity_moderate": "Chấn thương vừa phải",
   "severity_minor": "Chấn thương nhẹ",
   "severity_negligible": "Không đáng kể",
-
   "risk_low": "I - Rủi ro thấp",
   "risk_medium": "II - Rủi ro trung bình",
   "risk_high": "III - Rủi ro cao",
   "risk_very_high": "IV - Rủi ro rất cao",
   "risk_extreme": "V - Rủi ro cực kỳ cao",
-
   "needRecheck": "Cần rà soát lại vấn đề tương tự",
-
-
   "needRecheckWithArea": "Cần rà soát lại vấn đề tương tự ở {area}",
   "@needRecheckWithArea": {
     "placeholders": {
       "area": {}
     }
   },
-
   "needSelectArea": "Chưa chọn khu vực",
   "commentHint": "Nội dung...",
-  "counterMeasureHint": "Đối sách..."
+  "counterMeasureHint": "Đối sách...",
+  "label_5m": "5M phát sinh",
+  "m_material": "Material",
+  "m_machine": "Machine",
+  "m_man": "Man",
+  "m_method": "Method",
+  "m_measuring": "Measuring",
+  "m_df_5s": "DF_5S",
+  "label_quality_impact": "Mức độ ảnh hưởng đến chất lượng sản phẩm",
+  "impact_claim": "Phát sinh claim",
+  "impact_defect_in_process": "Phát sinh phế phẩm trong công đoạn",
+  "impact_accident_risk": "Có rủi ro phát sinh tai nạn lao động",
+  "impact_gauge_damage": "Phát sinh hư hỏng dụng cụ kiểm tra"
 }

@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:ui';
+
 import 'package:auto_size_text/auto_size_text.dart';
 import 'package:chuphinh/camera_preview_box.dart';
 import 'package:chuphinh/translator.dart';
@@ -9,17 +11,18 @@ import 'package:dio/dio.dart';
 import 'package:dropdown_search/dropdown_search.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+
 import 'api/api_config.dart';
+import 'api/auto_cmp_api.dart';
 import 'api/hse_master_service.dart';
 import 'common/common_ui_helper.dart';
 import 'edit/edit_before_screen.dart';
 import 'homeScreen/patrol_home_screen.dart';
+import 'model/auto_cmp.dart';
 import 'model/hse_patrol_team_model.dart';
 import 'model/machine_model.dart';
 import 'model/reason_model.dart';
-import 'api/auto_cmp_api.dart';
-import 'model/auto_cmp.dart';
-import 'dart:async';
+import 'model/risk_score_calculator.dart';
 
 class CameraScreen extends StatefulWidget {
   final List<MachineModel> machines;
@@ -75,6 +78,11 @@ class _CameraScreenState extends State<CameraScreen> {
 
   String? _employeeName;
   bool _isLoadingName = false;
+
+  // ✅ QA states
+  String? _qaFreq; // dùng chung key frequency_often...
+  String? _qa5m; // 1 lựa chọn
+  String? _qaImpact; // 1 lựa chọn
 
   @override
   void initState() {
@@ -242,6 +250,135 @@ class _CameraScreenState extends State<CameraScreen> {
   }
 
   Future<void> _sendReport() async {
+    final images = _cameraKey.currentState?.images ?? [];
+    final hasQr = _qrKey.trim().isNotEmpty;
+
+    final isQA = widget.patrolGroup == PatrolGroup.QualityPatrol;
+
+    // ================= VALIDATE =================
+    if (_selectedMachine == null) {
+      CommonUI.showWarning(
+        context: context,
+        title: "Information Required",
+        message: "Please select all required information.",
+      );
+      return;
+    }
+
+    if (_comment.trim().isEmpty) {
+      CommonUI.showWarning(
+        context: context,
+        title: "Comment Required",
+        message: "Please enter a comment.",
+      );
+      return;
+    }
+
+    // ================= LOADING =================
+    CommonUI.showSnackBar(
+      context: context,
+      message: 'Đang gửi ${images.length} ảnh...',
+      color: Colors.blue,
+      duration: const Duration(seconds: 60),
+    );
+
+    try {
+      // ================= IMAGE =================
+      final imageFiles = <MultipartFile>[];
+      for (int i = 0; i < images.length; i++) {
+        imageFiles.add(
+          MultipartFile.fromBytes(
+            images[i],
+            filename: 'photo_${i + 1}.jpg',
+            contentType: http.MediaType('image', 'jpeg'),
+          ),
+        );
+      }
+
+      // ================= REPORT (BASE) =================
+      final reportMap = <String, dynamic>{
+        'userCreate': '${widget.accountCode}_$_employeeName',
+        'qr_key': _qrKey ?? '',
+        'qr_scan_sts': hasQr ? 'SUCCESS_1st' : '',
+        'plant': _selectedPlant ?? '',
+        'type': widget.patrolGroup.name,
+        'division': _selectedFac ?? '',
+        'area': _selectedArea ?? '',
+        'group': _selectedGroup ?? '',
+        'machine': _selectedMachine ?? '',
+        'comment': _comment,
+        'countermeasure': _counterMeasure,
+        'check': _needRecheck
+            ? (_selectedArea != null
+                  ? ''.combinedViJa(context, 'needRecheck')
+                  : ''.combinedViJa(context, 'needSelectArea'))
+            : '',
+      };
+
+      // ================= REPORT (BY TYPE) =================
+      if (!isQA) {
+        // ✅ Patrol/Audit: gửi risk*
+        reportMap.addAll({
+          'riskFreq': ''.combinedViJa(context, _freq ?? ''),
+          'riskProb': ''.combinedViJa(context, _prob ?? ''),
+          'riskSev': ''.combinedViJa(context, _sev ?? ''),
+          'riskTotal': getScoreSymbol(),
+        });
+      } else {
+        // ✅ QualityPatrol: gửi QA fields, KHÔNG gửi risk*
+        reportMap.addAll({
+          'riskFreq': ''.combinedViJa(context, _qaFreq ?? ''),
+          'riskProb': ''.combinedViJa(context, _qa5m ?? ''),
+          'riskSev': ''.combinedViJa(context, _qaImpact ?? ''),
+        });
+      }
+
+      final formData = FormData.fromMap({
+        'report': jsonEncode(reportMap),
+        'images': imageFiles,
+      });
+
+      dio.options.headers['ngrok-skip-browser-warning'] = 'true';
+
+      final response = await dio.post(
+        "${ApiConfig.baseUrl}/api/report",
+        data: formData,
+        options: Options(sendTimeout: const Duration(seconds: 120)),
+      );
+
+      // ================= RESULT =================
+      if (response.statusCode! >= 200 && response.statusCode! < 300) {
+        CommonUI.showSnackBar(
+          context: context,
+          message: 'Successfully sent ${images.length} images!',
+          color: Colors.green,
+        );
+        _resetForm();
+      } else {
+        CommonUI.showSnackBar(
+          context: context,
+          message: 'Server error: ${response.statusCode}',
+          color: Colors.red,
+        );
+      }
+    } on DioException catch (e) {
+      String msg = 'Error: ';
+      if (e.response != null) {
+        msg += '${e.response?.statusCode} - ${e.response?.data}';
+      } else {
+        msg += e.message ?? 'Unknown';
+      }
+      CommonUI.showSnackBar(context: context, message: msg, color: Colors.red);
+    } catch (e) {
+      CommonUI.showSnackBar(
+        context: context,
+        message: 'Error: $e',
+        color: Colors.red,
+      );
+    }
+  }
+
+  Future<void> _sendReport1() async {
     final images = _cameraKey.currentState?.images ?? [];
     final hasQr = _qrKey.trim().isNotEmpty;
     // ================= VALIDATE =================
@@ -443,9 +580,11 @@ class _CameraScreenState extends State<CameraScreen> {
       // ✅ QUAN TRỌNG: Giúp giao diện tự co lên khi bàn phím hiện
       resizeToAvoidBottomInset: true,
       appBar: AppBar(
-        backgroundColor: Color(0xFF121826), // soft dark blue
+        backgroundColor: Color(0xFF121826),
+        // soft dark blue
         centerTitle: false,
-        titleSpacing: 4, // 👈 kéo sát về leading
+        titleSpacing: 4,
+        // 👈 kéo sát về leading
         leading: GlassActionButton(
           icon: Icons.arrow_back_rounded,
           onTap: () => Navigator.pop(context),
@@ -674,95 +813,97 @@ class _CameraScreenState extends State<CameraScreen> {
               const SizedBox(height: 16),
 
               // CÁC DROPDOWN RISK
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildRiskDropdown(
-                      labelKey: "label_freq",
-                      valueKey: _freq,
-                      items: frequencyOptions,
-                      onChanged: (v) => _freq = v,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: _buildRiskDropdown(
-                      labelKey: "label_prob",
-                      valueKey: _prob,
-                      items: probabilityOptions,
-                      onChanged: (v) => _prob = v,
-                    ),
-                  ),
-                ],
-              ),
+              _buildRiskSection(),
 
-              const SizedBox(height: 8),
-
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: _buildRiskDropdown(
-                      labelKey: "label_sev",
-                      valueKey: _sev,
-                      items: severityOptions,
-                      onChanged: (v) => _sev = v,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: SizedBox(
-                      child: TextField(
-                        enabled: false,
-                        controller: TextEditingController(text: displayScore),
-                        decoration: InputDecoration(
-                          labelText: "label_risk".tr(context),
-
-                          /// 🎨 nền hiển thị
-                          filled: true,
-                          fillColor: Colors.deepOrange.withOpacity(0.15),
-
-                          /// 🏷️ label
-                          labelStyle: TextStyle(
-                            fontSize: 14,
-                            color: Colors.white.withOpacity(0.65),
-                            fontWeight: FontWeight.w500,
-                          ),
-
-                          floatingLabelStyle: const TextStyle(
-                            color: Colors.deepOrange,
-                            fontWeight: FontWeight.bold,
-                          ),
-
-                          /// 🔲 viền
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(
-                              color: Colors.deepOrange.withOpacity(0.6),
-                            ),
-                          ),
-
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 14,
-                          ),
-                        ),
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 18,
-                          color: (displayScore == "V" || displayScore == "IV")
-                              ? Colors.red
-                              : Colors.white,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+              // Row(
+              //   children: [
+              //     Expanded(
+              //       child: _buildRiskDropdown(
+              //         labelKey: "label_freq",
+              //         valueKey: _freq,
+              //         items: frequencyOptions,
+              //         onChanged: (v) => _freq = v,
+              //       ),
+              //     ),
+              //     const SizedBox(width: 8),
+              //     Expanded(
+              //       child: _buildRiskDropdown(
+              //         labelKey: "label_prob",
+              //         valueKey: _prob,
+              //         items: probabilityOptions,
+              //         onChanged: (v) => _prob = v,
+              //       ),
+              //     ),
+              //   ],
+              // ),
+              //
+              // const SizedBox(height: 8),
+              //
+              // Row(
+              //   crossAxisAlignment: CrossAxisAlignment.start,
+              //   children: [
+              //     Expanded(
+              //       child: _buildRiskDropdown(
+              //         labelKey: "label_sev",
+              //         valueKey: _sev,
+              //         items: severityOptions,
+              //         onChanged: (v) => _sev = v,
+              //       ),
+              //     ),
+              //     const SizedBox(width: 8),
+              //     Expanded(
+              //       child: SizedBox(
+              //         child: TextField(
+              //           enabled: false,
+              //           controller: TextEditingController(text: displayScore),
+              //           decoration: InputDecoration(
+              //             labelText: "label_risk".tr(context),
+              //
+              //             /// 🎨 nền hiển thị
+              //             filled: true,
+              //             fillColor: Colors.deepOrange.withOpacity(0.15),
+              //
+              //             /// 🏷️ label
+              //             labelStyle: TextStyle(
+              //               fontSize: 14,
+              //               color: Colors.white.withOpacity(0.65),
+              //               fontWeight: FontWeight.w500,
+              //             ),
+              //
+              //             floatingLabelStyle: const TextStyle(
+              //               color: Colors.deepOrange,
+              //               fontWeight: FontWeight.bold,
+              //             ),
+              //
+              //             /// 🔲 viền
+              //             border: OutlineInputBorder(
+              //               borderRadius: BorderRadius.circular(12),
+              //             ),
+              //             enabledBorder: OutlineInputBorder(
+              //               borderRadius: BorderRadius.circular(12),
+              //               borderSide: BorderSide(
+              //                 color: Colors.deepOrange.withOpacity(0.6),
+              //               ),
+              //             ),
+              //
+              //             contentPadding: const EdgeInsets.symmetric(
+              //               horizontal: 12,
+              //               vertical: 14,
+              //             ),
+              //           ),
+              //           textAlign: TextAlign.center,
+              //           style: TextStyle(
+              //             fontSize: 18,
+              //             color: (displayScore == "V" || displayScore == "IV")
+              //                 ? Colors.red
+              //                 : Colors.white,
+              //             fontWeight: FontWeight.bold,
+              //           ),
+              //         ),
+              //       ),
+              //     ),
+              //   ],
+              // ),
               const SizedBox(height: 8),
 
               // ---------------------------------------------------------
@@ -1203,6 +1344,142 @@ class _CameraScreenState extends State<CameraScreen> {
     }
   }
 
+  Widget _buildRiskSection() {
+    switch (widget.patrolGroup) {
+      case PatrolGroup.QualityPatrol:
+        return _buildQualityRiskSection();
+      case PatrolGroup.Audit:
+      case PatrolGroup.Patrol:
+        return _buildPatrolRiskSection();
+    }
+  }
+
+  Widget _buildPatrolRiskSection() {
+    final displayScore = RiskScoreCalculator.scoreSymbol(
+      freqKey: _freq,
+      probKey: _prob,
+      sevKey: _sev,
+      frequencyOptions: frequencyOptions,
+      probabilityOptions: probabilityOptions,
+      severityOptions: severityOptions,
+    );
+
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: _buildRiskDropdown(
+                labelKey: "label_freq",
+                valueKey: _freq,
+                items: frequencyOptions,
+                onChanged: (v) => setState(() => _freq = v),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _buildRiskDropdown(
+                labelKey: "label_prob",
+                valueKey: _prob,
+                items: probabilityOptions,
+                onChanged: (v) => setState(() => _prob = v),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: _buildRiskDropdown(
+                labelKey: "label_sev",
+                valueKey: _sev,
+                items: severityOptions,
+                onChanged: (v) => setState(() => _sev = v),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(child: _buildRiskScoreField(displayScore)),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRiskScoreField(String displayScore) {
+    return TextField(
+      enabled: false,
+      controller: TextEditingController(text: displayScore),
+      decoration: InputDecoration(
+        labelText: "label_risk".tr(context),
+        filled: true,
+        fillColor: Colors.deepOrange.withOpacity(0.15),
+        labelStyle: TextStyle(
+          fontSize: 14,
+          color: Colors.white.withOpacity(0.65),
+          fontWeight: FontWeight.w500,
+        ),
+        floatingLabelStyle: const TextStyle(
+          color: Colors.deepOrange,
+          fontWeight: FontWeight.bold,
+        ),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.deepOrange.withOpacity(0.6)),
+        ),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 14,
+        ),
+      ),
+      textAlign: TextAlign.center,
+      style: TextStyle(
+        fontSize: 18,
+        color: (displayScore == "V" || displayScore == "IV")
+            ? Colors.red
+            : Colors.white,
+        fontWeight: FontWeight.bold,
+      ),
+    );
+  }
+
+  Widget _buildQualityRiskSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // 5. Tần suất phát sinh
+        _buildRiskDropdown(
+          labelKey: "label_freq",
+          valueKey: _qaFreq,
+          items: qaFrequencyOptions,
+          onChanged: (v) => setState(() => _qaFreq = v),
+        ),
+
+        const SizedBox(height: 12),
+
+        // 6. 5M phát sinh  (dropdown)
+        _buildRiskDropdown(
+          labelKey: "label_5m",
+          valueKey: _qa5m,
+          items: fiveMOptions,
+          onChanged: (v) => setState(() => _qa5m = v),
+        ),
+
+        const SizedBox(height: 12),
+
+        // 7. Mức độ ảnh hưởng đến chất lượng sản phẩm (dropdown)
+        _buildRiskDropdown(
+          labelKey: "label_quality_impact",
+          valueKey: _qaImpact,
+          items: qualityImpactOptions,
+          onChanged: (v) => setState(() => _qaImpact = v),
+        ),
+      ],
+    );
+  }
+
   // 🔴 HÀM PHỤ TRỢ: _buildSearchableDropdown (Giữ nguyên)
   Widget _buildSearchableDropdown({
     required String label,
@@ -1430,11 +1707,19 @@ class _CameraScreenState extends State<CameraScreen> {
     required List<RiskOption> items,
     required Function(String?) onChanged,
   }) {
-    return DropdownButtonFormField<String>(
-      value: valueKey,
-      isExpanded: true,
-      dropdownColor: const Color(0xFF2A2E32), // nền dropdown
+    // Tập key hợp lệ
+    final validKeys = items.map((e) => e.labelKey).toSet();
 
+    // ✅ Nếu valueKey null hoặc không nằm trong items -> trả null cho dropdown
+    final safeValue = (valueKey != null && validKeys.contains(valueKey))
+        ? valueKey
+        : null;
+    return DropdownButtonFormField<String>(
+      value: safeValue,
+      isExpanded: true,
+      dropdownColor: const Color(0xFF2A2E32),
+
+      // nền dropdown
       decoration: InputDecoration(
         labelText: labelKey.tr(context),
 
