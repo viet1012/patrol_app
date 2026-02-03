@@ -348,24 +348,24 @@ class _EditReportDialogState extends State<EditReportDialog> {
       ),
       child: Column(
         children: [
-          if (_loadingMaster)
-            const Padding(
-              padding: EdgeInsets.only(bottom: 10),
-              child: Row(
-                children: [
-                  SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
-                  SizedBox(width: 8),
-                  Text(
-                    "Loading master data...",
-                    style: TextStyle(color: Colors.white70, fontSize: 12),
-                  ),
-                ],
-              ),
-            ),
+          // if (_loadingMaster)
+          //   const Padding(
+          //     padding: EdgeInsets.only(bottom: 10),
+          //     child: Row(
+          //       children: [
+          //         SizedBox(
+          //           width: 16,
+          //           height: 16,
+          //           child: CircularProgressIndicator(strokeWidth: 2),
+          //         ),
+          //         SizedBox(width: 8),
+          //         Text(
+          //           "Loading master data...",
+          //           style: TextStyle(color: Colors.white70, fontSize: 12),
+          //         ),
+          //       ],
+          //     ),
+          //   ),
           if (_masterError != null)
             Padding(
               padding: const EdgeInsets.only(bottom: 10),
@@ -787,7 +787,6 @@ class _EditReportDialogState extends State<EditReportDialog> {
 
         grp: _selectedGroup ?? widget.report.grp,
         plant: widget.report.plant,
-        // plant b?n không cho s?a
         division: _selectedDivision ?? widget.report.division,
         area: _selectedArea ?? widget.report.area,
         machine: _selectedMachine ?? widget.report.machine,

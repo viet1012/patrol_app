@@ -105,4 +105,40 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get counterMeasureHint => 'Countermeasure...';
+
+  @override
+  String get label_5m => '5M（発生要因）';
+
+  @override
+  String get m_material => 'Material';
+
+  @override
+  String get m_machine => 'Machine';
+
+  @override
+  String get m_man => 'Man';
+
+  @override
+  String get m_method => 'Method';
+
+  @override
+  String get m_measuring => 'Measuring';
+
+  @override
+  String get m_df_5s => 'DF_5S';
+
+  @override
+  String get label_quality_impact => '製品品質への影響度';
+
+  @override
+  String get impact_claim => 'クレーム発生';
+
+  @override
+  String get impact_defect_in_process => '工程内不良（不良品）発生';
+
+  @override
+  String get impact_accident_risk => '労働災害発生リスクあり';
+
+  @override
+  String get impact_gauge_damage => '検査治具／測定器の破損発生';
 }

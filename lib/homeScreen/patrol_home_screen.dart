@@ -1,25 +1,18 @@
 import 'dart:ui';
-import 'dart:html' as html;
 
-import 'package:chuphinh/table/patrol_report_table.dart';
 import 'package:chuphinh/widget/glass_action_button.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:shimmer/shimmer.dart';
 
 import '../LanguageFlagButton.dart';
 import '../after/after_detail_screen.dart';
 import '../animate/call_to_action_arrow.dart';
-import '../animate/christmas_title.dart';
 import '../animate/glow_title.dart';
-import '../api/api_config.dart';
 import '../api/dio_client.dart';
 import '../api/hse_master_service.dart';
 import '../common/animated_glass_action_button.dart';
 import '../common/app_version_text.dart';
 import '../common/common_ui_helper.dart';
-import '../login/login_page.dart';
 import '../model/hse_patrol_team_model.dart';
 import '../model/machine_model.dart';
 import '../qrCode/qr_scanner_dialog.dart';
@@ -27,7 +20,7 @@ import '../recheck/recheck_detail_screen.dart';
 import '../session/session_store.dart';
 import '../test.dart';
 import '../translator.dart';
-import '../widget/error_display.dart';
+import 'access_rule.dart';
 
 enum PatrolGroup { Patrol, Audit, QualityPatrol }
 
@@ -62,6 +55,7 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
   PatrolGroup? expandedGroup;
 
   String _employeeName = '';
+
   Future<void> _initEmployee() async {
     await fetchEmployeeName(widget.accountCode);
     debugPrint("EMPLOYEE NAME = $_employeeName");
@@ -71,6 +65,7 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
   bool _needManualSelect = true;
   bool _qrHandled = false;
   final _qrDialogKey = GlobalKey<QrScannerDialogState>();
+
   @override
   void initState() {
     super.initState();
@@ -225,7 +220,6 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
 
       return getNum(a).compareTo(getNum(b));
     });
-
     debugPrint('FACTORIES = $factories');
     debugPrint('AUTO TEAM = ${_autoTeam?.plant}');
     return Scaffold(
@@ -281,9 +275,9 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
                 )
               : errorMessage != null && errorMessage!.isNotEmpty
               ? CommonUI.errorPage(
-            message:errorMessage.toString(),
-            context: context,
-          )
+                  message: errorMessage.toString(),
+                  context: context,
+                )
               : Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 24,
@@ -340,7 +334,8 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
                                 SizedBox(
                                   width: 150,
                                   child: DropdownButtonFormField<String>(
-                                    value: selectedFactory, // null lúc đầu
+                                    value: selectedFactory,
+                                    // null lúc đầu
                                     isExpanded: true,
                                     dropdownColor: Colors.blueGrey.shade900
                                         .withOpacity(0.95),
@@ -749,6 +744,12 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
     required Color color,
     required String titleScreen,
   }) {
+    final canRecheck = AccessRule().can(
+      PatrolAction.recheck,
+      group: group,
+      user: widget.accountCode,
+    );
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
       child: Column(
@@ -798,11 +799,12 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
             },
           ),
           const SizedBox(height: 16),
+
           _patrolButton(
             number: '3)',
             title: _recheckTitle(group),
             color: color,
-            enabled: true,
+            enabled: canRecheck,
             onTap: () {
               Navigator.push(
                 context,
@@ -818,6 +820,26 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
               );
             },
           ),
+          // _patrolButton(
+          //   number: '3)',
+          //   title: _recheckTitle(group),
+          //   color: color,
+          //   enabled: true,
+          //   onTap: () {
+          //     Navigator.push(
+          //       context,
+          //       MaterialPageRoute(
+          //         builder: (_) => RecheckDetailScreen(
+          //           accountCode: widget.accountCode,
+          //           machines: machines,
+          //           selectedPlant: selectedFactory,
+          //           titleScreen: titleScreen,
+          //           patrolGroup: group,
+          //         ),
+          //       ),
+          //     );
+          //   },
+          // ),
           const SizedBox(height: 16),
           // _patrolButton(
           //   number: '4)',

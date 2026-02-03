@@ -1,50 +1,52 @@
 {
   "@@locale": "en",
-
   "plant": "Factory",
   "group": "Group",
   "fac": "Factory",
   "area": "Area",
   "machine": "Machine",
   "search_or_add_new": "Search or add new...",
-
   "label_freq": "Frequency",
   "label_prob": "Probability",
   "label_sev": "Severity",
   "label_risk": "Risk Level",
-
   "frequency_often": "Frequent",
   "frequency_sometimes": "Occasional",
   "frequency_rare": "Rare",
-
   "probability_certain": "Certain",
   "probability_high": "Likely",
   "probability_possible": "Possible",
   "probability_rare": "Unlikely",
-
   "severity_critical": "Catastrophic",
   "severity_severe": "Severe Injury",
   "severity_moderate": "Moderate Injury",
   "severity_minor": "Minor Injury",
   "severity_negligible": "Negligible",
-
   "risk_low": "I - Low Risk",
   "risk_medium": "II - Medium Risk",
   "risk_high": "III - High Risk",
   "risk_very_high": "IV - Very High Risk",
   "risk_extreme": "V - Extreme Risk",
-
   "needRecheck": "Need to recheck similar issues",
-
   "needRecheckWithArea": "Need to recheck similar issues in {area}",
   "@needRecheckWithArea": {
     "placeholders": {
       "area": {}
     }
   },
-
   "needSelectArea": "Area not selected",
   "commentHint": "Note...",
-  "counterMeasureHint": "Countermeasure..."
-
+  "counterMeasureHint": "Countermeasure...",
+  "label_5m": "5M（発生要因）",
+  "m_material": "Material",
+  "m_machine": "Machine",
+  "m_man": "Man",
+  "m_method": "Method",
+  "m_measuring": "Measuring",
+  "m_df_5s": "DF_5S",
+  "label_quality_impact": "製品品質への影響度",
+  "impact_claim": "クレーム発生",
+  "impact_defect_in_process": "工程内不良（不良品）発生",
+  "impact_accident_risk": "労働災害発生リスクあり",
+  "impact_gauge_damage": "検査治具／測定器の破損発生"
 }

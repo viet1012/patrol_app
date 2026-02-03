@@ -288,6 +288,78 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Countermeasure...'**
   String get counterMeasureHint;
+
+  /// No description provided for @label_5m.
+  ///
+  /// In en, this message translates to:
+  /// **'5M（発生要因）'**
+  String get label_5m;
+
+  /// No description provided for @m_material.
+  ///
+  /// In en, this message translates to:
+  /// **'Material'**
+  String get m_material;
+
+  /// No description provided for @m_machine.
+  ///
+  /// In en, this message translates to:
+  /// **'Machine'**
+  String get m_machine;
+
+  /// No description provided for @m_man.
+  ///
+  /// In en, this message translates to:
+  /// **'Man'**
+  String get m_man;
+
+  /// No description provided for @m_method.
+  ///
+  /// In en, this message translates to:
+  /// **'Method'**
+  String get m_method;
+
+  /// No description provided for @m_measuring.
+  ///
+  /// In en, this message translates to:
+  /// **'Measuring'**
+  String get m_measuring;
+
+  /// No description provided for @m_df_5s.
+  ///
+  /// In en, this message translates to:
+  /// **'DF_5S'**
+  String get m_df_5s;
+
+  /// No description provided for @label_quality_impact.
+  ///
+  /// In en, this message translates to:
+  /// **'製品品質への影響度'**
+  String get label_quality_impact;
+
+  /// No description provided for @impact_claim.
+  ///
+  /// In en, this message translates to:
+  /// **'クレーム発生'**
+  String get impact_claim;
+
+  /// No description provided for @impact_defect_in_process.
+  ///
+  /// In en, this message translates to:
+  /// **'工程内不良（不良品）発生'**
+  String get impact_defect_in_process;
+
+  /// No description provided for @impact_accident_risk.
+  ///
+  /// In en, this message translates to:
+  /// **'労働災害発生リスクあり'**
+  String get impact_accident_risk;
+
+  /// No description provided for @impact_gauge_damage.
+  ///
+  /// In en, this message translates to:
+  /// **'検査治具／測定器の破損発生'**
+  String get impact_gauge_damage;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {
