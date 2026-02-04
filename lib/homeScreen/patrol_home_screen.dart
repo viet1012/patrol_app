@@ -13,6 +13,7 @@ import '../api/hse_master_service.dart';
 import '../common/animated_glass_action_button.dart';
 import '../common/app_version_text.dart';
 import '../common/common_ui_helper.dart';
+import '../model/auth_me.dart';
 import '../model/hse_patrol_team_model.dart';
 import '../model/machine_model.dart';
 import '../qrCode/qr_scanner_dialog.dart';
@@ -20,9 +21,10 @@ import '../recheck/recheck_detail_screen.dart';
 import '../session/session_store.dart';
 import '../test.dart';
 import '../translator.dart';
-import 'access_rule.dart';
 
 enum PatrolGroup { Patrol, Audit, QualityPatrol }
+
+enum PatrolAction { before, after, recheck, summary }
 
 class PatrolHomeScreen extends StatefulWidget {
   final String accountCode;
@@ -65,17 +67,37 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
   bool _needManualSelect = true;
   bool _qrHandled = false;
   final _qrDialogKey = GlobalKey<QrScannerDialogState>();
+  AuthMe? _authMe;
 
   @override
   void initState() {
     super.initState();
     _initEmployee();
+    _loadAuthMe();
     _initData();
   }
 
   Future<void> _initData() async {
     await _loadHseMaster(); // load machines trước
     await _loadTeams(); // sau đó mới auto set plant
+  }
+
+  Future<void> _loadAuthMe() async {
+    try {
+      final dio = DioClient.dio;
+      final res = await dio.get(
+        '/api/hr/me',
+        queryParameters: {'code': widget.accountCode},
+      );
+
+      if (res.statusCode == 200) {
+        setState(() {
+          _authMe = AuthMe.fromJson(res.data);
+        });
+      }
+    } catch (e) {
+      debugPrint('Load auth me error: $e');
+    }
   }
 
   Future<void> _loadTeams() async {
@@ -744,11 +766,15 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
     required Color color,
     required String titleScreen,
   }) {
-    final canRecheck = AccessRule().can(
-      PatrolAction.recheck,
-      group: group,
-      user: widget.accountCode,
-    );
+    // final canRecheck = AccessRule().can(
+    //   PatrolAction.recheck,
+    //   group: group,
+    //   user: widget.accountCode,
+    // );
+    final canBefore = _authMe?.can(group, PatrolAction.before) ?? false;
+    final canAfter = _authMe?.can(group, PatrolAction.after) ?? false;
+    final canRecheck = _authMe?.can(group, PatrolAction.recheck) ?? false;
+    final canTable = _authMe?.can(group, PatrolAction.summary) ?? false;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
@@ -758,7 +784,7 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
             number: '1)',
             title: '$prefix Before',
             color: color,
-            enabled: true,
+            enabled: canBefore,
             onTap: () {
               Navigator.push(
                 context,
@@ -782,7 +808,7 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
             number: '2)',
             title: 'Action After',
             color: color,
-            enabled: true,
+            enabled: canAfter,
             onTap: () {
               Navigator.push(
                 context,
@@ -820,47 +846,14 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
               );
             },
           ),
-          // _patrolButton(
-          //   number: '3)',
-          //   title: _recheckTitle(group),
-          //   color: color,
-          //   enabled: true,
-          //   onTap: () {
-          //     Navigator.push(
-          //       context,
-          //       MaterialPageRoute(
-          //         builder: (_) => RecheckDetailScreen(
-          //           accountCode: widget.accountCode,
-          //           machines: machines,
-          //           selectedPlant: selectedFactory,
-          //           titleScreen: titleScreen,
-          //           patrolGroup: group,
-          //         ),
-          //       ),
-          //     );
-          //   },
-          // ),
+
           const SizedBox(height: 16),
-          // _patrolButton(
-          //   number: '4)',
-          //   title: 'Data Table',
-          //   color: color,
-          //   enabled: true,
-          //   onTap: () {
-          //     final url =
-          //         'http://192.168.122.16:64644/?group=${Uri.encodeComponent(group.name)}';
-          //
-          //     html.window.open(
-          //       url,
-          //       '_blank', // ?? m? tab m?i
-          //     );
-          //   },
-          // ),
+
           _patrolButton(
             number: '4)',
             title: 'Data Table',
             color: color,
-            enabled: true,
+            enabled: canTable,
             onTap: () {
               context.go(
                 '/home/summary?group=${group.name}&plant=$selectedFactory',
@@ -929,7 +922,7 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
                         ),
                         if (!enabled)
                           const Text(
-                            'Coming soon...',
+                            'Permission',
                             style: TextStyle(
                               fontSize: 14,
                               color: Colors.white54,

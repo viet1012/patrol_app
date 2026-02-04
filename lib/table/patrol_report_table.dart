@@ -714,7 +714,7 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
     return _HoverableRow(
       height: 100,
       background: bg,
-      onTap: () async {
+      onDoubleTap: () async {
         setState(() => _selectedIndex = index);
 
         final updated = await EditReportDialog.show(context, model: e);
@@ -1461,13 +1461,13 @@ class _HoverableRow extends StatefulWidget {
   final double height;
   final Color background;
   final Widget child;
-  final VoidCallback? onTap;
+  final VoidCallback? onDoubleTap; // 👈 double click
 
   const _HoverableRow({
     required this.height,
     required this.background,
     required this.child,
-    this.onTap,
+    this.onDoubleTap,
   });
 
   @override
@@ -1484,8 +1484,9 @@ class _HoverableRowState extends State<_HoverableRow> {
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
       onExit: (_) => setState(() => _hover = false),
-      child: InkWell(
-        onTap: widget.onTap,
+      child: GestureDetector(
+        onDoubleTap: widget.onDoubleTap, // ✅ double click
+        behavior: HitTestBehavior.opaque,
         child: Container(height: widget.height, color: bg, child: widget.child),
       ),
     );
