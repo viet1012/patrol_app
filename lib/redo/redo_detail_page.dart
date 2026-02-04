@@ -1,11 +1,12 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
-import 'dart:ui';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' hide MultipartFile;
+
 import '../after/camera_after_box.dart';
 import '../after/replaceable_image_item.dart';
 import '../api/dio_client.dart';
@@ -23,12 +24,14 @@ class RedoDetailPage extends StatefulWidget {
   final String accountCode;
   final PatrolReportModel report;
   final PatrolGroup patrolGroup;
+  final String? qrCode; // có thể null
 
   const RedoDetailPage({
     super.key,
     required this.accountCode,
     required this.report,
     required this.patrolGroup,
+    this.qrCode,
   });
 
   @override
@@ -107,10 +110,18 @@ class _RedoDetailPageState extends State<RedoDetailPage> {
     return Scaffold(
       appBar: AppBar(
         centerTitle: false,
-        titleSpacing: 4, // 👈 kéo sát về leading
+        titleSpacing: 4,
+        // 👈 kéo sát về leading
         leading: GlassActionButton(
           icon: Icons.arrow_back_rounded,
-          onTap: () => Navigator.pop(context, true),
+          onTap: () {
+            final hasQr = (widget.qrCode ?? '').trim().isNotEmpty;
+            if (hasQr) {
+              context.go('/home');
+            } else {
+              Navigator.pop(context, true);
+            }
+          },
         ),
         backgroundColor: const Color(0xFF121826),
         title: Row(

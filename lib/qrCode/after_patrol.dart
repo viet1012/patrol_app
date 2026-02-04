@@ -17,6 +17,8 @@ import '../common/common_searchable_dropdown.dart';
 import '../common/common_ui_helper.dart';
 import '../homeScreen/patrol_home_screen.dart';
 import '../model/patrol_report_model.dart';
+import '../recheck/recheck_detail_page.dart';
+import '../redo/redo_detail_page.dart';
 import '../translator.dart';
 import '../widget/glass_action_button.dart';
 
@@ -107,8 +109,11 @@ class _AfterPatrolState extends State<AfterPatrol> {
         _loading = false;
         _enableCamera = true;
       });
+
       _commentAfStatusCtrl.text = _report?.atComment ?? '';
       patrolUser = _report?.atPic;
+      // ✅ redirect theo status
+      _routeByAfStatus(picked);
     } catch (e) {
       setState(() {
         _error = e.toString();
@@ -139,6 +144,47 @@ class _AfterPatrolState extends State<AfterPatrol> {
     _commentCtrl.dispose();
     _msnvCtrl.dispose();
     super.dispose();
+  }
+
+  bool _redirected = false;
+
+  void _routeByAfStatus(PatrolReportModel r) {
+    if (_redirected) return;
+
+    final st = (r.atStatus ?? '').trim();
+    if (st.isEmpty || st == 'Wait') return;
+
+    _redirected = true;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+
+      if (st == 'Done') {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => RecheckDetailPage(
+              accountCode: widget.accountCode,
+              report: r,
+              patrolGroup: widget.patrolGroup,
+              qrCode: widget.qrCode,
+            ),
+          ),
+        );
+      } else if (st == 'Redo') {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => RedoDetailPage(
+              accountCode: widget.accountCode,
+              report: r,
+              patrolGroup: widget.patrolGroup,
+              qrCode: widget.qrCode,
+            ),
+          ),
+        );
+      }
+    });
   }
 
   static Future<List<String>> findPicsByPlantFromApi(String plant) async {
@@ -173,7 +219,11 @@ class _AfterPatrolState extends State<AfterPatrol> {
       );
     }
     if (_error != null) {
-      return CommonUI.warningPage(context: context, message: _error!);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        CommonUI.showGoHomeDialog(context: context, message: 'No value');
+      });
+
+      return const Center(child: CircularProgressIndicator());
     }
 
     final report = _report!; //  dùng report thay widget.report
