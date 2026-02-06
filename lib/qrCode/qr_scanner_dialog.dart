@@ -1,5 +1,6 @@
 import 'package:chuphinh/qrCode/qr_code_camera.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 class QrScannerDialog extends StatefulWidget {
   final ValueChanged<String> onDetected;
@@ -102,36 +103,6 @@ class QrScannerDialogState extends State<QrScannerDialog> {
             ],
           ),
           const SizedBox(height: 10),
-
-          // Camera
-          QrCodeCamera(
-            key: _camKey,
-            size: 340,
-            onQrDetected: (qr) async {
-              final t = qr.trim();
-              if (t.isEmpty) return;
-              if (_submitting) return; // tránh double trigger
-              setState(() => _submitting = true);
-
-              // stop camera trước cho chắc
-              await stopCamera();
-              if (!mounted) return;
-
-              widget.onDetected(t);
-
-              if (mounted) setState(() => _submitting = false);
-            },
-          ),
-
-          const SizedBox(height: 10),
-          Text(
-            'Point the camera at the QR code',
-            style: TextStyle(color: Colors.white.withOpacity(0.75)),
-          ),
-
-          const SizedBox(height: 12),
-
-          // Manual input
           Row(
             children: [
               Expanded(
@@ -140,6 +111,11 @@ class QrScannerDialogState extends State<QrScannerDialog> {
                   focusNode: _manualFocus,
                   enabled: !_submitting,
                   textInputAction: TextInputAction.done,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: false,
+                    signed: false,
+                  ),
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                   onSubmitted: (_) => _submitManual(),
                   style: const TextStyle(color: Colors.white),
                   decoration: InputDecoration(
@@ -188,14 +164,14 @@ class QrScannerDialogState extends State<QrScannerDialog> {
                   ),
                   child: _submitting
                       ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
                       : const Text(
-                          'Use',
-                          style: TextStyle(fontWeight: FontWeight.w800),
-                        ),
+                    'Use',
+                    style: TextStyle(fontWeight: FontWeight.w800),
+                  ),
                 ),
               ),
             ],
@@ -209,6 +185,37 @@ class QrScannerDialogState extends State<QrScannerDialog> {
               fontSize: 12,
             ),
           ),
+          const SizedBox(height: 12),
+
+          // Camera
+          QrCodeCamera(
+            key: _camKey,
+            size: 340,
+            onQrDetected: (qr) async {
+              final t = qr.trim();
+              if (t.isEmpty) return;
+              if (_submitting) return; // tránh double trigger
+              setState(() => _submitting = true);
+
+              // stop camera trước cho chắc
+              await stopCamera();
+              if (!mounted) return;
+
+              widget.onDetected(t);
+
+              if (mounted) setState(() => _submitting = false);
+            },
+          ),
+
+          const SizedBox(height: 10),
+          Text(
+            'Point the camera at the QR code',
+            style: TextStyle(color: Colors.white.withOpacity(0.75)),
+          ),
+
+          const SizedBox(height: 12),
+
+          // Manual input
         ],
       ),
     );
