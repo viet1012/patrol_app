@@ -256,6 +256,15 @@ class _CameraScreenState extends State<CameraScreen> {
     final isQA = widget.patrolGroup == PatrolGroup.QualityPatrol;
 
     // ================= VALIDATE =================
+    if (_qrKey.trim().isEmpty) {
+      CommonUI.showWarning(
+        context: context,
+        title: "QR Required",
+        message: "Please scan QR code before sending report.",
+      );
+      return;
+    }
+
     if (_selectedMachine == null) {
       CommonUI.showWarning(
         context: context,
@@ -382,6 +391,14 @@ class _CameraScreenState extends State<CameraScreen> {
     final images = _cameraKey.currentState?.images ?? [];
     final hasQr = _qrKey.trim().isNotEmpty;
     // ================= VALIDATE =================
+    if (_qrKey.trim().isEmpty) {
+      CommonUI.showWarning(
+        context: context,
+        title: "QR Required",
+        message: "Please scan QR code before sending report.",
+      );
+      return;
+    }
 
     if (_selectedMachine == null) {
       CommonUI.showWarning(
