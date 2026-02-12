@@ -259,6 +259,7 @@ class _CameraScreenState extends State<CameraScreen> {
     if (_qrKey.trim().isEmpty) {
       CommonUI.showWarning(
         context: context,
+        icon: Icons.qr_code_rounded,
         title: "QR Required",
         message: "Please scan QR code before sending report.",
       );
