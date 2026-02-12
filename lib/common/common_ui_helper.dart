@@ -261,11 +261,15 @@ class CommonUI {
     required BuildContext context,
     required String title,
     required String message,
+    IconData? icon,
+    Color? iconColor,
   }) {
     showGlassDialog(
       context: context,
-      icon: Icons.warning_amber_rounded,
-      iconColor: Colors.orange,
+      icon: icon ?? Icons.warning_amber_rounded,
+      // ✅ mặc định warning
+      iconColor: iconColor ?? Colors.orange,
+      // ✅ mặc định cam
       title: title,
       message: message,
     );
