@@ -121,9 +121,7 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
   void initState() {
     super.initState();
 
-    _viewType = 'camera_${DateTime
-        .now()
-        .millisecondsSinceEpoch}';
+    _viewType = 'camera_${DateTime.now().millisecondsSinceEpoch}';
     _fac = (widget.plant ?? '').trim();
     _group = (widget.group ?? '').trim();
     _wsUrl = widget.wsUrl ?? '${ApiConfig.wsBaseUrl}/ws-stt/websocket';
@@ -204,8 +202,9 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
 
       final video = html.VideoElement()
         ..id = 'qr-video'
-        ..setAttribute('autoplay', 'true')..setAttribute(
-            'playsinline', 'true')..setAttribute('muted', 'true')
+        ..setAttribute('autoplay', 'true')
+        ..setAttribute('playsinline', 'true')
+        ..setAttribute('muted', 'true')
         ..style.objectFit = 'cover'
         ..style.pointerEvents = 'none'
         ..srcObject = stream;
@@ -328,12 +327,11 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
       pts = pointsRaw
           .whereType<Map>()
           .map(
-            (m) =>
-            Offset(
+            (m) => Offset(
               (m['x'] as num?)?.toDouble() ?? 0,
               (m['y'] as num?)?.toDouble() ?? 0,
             ),
-      )
+          )
           .toList();
       if (pts.isEmpty) pts = null;
     }
@@ -521,18 +519,18 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
                   children: [
                     _video != null
                         ? Transform.scale(
-                      scale: _zoom,
-                      child: HtmlElementView(
-                        key: ValueKey(_viewType),
-                        viewType: _viewType,
-                      ),
-                    )
+                            scale: _zoom,
+                            child: HtmlElementView(
+                              key: ValueKey(_viewType),
+                              viewType: _viewType,
+                            ),
+                          )
                         : Container(
-                      color: Colors.grey[300],
-                      child: const Center(
-                        child: CircularProgressIndicator(),
-                      ),
-                    ),
+                            color: Colors.grey[300],
+                            child: const Center(
+                              child: CircularProgressIndicator(),
+                            ),
+                          ),
 
                     // QR box overlay (if points exist)
                     if (_qrPoints != null && _videoSize != null)
@@ -558,12 +556,11 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
                     // flash
                     AnimatedBuilder(
                       animation: _flashController,
-                      builder: (_, __) =>
-                          Container(
-                            color: Colors.white.withOpacity(
-                              0.85 * _flashController.value,
-                            ),
-                          ),
+                      builder: (_, __) => Container(
+                        color: Colors.white.withOpacity(
+                          0.85 * _flashController.value,
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -616,9 +613,9 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
                         vertical: 5,
                       ),
                       decoration: BoxDecoration(
-                        color: _lastQr != null
-                            ? Colors.white.withOpacity(0.18)
-                            : Colors.redAccent,
+                        color: _qrFlashCtrl.isAnimating
+                            ? Color(0xFF203A43)
+                            : Colors.white.withOpacity(0.18),
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(
                           color: _qrFlashCtrl.isAnimating
@@ -633,9 +630,9 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
                           Icon(
                             Icons.qr_code_rounded,
                             size: 20,
-                            color: _qrFlashCtrl.isAnimating
-                                ? Color(0xFF203A43)
-                                : Colors.white,
+                            color: _lastQr != null
+                                ? Colors.white
+                                : Colors.red.withOpacity(.6),
                           ),
                           const SizedBox(width: 8),
 
@@ -703,22 +700,22 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
                     ),
                     child: _sttLoading
                         ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
                         : Text(
-                      'No. ${stt + 1}',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 0.6,
-                      ),
-                    ),
+                            'No. ${stt + 1}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.6,
+                            ),
+                          ),
                   ),
                 ),
               ),
@@ -750,10 +747,10 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
                     child: _isCapturing
                         ? null
                         : Icon(
-                      Icons.camera_alt_rounded,
-                      color: canUpload ? Colors.white : Colors.grey,
-                      size: 36,
-                    ),
+                            Icons.camera_alt_rounded,
+                            color: canUpload ? Colors.white : Colors.grey,
+                            size: 36,
+                          ),
                   ),
                 ),
               ),
@@ -799,10 +796,7 @@ class _QrBoxPainterCoverSquare extends CustomPainter {
     final vw = videoSize.width;
     final vh = videoSize.height;
 
-    double cropX = 0,
-        cropY = 0,
-        cropW = vw,
-        cropH = vh;
+    double cropX = 0, cropY = 0, cropW = vw, cropH = vh;
     final aspect = vw / vh;
     if (aspect > 1) {
       // landscape -> crop width
