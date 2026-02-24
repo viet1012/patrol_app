@@ -57,6 +57,8 @@ class _PatrolRiskSummarySfPageState extends State<PatrolRiskSummarySfPage> {
   bool _loading = true;
   String? _error;
   List<RiskSummary> _items = const [];
+  late final DateTime _initialFrom;
+  late final DateTime _initialTo;
 
   @override
   void initState() {
@@ -79,7 +81,8 @@ class _PatrolRiskSummarySfPageState extends State<PatrolRiskSummarySfPage> {
 
     _fromDate = _normalize(widget.fromD) ?? defaultFrom;
     _toDate = _normalize(widget.toD) ?? defaultTo;
-
+    _initialFrom = _fromDate;
+    _initialTo = _toDate;
     // ✅ đảm bảo from <= to
     if (_fromDate.isAfter(_toDate)) {
       _fromDate = defaultFrom;
@@ -171,7 +174,7 @@ class _PatrolRiskSummarySfPageState extends State<PatrolRiskSummarySfPage> {
         setState(() {
           _loading = false;
           _noData = true;
-          _noDataMsg = 'Không có dữ liệu cho khoảng ngày đã chọn';
+          _noDataMsg = 'No data for the selected date range';
           _items = const [];
         });
         return;
@@ -239,6 +242,22 @@ class _PatrolRiskSummarySfPageState extends State<PatrolRiskSummarySfPage> {
     _fetch();
   }
 
+  void _revertToInitial() {
+    setState(() {
+      _fromDate = _initialFrom;
+      _toDate = _initialTo;
+      _fromCtrl.text = _fmt(_fromDate);
+      _toCtrl.text = _fmt(_toDate);
+
+      _noData = false;
+      _noDataMsg = '';
+      _error = null;
+    });
+
+    widget.onDateChanged?.call(_fromDate, _toDate);
+    _fetch(); // ✅ quan trọng
+  }
+
   void _revertToLastGood() {
     if (_lastGoodFrom == null ||
         _lastGoodTo == null ||
@@ -271,7 +290,9 @@ class _PatrolRiskSummarySfPageState extends State<PatrolRiskSummarySfPage> {
       return _ErrorView(message: _error!, onRetry: _reload);
     }
 
-    final shownItems = _items.isNotEmpty ? _items : _lastGoodItems;
+    // final shownItems = _items.isNotEmpty ? _items : _lastGoodItems;
+    final shownItems = _items;
+
     final totalItem = shownItems.cast<RiskSummary?>().firstWhere(
       (e) => e?.grp == 'TOTAL',
       orElse: () => null,
@@ -279,9 +300,9 @@ class _PatrolRiskSummarySfPageState extends State<PatrolRiskSummarySfPage> {
 
     final chartItems = shownItems.where((e) => e.grp != 'TOTAL').toList();
 
-    if (shownItems.isEmpty) {
-      return _EmptyView(onRetry: _reload);
-    }
+    // if (shownItems.isEmpty) {
+    //   return _EmptyView(onRetry: _reload);
+    // }
 
     return Padding(
       padding: const EdgeInsets.all(12),
@@ -334,7 +355,7 @@ class _PatrolRiskSummarySfPageState extends State<PatrolRiskSummarySfPage> {
                       const SizedBox(width: 8),
                       Expanded(child: Text(_noDataMsg)),
                       TextButton.icon(
-                        onPressed: _revertToLastGood,
+                        onPressed: _revertToInitial,
                         icon: const Icon(Icons.history),
                         label: const Text('Back'),
                       ),
@@ -343,13 +364,14 @@ class _PatrolRiskSummarySfPageState extends State<PatrolRiskSummarySfPage> {
                 ),
               ],
               const SizedBox(height: 8),
-              SizedBox(
-                height: chartItems.length * 20 + 80,
-                child: _RiskStackedBarChart(
-                  items: chartItems,
-                  onSelect: widget.onSelect,
+              if (!_noData && chartItems.isNotEmpty)
+                SizedBox(
+                  height: chartItems.length * 20 + 80,
+                  child: _RiskStackedBarChart(
+                    items: chartItems,
+                    onSelect: widget.onSelect,
+                  ),
                 ),
-              ),
             ],
           ),
         ),
@@ -473,6 +495,7 @@ class _EmptyView extends StatelessWidget {
             style: TextStyle(fontWeight: FontWeight.w700, color: Colors.white),
           ),
           const SizedBox(height: 10),
+
           ElevatedButton.icon(
             onPressed: onRetry,
             icon: const Icon(Icons.refresh),
