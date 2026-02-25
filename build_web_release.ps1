@@ -43,3 +43,7 @@ Write-Host "? Version bumped: $old ? $new"
 flutter clean
 flutter pub get
 flutter build web --release
+
+# inject version vào index.html
+$index = "build\web\index.html"
+(Get-Content $index) -replace "__APP_VERSION__", $new | Set-Content $index -Encoding UTF8

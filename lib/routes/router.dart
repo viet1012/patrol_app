@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+
 import '../common/common_ui_helper.dart';
 import '../homeScreen/patrol_home_screen.dart';
 import '../login/login_page.dart';
@@ -9,7 +10,12 @@ import '../table/patrol_report_table.dart';
 
 final router = GoRouter(
   routes: [
-    GoRoute(path: '/', builder: (context, state) => const LoginPage()),
+    // GoRoute(path: '/', builder: (context, state) => const LoginPage()),
+    GoRoute(
+      path: '/',
+      pageBuilder: (context, state) =>
+          NoTransitionPage(key: state.pageKey, child: const LoginPage()),
+    ),
     GoRoute(
       path: '/home/summary',
       // path: '/',
