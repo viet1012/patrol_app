@@ -1,11 +1,13 @@
+// ignore: avoid_web_libraries_in_flutter
+import 'dart:html' as html;
+
 import 'package:chuphinh/routes/router.dart';
-import 'package:chuphinh/table/patrol_report_table.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'homeScreen/patrol_home_screen.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:google_fonts/google_fonts.dart';
+
 import 'l10n/app_localizations.dart';
-import 'login/login_page.dart'; // đường dẫn tuỳ vào bạn
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -38,10 +40,31 @@ class MyApp extends StatefulWidget {
 class _MyAppState extends State<MyApp> {
   Locale _locale = const Locale('vi');
 
+  @override
+  void initState() {
+    super.initState();
+    checkWebVersionAndReload();
+  }
+
   void setLocale(Locale locale) {
     setState(() {
       _locale = locale;
     });
+  }
+
+  void checkWebVersionAndReload() {
+    if (!kIsWeb) return;
+    final meta = html.document.querySelector('meta[name="app-version"]');
+    final v = meta?.getAttribute('content') ?? '';
+    final key = 'last_app_version';
+
+    final last = html.window.localStorage[key] ?? '';
+    if (last.isNotEmpty && last != v) {
+      html.window.localStorage[key] = v;
+      html.window.location.reload(); // tự reload khi có bản mới
+      return;
+    }
+    html.window.localStorage[key] = v;
   }
 
   @override

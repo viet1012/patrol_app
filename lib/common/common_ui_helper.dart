@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../api/dio_client.dart';
 import '../session/session_store.dart';
 import '../widget/glass_action_button.dart';
 
@@ -470,7 +471,6 @@ class CommonUI {
                     const SizedBox(height: 26),
 
                     // BUTTON
-                    // BUTTON
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
@@ -486,6 +486,8 @@ class CommonUI {
                         onPressed: () async {
                           // ✅ clear session + về login
                           await SessionStore.clear();
+                          DioClient.reset(); // ⭐ thêm dòng này
+
                           if (!context.mounted) return;
                           context.go('/');
                         },

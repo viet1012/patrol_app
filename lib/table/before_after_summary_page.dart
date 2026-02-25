@@ -1047,7 +1047,6 @@ class _AfterCard extends StatelessWidget {
                       ),
 
                       _RowLine(
-                        // bg: isSum ? sumBg : const Color(0xFFBFF2C8),
                         bg: isSum
                             ? sumBg
                             : (isPct ? null : const Color(0xFFBFF2C8)),
@@ -1089,7 +1088,6 @@ class _AfterCard extends StatelessWidget {
                       ),
 
                       _RowLine(
-                        // bg: isSum ? sumBg : const Color(0xFFBFE0F2),
                         bg: isSum
                             ? sumBg
                             : (isPct ? null : const Color(0xFFBFE0F2)),
@@ -1115,63 +1113,6 @@ class _AfterCard extends StatelessWidget {
                 }),
 
                 const SizedBox(height: 10),
-                // Row(
-                //   children: [
-                //     const Icon(Icons.camera_alt, size: 16, color: Colors.green),
-                //     const SizedBox(width: 4),
-                //     const Text(
-                //       'Before',
-                //       style: TextStyle(
-                //         fontWeight: FontWeight.w700,
-                //         fontSize: 13,
-                //         color: Colors.white,
-                //       ),
-                //     ),
-                //     const SizedBox(width: 6),
-                //     _badgeNumber(totals.sumAll, bg: Colors.yellow),
-                //     const SizedBox(width: 24),
-                //
-                //     const Icon(
-                //       Icons.check_circle,
-                //       size: 16,
-                //       color: Colors.green,
-                //     ),
-                //     const SizedBox(width: 4),
-                //     const Text(
-                //       'Done',
-                //       style: TextStyle(
-                //         fontWeight: FontWeight.w700,
-                //         fontSize: 13,
-                //         color: Colors.white,
-                //       ),
-                //     ),
-                //     const SizedBox(width: 6),
-                //     _badgeNumber(totals.done, bg: Colors.yellow),
-                //     const SizedBox(width: 8),
-                //     _badgePercent(totals.donePct),
-                //
-                //     const SizedBox(width: 24),
-                //
-                //     const Icon(
-                //       Icons.hourglass_bottom,
-                //       size: 16,
-                //       color: Colors.orange,
-                //     ),
-                //     const SizedBox(width: 4),
-                //     const Text(
-                //       'Remain',
-                //       style: TextStyle(
-                //         fontWeight: FontWeight.w700,
-                //         fontSize: 13,
-                //         color: Colors.white,
-                //       ),
-                //     ),
-                //     const SizedBox(width: 6),
-                //     _badgeNumber(totals.sumRemain, bg: Colors.yellow),
-                //     const SizedBox(width: 8),
-                //     _badgePercent(totals.remainPct),
-                //   ],
-                // ),
               ],
             ),
           ),

@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+
 import '../model/auth_result.dart';
 import 'dio_client.dart';
 
@@ -48,6 +49,7 @@ class AuthApi {
 
       // ❗ KHÔNG CÓ RESPONSE → SERVER / NETWORK
       if (e.response == null) {
+        DioClient.reset(); // ⭐ QUAN TRỌNG
         return AuthResult(
           success: false,
           isServerError: true,
