@@ -597,6 +597,7 @@ import 'package:flutter/material.dart';
 import '../api/summary_api.dart';
 import '../model/division_summary.dart';
 import '../model/pic_summary.dart';
+import '../test_1/patrol_summary_table.dart';
 import '../widget/glass_action_button.dart'; // bạn đang dùng
 // nếu không có GlassActionButton thì thay bằng IconButton bình thường
 
@@ -614,7 +615,8 @@ class BeforeAfterSummaryDialog extends StatefulWidget {
     required this.type,
   });
 
-  static Future<void> show(BuildContext context, {
+  static Future<void> show(
+    BuildContext context, {
     required String fromD,
     required String toD,
     required String fac,
@@ -623,13 +625,12 @@ class BeforeAfterSummaryDialog extends StatefulWidget {
     return showDialog<void>(
       context: context,
       barrierDismissible: true,
-      builder: (_) =>
-          BeforeAfterSummaryDialog(
-            fromD: fromD,
-            toD: toD,
-            fac: fac,
-            type: type,
-          ),
+      builder: (_) => BeforeAfterSummaryDialog(
+        fromD: fromD,
+        toD: toD,
+        fac: fac,
+        type: type,
+      ),
     );
   }
 
@@ -695,10 +696,7 @@ class _BeforeAfterSummaryDialogState extends State<BeforeAfterSummaryDialog> {
   @override
   Widget build(BuildContext context) {
     final maxW = 1800.0; // ⬅ tăng lên
-    final w = MediaQuery
-        .of(context)
-        .size
-        .width;
+    final w = MediaQuery.of(context).size.width;
     final dialogW = w < 600 ? w - 24 : (w < maxW ? w - 64 : maxW);
 
     return Dialog(
@@ -707,10 +705,7 @@ class _BeforeAfterSummaryDialogState extends State<BeforeAfterSummaryDialog> {
       child: ConstrainedBox(
         constraints: BoxConstraints(
           maxWidth: dialogW,
-          maxHeight: MediaQuery
-              .of(context)
-              .size
-              .height * 0.86,
+          maxHeight: MediaQuery.of(context).size.height * 0.86,
         ),
         child: Container(
           decoration: BoxDecoration(
@@ -754,8 +749,7 @@ class _BeforeAfterSummaryDialogState extends State<BeforeAfterSummaryDialog> {
                             ),
                           ),
                           Text(
-                            '${widget.fromD} → ${widget.toD}   •   ${widget
-                                .type}',
+                            '${widget.fromD} → ${widget.toD}   •   ${widget.type}',
                             style: const TextStyle(
                               color: Colors.white70,
                               fontSize: 11,
@@ -813,6 +807,13 @@ class _BeforeAfterSummaryDialogState extends State<BeforeAfterSummaryDialog> {
                       ),
 
                       const SizedBox(height: 12),
+                      // ✅ 2) PATROL SUMMARY (fac blocks like image)
+                      PatrolSummaryScreen(
+                        fromD: widget.fromD,
+                        toD: widget.toD,
+                        plant: widget.fac, // nếu fac đang là Fac_2
+                        type: widget.type,
+                      ),
 
                       // 2) PIC LOW
                       _PicSummaryTable(
@@ -1195,9 +1196,9 @@ Widget _cell(_CellSpec c, {bool header = false, Color? bg}) {
       c
           .bg // ✅ ưu tiên bg riêng của cell
           ??
-          (header
-              ? (bg ?? const Color(0xFFDDDDDD))
-              : (bg ?? const Color(0xFFEFEFEF)));
+      (header
+          ? (bg ?? const Color(0xFFDDDDDD))
+          : (bg ?? const Color(0xFFEFEFEF)));
 
   return Container(
     width: c.w,
@@ -1315,7 +1316,8 @@ class _CellSpec {
   final TextAlign align;
   final Color? bg; // ✅ thêm
 
-  const _CellSpec(this.text, {
+  const _CellSpec(
+    this.text, {
     required this.w,
     this.bold = false,
     this.align = TextAlign.center,
