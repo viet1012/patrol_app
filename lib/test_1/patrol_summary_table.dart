@@ -1,12 +1,14 @@
 import 'dart:convert';
 
+import 'package:chuphinh/api/api_config.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
 // =====================
 // CONFIG
 // =====================
-const String kBaseUrl = 'http://localhost:9299'; // đổi theo server bạn
+// const String kBaseUrl = 'http://localhost:9299'; // đổi theo server bạn
+String kBaseUrl = ApiConfig.baseUrl; // đổi theo server bạn
 
 // =====================
 // MODELS
@@ -456,7 +458,7 @@ class _AfterTable extends StatelessWidget {
       titleLeft: 'AFTER TOTAL',
       titleCenter: 'Pro action (All)',
       subtitleRight:
-      'Finished ${_pct(finishedRate)}   •   Remain ${_pct(remainRate)}',
+          'Finished ${_pct(finishedRate)}   •   Remain ${_pct(remainRate)}',
       headerColor: Colors.white,
       columns: const [
         'PIC',
