@@ -816,18 +816,18 @@ class _BeforeAfterSummaryDialogState extends State<BeforeAfterSummaryDialog> {
                       ),
 
                       // 2) PIC LOW
-                      _PicSummaryTable(
-                        title: 'PIC SUMMARY (I / II / III / -)',
-                        future: _futurePicLow,
-                      ),
-
-                      const SizedBox(height: 12),
-
-                      // 3) PIC HIGH
-                      _PicSummaryTable(
-                        title: 'PIC SUMMARY (IV / V)',
-                        future: _futurePicHigh,
-                      ),
+                      // _PicSummaryTable(
+                      //   title: 'PIC SUMMARY (I / II / III / -)',
+                      //   future: _futurePicLow,
+                      // ),
+                      //
+                      // const SizedBox(height: 12),
+                      //
+                      // // 3) PIC HIGH
+                      // _PicSummaryTable(
+                      //   title: 'PIC SUMMARY (IV / V)',
+                      //   future: _futurePicHigh,
+                      // ),
                     ],
                   ),
                 ),
