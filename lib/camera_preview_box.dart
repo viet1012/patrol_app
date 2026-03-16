@@ -260,6 +260,12 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
         ..setAttribute('muted', 'true')
         ..style.objectFit = 'cover'
         ..style.pointerEvents = 'none'
+        ..style.position = 'absolute'
+        ..style.top = '0'
+        ..style.left = '0'
+        ..style.width = '100%'
+        ..style.height = '100%'
+        ..style.zIndex = '0'
         ..srcObject = stream;
 
       ui_web.platformViewRegistry.registerViewFactory(_viewType, (id) => video);
