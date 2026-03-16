@@ -250,13 +250,15 @@ class _CameraScreenState extends State<CameraScreen> {
   }
 
   Future<void> _sendReport() async {
+    final isPatrol = widget.patrolGroup == PatrolGroup.Patrol;
+
     final images = _cameraKey.currentState?.images ?? [];
     final hasQr = _qrKey.trim().isNotEmpty;
 
     final isQA = widget.patrolGroup == PatrolGroup.QualityPatrol;
 
     // ================= VALIDATE =================
-    if (_qrKey.trim().isEmpty) {
+    if (_qrKey.trim().isEmpty && isPatrol) {
       CommonUI.showWarning(
         context: context,
         icon: Icons.qr_code_rounded,
@@ -266,7 +268,7 @@ class _CameraScreenState extends State<CameraScreen> {
       return;
     }
 
-    if (_selectedMachine == null) {
+    if (_selectedMachine == null && isPatrol) {
       CommonUI.showWarning(
         context: context,
         title: "Information Required",
@@ -728,87 +730,88 @@ class _CameraScreenState extends State<CameraScreen> {
               ),
 
               const SizedBox(height: 16),
-
-              // CÁC DROPDOWN PHÍA TRÊN
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildSearchableDropdown(
-                      label: "group".tr(context),
-                      selectedValue: _selectedGroup,
-                      items: groupList,
-                      onChanged: (v) {
-                        setState(() {
-                          _selectedGroup = v;
-                        });
-                      },
-                      isRequired: true,
+              if (widget.patrolGroup != PatrolGroup.AssetUpdate)
+                // CÁC DROPDOWN PHÍA TRÊN
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildSearchableDropdown(
+                        label: "group".tr(context),
+                        selectedValue: _selectedGroup,
+                        items: groupList,
+                        onChanged: (v) {
+                          setState(() {
+                            _selectedGroup = v;
+                          });
+                        },
+                        isRequired: true,
+                      ),
                     ),
-                  ),
 
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: _buildSearchableDropdown(
-                      label: "fac".tr(context),
-                      selectedValue: _selectedFac,
-                      items: _selectedPlant == null
-                          ? <String>[]
-                          : facList.cast<String>(),
-                      onChanged: (v) {
-                        setState(() {
-                          _selectedFac = v;
-                          _selectedArea = null;
-                          _selectedMachine = null;
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _buildSearchableDropdown(
+                        label: "fac".tr(context),
+                        selectedValue: _selectedFac,
+                        items: _selectedPlant == null
+                            ? <String>[]
+                            : facList.cast<String>(),
+                        onChanged: (v) {
+                          setState(() {
+                            _selectedFac = v;
+                            _selectedArea = null;
+                            _selectedMachine = null;
 
-                          final areas = getAreaByFac(_selectedPlant!, v!);
-                          if (areas.length == 1) {
-                            _selectedArea = areas.first;
+                            final areas = getAreaByFac(_selectedPlant!, v!);
+                            if (areas.length == 1) {
+                              _selectedArea = areas.first;
 
-                            final machines = getMachineByArea(
-                              _selectedPlant!,
-                              v,
-                              areas.first,
-                            );
-                            if (machines.length == 1) {
-                              _selectedMachine = machines.first;
+                              final machines = getMachineByArea(
+                                _selectedPlant!,
+                                v,
+                                areas.first,
+                              );
+                              if (machines.length == 1) {
+                                _selectedMachine = machines.first;
+                              }
                             }
-                          }
-                        });
-                      },
-                      isRequired: true,
+                          });
+                        },
+                        isRequired: true,
+                      ),
                     ),
-                  ),
-                ],
-              ),
+                  ],
+                ),
               const SizedBox(height: 8),
 
               Row(
                 children: [
-                  Expanded(
-                    child: _buildSearchableDropdown(
-                      label: "area".tr(context),
-                      selectedValue: _selectedArea,
-                      items: (_selectedPlant == null || _selectedFac == null)
-                          ? <String>[]
-                          : areaList.cast<String>(),
-                      onChanged: (v) {
-                        setState(() {
-                          _selectedArea = v;
-                          _selectedMachine = null;
+                  if (widget.patrolGroup != PatrolGroup.AssetUpdate)
+                    Expanded(
+                      child: _buildSearchableDropdown(
+                        label: "area".tr(context),
+                        selectedValue: _selectedArea,
+                        items: (_selectedPlant == null || _selectedFac == null)
+                            ? <String>[]
+                            : areaList.cast<String>(),
+                        onChanged: (v) {
+                          setState(() {
+                            _selectedArea = v;
+                            _selectedMachine = null;
 
-                          final machines = getMachineByArea(
-                            _selectedPlant!,
-                            _selectedFac!,
-                            v!,
-                          );
-                          if (machines.length == 1) {
-                            _selectedMachine = machines.first;
-                          }
-                        });
-                      },
-                      isRequired: true,
+                            final machines = getMachineByArea(
+                              _selectedPlant!,
+                              _selectedFac!,
+                              v!,
+                            );
+                            if (machines.length == 1) {
+                              _selectedMachine = machines.first;
+                            }
+                          });
+                        },
+                        isRequired: true,
+                      ),
                     ),
-                  ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: _buildSearchableDropdown(
@@ -831,97 +834,9 @@ class _CameraScreenState extends State<CameraScreen> {
               const SizedBox(height: 16),
 
               // CÁC DROPDOWN RISK
-              _buildRiskSection(),
+              if (widget.patrolGroup != PatrolGroup.AssetUpdate)
+                _buildRiskSection(),
 
-              // Row(
-              //   children: [
-              //     Expanded(
-              //       child: _buildRiskDropdown(
-              //         labelKey: "label_freq",
-              //         valueKey: _freq,
-              //         items: frequencyOptions,
-              //         onChanged: (v) => _freq = v,
-              //       ),
-              //     ),
-              //     const SizedBox(width: 8),
-              //     Expanded(
-              //       child: _buildRiskDropdown(
-              //         labelKey: "label_prob",
-              //         valueKey: _prob,
-              //         items: probabilityOptions,
-              //         onChanged: (v) => _prob = v,
-              //       ),
-              //     ),
-              //   ],
-              // ),
-              //
-              // const SizedBox(height: 8),
-              //
-              // Row(
-              //   crossAxisAlignment: CrossAxisAlignment.start,
-              //   children: [
-              //     Expanded(
-              //       child: _buildRiskDropdown(
-              //         labelKey: "label_sev",
-              //         valueKey: _sev,
-              //         items: severityOptions,
-              //         onChanged: (v) => _sev = v,
-              //       ),
-              //     ),
-              //     const SizedBox(width: 8),
-              //     Expanded(
-              //       child: SizedBox(
-              //         child: TextField(
-              //           enabled: false,
-              //           controller: TextEditingController(text: displayScore),
-              //           decoration: InputDecoration(
-              //             labelText: "label_risk".tr(context),
-              //
-              //             /// 🎨 nền hiển thị
-              //             filled: true,
-              //             fillColor: Colors.deepOrange.withOpacity(0.15),
-              //
-              //             /// 🏷️ label
-              //             labelStyle: TextStyle(
-              //               fontSize: 14,
-              //               color: Colors.white.withOpacity(0.65),
-              //               fontWeight: FontWeight.w500,
-              //             ),
-              //
-              //             floatingLabelStyle: const TextStyle(
-              //               color: Colors.deepOrange,
-              //               fontWeight: FontWeight.bold,
-              //             ),
-              //
-              //             /// 🔲 viền
-              //             border: OutlineInputBorder(
-              //               borderRadius: BorderRadius.circular(12),
-              //             ),
-              //             enabledBorder: OutlineInputBorder(
-              //               borderRadius: BorderRadius.circular(12),
-              //               borderSide: BorderSide(
-              //                 color: Colors.deepOrange.withOpacity(0.6),
-              //               ),
-              //             ),
-              //
-              //             contentPadding: const EdgeInsets.symmetric(
-              //               horizontal: 12,
-              //               vertical: 14,
-              //             ),
-              //           ),
-              //           textAlign: TextAlign.center,
-              //           style: TextStyle(
-              //             fontSize: 18,
-              //             color: (displayScore == "V" || displayScore == "IV")
-              //                 ? Colors.red
-              //                 : Colors.white,
-              //             fontWeight: FontWeight.bold,
-              //           ),
-              //         ),
-              //       ),
-              //     ),
-              //   ],
-              // ),
               const SizedBox(height: 8),
 
               // ---------------------------------------------------------
@@ -929,6 +844,7 @@ class _CameraScreenState extends State<CameraScreen> {
               // ---------------------------------------------------------
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   // Ô 1: COMMENT
                   Expanded(
@@ -1118,213 +1034,227 @@ class _CameraScreenState extends State<CameraScreen> {
                     ),
                   ),
 
-                  const SizedBox(width: 8),
+                  if (widget.patrolGroup != PatrolGroup.AssetUpdate) ...[
+                    const SizedBox(width: 8),
+                    // Ô 2: COUNTERMEASURE (giữ nguyên, không cần linking ngược)
+                    Expanded(
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          return Autocomplete<AutoCmp>(
+                            optionsViewOpenDirection:
+                                OptionsViewOpenDirection.up,
+                            optionsBuilder: (TextEditingValue value) {
+                              if (value.text.length < minLength || isLoading) {
+                                return const Iterable<AutoCmp>.empty();
+                              }
 
-                  // Ô 2: COUNTERMEASURE (giữ nguyên, không cần linking ngược)
-                  Expanded(
-                    child: LayoutBuilder(
-                      builder: (context, constraints) {
-                        return Autocomplete<AutoCmp>(
-                          optionsViewOpenDirection: OptionsViewOpenDirection.up,
-                          optionsBuilder: (TextEditingValue value) {
-                            if (value.text.length < minLength || isLoading) {
-                              return const Iterable<AutoCmp>.empty();
-                            }
+                              return allOptionsCounter
+                                  .where((AutoCmp option) {
+                                    return option.inputText
+                                        .toLowerCase()
+                                        .contains(
+                                          value.text.toLowerCase(),
+                                        ); // Tìm kiếm không phân biệt hoa thường
+                                  })
+                                  .take(
+                                    5,
+                                  ); // Chỉ lấy 5 kết quả đầu tiên giống như logic cũ của BE
+                            },
+                            displayStringForOption: (option) =>
+                                option.inputText,
+                            onSelected: (AutoCmp selection) {
+                              _counterController.text = selection.inputText;
 
-                            return allOptionsCounter
-                                .where((AutoCmp option) {
-                                  return option.inputText
-                                      .toLowerCase()
-                                      .contains(
-                                        value.text.toLowerCase(),
-                                      ); // Tìm kiếm không phân biệt hoa thường
-                                })
-                                .take(
-                                  5,
-                                ); // Chỉ lấy 5 kết quả đầu tiên giống như logic cũ của BE
-                          },
-                          displayStringForOption: (option) => option.inputText,
-                          onSelected: (AutoCmp selection) {
-                            _counterController.text = selection.inputText;
-
-                            _counterController
-                                .selection = TextSelection.fromPosition(
-                              TextPosition(offset: selection.inputText.length),
-                            );
-                            _counterMeasure = selection.inputText;
-                            _autoFont(_counterMeasure);
-                          },
-                          fieldViewBuilder:
-                              (
-                                context,
-                                controller,
-                                focusNode,
-                                onFieldSubmitted,
-                              ) {
-                                _counterController = controller;
-                                return TextField(
-                                  controller: controller,
-                                  focusNode: focusNode,
-                                  maxLines: 3,
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: _fontSize,
-                                  ),
-                                  decoration: InputDecoration(
-                                    hintText: "counterMeasureHint".tr(context),
-                                    filled: true,
-                                    fillColor: Colors.green.withOpacity(0.08),
-                                    hintStyle: TextStyle(
-                                      color: Colors.white.withOpacity(.6),
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.bold,
+                              _counterController.selection =
+                                  TextSelection.fromPosition(
+                                    TextPosition(
+                                      offset: selection.inputText.length,
                                     ),
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(14),
-                                      borderSide: BorderSide(
-                                        color: Colors.white.withOpacity(0.35),
+                                  );
+                              _counterMeasure = selection.inputText;
+                              _autoFont(_counterMeasure);
+                            },
+                            fieldViewBuilder:
+                                (
+                                  context,
+                                  controller,
+                                  focusNode,
+                                  onFieldSubmitted,
+                                ) {
+                                  _counterController = controller;
+                                  return TextField(
+                                    controller: controller,
+                                    focusNode: focusNode,
+                                    maxLines: 3,
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: _fontSize,
+                                    ),
+                                    decoration: InputDecoration(
+                                      hintText: "counterMeasureHint".tr(
+                                        context,
                                       ),
-                                    ),
-                                    enabledBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(14),
-                                      borderSide: BorderSide(
-                                        color: Color(
-                                          0xFF90E14D,
-                                        ).withOpacity(0.25),
+                                      filled: true,
+                                      fillColor: Colors.green.withOpacity(0.08),
+                                      hintStyle: TextStyle(
+                                        color: Colors.white.withOpacity(.6),
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.bold,
                                       ),
-                                    ),
-                                    focusedBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(14),
-                                      borderSide: BorderSide(
-                                        color: Color(
-                                          0xFF90E14D,
-                                        ).withOpacity(.45), // cyan
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(14),
+                                        borderSide: BorderSide(
+                                          color: Colors.white.withOpacity(0.35),
+                                        ),
                                       ),
+                                      enabledBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(14),
+                                        borderSide: BorderSide(
+                                          color: Color(
+                                            0xFF90E14D,
+                                          ).withOpacity(0.25),
+                                        ),
+                                      ),
+                                      focusedBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(14),
+                                        borderSide: BorderSide(
+                                          color: Color(
+                                            0xFF90E14D,
+                                          ).withOpacity(.45), // cyan
+                                        ),
+                                      ),
+
+                                      contentPadding: const EdgeInsets.all(12),
                                     ),
+                                    onChanged: (v) {
+                                      _counterMeasure = v;
+                                      _autoFont(v);
 
-                                    contentPadding: const EdgeInsets.all(12),
-                                  ),
-                                  onChanged: (v) {
-                                    _counterMeasure = v;
-                                    _autoFont(v);
+                                      if (_counterDebounce?.isActive ?? false) {
+                                        _counterDebounce!.cancel();
+                                      }
+                                    },
+                                  );
+                                },
+                            optionsViewBuilder: (context, onSelected, options) {
+                              return Align(
+                                alignment: Alignment.topLeft,
+                                child: Transform.translate(
+                                  offset: const Offset(0, 8),
+                                  child: Material(
+                                    elevation: 8,
+                                    borderRadius: BorderRadius.circular(12),
+                                    color: Colors.black.withOpacity(.5),
 
-                                    if (_counterDebounce?.isActive ?? false) {
-                                      _counterDebounce!.cancel();
-                                    }
-                                  },
-                                );
-                              },
-                          optionsViewBuilder: (context, onSelected, options) {
-                            return Align(
-                              alignment: Alignment.topLeft,
-                              child: Transform.translate(
-                                offset: const Offset(0, 8),
-                                child: Material(
-                                  elevation: 8,
-                                  borderRadius: BorderRadius.circular(12),
-                                  color: Colors.black.withOpacity(.5),
-
-                                  child: ConstrainedBox(
-                                    constraints: BoxConstraints(
-                                      maxWidth: constraints.maxWidth,
-                                      maxHeight: 250,
-                                    ),
-                                    child: ListView.separated(
-                                      padding: EdgeInsets.zero,
-                                      shrinkWrap: true,
-                                      itemCount: options.length,
-                                      separatorBuilder: (_, __) =>
-                                          const Divider(
-                                            height: 1,
-                                            thickness: 0.5,
-                                          ),
-                                      itemBuilder: (context, index) {
-                                        final option = options.elementAt(index);
-                                        return InkWell(
-                                          onTap: () => onSelected(option),
-                                          child: Padding(
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 16,
-                                              vertical: 14,
+                                    child: ConstrainedBox(
+                                      constraints: BoxConstraints(
+                                        maxWidth: constraints.maxWidth,
+                                        maxHeight: 250,
+                                      ),
+                                      child: ListView.separated(
+                                        padding: EdgeInsets.zero,
+                                        shrinkWrap: true,
+                                        itemCount: options.length,
+                                        separatorBuilder: (_, __) =>
+                                            const Divider(
+                                              height: 1,
+                                              thickness: 0.5,
                                             ),
-                                            child: Text(
-                                              option.inputText,
-                                              style: const TextStyle(
-                                                fontSize: 14,
-                                                fontWeight: FontWeight.w600,
-                                                color: Colors.white,
+                                        itemBuilder: (context, index) {
+                                          final option = options.elementAt(
+                                            index,
+                                          );
+                                          return InkWell(
+                                            onTap: () => onSelected(option),
+                                            child: Padding(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 16,
+                                                    vertical: 14,
+                                                  ),
+                                              child: Text(
+                                                option.inputText,
+                                                style: const TextStyle(
+                                                  fontSize: 14,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: Colors.white,
+                                                ),
+                                                maxLines: 3,
+                                                overflow: TextOverflow.ellipsis,
                                               ),
-                                              maxLines: 3,
-                                              overflow: TextOverflow.ellipsis,
                                             ),
-                                          ),
-                                        );
-                                      },
+                                          );
+                                        },
+                                      ),
                                     ),
                                   ),
                                 ),
-                              ),
-                            );
-                          },
-                        );
-                      },
+                              );
+                            },
+                          );
+                        },
+                      ),
                     ),
-                  ),
+                  ],
                 ],
               ),
 
               // Checkbox và phần cuối
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                child: Row(
-                  children: [
-                    SizedBox(
-                      width: 28,
-                      height: 28,
-                      child: Checkbox(
-                        value: _needRecheck,
-                        onChanged: (v) =>
-                            setState(() => _needRecheck = v ?? false),
-                        activeColor: Colors.orange.shade700,
-                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        visualDensity: VisualDensity.compact,
+              if (widget.patrolGroup != PatrolGroup.AssetUpdate)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: Row(
+                    children: [
+                      SizedBox(
+                        width: 28,
+                        height: 28,
+                        child: Checkbox(
+                          value: _needRecheck,
+                          onChanged: (v) =>
+                              setState(() => _needRecheck = v ?? false),
+                          activeColor: Colors.orange.shade700,
+                          materialTapTargetSize:
+                              MaterialTapTargetSize.shrinkWrap,
+                          visualDensity: VisualDensity.compact,
+                        ),
                       ),
-                    ),
-                    Expanded(
-                      child: Text(
-                        "needRecheck".tr(context),
-                        style: TextStyle(fontSize: 14, color: Colors.white70),
+                      Expanded(
+                        child: Text(
+                          "needRecheck".tr(context),
+                          style: TextStyle(fontSize: 14, color: Colors.white70),
+                        ),
                       ),
-                    ),
-                    GlassActionButton(
-                      icon: Icons.edit_calendar_sharp,
-                      enabled: true,
-                      onTap: () {
-                        // if (_selectedGroup == null || _selectedGroup!.isEmpty) {
-                        //   _showSelectGroupWarning(context);
-                        //   return;
-                        // }
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => EditBeforeScreen(
-                              machines: widget.machines,
-                              accountCode: widget.accountCode,
-                              selectedFac: _selectedFac,
-                              selectedPlant: _selectedPlant,
-                              selectedGrp: widget.autoTeam?.grp ?? '',
-                              titleScreen: widget.titleScreen,
-                              patrolGroup: widget.patrolGroup,
+                      GlassActionButton(
+                        icon: Icons.edit_calendar_sharp,
+                        enabled: true,
+                        onTap: () {
+                          // if (_selectedGroup == null || _selectedGroup!.isEmpty) {
+                          //   _showSelectGroupWarning(context);
+                          //   return;
+                          // }
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => EditBeforeScreen(
+                                machines: widget.machines,
+                                accountCode: widget.accountCode,
+                                selectedFac: _selectedFac,
+                                selectedPlant: _selectedPlant,
+                                selectedGrp: widget.autoTeam?.grp ?? '',
+                                titleScreen: widget.titleScreen,
+                                patrolGroup: widget.patrolGroup,
+                              ),
                             ),
-                          ),
-                        );
-                      },
-                      backgroundColor: const Color(0xFF22C55E).withOpacity(.4),
-                      iconColor: hasImages ? Colors.black : Colors.white,
-                    ),
-                  ],
+                          );
+                        },
+                        backgroundColor: const Color(
+                          0xFF22C55E,
+                        ).withOpacity(.4),
+                        iconColor: hasImages ? Colors.black : Colors.white,
+                      ),
+                    ],
+                  ),
                 ),
-              ),
             ],
           ),
         ),
@@ -1367,6 +1297,7 @@ class _CameraScreenState extends State<CameraScreen> {
       case PatrolGroup.QualityPatrol:
         return _buildQualityRiskSection();
       case PatrolGroup.Audit:
+      case PatrolGroup.AssetUpdate:
       case PatrolGroup.Patrol:
         return _buildPatrolRiskSection();
     }
