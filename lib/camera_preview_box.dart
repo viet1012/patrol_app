@@ -189,6 +189,59 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
   // =========================
   // Camera
   // =========================
+
+  //function nhập QR tay
+
+  Future<void> _inputQrManually() async {
+    final controller = TextEditingController();
+
+    final value = await showDialog<String>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF1F2937),
+          title: const Text(
+            "Enter QR Code",
+            style: TextStyle(color: Colors.white),
+          ),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            style: const TextStyle(color: Colors.white),
+            decoration: const InputDecoration(
+              hintText: "Input QR code manually",
+              hintStyle: TextStyle(color: Colors.white54),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Cancel"),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context, controller.text.trim());
+              },
+              child: const Text("OK"),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (value != null && value.isNotEmpty) {
+      setState(() {
+        _lastQr = value;
+        _lastQrAt = DateTime.now();
+      });
+
+      widget.onQrDetected?.call(value);
+
+      HapticFeedback.mediumImpact();
+      _playQrChangedFx();
+    }
+  }
+
   Future<void> _startCamera() async {
     try {
       final stream = await html.window.navigator.mediaDevices!.getUserMedia({
@@ -570,7 +623,7 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
             // Upload
             Positioned(
               bottom: 14,
-              left: 14,
+              left: 7,
               child: GestureDetector(
                 onTap: canUpload ? () => pickImagesFromDevice(context) : null,
                 child: GlassCircleButton(
@@ -583,7 +636,21 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
                 ),
               ),
             ),
-
+            Positioned(
+              bottom: 14,
+              left: 65,
+              child: GestureDetector(
+                onTap: _inputQrManually,
+                child: GlassCircleButton(
+                  size: 50,
+                  child: const Icon(
+                    Icons.keyboard_rounded,
+                    color: Colors.white,
+                    size: 28,
+                  ),
+                ),
+              ),
+            ),
             // QR text
             Positioned(
               top: 12,

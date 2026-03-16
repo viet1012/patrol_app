@@ -22,7 +22,7 @@ import '../session/session_store.dart';
 import '../test.dart';
 import '../translator.dart';
 
-enum PatrolGroup { Patrol, Audit, QualityPatrol }
+enum PatrolGroup { Patrol, Audit, QualityPatrol, AssetUpdate }
 
 enum PatrolAction { before, after, recheck, summary }
 
@@ -94,6 +94,7 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
         setState(() {
           _authMe = AuthMe.fromJson(res.data);
         });
+        debugPrint("RAW JSON: ${res.data}");
       }
     } catch (e) {
       debugPrint('Load auth me error: $e');
@@ -484,6 +485,17 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
                                       titleScreen: 'QA Patrol',
                                     ),
                                   ),
+                                  _animatedCard(
+                                    3,
+                                    _patrolGroupCard(
+                                      group: PatrolGroup.AssetUpdate,
+                                      title: 'Asset Update',
+                                      icon: Icons.verified,
+                                      prefix: 'Asset Patrol',
+                                      enabled: true,
+                                      titleScreen: 'Asset Patrol',
+                                    ),
+                                  ),
                                 ],
                               ),
                       ),
@@ -609,6 +621,8 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
         return 'SRG Recheck';
       case PatrolGroup.QualityPatrol:
         return 'QA Recheck';
+      case PatrolGroup.AssetUpdate:
+        return 'Asset Recheck';
     }
   }
 
@@ -639,6 +653,8 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
         return Colors.green.shade400; // SRG Safety Audit
       case PatrolGroup.QualityPatrol:
         return Colors.purpleAccent.shade100; // QA Quality Audit
+      case PatrolGroup.AssetUpdate:
+        return Colors.yellow.shade100;
     }
   }
 
@@ -766,11 +782,6 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
     required Color color,
     required String titleScreen,
   }) {
-    // final canRecheck = AccessRule().can(
-    //   PatrolAction.recheck,
-    //   group: group,
-    //   user: widget.accountCode,
-    // );
     final canBefore = _authMe?.can(group, PatrolAction.before) ?? false;
     final canAfter = _authMe?.can(group, PatrolAction.after) ?? false;
     final canRecheck = _authMe?.can(group, PatrolAction.recheck) ?? false;
