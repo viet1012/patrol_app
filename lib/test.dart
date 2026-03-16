@@ -258,7 +258,7 @@ class _CameraScreenState extends State<CameraScreen> {
     final isQA = widget.patrolGroup == PatrolGroup.QualityPatrol;
 
     // ================= VALIDATE =================
-    if (_qrKey.trim().isEmpty && isPatrol) {
+    if (_qrKey.trim().isEmpty) {
       CommonUI.showWarning(
         context: context,
         icon: Icons.qr_code_rounded,

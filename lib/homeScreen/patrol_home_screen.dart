@@ -75,6 +75,7 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
     _initEmployee();
     _loadAuthMe();
     _initData();
+    _loadPlant();
   }
 
   Future<void> _initData() async {
@@ -99,6 +100,17 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
     } catch (e) {
       debugPrint('Load auth me error: $e');
     }
+  }
+
+  Future<void> _loadPlant() async {
+    final plant = await SessionStore.getPlant(widget.accountCode);
+
+    if (plant != null && mounted) {
+      setState(() {
+        selectedFactory = plant;
+      });
+    }
+    print("selectedFactory: ${selectedFactory}");
   }
 
   Future<void> _loadTeams() async {
@@ -135,7 +147,7 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
     }
   }
 
-  Future<void> _loadHseMaster() async {
+  Future<void> _loadHseMaster1() async {
     try {
       final data = await HseMasterService.fetchMachines();
 
@@ -149,6 +161,34 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
         if (_autoTeam == null) {
           selectedFactory = null;
         }
+        isLoading = false;
+      });
+    } catch (e) {
+      debugPrint('Load HSE master error: $e');
+      setState(() {
+        errorMessage = e.toString();
+        isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _loadHseMaster() async {
+    try {
+      final data = await HseMasterService.fetchMachines();
+
+      setState(() {
+        machines = data;
+
+        final factories = getAllFactories(machines: machines, teams: teams);
+
+        // 🔥 FIX
+        if (selectedFactory != null && factories.contains(selectedFactory)) {
+          // giữ nguyên Fac_2
+        }
+        // else if (factories.isNotEmpty) {
+        //   selectedFactory = factories.first;
+        // }
+
         isLoading = false;
       });
     } catch (e) {
@@ -238,6 +278,10 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
     final factories = _autoTeam != null
         ? [_autoTeam!.plant!]
         : getAllFactories(machines: machines, teams: teams);
+    final validValue = factories.contains(selectedFactory)
+        ? selectedFactory
+        : null;
+    print("valid Value: $validValue");
     factories.sort((a, b) {
       int getNum(String s) => int.tryParse(s.split('_').last) ?? 0;
 
@@ -357,7 +401,7 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
                                 SizedBox(
                                   width: 150,
                                   child: DropdownButtonFormField<String>(
-                                    value: selectedFactory,
+                                    value: validValue,
                                     // null lúc đầu
                                     isExpanded: true,
                                     dropdownColor: Colors.blueGrey.shade900
@@ -428,7 +472,7 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
                                       );
                                     }).toList(),
 
-                                    onChanged: (val) {
+                                    onChanged: (val) async {
                                       setState(() {
                                         selectedFactory = val;
 
@@ -436,6 +480,13 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
                                         _autoTeam = null;
                                         _needManualSelect = true;
                                       });
+
+                                      if (val != null) {
+                                        await SessionStore.savePlant(
+                                          widget.accountCode,
+                                          val,
+                                        );
+                                      }
                                     },
                                   ),
                                 ),
