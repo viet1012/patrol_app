@@ -730,7 +730,7 @@ class _CameraScreenState extends State<CameraScreen> {
               ),
 
               const SizedBox(height: 16),
-              if (widget.patrolGroup != PatrolGroup.AssetUpdate)
+              if (widget.patrolGroup != PatrolGroup.AssetUpdate) ...[
                 // CÁC DROPDOWN PHÍA TRÊN
                 Row(
                   children: [
@@ -782,57 +782,58 @@ class _CameraScreenState extends State<CameraScreen> {
                     ),
                   ],
                 ),
-              const SizedBox(height: 8),
+                const SizedBox(height: 8),
 
-              Row(
-                children: [
-                  if (widget.patrolGroup != PatrolGroup.AssetUpdate)
+                Row(
+                  children: [
+                    if (widget.patrolGroup != PatrolGroup.AssetUpdate)
+                      Expanded(
+                        child: _buildSearchableDropdown(
+                          label: "area".tr(context),
+                          selectedValue: _selectedArea,
+                          items:
+                              (_selectedPlant == null || _selectedFac == null)
+                              ? <String>[]
+                              : areaList.cast<String>(),
+                          onChanged: (v) {
+                            setState(() {
+                              _selectedArea = v;
+                              _selectedMachine = null;
+
+                              final machines = getMachineByArea(
+                                _selectedPlant!,
+                                _selectedFac!,
+                                v!,
+                              );
+                              if (machines.length == 1) {
+                                _selectedMachine = machines.first;
+                              }
+                            });
+                          },
+                          isRequired: true,
+                        ),
+                      ),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: _buildSearchableDropdown(
-                        label: "area".tr(context),
-                        selectedValue: _selectedArea,
-                        items: (_selectedPlant == null || _selectedFac == null)
+                        label: "machine".tr(context),
+                        selectedValue: _selectedMachine,
+                        items:
+                            (_selectedPlant == null ||
+                                _selectedFac == null ||
+                                _selectedArea == null)
                             ? <String>[]
-                            : areaList.cast<String>(),
+                            : machineList.cast<String>(),
                         onChanged: (v) {
-                          setState(() {
-                            _selectedArea = v;
-                            _selectedMachine = null;
-
-                            final machines = getMachineByArea(
-                              _selectedPlant!,
-                              _selectedFac!,
-                              v!,
-                            );
-                            if (machines.length == 1) {
-                              _selectedMachine = machines.first;
-                            }
-                          });
+                          setState(() => _selectedMachine = v);
                         },
                         isRequired: true,
                       ),
                     ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: _buildSearchableDropdown(
-                      label: "machine".tr(context),
-                      selectedValue: _selectedMachine,
-                      items:
-                          (_selectedPlant == null ||
-                              _selectedFac == null ||
-                              _selectedArea == null)
-                          ? <String>[]
-                          : machineList.cast<String>(),
-                      onChanged: (v) {
-                        setState(() => _selectedMachine = v);
-                      },
-                      isRequired: true,
-                    ),
-                  ),
-                ],
-              ),
+                  ],
+                ),
+              ],
               const SizedBox(height: 16),
-
               // CÁC DROPDOWN RISK
               if (widget.patrolGroup != PatrolGroup.AssetUpdate)
                 _buildRiskSection(),

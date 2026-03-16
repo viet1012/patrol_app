@@ -654,7 +654,7 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
       case PatrolGroup.QualityPatrol:
         return Colors.purpleAccent.shade100; // QA Quality Audit
       case PatrolGroup.AssetUpdate:
-        return Colors.yellow.shade100;
+        return Colors.yellow.shade700;
     }
   }
 
