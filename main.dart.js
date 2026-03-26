@@ -62748,7 +62748,7 @@ b5=b4==null?A.b([],t.XE):b4
 b3=B.d.al(n.k2).length===0
 m=!b3
 l=n.a.r===B.qv
-if(b3){b3=n.c
+if(b3&&b2){b3=n.c
 b3.toString
 A.mV(b3,B.le,"Please scan QR code before sending report.","QR Required")
 s=1
