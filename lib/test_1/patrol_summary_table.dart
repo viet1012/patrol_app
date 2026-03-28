@@ -396,7 +396,7 @@ class _FacSummaryCardState extends State<FacSummaryCard> {
     if (rowCount <= 5) return 250;
     if (rowCount >= 8) return 380;
 
-    return 320;
+    return 370;
   }
 
   @override
@@ -893,6 +893,7 @@ class ExcelLikeTable extends StatelessWidget {
   bool _isRecheckNgColumn(int index) => index >= 8 && index <= 13;
 
   Color? _cellBackground(int index) {
+    if (index == 0) return const Color(0xFFF7F8FA);
     if (titleLeft == 'AFTER TOTAL') {
       if (_isAfterFinishedColumn(index)) return TableUiConfig.finishedBg;
       if (_isAfterRemainColumn(index)) return TableUiConfig.remainBg;
@@ -907,59 +908,64 @@ class ExcelLikeTable extends StatelessWidget {
   }
 
   Border _cellBorder(int index) {
-    BorderSide normal = const BorderSide(color: TableUiConfig.borderColor);
+    final normal = BorderSide(color: const Color(0xFFBFC7D3), width: 1);
 
-    BorderSide finishedStrong = const BorderSide(
+    final rowLine = BorderSide(color: const Color(0xFFD7DCE5), width: 1);
+
+    final picDivider = BorderSide(color: const Color(0xFF98A2B3), width: 2);
+
+    final finishedStrong = BorderSide(
       color: TableUiConfig.finishedBorder,
       width: 2,
     );
 
-    BorderSide remainStrong = const BorderSide(
+    final remainStrong = BorderSide(
       color: TableUiConfig.remainBorder,
       width: 2,
     );
 
-    BorderSide okStrong = const BorderSide(
-      color: TableUiConfig.okBorder,
-      width: 2,
-    );
+    final okStrong = BorderSide(color: TableUiConfig.okBorder, width: 2);
 
-    BorderSide ngStrong = const BorderSide(
-      color: TableUiConfig.ngBorder,
-      width: 2,
-    );
+    final ngStrong = BorderSide(color: TableUiConfig.ngBorder, width: 2);
+
+    if (index == 0) {
+      return Border(bottom: rowLine);
+    }
 
     if (titleLeft == 'AFTER TOTAL') {
       if (index == 1) {
-        return Border(left: finishedStrong, right: normal);
+        return Border(left: finishedStrong, right: normal, bottom: rowLine);
       }
       if (index == 6) {
-        return Border(right: finishedStrong);
+        return Border(right: finishedStrong, bottom: rowLine);
       }
       if (index == 7) {
-        return Border(left: remainStrong);
+        return Border(left: remainStrong, bottom: rowLine);
       }
       if (index == 12) {
-        return Border(right: remainStrong);
+        return Border(right: remainStrong, bottom: rowLine);
       }
     }
 
     if (titleCenter == 'HSE re-check (All)') {
       if (index == 2) {
-        return Border(left: okStrong);
+        return Border(left: okStrong, bottom: rowLine);
       }
       if (index == 7) {
-        return Border(right: okStrong);
+        return Border(right: okStrong, bottom: rowLine);
       }
       if (index == 8) {
-        return Border(left: ngStrong);
+        return Border(left: ngStrong, bottom: rowLine);
       }
       if (index == 13) {
-        return Border(right: ngStrong);
+        return Border(right: ngStrong, bottom: rowLine);
       }
     }
 
-    return Border(left: normal, right: normal);
+    return Border(
+      right: BorderSide(color: const Color(0xFFD7DCE5), width: 1),
+      bottom: rowLine,
+    );
   }
 
   @override
@@ -993,6 +999,7 @@ class ExcelLikeTable extends StatelessWidget {
                     border: const TableBorder(
                       horizontalInside: BorderSide(
                         color: TableUiConfig.borderColor,
+                        width: 1,
                       ),
                       verticalInside: BorderSide(
                         color: TableUiConfig.borderColor,
@@ -1062,7 +1069,10 @@ class ExcelLikeTable extends StatelessWidget {
           Table(
             columnWidths: columnWidths,
             border: const TableBorder(
-              horizontalInside: BorderSide(color: TableUiConfig.borderColor),
+              horizontalInside: BorderSide(
+                color: TableUiConfig.borderColor,
+                width: 1,
+              ),
               verticalInside: BorderSide(color: TableUiConfig.borderColor),
             ),
             children: [
