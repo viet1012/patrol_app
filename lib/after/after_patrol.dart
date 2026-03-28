@@ -7,8 +7,6 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' hide MultipartFile;
 
-import '../after/camera_after_box.dart';
-import '../after/replaceable_image_item.dart';
 import '../api/dio_client.dart';
 import '../api/hse_master_service.dart';
 import '../api/patrol_report_api.dart';
@@ -21,6 +19,8 @@ import '../recheck/recheck_detail_page.dart';
 import '../redo/redo_detail_page.dart';
 import '../translator.dart';
 import '../widget/glass_action_button.dart';
+import 'camera_after_box.dart';
+import 'replaceable_image_item.dart';
 
 class AfterPatrol extends StatefulWidget {
   final String accountCode;

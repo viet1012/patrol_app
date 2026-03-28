@@ -8,14 +8,13 @@ import '../common/common_searchable_dropdown.dart';
 import '../common/due_date_utils.dart';
 import '../homeScreen/patrol_home_screen.dart';
 import '../model/patrol_report_model.dart';
-import '../qrCode/after_patrol.dart';
 import '../widget/error_display.dart';
 import '../widget/glass_action_button.dart';
 
 class RecheckPicDetailScreen extends StatefulWidget {
   final String accountCode;
   final String plant;
-  final String atStatus; // Wait / Redo / Done (hoặc Wait,Redo)
+  final String atStatus;
   final String pic;
   final PatrolGroup patrolGroup;
 
@@ -33,90 +32,112 @@ class RecheckPicDetailScreen extends StatefulWidget {
 }
 
 class _RecheckPicDetailScreenState extends State<RecheckPicDetailScreen> {
-  Future<List<PatrolReportModel>>? _futureReport;
+  static const _emptyPicLabel = 'UNKNOWN';
+  static const _backgroundGradient = LinearGradient(
+    colors: [Color(0xFF121826), Color(0xFF1F2937), Color(0xFF374151)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
 
-  String? _filterArea;
-  String? _filterRisk;
+  Future<List<PatrolReportModel>>? _futureReport;
+  String? _selectedArea;
+  String? _selectedRisk;
+  String? _selectedRowKey;
 
   @override
   void initState() {
     super.initState();
-    _loadReport();
+    _fetchReports();
   }
 
-  void _loadReport() {
-    // nếu pic = UNKNOWN thì lọc pic rỗng giống bạn
-    const emptyLabel = 'UNKNOWN';
-    final picFilter = (widget.pic == emptyLabel) ? '' : widget.pic.trim();
+  String get _normalizedPic =>
+      widget.pic.trim() == _emptyPicLabel ? '' : widget.pic.trim();
 
+  void _fetchReports() {
     setState(() {
       _futureReport = PatrolReportApi.fetchReports(
         plant: widget.plant,
         type: widget.patrolGroup.name,
-        pic: picFilter,
+        pic: _normalizedPic,
         afStatus: widget.atStatus,
       );
     });
   }
 
+  void _clearFilters() {
+    setState(() {
+      _selectedArea = null;
+      _selectedRisk = null;
+    });
+  }
+
+  List<PatrolReportModel> _applyFiltersAndSort(
+    List<PatrolReportModel> reports,
+  ) {
+    final now = DateTime.now();
+
+    final filtered = reports.where((report) {
+      final matchArea = _selectedArea == null || report.area == _selectedArea;
+      final matchRisk =
+          _selectedRisk == null || report.riskTotal == _selectedRisk;
+
+      return matchArea && matchRisk;
+    }).toList();
+
+    filtered.sort((a, b) {
+      final riskCompare = CommonUI.riskToScore(
+        b.riskTotal,
+      ).compareTo(CommonUI.riskToScore(a.riskTotal));
+      if (riskCompare != 0) return riskCompare;
+
+      return _compareDueDate(a.dueDate, b.dueDate, now);
+    });
+
+    return filtered;
+  }
+
+  int _compareDueDate(DateTime? aDue, DateTime? bDue, DateTime now) {
+    if (aDue == null && bDue == null) return 0;
+    if (aDue == null) return 1;
+    if (bDue == null) return -1;
+
+    final aOverdue = aDue.isBefore(now);
+    final bOverdue = bDue.isBefore(now);
+
+    if (aOverdue && !bOverdue) return -1;
+    if (!aOverdue && bOverdue) return 1;
+
+    final aDiff = aDue.difference(now).abs();
+    final bDiff = bDue.difference(now).abs();
+    return aDiff.compareTo(bDiff);
+  }
+
+  List<String> _extractAreas(List<PatrolReportModel> reports) {
+    return reports.map((e) => e.area).toSet().toList()..sort();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF121826),
-        centerTitle: false,
-        titleSpacing: 4,
-        leading: GlassActionButton(
-          icon: Icons.arrow_back_rounded,
-          onTap: () => Navigator.pop(context, false),
-        ),
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'PIC: ${widget.pic}',
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              '${widget.plant} | ${widget.atStatus}',
-              style: const TextStyle(color: Colors.white70, fontSize: 11),
-            ),
-          ],
-        ),
-        actions: [
-          GlassActionButton(icon: Icons.refresh_rounded, onTap: _loadReport),
-        ],
-      ),
+      appBar: _buildAppBar(),
       body: Container(
-        height: MediaQuery.of(context).size.height,
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Color(0xFF121826), Color(0xFF1F2937), Color(0xFF374151)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-        ),
+        decoration: const BoxDecoration(gradient: _backgroundGradient),
         child: FutureBuilder<List<PatrolReportModel>>(
           future: _futureReport,
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(child: CircularProgressIndicator());
             }
+
             if (snapshot.hasError) {
               return ErrorDisplay(
                 errorMessage: snapshot.error.toString(),
-                onRetry: _loadReport,
+                onRetry: _fetchReports,
               );
             }
 
-            final list = snapshot.data ?? [];
-            if (list.isEmpty) {
+            final reports = snapshot.data ?? [];
+            if (reports.isEmpty) {
               return const Center(
                 child: Text(
                   'No data available',
@@ -125,7 +146,8 @@ class _RecheckPicDetailScreenState extends State<RecheckPicDetailScreen> {
               );
             }
 
-            final areas = list.map((e) => e.area).toSet().toList();
+            final areas = _extractAreas(reports);
+            final filteredReports = _applyFiltersAndSort(reports);
 
             return Padding(
               padding: const EdgeInsets.all(8),
@@ -135,8 +157,12 @@ class _RecheckPicDetailScreenState extends State<RecheckPicDetailScreen> {
                   const SizedBox(height: 8),
                   Expanded(
                     child: LayoutBuilder(
-                      builder: (context, c) =>
-                          _buildReportTable(list, c.maxWidth),
+                      builder: (context, constraints) {
+                        return _buildReportTable(
+                          filteredReports,
+                          constraints.maxWidth,
+                        );
+                      },
                     ),
                   ),
                 ],
@@ -145,6 +171,40 @@ class _RecheckPicDetailScreenState extends State<RecheckPicDetailScreen> {
           },
         ),
       ),
+    );
+  }
+
+  PreferredSizeWidget _buildAppBar() {
+    return AppBar(
+      backgroundColor: const Color(0xFF121826),
+      centerTitle: false,
+      titleSpacing: 4,
+      leading: GlassActionButton(
+        icon: Icons.arrow_back_rounded,
+        onTap: () => Navigator.pop(context, false),
+      ),
+      title: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            'PIC: ${widget.pic}',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            '${widget.plant} | ${widget.atStatus}',
+            style: const TextStyle(color: Colors.white70, fontSize: 11),
+          ),
+        ],
+      ),
+      actions: [
+        GlassActionButton(icon: Icons.refresh_rounded, onTap: _fetchReports),
+      ],
     );
   }
 
@@ -159,103 +219,33 @@ class _RecheckPicDetailScreenState extends State<RecheckPicDetailScreen> {
         children: [
           Expanded(
             child: CommonSearchableDropdown(
-              label: "Area",
-              selectedValue: _filterArea,
+              label: 'Area',
+              selectedValue: _selectedArea,
               items: areas,
               isRequired: false,
-              onChanged: (v) => setState(() => _filterArea = v),
+              onChanged: (value) => setState(() => _selectedArea = value),
             ),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: CommonSearchableDropdown(
-              label: "Risk",
-              selectedValue: _filterRisk,
+              label: 'Risk',
+              selectedValue: _selectedRisk,
               items: const ['V', 'IV', 'III', 'II', 'I'],
               isRequired: false,
-              onChanged: (v) => setState(() => _filterRisk = v),
+              onChanged: (value) => setState(() => _selectedRisk = value),
             ),
           ),
-
           const SizedBox(width: 12),
-          GlassActionButton(
-            icon: Icons.filter_alt_off,
-            onTap: () => setState(() {
-              _filterArea = null;
-              _filterRisk = null;
-            }),
-          ),
+          GlassActionButton(icon: Icons.filter_alt_off, onTap: _clearFilters),
         ],
       ),
     );
   }
 
-  // (để nhanh) dropdown basic; nếu bạn muốn dùng CommonSearchableDropdown thì thay vào
-  Widget _simpleDropdown({
-    required String label,
-    required String? value,
-    required List<String> items,
-    required ValueChanged<String?> onChanged,
-  }) {
-    return DropdownButtonFormField<String>(
-      value: value,
-      dropdownColor: const Color(0xFF161D23),
-      decoration: InputDecoration(
-        hintText: label,
-        filled: true,
-        fillColor: Colors.white.withOpacity(0.08),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide.none,
-        ),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 10,
-          vertical: 10,
-        ),
-      ),
-      style: const TextStyle(color: Colors.white),
-      items: [
-        const DropdownMenuItem(value: null, child: Text('All')),
-        ...items.map((e) => DropdownMenuItem(value: e, child: Text(e))),
-      ],
-      onChanged: onChanged,
-    );
-  }
-
-  Widget _buildReportTable(List<PatrolReportModel> list, double maxWidth) {
-    final filtered =
-        list.where((r) {
-          if (_filterArea != null && r.area != _filterArea) return false;
-          if (_filterRisk != null && r.riskTotal != _filterRisk) return false;
-          return true;
-        }).toList()..sort((a, b) {
-          final riskCompare = CommonUI.riskToScore(
-            b.riskTotal,
-          ).compareTo(CommonUI.riskToScore(a.riskTotal));
-          if (riskCompare != 0) return riskCompare;
-
-          final now = DateTime.now();
-          final aDue = a.dueDate;
-          final bDue = b.dueDate;
-
-          if (aDue == null && bDue == null) return 0;
-          if (aDue == null) return 1;
-          if (bDue == null) return -1;
-
-          final aOverdue = aDue.isBefore(now);
-          final bOverdue = bDue.isBefore(now);
-
-          if (aOverdue && !bOverdue) return -1;
-          if (!aOverdue && bOverdue) return 1;
-
-          final aDiff = (aDue.difference(now)).abs();
-          final bDiff = (bDue.difference(now)).abs();
-          return aDiff.compareTo(bDiff);
-        });
-
+  Widget _buildReportTable(List<PatrolReportModel> reports, double maxWidth) {
     return SingleChildScrollView(
       scrollDirection: Axis.vertical,
-
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: ConstrainedBox(
@@ -264,9 +254,7 @@ class _RecheckPicDetailScreenState extends State<RecheckPicDetailScreen> {
             columnSpacing: 6,
             horizontalMargin: 6,
             headingRowHeight: 42,
-            // ✅ FIX: chỉ set 1 cái để tránh NOT NORMALIZED
-            dataRowHeight: 60, // đủ cho Area/Machine/Status xuống dòng
-
+            dataRowHeight: 60,
             headingRowColor: MaterialStateProperty.all(
               Colors.white.withOpacity(0.10),
             ),
@@ -283,130 +271,131 @@ class _RecheckPicDetailScreenState extends State<RecheckPicDetailScreen> {
               DataColumn(label: Text('Risk')),
               DataColumn(label: Text('Deadline')),
             ],
-            rows: filtered.map((r) {
-              final color = CommonUI.riskColor(r.riskTotal);
-
-              return DataRow(
-                cells: [
-                  DataCell(
-                    ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 170),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          SizedBox(
-                            width: 30,
-                            height: 32,
-                            child: Material(
-                              color: Colors.white.withOpacity(0.10),
-                              borderRadius: BorderRadius.circular(8),
-                              child: InkWell(
-                                borderRadius: BorderRadius.circular(8),
-                                onTap: () async {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      // builder: (_) => AfterDetailPage(
-                                      //   accountCode: widget.accountCode,
-                                      //   report: r,
-                                      //   patrolGroup: widget.patrolGroup,
-                                      // ),
-                                      builder: (_) => RecheckDetailPage(
-                                        accountCode: widget.accountCode,
-                                        patrolGroup: widget.patrolGroup,
-                                        report: r,
-                                      ),
-                                    ),
-                                  ).then((result) {
-                                    if (result == true && mounted) {
-                                      _loadReport();
-                                    }
-                                  });
-                                },
-                                child: const Center(
-                                  child: Icon(
-                                    Icons.visibility_rounded,
-                                    size: 18,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                  DataCell(
-                    SizedBox(
-                      width: 40,
-                      child: Text(
-                        '${r.qr_key}',
-                        style: const TextStyle(color: Colors.white),
-                      ),
-                    ),
-                  ),
-                  DataCell(
-                    ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 80),
-                      child: Text(
-                        r.area,
-                        softWrap: true,
-                        maxLines: 3,
-                        overflow: TextOverflow.visible,
-                        style: TextStyle(color: Colors.white.withOpacity(0.85)),
-                      ),
-                    ),
-                  ),
-
-                  DataCell(
-                    ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 80),
-                      child: Text(
-                        r.machine,
-                        softWrap: true,
-                        maxLines: 3,
-                        overflow: TextOverflow.visible,
-                        style: TextStyle(color: Colors.white.withOpacity(0.85)),
-                      ),
-                    ),
-                  ),
-
-                  DataCell(
-                    SizedBox(
-                      width: 32,
-                      child: Center(
-                        child: Text(
-                          r.riskTotal,
-                          style: TextStyle(
-                            color: color.withOpacity(0.85),
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  DataCell(
-                    SizedBox(
-                      width: 74,
-                      child: Text(
-                        r.dueDate == null
-                            ? '-'
-                            : DateFormat('M/d/yy').format(r.dueDate!),
-                        style: TextStyle(
-                          color: DueDateUtils.getDueDateColor(r.dueDate),
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              );
-            }).toList(),
+            rows: reports.map(_buildDataRow).toList(),
           ),
         ),
+      ),
+    );
+  }
+
+  String _rowKey(PatrolReportModel report) {
+    return '${report.qr_key}_${report.area}_${report.machine}_${report.dueDate?.toIso8601String() ?? ''}';
+  }
+
+  DataRow _buildDataRow(PatrolReportModel report) {
+    final riskColor = CommonUI.riskColor(report.riskTotal);
+    final isSelected = _selectedRowKey == _rowKey(report);
+
+    return DataRow(
+      color: MaterialStateProperty.resolveWith<Color?>((states) {
+        if (isSelected) {
+          return Colors.amber.withOpacity(0.25); // màu highlight
+        }
+        return null;
+      }),
+
+      cells: [
+        DataCell(_buildViewButton(report)),
+        DataCell(
+          SizedBox(
+            width: 40,
+            child: Text(
+              '${report.qr_key}',
+              style: const TextStyle(color: Colors.white),
+            ),
+          ),
+        ),
+        DataCell(_buildWrappedText(report.area)),
+        DataCell(_buildWrappedText(report.machine)),
+        DataCell(
+          SizedBox(
+            width: 32,
+            child: Center(
+              child: Text(
+                report.riskTotal,
+                style: TextStyle(
+                  color: riskColor.withOpacity(0.85),
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+        ),
+        DataCell(
+          SizedBox(
+            width: 74,
+            child: Text(
+              report.dueDate == null
+                  ? '-'
+                  : DateFormat('M/d/yy').format(report.dueDate!),
+              style: TextStyle(
+                color: DueDateUtils.getDueDateColor(report.dueDate),
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildViewButton(PatrolReportModel report) {
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 170),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 30,
+            height: 32,
+            child: Material(
+              color: Colors.white.withOpacity(0.10),
+              borderRadius: BorderRadius.circular(8),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(8),
+                onTap: () async {
+                  setState(() {
+                    _selectedRowKey = _rowKey(report);
+                  });
+
+                  final result = await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => RecheckDetailPage(
+                        accountCode: widget.accountCode,
+                        patrolGroup: widget.patrolGroup,
+                        report: report,
+                      ),
+                    ),
+                  );
+
+                  if (result == true && mounted) {
+                    _fetchReports();
+                  }
+                },
+                child: const Center(
+                  child: Icon(
+                    Icons.visibility_rounded,
+                    size: 18,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWrappedText(String value) {
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 80),
+      child: Text(
+        value,
+        softWrap: true,
+        maxLines: 3,
+        overflow: TextOverflow.visible,
+        style: TextStyle(color: Colors.white.withOpacity(0.85)),
       ),
     );
   }
