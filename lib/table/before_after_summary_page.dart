@@ -695,17 +695,19 @@ class _BeforeAfterSummaryDialogState extends State<BeforeAfterSummaryDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final maxW = 1800.0; // ⬅ tăng lên
+    // final maxW = 1800.0; // ⬅ tăng lên
+    // final w = MediaQuery.of(context).size.width;
+    // final dialogW = w < 600 ? w - 24 : (w < maxW ? w - 64 : maxW);
     final w = MediaQuery.of(context).size.width;
-    final dialogW = w < 600 ? w - 24 : (w < maxW ? w - 64 : maxW);
 
+    final dialogW = w - 16; // hoặc -24 nếu muốn có viền
     return Dialog(
       backgroundColor: Colors.transparent,
       insetPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
       child: ConstrainedBox(
         constraints: BoxConstraints(
           maxWidth: dialogW,
-          maxHeight: MediaQuery.of(context).size.height * 0.86,
+          maxHeight: MediaQuery.of(context).size.height,
         ),
         child: Container(
           decoration: BoxDecoration(
@@ -752,7 +754,7 @@ class _BeforeAfterSummaryDialogState extends State<BeforeAfterSummaryDialog> {
                             '${widget.fromD} → ${widget.toD}   •   ${widget.type}',
                             style: const TextStyle(
                               color: Colors.white70,
-                              fontSize: 11,
+                              fontSize: 14,
                             ),
                           ),
                         ],
@@ -767,7 +769,7 @@ class _BeforeAfterSummaryDialogState extends State<BeforeAfterSummaryDialog> {
               // ===== Body =====
               Expanded(
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.all(4),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -806,7 +808,7 @@ class _BeforeAfterSummaryDialogState extends State<BeforeAfterSummaryDialog> {
                         },
                       ),
 
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 8),
                       // ✅ 2) PATROL SUMMARY (fac blocks like image)
                       PatrolSummaryScreen(
                         fromD: widget.fromD,
