@@ -63581,8 +63581,8 @@ gDE(){var s=A.T(this.a.c.f,t.Dw),r=this.a.c.r
 if(r!=null)s.push(r)
 return s},
 gaH5(){var s=this.gDE().length
-if(s<=5)return 250
-if(s>=8)return 380
+if(s<=5)return 300
+if(s>=8)return 480
 return 370},
 K(a){var s,r,q,p,o,n,m,l,k=this,j=null,i=A.C(15,B.c.k()>>>16&255,B.c.k()>>>8&255,B.c.k()&255),h=A.V(12),g=A.bX(A.C(B.e.aq(127.5),B.c.k()>>>16&255,B.c.k()>>>8&255,B.c.k()&255),1),f=A.b([new A.bI(0,B.S,A.C(20,B.j.k()>>>16&255,B.j.k()>>>8&255,B.j.k()&255),B.da,10)],t.V),e=k.a.c
 k.mJ(e.b)
