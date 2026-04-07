@@ -393,8 +393,8 @@ class _FacSummaryCardState extends State<FacSummaryCard> {
   double get _tableHeight {
     final rowCount = _displayRows.length;
 
-    if (rowCount <= 5) return 250;
-    if (rowCount >= 8) return 380;
+    if (rowCount <= 5) return 300;
+    if (rowCount >= 8) return 480;
 
     return 370;
   }
