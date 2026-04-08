@@ -477,36 +477,6 @@ class _RiskStackedBarChart extends StatelessWidget {
 
 // ====== UI helpers nhỏ gọn ======
 
-class _EmptyView extends StatelessWidget {
-  final VoidCallback onRetry;
-
-  const _EmptyView({required this.onRetry});
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.inbox_rounded, size: 46, color: Colors.grey),
-          const SizedBox(height: 10),
-          const Text(
-            'No data',
-            style: TextStyle(fontWeight: FontWeight.w700, color: Colors.white),
-          ),
-          const SizedBox(height: 10),
-
-          ElevatedButton.icon(
-            onPressed: onRetry,
-            icon: const Icon(Icons.refresh),
-            label: const Text('Reload'),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _ErrorView extends StatelessWidget {
   final String message;
   final VoidCallback onRetry;
