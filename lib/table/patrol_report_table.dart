@@ -1736,6 +1736,30 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
     return filtered.sublist(start, end);
   }
 
+  Map<String, int> get _groupCaseCounts {
+    final base = PatrolReportTableHelper.applyFilters(
+      source: _reports,
+      query: _viewState.searchQuery,
+      fromDate: _viewState.fromDate,
+      toDate: _viewState.toDate,
+      filterValues: _viewState.filterValues,
+      columns: _columns,
+      excludeColumn: 'Group',
+    );
+
+    final counts = <String, int>{};
+
+    for (final row in base) {
+      final group = row.grp.trim();
+      if (group.isEmpty) continue;
+      counts[group] = (counts[group] ?? 0) + 1;
+    }
+
+    final sortedKeys = counts.keys.toList()..sort();
+
+    return {for (final key in sortedKeys) key: counts[key]!};
+  }
+
   List<String> get _availableGroups {
     final base = PatrolReportTableHelper.applyFilters(
       source: _reports,
@@ -2083,7 +2107,10 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
           TextButton.icon(
             onPressed: _openBeforeAfterSummary,
             icon: const Icon(Icons.analytics_outlined, color: Colors.white),
-            label: const Text('Open', style: TextStyle(color: Colors.white70)),
+            label: const Text(
+              'Report',
+              style: TextStyle(color: Colors.white70),
+            ),
           ),
         ],
       ),
@@ -2185,14 +2212,6 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
     _jumpVerticalToTop();
   }
 
-  void _clearTableDateFilter() {
-    setState(() {
-      _viewState = _viewState.copyWith(fromDate: null, toDate: null, page: 0);
-    });
-
-    _jumpVerticalToTop();
-  }
-
   Widget _buildDateChip({
     required String label,
     required String value,
@@ -2225,7 +2244,8 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
   }
 
   Widget _buildGroupBar() {
-    final groups = _availableGroups;
+    final groupCounts = _groupCaseCounts;
+    final groups = groupCounts.keys.toList();
     final selectedGroup = _selectedGroup;
 
     final fromText = _viewState.fromDate != null
@@ -2243,7 +2263,6 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
     }
 
     return Container(
-      // width: double.infinity,
       padding: const EdgeInsets.fromLTRB(12, 6, 12, 6),
       child: Wrap(
         spacing: 8,
@@ -2252,9 +2271,10 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
         children: [
           ...groups.map((group) {
             final selected = group == selectedGroup;
+            final count = groupCounts[group] ?? 0;
 
             return FilterChip(
-              label: Text(group),
+              label: Text('$group ($count)'),
               selected: selected,
               onSelected: (_) => _onTapGroup(group),
               selectedColor: Colors.blue.withOpacity(0.22),
