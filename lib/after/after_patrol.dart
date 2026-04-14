@@ -1056,8 +1056,11 @@ class _AfterPatrolState extends State<AfterPatrol> {
       final picToApi = _selectedPIC; // gửi luôn kể cả UNKNOWN
       final name = await fetchEmployeeName(widget.accountCode);
 
-      await updateReportApi(id: _report!.id!, pic: picToApi, editUser: name);
-
+      await updateReportApi(
+        id: _report!.id!,
+        pic: picToApi,
+        editUser: "${widget.accountCode}_$name",
+      );
       if (!mounted) return;
 
       CommonUI.showGlassDialog(
