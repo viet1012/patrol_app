@@ -1054,11 +1054,9 @@ class _AfterPatrolState extends State<AfterPatrol> {
   Future<void> _onSave() async {
     try {
       final picToApi = _selectedPIC; // gửi luôn kể cả UNKNOWN
-      await updateReportApi(
-        id: _report!.id!,
-        pic: picToApi,
-        editUser: widget.accountCode,
-      );
+      final name = await fetchEmployeeName(widget.accountCode);
+
+      await updateReportApi(id: _report!.id!, pic: picToApi, editUser: name);
 
       if (!mounted) return;
 
