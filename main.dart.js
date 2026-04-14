@@ -38782,23 +38782,24 @@ case 2:o=d
 if(o.c!==200)throw A.h(A.dn("Delete image failed: "+A.j(o.a)))
 return A.z(null,r)}})
 return A.A($async$b7c,r)},
-tZ(a,b,c,d,e,f,g,h,i,j,k,l,m,a0,a1,a2){var s=0,r=A.B(t.H),q,p,o,n
-var $async$tZ=A.C(function(a3,a4){if(a3===1)return A.y(a4,r)
+tZ(a,b,c,d,e,f,g,h,i,j,k,l,m,a0,a1,a2,a3){var s=0,r=A.B(t.H),q,p,o,n
+var $async$tZ=A.C(function(a4,a5){if(a4===1)return A.y(a5,r)
 while(true)switch(s){case 0:p=t.N
 o=t.z
 n=A.v(p,o)
 if(e!=null)n.n(0,"comment",e)
 if(f!=null)n.n(0,"countermeasure",f)
-if(k!=null)n.n(0,"pic",k)
-if(h!=null)n.n(0,"grp",h)
-if(l!=null)n.n(0,"plant",l)
+if(l!=null)n.n(0,"pic",l)
+if(i!=null)n.n(0,"grp",i)
+if(m!=null)n.n(0,"plant",m)
 if(g!=null)n.n(0,"division",g)
 if(a!=null)n.n(0,"area",a)
-if(j!=null)n.n(0,"machine",j)
-if(m!=null)n.n(0,"riskFreq",m)
-if(a0!=null)n.n(0,"riskProb",a0)
-if(a1!=null)n.n(0,"riskSev",a1)
-if(a2!=null)n.n(0,"riskTotal",a2)
+if(k!=null)n.n(0,"machine",k)
+if(a0!=null)n.n(0,"riskFreq",a0)
+if(a1!=null)n.n(0,"riskProb",a1)
+if(a2!=null)n.n(0,"riskSev",a2)
+if(a3!=null)n.n(0,"riskTotal",a3)
+if(h!=null)n.n(0,"editUser",h)
 if(b!=null)n.n(0,"atComment",b)
 if(c!=null)n.n(0,"atStatus",c)
 if(d!=null)n.n(0,"atUser",d)
@@ -38808,8 +38809,8 @@ q=A.ba3(p)
 p=$.ce
 if(p==null)p=$.ce=A.eC()
 s=2
-return A.w(p.BI("/api/patrol_report/"+i+"/edit",q,A.vU("multipart/form-data",null,null),o),$async$tZ)
-case 2:p=a4.c
+return A.w(p.BI("/api/patrol_report/"+j+"/edit",q,A.vU("multipart/form-data",null,null),o),$async$tZ)
+case 2:p=a5.c
 if(p!==200)throw A.h(A.dn("Update failed: "+A.j(p)))
 return A.z(null,r)}})
 return A.A($async$tZ,r)},
@@ -56061,7 +56062,7 @@ s=p}while(true)switch(s){case 0:p=4
 k=n.ax.a
 k.toString
 s=7
-return A.w(A.tZ(null,B.d.al(n.f.a.a),"Wait",B.d.al(n.w.a.a)+"_"+A.j(n.x),null,null,null,null,k,null,null,null,null,null,null,null),$async$yU)
+return A.w(A.tZ(null,B.d.al(n.f.a.a),"Wait",B.d.al(n.w.a.a)+"_"+A.j(n.x),null,null,null,null,null,k,null,null,null,null,null,null,null),$async$yU)
 case 7:k=n.c
 if(k==null){s=1
 break}A.yI("OK",k,B.fk,B.dc,u.r,"Update Successful")
@@ -56110,7 +56111,7 @@ m=n.as
 j=n.ax.a
 j.toString
 s=7
-return A.w(A.tZ(null,null,null,null,null,null,null,null,j,null,m,null,null,null,null,null),$async$yT)
+return A.w(A.tZ(null,null,null,null,null,null,null,n.a.c,null,j,null,m,null,null,null,null,null),$async$yT)
 case 7:j=n.c
 if(j==null){s=1
 break}A.yI("OK",j,B.fk,B.dc,u.r,"Update Successful")
@@ -58535,7 +58536,7 @@ a1=B.d.al(n.f.a.a)
 a2=n.r
 a3=n.w
 s=7
-return A.w(A.tZ(n.x,null,null,null,a0,a1,a3,a2,a,n.y,null,b.f,j,i,h,n.gz9()),$async$yg)
+return A.w(A.tZ(n.x,null,null,null,a0,a1,a3,null,a2,a,n.y,null,b.f,j,i,h,n.gz9()),$async$yg)
 case 7:b=n.c
 if(b==null){s=1
 break}A.yI("OK",b,B.fk,B.dc,u.r,"Update Successful")
@@ -60300,7 +60301,7 @@ m=j==="UNKNOWN"?null:j
 i=n.a.d.a
 i.toString
 s=7
-return A.w(A.tZ(null,null,null,null,null,null,null,null,i,null,m,null,null,null,null,null),$async$z3)
+return A.w(A.tZ(null,null,null,null,null,null,null,null,null,i,null,m,null,null,null,null,null),$async$z3)
 case 7:i=n.c
 if(i==null){s=1
 break}A.yI("OK",i,B.fk,B.dc,u.r,"Update Successful")
@@ -60918,7 +60919,7 @@ m=j==="UNKNOWN"?null:j
 i=n.a.d.a
 i.toString
 s=7
-return A.w(A.tZ(null,null,null,null,null,null,null,null,i,null,m,null,null,null,null,null),$async$z4)
+return A.w(A.tZ(null,null,null,null,null,null,null,null,null,i,null,m,null,null,null,null,null),$async$z4)
 case 7:i=n.c
 if(i==null){s=1
 break}A.yI("OK",i,B.fk,B.dc,u.r,"Update Successful")
@@ -61702,7 +61703,7 @@ a7=n.w
 a8=n.x
 a9=n.gyi()
 s=7
-return A.w(A.tZ(a7,null,n.dy,null,a2,a4,a6,a5,a0,a8,n.db,a.f,j,i,h,a9),$async$uJ)
+return A.w(A.tZ(a7,null,n.dy,null,a2,a4,a6,null,a5,a0,a8,n.db,a.f,j,i,h,a9),$async$uJ)
 case 7:a=n.c
 if(a==null){s=1
 break}a0=n.a.c
