@@ -1053,10 +1053,12 @@ class _AfterPatrolState extends State<AfterPatrol> {
 
   Future<void> _onSave() async {
     try {
-      const emptyLabel = 'UNKNOWN';
-      // final picToApi = (_selectedPIC == emptyLabel) ? null : _selectedPIC;
       final picToApi = _selectedPIC; // gửi luôn kể cả UNKNOWN
-      await updateReportApi(id: _report!.id!, pic: picToApi);
+      await updateReportApi(
+        id: _report!.id!,
+        pic: picToApi,
+        editUser: widget.accountCode,
+      );
 
       if (!mounted) return;
 
