@@ -32,7 +32,7 @@ const RESOURCES = {"assets/assets/fonts/Roboto/Roboto-VariableFont_wdth.ttf": "3
 "canvaskit/skwasm_heavy.wasm": "8034ad26ba2485dab2fd49bdd786837b",
 "canvaskit/skwasm.js": "1ef3ea3a0fec4569e5d531da25f34095",
 "flutter.js": "888483df48293866f9f41d3d9274a779",
-"flutter_bootstrap.js": "fbaa44a90fd4046f4b204fc320ffc233",
+"flutter_bootstrap.js": "b2985abac99fcd03707eaae011e6d3f8",
 "main.dart.js": "90ede04cb9b4d93f8bcbb6450d51c260",
 "version.json": "7743835af26496e4f722fabd0b86b02a",
 "icons/Icon-maskable-512.png": "301a7604d45b3e739efc881eb04896ea",
