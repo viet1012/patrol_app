@@ -353,14 +353,24 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
 
     // ✅ đọc detail an toàn (đừng cast Map cứng)
     final detail = e.detail;
-    final text = detail['text']?.toString() ?? '';
+
+    // final text = detail['text']?.toString() ?? '';
+    // final err = detail['error']?.toString() ?? '';
+    // if (err.isNotEmpty) {
+    //   debugPrint("QR err: $err");
+    //   return;
+    // }
+    // if (text.isEmpty) return;
+    final text = detail['text']?.toString().trim() ?? '';
     final err = detail['error']?.toString() ?? '';
-    if (err.isNotEmpty) {
-      // Bạn có thể log nhẹ thôi để không spam
-      // debugPrint("QR err: $err");
-      return;
-    }
+
+    if (err.isNotEmpty) return;
     if (text.isEmpty) return;
+
+    // 👉 Nếu type là Patrol thì chỉ nhận số
+    if (widget.type == 'Patrol') {
+      if (!RegExp(r'^\d{4}$').hasMatch(text)) return;
+    }
 
     // ✅ dedupe
     final now = DateTime.now();
