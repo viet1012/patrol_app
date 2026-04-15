@@ -390,152 +390,6 @@ class _CameraScreenState extends State<CameraScreen> {
     }
   }
 
-  Future<void> _sendReport1() async {
-    final images = _cameraKey.currentState?.images ?? [];
-    final hasQr = _qrKey.trim().isNotEmpty;
-    // ================= VALIDATE =================
-    if (_qrKey.trim().isEmpty) {
-      CommonUI.showWarning(
-        context: context,
-        title: "QR Required",
-        message: "Please scan QR code before sending report.",
-      );
-      return;
-    }
-
-    if (_selectedMachine == null) {
-      CommonUI.showWarning(
-        context: context,
-        title: "Information Required",
-        message: "Please select all required information.",
-      );
-      return;
-    }
-
-    if (_comment.trim().isEmpty) {
-      CommonUI.showWarning(
-        context: context,
-        title: "Comment Required",
-        message: "Please enter a comment.",
-      );
-      return;
-    }
-
-    // ================= LOADING =================
-    CommonUI.showSnackBar(
-      context: context,
-      message: 'Đang gửi ${images.length} ảnh...',
-      color: Colors.blue,
-      duration: const Duration(seconds: 60),
-    );
-
-    try {
-      // ================= IMAGE =================
-      final imageFiles = <MultipartFile>[];
-      for (int i = 0; i < images.length; i++) {
-        imageFiles.add(
-          MultipartFile.fromBytes(
-            images[i],
-            filename: 'photo_${i + 1}.jpg',
-            contentType: http.MediaType('image', 'jpeg'),
-          ),
-        );
-      }
-
-      // ================= REPORT =================
-      final reportMap = {
-        'userCreate': '${widget.accountCode}_$_employeeName',
-        'qr_key': _qrKey ?? '',
-        'qr_scan_sts': hasQr ? 'SUCCESS_1st' : '',
-        'plant': _selectedPlant ?? '',
-        'type': widget.patrolGroup.name,
-        'division': _selectedFac ?? '',
-        'area': _selectedArea ?? '',
-        'group': _selectedGroup ?? '',
-        'machine': _selectedMachine ?? '',
-        'comment': _comment,
-        'countermeasure': _counterMeasure,
-        'check': _needRecheck
-            ? (_selectedArea != null
-                  ? ''.combinedViJa(context, 'needRecheck')
-                  : ''.combinedViJa(context, 'needSelectArea'))
-            : '',
-        'riskFreq': ''.combinedViJa(
-          context,
-          frequencyOptions
-              .firstWhere(
-                (e) => e.labelKey == _freq,
-                orElse: () => RiskOption(labelKey: '', score: 0),
-              )
-              .labelKey,
-        ),
-        'riskProb': ''.combinedViJa(
-          context,
-          probabilityOptions
-              .firstWhere(
-                (e) => e.labelKey == _prob,
-                orElse: () => RiskOption(labelKey: '', score: 0),
-              )
-              .labelKey,
-        ),
-        'riskSev': ''.combinedViJa(
-          context,
-          severityOptions
-              .firstWhere(
-                (e) => e.labelKey == _sev,
-                orElse: () => RiskOption(labelKey: '', score: 0),
-              )
-              .labelKey,
-        ),
-        'riskTotal': getScoreSymbol(),
-      };
-
-      final formData = FormData.fromMap({
-        'report': jsonEncode(reportMap),
-        'images': imageFiles,
-      });
-
-      dio.options.headers['ngrok-skip-browser-warning'] = 'true';
-
-      final response = await dio.post(
-        "${ApiConfig.baseUrl}/api/report",
-        data: formData,
-        options: Options(sendTimeout: const Duration(seconds: 120)),
-      );
-
-      // ================= RESULT =================
-      if (response.statusCode! >= 200 && response.statusCode! < 300) {
-        CommonUI.showSnackBar(
-          context: context,
-          message: 'Successfully sent ${images.length} images!',
-          color: Colors.green,
-        );
-        _resetForm();
-      } else {
-        CommonUI.showSnackBar(
-          context: context,
-          message: 'Server error: ${response.statusCode}',
-          color: Colors.red,
-        );
-      }
-    } on DioException catch (e) {
-      String msg = 'Error: ';
-      if (e.response != null) {
-        msg += '${e.response?.statusCode} - ${e.response?.data}';
-      } else {
-        msg += e.message ?? 'Unknown';
-      }
-
-      CommonUI.showSnackBar(context: context, message: msg, color: Colors.red);
-    } catch (e) {
-      CommonUI.showSnackBar(
-        context: context,
-        message: 'Error: $e',
-        color: Colors.red,
-      );
-    }
-  }
-
   double _fontSize = 14;
 
   void _autoFont(String text) {
@@ -604,14 +458,12 @@ class _CameraScreenState extends State<CameraScreen> {
         // soft dark blue
         centerTitle: false,
         titleSpacing: 4,
-        // 👈 kéo sát về leading
         leading: GlassActionButton(
           icon: Icons.arrow_back_rounded,
           onTap: () => Navigator.pop(context),
         ),
         title: Container(
           padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 6),
-
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
