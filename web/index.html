@@ -36,7 +36,8 @@
 <!-- ZXing UMD -->
 <!-- ZXing UMD -->
 <script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js"></script>
-
+<script src="https://cdn.jsdelivr.net/npm/jsqr/dist/jsQR.js"></script>
+<script src="https://docs.opencv.org/4.x/opencv.js"></script>
 <script>
     // ===============================
     // CONFIG (tune)
@@ -454,6 +455,170 @@
       // camera: tuỳ bạn muốn tắt luôn hay giữ để mở lại nhanh
       // closeCamera();
     };
+
+function decodeCanvasZXingOrJsQR(targetCanvas) {
+  let text = "";
+
+  try {
+    if (qrReader && ZXing.HTMLCanvasElementLuminanceSource) {
+      const source = new ZXing.HTMLCanvasElementLuminanceSource(targetCanvas);
+      const bitmap = new ZXing.BinaryBitmap(
+        new ZXing.HybridBinarizer(source)
+      );
+
+      const hints = new Map();
+      if (ZXing.DecodeHintType?.TRY_HARDER) {
+        hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+      }
+      if (ZXing.DecodeHintType?.POSSIBLE_FORMATS && ZXing.BarcodeFormat?.QR_CODE) {
+        hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [ZXing.BarcodeFormat.QR_CODE]);
+      }
+
+      if (qrReader.setHints) qrReader.setHints(hints);
+
+      const result = qrReader.decode(bitmap, hints || undefined);
+      text = result?.text ? String(result.text).trim() : "";
+      if (text) return text;
+    }
+  } catch (_) {}
+
+  try {
+    const cx = targetCanvas.getContext("2d", { willReadFrequently: true });
+    const imageData = cx.getImageData(0, 0, targetCanvas.width, targetCanvas.height);
+    const code = jsQR(imageData.data, targetCanvas.width, targetCanvas.height);
+    text = code?.data ? String(code.data).trim() : "";
+    if (text) return text;
+  } catch (_) {}
+
+  return "";
+}
+
+window.decodeQrFromImageBytes = function (objectUrl) {
+  console.log('[QR-DECODE] ===== START =====');
+  console.log('[QR-DECODE] objectUrl:', objectUrl);
+
+  try {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+
+    img.onload = function () {
+      try {
+        let w = img.naturalWidth || img.width || 0;
+        let h = img.naturalHeight || img.height || 0;
+
+        console.log('[QR-DECODE] original size:', w, 'x', h);
+
+        if (!w || !h) {
+          window.dispatchEvent(new CustomEvent("qr-from-uploaded-image", {
+            detail: { text: "", error: "Invalid image size" }
+          }));
+          return;
+        }
+
+        const maxSize = 1600;
+        if (w > maxSize || h > maxSize) {
+          const scale = Math.min(maxSize / w, maxSize / h);
+          w = Math.floor(w * scale);
+          h = Math.floor(h * scale);
+        }
+
+        ensureCanvas(w, h);
+        ctx.clearRect(0, 0, w, h);
+        ctx.drawImage(img, 0, 0, w, h);
+
+        let resultText = "";
+
+        // PASS 1: OpenCV QRCodeDetector
+        try {
+          if (typeof cv !== "undefined" && cv.QRCodeDetector) {
+            const src = cv.imread(canvas);
+            const detector = new cv.QRCodeDetector();
+            const points = new cv.Mat();
+            const straight = new cv.Mat();
+
+            const decoded = detector.detectAndDecode(src, points, straight);
+            resultText = decoded ? String(decoded).trim() : "";
+
+            console.log('[QR-DECODE] OpenCV detectAndDecode =', resultText);
+
+            src.delete();
+            points.delete();
+            straight.delete();
+          }
+        } catch (e) {
+          console.warn('[QR-DECODE] OpenCV detectAndDecode failed:', e);
+        }
+
+        // PASS 2: grayscale + retry OpenCV
+        if (!resultText) {
+          try {
+            const src = cv.imread(canvas);
+            const gray = new cv.Mat();
+            cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY, 0);
+            cv.imshow(canvas, gray);
+
+            const detector = new cv.QRCodeDetector();
+            const points = new cv.Mat();
+            const straight = new cv.Mat();
+
+            const decoded = detector.detectAndDecode(cv.imread(canvas), points, straight);
+            resultText = decoded ? String(decoded).trim() : "";
+
+            console.log('[QR-DECODE] OpenCV gray detectAndDecode =', resultText);
+
+            src.delete();
+            gray.delete();
+            points.delete();
+            straight.delete();
+          } catch (e) {
+            console.warn('[QR-DECODE] OpenCV gray failed:', e);
+          }
+        }
+
+        // PASS 3: jsQR fallback
+        if (!resultText) {
+          try {
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const code = jsQR(imageData.data, canvas.width, canvas.height);
+            resultText = code?.data ? String(code.data).trim() : "";
+            console.log('[QR-DECODE] jsQR fallback =', resultText);
+          } catch (e) {
+            console.warn('[QR-DECODE] jsQR fallback failed:', e);
+          }
+        }
+
+        console.log('[QR-DECODE] FINAL RESULT:', resultText || 'NOT FOUND');
+
+        window.dispatchEvent(new CustomEvent("qr-from-uploaded-image", {
+          detail: {
+            text: resultText || "",
+            error: resultText ? "" : "No QR code found in image"
+          }
+        }));
+      } catch (e) {
+        console.error('[QR-DECODE] inner error:', e);
+        window.dispatchEvent(new CustomEvent("qr-from-uploaded-image", {
+          detail: { text: "", error: String(e?.message || e) }
+        }));
+      }
+
+      console.log('[QR-DECODE] ===== END =====');
+    };
+
+    img.onerror = function () {
+      window.dispatchEvent(new CustomEvent("qr-from-uploaded-image", {
+        detail: { text: "", error: "Failed to load image" }
+      }));
+    };
+
+    img.src = objectUrl;
+  } catch (e) {
+    console.error('[QR-DECODE] outer error:', e);
+    window.dispatchEvent(new CustomEvent("qr-from-uploaded-image", {
+      detail: { text: "", error: String(e?.message || e) }
+    }));
+  }
+};
 </script>
 
 
