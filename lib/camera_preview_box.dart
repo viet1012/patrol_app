@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:html' as html;
 import 'dart:math' as math;
+import 'dart:typed_data';
 import 'dart:ui';
 import 'dart:ui_web' as ui_web;
 
@@ -20,6 +21,9 @@ external void startQrLoop();
 
 @JS('stopQrLoop')
 external void stopQrLoop();
+
+@JS('decodeQrFromImageBytes')
+external void _decodeQrFromImageBytesJs(String objectUrl);
 
 class CameraPreviewBox extends StatefulWidget {
   final double size;
@@ -229,7 +233,31 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
       },
     );
 
+    // if (value != null && value.isNotEmpty) {
+    //   setState(() {
+    //     _lastQr = value;
+    //     _lastQrAt = DateTime.now();
+    //   });
+    //
+    //   widget.onQrDetected?.call(value);
+    //
+    //   HapticFeedback.mediumImpact();
+    //   _playQrChangedFx();
+    // }
+
     if (value != null && value.isNotEmpty) {
+      // Nếu type là Patrol thì chỉ nhận đúng 4 số
+      if (widget.type == 'Patrol' && !RegExp(r'^\d{4}$').hasMatch(value)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('QR Patrol chỉ được đúng 4 số'),
+            backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        return;
+      }
+
       setState(() {
         _lastQr = value;
         _lastQrAt = DateTime.now();
@@ -468,12 +496,126 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
   // =========================
   // Capture / Upload
   // =========================
+  Future<String?> _decodeQrFromBytes(Uint8List bytes) async {
+    String? url;
+    StreamSubscription<html.Event>? sub;
+    final completer = Completer<String?>();
+
+    try {
+      debugPrint('[DECODE] start, bytes = ${bytes.length}');
+
+      final blob = html.Blob([bytes], 'image/*');
+      url = html.Url.createObjectUrlFromBlob(blob);
+      debugPrint('[DECODE] objectUrl created = $url');
+
+      sub = html.window.on['qr-from-uploaded-image'].listen((event) {
+        debugPrint('[DECODE] event qr-from-uploaded-image received');
+
+        final e = event as html.CustomEvent;
+        final detail = e.detail;
+
+        final text = detail['text']?.toString().trim();
+        final err = detail['error']?.toString() ?? '';
+
+        debugPrint('[DECODE] text = $text');
+        debugPrint('[DECODE] error = $err');
+
+        if (!completer.isCompleted) {
+          completer.complete((text == null || text.isEmpty) ? null : text);
+        }
+      });
+
+      debugPrint('[DECODE] call JS decodeQrFromImageBytes');
+      _decodeQrFromImageBytesJs(url);
+
+      final result = await completer.future.timeout(
+        const Duration(seconds: 5),
+        onTimeout: () {
+          debugPrint('[DECODE] timeout after 5s');
+          return null;
+        },
+      );
+
+      debugPrint('[DECODE] final result = $result');
+      return result;
+    } catch (e, st) {
+      debugPrint('[DECODE] ERROR = $e');
+      debugPrint('[DECODE] STACK = $st');
+      return null;
+    } finally {
+      await sub?.cancel();
+      debugPrint('[DECODE] listener cancelled');
+
+      if (url != null) {
+        html.Url.revokeObjectUrl(url);
+        debugPrint('[DECODE] objectUrl revoked');
+      }
+    }
+  }
+
+  // Future<void> pickImagesFromDevice(BuildContext context) async {
+  //   final remain = _maxImages - _capturedImages.length;
+  //   if (remain <= 0) {
+  //     ScaffoldMessenger.of(context).showSnackBar(
+  //       const SnackBar(
+  //         content: Text("You can upload up to 3 images only."),
+  //         backgroundColor: Colors.redAccent,
+  //         behavior: SnackBarBehavior.floating,
+  //       ),
+  //     );
+  //     return;
+  //   }
+  //
+  //   final uploadInput = html.FileUploadInputElement()
+  //     ..accept = 'image/*'
+  //     ..multiple = true;
+  //
+  //   uploadInput.click();
+  //
+  //   uploadInput.onChange.listen((_) async {
+  //     final files = uploadInput.files;
+  //     if (files == null || files.isEmpty) return;
+  //
+  //     final selected = files.take(remain);
+  //
+  //     for (final file in selected) {
+  //       final reader = html.FileReader();
+  //       reader.readAsArrayBuffer(file);
+  //       await reader.onLoadEnd.first;
+  //
+  //       final bytes = reader.result as Uint8List;
+  //
+  //       // decode QR trong chính ảnh upload
+  //       final qrText = await _decodeQrFromBytes(bytes);
+  //
+  //       if (qrText != null && qrText.isNotEmpty) {
+  //         if (widget.type != 'Patrol' || RegExp(r'^\d{4}$').hasMatch(qrText)) {
+  //           setState(() {
+  //             _lastQr = qrText;
+  //             _lastQrAt = DateTime.now();
+  //           });
+  //
+  //           widget.onQrDetected?.call(qrText);
+  //           HapticFeedback.mediumImpact();
+  //           _playQrChangedFx();
+  //         }
+  //       }
+  //
+  //       // add ảnh sau khi đọc QR
+  //       setState(() {
+  //         _capturedImages.add(bytes);
+  //       });
+  //     }
+  //
+  //     widget.onImagesChanged?.call(_capturedImages);
+  //   });
+  // }
   Future<void> pickImagesFromDevice(BuildContext context) async {
     final remain = _maxImages - _capturedImages.length;
     if (remain <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text("You can upload up to 2 images only."),
+          content: Text("You can upload up to 3 images only."),
           backgroundColor: Colors.redAccent,
           behavior: SnackBarBehavior.floating,
         ),
@@ -492,12 +634,83 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
       if (files == null || files.isEmpty) return;
 
       final selected = files.take(remain);
+
       for (final file in selected) {
-        final reader = html.FileReader();
-        reader.readAsArrayBuffer(file);
-        await reader.onLoadEnd.first;
-        final bytes = reader.result as Uint8List;
-        setState(() => _capturedImages.add(bytes));
+        try {
+          // ✅ tạo object url từ file gốc
+          final objectUrl = html.Url.createObjectUrl(file);
+
+          // ✅ load ảnh vào ImageElement
+          final img = html.ImageElement();
+          final completer = Completer<void>();
+
+          img.onLoad.listen((_) {
+            if (!completer.isCompleted) completer.complete();
+          });
+
+          img.onError.listen((_) {
+            if (!completer.isCompleted) {
+              completer.completeError('Failed to load image');
+            }
+          });
+
+          img.src = objectUrl;
+          await completer.future;
+
+          final w = img.naturalWidth ?? img.width ?? 0;
+          final h = img.naturalHeight ?? img.height ?? 0;
+
+          if (w == 0 || h == 0) {
+            html.Url.revokeObjectUrl(objectUrl);
+            continue;
+          }
+
+          // ✅ vẽ lại qua canvas để chuẩn hóa sang JPEG
+          final canvas = html.CanvasElement(width: w, height: h);
+          final ctx = canvas.context2D;
+          ctx.drawImage(img, 0, 0);
+
+          final blob = await canvas.toBlob('image/jpeg', 0.9);
+          if (blob == null) {
+            html.Url.revokeObjectUrl(objectUrl);
+            continue;
+          }
+
+          final reader = html.FileReader();
+          reader.readAsArrayBuffer(blob);
+          await reader.onLoadEnd.first;
+
+          final result = reader.result;
+          final bytes = result is ByteBuffer
+              ? Uint8List.view(result)
+              : Uint8List.fromList(result as List<int>);
+
+          // ✅ decode QR từ ảnh đã chuẩn hóa
+          final qrText = await _decodeQrFromBytes(bytes);
+
+          if (qrText != null && qrText.isNotEmpty) {
+            if (widget.type != 'Patrol' ||
+                RegExp(r'^\d{4}$').hasMatch(qrText)) {
+              setState(() {
+                _lastQr = qrText;
+                _lastQrAt = DateTime.now();
+              });
+
+              widget.onQrDetected?.call(qrText);
+              HapticFeedback.mediumImpact();
+              _playQrChangedFx();
+            }
+          }
+
+          // ✅ add preview bytes
+          setState(() {
+            _capturedImages.add(bytes);
+          });
+
+          html.Url.revokeObjectUrl(objectUrl);
+        } catch (e) {
+          debugPrint('pickImagesFromDevice error: $e');
+        }
       }
 
       widget.onImagesChanged?.call(_capturedImages);
