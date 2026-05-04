@@ -356,10 +356,7 @@ class LoginCard extends StatelessWidget {
                 onTap: onForgotPassword,
                 child: const Text(
                   "Forgot password?",
-                  style: TextStyle(
-                    color: Colors.white70,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: TextStyle(color: Colors.white70),
                 ),
               ),
             ],
