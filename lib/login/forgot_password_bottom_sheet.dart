@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../api/auth_api.dart';
+import 'login_page.dart';
 
 class ForgotPasswordBottomSheet extends StatefulWidget {
   const ForgotPasswordBottomSheet({super.key});
@@ -63,31 +64,40 @@ class _ForgotPasswordBottomSheetState extends State<ForgotPasswordBottomSheet> {
         children: [
           const Text(
             "Forgot Password",
-            style: TextStyle(color: Colors.white, fontSize: 18),
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+            ),
           ),
 
           const SizedBox(height: 16),
 
           /// Employee ID
-          TextField(
+          AppInput(
             controller: _codeCtrl,
-            style: const TextStyle(color: Colors.white),
-            decoration: const InputDecoration(
-              labelText: "Employee ID",
-              prefixIcon: Icon(Icons.badge),
-            ),
+            label: "Employee ID",
+            icon: Icons.badge_outlined,
+            isNumber: true,
+            onChanged: (_) {
+              if (_error != null) {
+                setState(() => _error = null);
+              }
+            },
           ),
 
           const SizedBox(height: 12),
 
           /// Email
-          TextField(
+          AppInput(
             controller: _emailCtrl,
-            style: const TextStyle(color: Colors.white),
-            decoration: const InputDecoration(
-              labelText: "Email",
-              prefixIcon: Icon(Icons.email),
-            ),
+            label: "Email",
+            icon: Icons.email_outlined,
+            onChanged: (_) {
+              if (_error != null) {
+                setState(() => _error = null);
+              }
+            },
           ),
 
           const SizedBox(height: 16),
@@ -101,9 +111,22 @@ class _ForgotPasswordBottomSheetState extends State<ForgotPasswordBottomSheet> {
             width: double.infinity,
             child: ElevatedButton(
               onPressed: _loading ? null : _verify,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF2563EB),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
               child: _loading
                   ? const CircularProgressIndicator()
-                  : const Text("Verify"),
+                  : const Text(
+                      "Verify",
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Colors.white70,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
             ),
           ),
 
