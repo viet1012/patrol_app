@@ -1,55 +1,79 @@
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart';
 
 import '../model/auth_result.dart';
 import 'dio_client.dart';
 
+////////////////////////////////////////////////////////////
+/// MESSAGE SYSTEM
+////////////////////////////////////////////////////////////
+
+class AppMessage {
+  /// ===== USER ERRORS =====
+  static const accountNotFound = "Account not found.";
+  static const wrongPassword = "Incorrect password.";
+  static const accountExists = "Account already exists.";
+  static const invalidData = "Invalid input data.";
+
+  /// ===== SUCCESS =====
+  static const loginSuccess = "Login successful.";
+  static const registerSuccess = "Registration successful.";
+  static const changePasswordSuccess = "Password changed successfully.";
+
+  /// ===== SERVER / NETWORK =====
+  static const serverError = "Server error. Please contact KVH_IT support";
+  static const cannotConnect =
+      "Cannot connect to server.\nPlease contact KVH_IT support";
+  static const timeout =
+      "Server timeout. Please try again later.\nPlease contact KVH_IT support";
+  static const networkError = "Network error.\nPlease contact KVH_IT support";
+
+  /// ===== FALLBACK =====
+  static const unknownError = "Something went wrong. Please try again.";
+}
+
+////////////////////////////////////////////////////////////
+/// API
+////////////////////////////////////////////////////////////
+
 class AuthApi {
   static const String _basePath = '/api/auth';
 
-  /// ===================== LOGIN =====================
+  ////////////////////////////////////////////////////////////
+  /// LOGIN
+  ////////////////////////////////////////////////////////////
   static Future<AuthResult> login({
     required String account,
     required String password,
   }) async {
     try {
-      final endpoint = '$_basePath/login';
-      final body = {'account': account, 'password': password};
-
-      debugPrint('👉 API CALL: ${DioClient.dio.options.baseUrl}$endpoint');
-
       final response = await DioClient.dio.post(
-        endpoint,
-        data: body,
+        '$_basePath/login',
+        data: {'account': account, 'password': password},
         options: Options(
           sendTimeout: const Duration(seconds: 5),
           receiveTimeout: const Duration(seconds: 5),
         ),
       );
 
-      debugPrint('✅ STATUS: ${response.statusCode}');
-      debugPrint('✅ RESPONSE: ${response.data}');
-
-      if (response.statusCode == 200 && response.data is Map) {
+      if (response.statusCode == 200) {
         return AuthResult(
-          success: response.data['success'] ?? false,
-          message: response.data['message'] ?? 'Login failed',
+          success: true,
+          message: AppMessage.loginSuccess,
+          code: response.data?['code'],
         );
       }
 
       return AuthResult(
         success: false,
-        message: 'Invalid server response',
         isServerError: true,
+        message: AppMessage.serverError,
       );
-    } on DioException catch (e) {
-      debugPrint('❌ LOGIN ERROR: ${e.type}');
-      debugPrint('❌ MESSAGE: ${e.message}');
-      debugPrint('❌ RESPONSE: ${e.response?.data}');
-
-      // ❗ KHÔNG CÓ RESPONSE → SERVER / NETWORK
+    }
+    ////////////////////////////////////////////////////////////
+    /// ERROR HANDLE
+    ////////////////////////////////////////////////////////////
+    on DioException catch (e) {
       if (e.response == null) {
-        DioClient.reset(); // ⭐ QUAN TRỌNG
         return AuthResult(
           success: false,
           isServerError: true,
@@ -57,154 +81,221 @@ class AuthApi {
         );
       }
 
-      // ❗ CÓ RESPONSE → backend trả lỗi (401 / 403 / 400)
+      final data = e.response?.data;
+      final code = data?['code'];
+      final msg = data?['message'];
+
       return AuthResult(
         success: false,
-        message: e.response?.data?['message'] ?? 'Invalid account or password',
-        isServerError: false,
+        code: code,
+        message: _mapErrorCode(code, msg),
       );
-    } catch (e) {
+    } catch (_) {
       return AuthResult(
         success: false,
         isServerError: true,
-        message: 'Unexpected error: $e',
+        message: AppMessage.unknownError,
       );
     }
   }
 
-  /// ===================== REGISTER =====================
+  ////////////////////////////////////////////////////////////
+  /// REGISTER
+  ////////////////////////////////////////////////////////////
   static Future<AuthResult> register({
     required String account,
     required String password,
   }) async {
     try {
-      final endpoint = '$_basePath/register';
+      final response = await DioClient.dio.post(
+        '$_basePath/register',
+        data: {'account': account, 'password': password},
+      );
 
-      final body = {'account': account, 'password': password};
-
-      /// 🔥 LOG REQUEST
-      debugPrint('👉 API CALL: ${DioClient.dio.options.baseUrl}$endpoint');
-      // debugPrint('👉 BODY: $body');
-
-      final response = await DioClient.dio.post(endpoint, data: body);
-
-      debugPrint('✅ STATUS: ${response.statusCode}');
-      debugPrint('✅ RESPONSE: ${response.data}');
-
-      if (response.statusCode == 200 && response.data is Map) {
+      if (response.statusCode == 200) {
         return AuthResult(
-          success: response.data['success'] ?? false,
-          message: response.data['message'] ?? 'Register failed',
+          success: true,
+          message: AppMessage.registerSuccess,
+          code: response.data?['code'],
         );
       }
 
-      return AuthResult(success: false, message: 'Invalid response format');
+      return AuthResult(
+        success: false,
+        isServerError: true,
+        message: AppMessage.serverError,
+      );
     } on DioException catch (e) {
-      debugPrint('❌ REGISTER ERROR: ${e.message}');
-      debugPrint('❌ RESPONSE: ${e.response?.data}');
+      if (e.response == null) {
+        return AuthResult(
+          success: false,
+          isServerError: true,
+          message: _mapDioError(e),
+        );
+      }
+
+      final data = e.response?.data;
+      final code = data?['code'];
+      final msg = data?['message'];
 
       return AuthResult(
         success: false,
-        message:
-            e.response?.data?['message'] ??
-            'Unable to register. Please try again',
+        code: code,
+        message: _mapErrorCode(code, msg),
       );
-    } catch (e) {
-      return AuthResult(success: false, message: e.toString());
+    } catch (_) {
+      return AuthResult(
+        success: false,
+        isServerError: true,
+        message: AppMessage.unknownError,
+      );
     }
   }
 
-  /// ===================== CHANGE PASSWORD =====================
+  ////////////////////////////////////////////////////////////
+  /// CHANGE PASSWORD
+  ////////////////////////////////////////////////////////////
   static Future<AuthResult> changePassword({
     required String account,
     required String oldPassword,
     required String newPassword,
   }) async {
     try {
-      final endpoint = '$_basePath/change_password';
+      final response = await DioClient.dio.post(
+        '$_basePath/change_password',
+        data: {
+          'account': account,
+          'oldPassword': oldPassword,
+          'newPassword': newPassword,
+        },
+      );
 
-      final body = {
-        'account': account,
-        'oldPassword': oldPassword,
-        'newPassword': newPassword,
-      };
-
-      /// 🔥 LOG REQUEST
-      debugPrint('👉 API CALL: ${DioClient.dio.options.baseUrl}$endpoint');
-      // debugPrint('👉 BODY: $body');
-
-      final response = await DioClient.dio.post(endpoint, data: body);
-
-      debugPrint('✅ STATUS: ${response.statusCode}');
-      // debugPrint('✅ RESPONSE: ${response.data}');
-
-      if (response.statusCode == 200 && response.data is Map) {
+      if (response.statusCode == 200) {
         return AuthResult(
-          success: response.data['success'] ?? false,
-          message: response.data['message'] ?? 'Change password failed',
+          success: true,
+          message: AppMessage.changePasswordSuccess,
+          code: response.data?['code'],
         );
       }
 
-      return AuthResult(success: false, message: 'Invalid response format');
+      return AuthResult(
+        success: false,
+        isServerError: true,
+        message: AppMessage.serverError,
+      );
     } on DioException catch (e) {
-      debugPrint('❌ CHANGE PASSWORD ERROR: ${e.message}');
-      debugPrint('❌ RESPONSE: ${e.response?.data}');
+      if (e.response == null) {
+        return AuthResult(
+          success: false,
+          isServerError: true,
+          message: _mapDioError(e),
+        );
+      }
+
+      final data = e.response?.data;
+      final code = data?['code'];
+      final msg = data?['message'];
 
       return AuthResult(
         success: false,
-        message:
-            e.response?.data?['message'] ??
-            'Unable to change password. Please try again',
+        code: code,
+        message: _mapErrorCode(code, msg),
       );
-    } catch (e) {
-      return AuthResult(success: false, message: e.toString());
+    } catch (_) {
+      return AuthResult(
+        success: false,
+        isServerError: true,
+        message: AppMessage.unknownError,
+      );
     }
   }
 
-  /// ===================== CHECK ACCOUNT EXISTS =====================
+  ////////////////////////////////////////////////////////////
+  /// CHECK ACCOUNT
+  ////////////////////////////////////////////////////////////
   static Future<bool> checkAccountExists(String account) async {
     try {
-      final endpoint = '$_basePath/check-account-exists';
-
-      /// 🔥 LOG REQUEST
-      debugPrint('👉 API CALL: ${DioClient.dio.options.baseUrl}$endpoint');
-      // debugPrint('👉 PARAMS: account=$account');
-
       final response = await DioClient.dio.get(
-        endpoint,
+        '$_basePath/check-account-exists',
         queryParameters: {'account': account},
       );
-
-      // debugPrint('✅ STATUS: ${response.statusCode}');
-      // debugPrint('✅ RESPONSE: ${response.data}');
 
       if (response.statusCode == 200 && response.data is bool) {
         return response.data as bool;
       }
 
-      // Nếu response không đúng kiểu bool thì trả về false
       return false;
-    } on DioException catch (e) {
-      debugPrint('❌ CHECK ACCOUNT ERROR: ${e.message}');
-      debugPrint('❌ RESPONSE: ${e.response?.data}');
-      return false;
-    } catch (e) {
-      debugPrint('❌ CHECK ACCOUNT ERROR: $e');
+    } catch (_) {
       return false;
     }
   }
 
+  static Future<AuthResult> forgotPassword({
+    required String account,
+    required String email,
+  }) async {
+    try {
+      final res = await DioClient.dio.get(
+        '/api/auth/export-password',
+        queryParameters: {'account': account, 'email': email},
+      );
+
+      return AuthResult(success: true, message: res.data ?? "File created");
+    } on DioException catch (e) {
+      if (e.response == null) {
+        return AuthResult(
+          success: false,
+          isServerError: true,
+          message: "Cannot connect to server",
+        );
+      }
+
+      return AuthResult(
+        success: false,
+        message: e.response?.data?['message'] ?? "Failed",
+      );
+    }
+  }
+
+  ////////////////////////////////////////////////////////////
+  /// MAP ERROR CODE
+  ////////////////////////////////////////////////////////////
+  static String _mapErrorCode(String? code, String? msg) {
+    switch (code) {
+      case "AUTH_001":
+        return AppMessage.accountNotFound;
+
+      case "AUTH_002":
+        return AppMessage.wrongPassword;
+
+      case "AUTH_003":
+        return AppMessage.accountExists;
+
+      case "AUTH_004":
+        return AppMessage.invalidData;
+
+      default:
+        return msg ?? AppMessage.unknownError;
+    }
+  }
+
+  ////////////////////////////////////////////////////////////
+  /// MAP NETWORK ERROR
+  ////////////////////////////////////////////////////////////
   static String _mapDioError(DioException e) {
     switch (e.type) {
       case DioExceptionType.connectionTimeout:
       case DioExceptionType.receiveTimeout:
-        return 'Server timeout. Please try again later.';
+        return AppMessage.timeout;
+
       case DioExceptionType.connectionError:
-        return 'Cannot connect to server.';
+        return AppMessage.cannotConnect;
+
       case DioExceptionType.badResponse:
-        return 'Server error (${e.response?.statusCode}).';
+        return AppMessage.serverError;
+
       default:
-        return 'Network error.';
+        return AppMessage.networkError;
     }
   }
 }
