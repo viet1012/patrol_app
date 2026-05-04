@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../api/auth_api.dart';
 import '../common/common_ui_helper.dart';
+import '../login/error_box.dart';
 
 class RegisterBottomSheet extends StatefulWidget {
   const RegisterBottomSheet({super.key});
@@ -20,6 +21,7 @@ class _RegisterBottomSheetState extends State<RegisterBottomSheet> {
   bool _showConfirmPassword = false;
 
   String? _errorMsg;
+  bool _isServerError = false; // ?? QUAN TR?NG
 
   @override
   void dispose() {
@@ -29,12 +31,18 @@ class _RegisterBottomSheetState extends State<RegisterBottomSheet> {
     super.dispose();
   }
 
-  void _register() async {
+  ////////////////////////////////////////////////////////////
+  /// REGISTER
+  ////////////////////////////////////////////////////////////
+  Future<void> _register() async {
     final code = _codeCtrl.text.trim();
     final pass = _passCtrl.text.trim();
     final confirm = _confirmPassCtrl.text.trim();
 
-    setState(() => _errorMsg = null);
+    setState(() {
+      _errorMsg = null;
+      _isServerError = false;
+    });
 
     if (code.isEmpty || pass.isEmpty || confirm.isEmpty) {
       setState(() => _errorMsg = "Please fill all fields");
@@ -49,23 +57,28 @@ class _RegisterBottomSheetState extends State<RegisterBottomSheet> {
     final result = await AuthApi.register(account: code, password: pass);
 
     if (!result.success) {
-      setState(() => _errorMsg = result.message);
+      setState(() {
+        _errorMsg = result.message;
+        _isServerError = result.isServerError; // ?? KEY
+      });
       return;
     }
 
-    // ✅ ĐĂNG KÝ THÀNH CÔNG
     if (!mounted) return;
 
     CommonUI.showSnackBar(
       context: context,
-      message: 'Register successful',
+      message: 'Registration successful',
       color: Colors.green,
     );
-    // Đóng bottom sheet sau 1 chút cho user kịp thấy
+
     await Future.delayed(const Duration(milliseconds: 600));
-    Navigator.pop(context, code); // ✅ trả về account
+    Navigator.pop(context, code);
   }
 
+  ////////////////////////////////////////////////////////////
+  /// UI
+  ////////////////////////////////////////////////////////////
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -85,7 +98,7 @@ class _RegisterBottomSheetState extends State<RegisterBottomSheet> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // drag handle
+            /// drag handle
             Container(
               width: 42,
               height: 4,
@@ -97,14 +110,8 @@ class _RegisterBottomSheetState extends State<RegisterBottomSheet> {
 
             const SizedBox(height: 18),
 
-            // icon
-            Image.asset(
-              'assets/flags/favicon.png',
-              width: 120,
-              height: 120,
-              filterQuality: FilterQuality.high,
-              fit: BoxFit.contain,
-            ),
+            Image.asset('assets/flags/favicon.png', width: 120, height: 120),
+
             const SizedBox(height: 14),
 
             const Text(
@@ -150,6 +157,7 @@ class _RegisterBottomSheetState extends State<RegisterBottomSheet> {
               obscure: true,
               isConfirm: true,
             ),
+
             const SizedBox(height: 16),
 
             SizedBox(
@@ -175,12 +183,12 @@ class _RegisterBottomSheetState extends State<RegisterBottomSheet> {
               ),
             ),
 
+            ////////////////////////////////////////////////////////////
+            /// ERROR BOX (GI?NG LOGIN)
+            ////////////////////////////////////////////////////////////
             if (_errorMsg != null) ...[
               const SizedBox(height: 12),
-              Text(
-                _errorMsg!,
-                style: const TextStyle(color: Colors.redAccent, fontSize: 13),
-              ),
+              ErrorBox(message: _errorMsg!, isServerError: _isServerError),
             ],
           ],
         ),
@@ -188,6 +196,9 @@ class _RegisterBottomSheetState extends State<RegisterBottomSheet> {
     );
   }
 
+  ////////////////////////////////////////////////////////////
+  /// INPUT
+  ////////////////////////////////////////////////////////////
   Widget _input({
     required TextEditingController controller,
     required String label,
@@ -197,7 +208,6 @@ class _RegisterBottomSheetState extends State<RegisterBottomSheet> {
     bool isConfirm = false,
   }) {
     final isPasswordField = obscure;
-
     bool showPassword = isConfirm ? _showConfirmPassword : _showPassword;
 
     return TextField(
@@ -208,12 +218,18 @@ class _RegisterBottomSheetState extends State<RegisterBottomSheet> {
           ? [FilteringTextInputFormatter.digitsOnly]
           : null,
       style: const TextStyle(color: Colors.white),
+      onChanged: (_) {
+        if (_errorMsg != null) {
+          setState(() {
+            _errorMsg = null;
+            _isServerError = false;
+          });
+        }
+      },
       decoration: InputDecoration(
         labelText: label,
         labelStyle: const TextStyle(color: Colors.white70),
         prefixIcon: Icon(icon, color: Colors.white70),
-
-        // 👁 icon xem / ẩn mật khẩu
         suffixIcon: isPasswordField
             ? IconButton(
                 icon: Icon(
@@ -233,7 +249,6 @@ class _RegisterBottomSheetState extends State<RegisterBottomSheet> {
                 },
               )
             : null,
-
         filled: true,
         fillColor: const Color(0xFF020617),
         border: OutlineInputBorder(

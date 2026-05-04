@@ -95,7 +95,7 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
         setState(() {
           _authMe = AuthMe.fromJson(res.data);
         });
-        debugPrint("RAW JSON: ${res.data}");
+        // debugPrint("RAW JSON: ${res.data}");
       }
     } catch (e) {
       debugPrint('Load auth me error: $e');

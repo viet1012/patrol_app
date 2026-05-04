@@ -7,6 +7,22 @@ import '../common/app_version_text.dart';
 import '../register/register_page.dart';
 import '../session/session_store.dart';
 import 'change_password_screen.dart';
+import 'error_box.dart';
+import 'forgot_password_bottom_sheet.dart';
+
+class LoadingDialog {
+  static void show(BuildContext context) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+  }
+
+  static void hide(BuildContext context) {
+    Navigator.of(context, rootNavigator: true).pop();
+  }
+}
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -23,6 +39,7 @@ class _LoginPageState extends State<LoginPage> {
   String? _errorMsg;
   bool _showPassword = false;
   bool _rememberMe = true;
+  bool _isServerError = false; // thêm ? class
 
   @override
   void initState() {
@@ -69,7 +86,10 @@ class _LoginPageState extends State<LoginPage> {
     final result = await AuthApi.login(account: code, password: pass);
 
     if (!result.success) {
-      setState(() => _errorMsg = result.message);
+      setState(() {
+        _errorMsg = result.message;
+        _isServerError = result.isServerError; // ?? KEY
+      });
       return;
     }
 
@@ -132,9 +152,23 @@ class _LoginPageState extends State<LoginPage> {
     );
 
     if (result == true) {
+      // 👉 SHOW LOADING
+      LoadingDialog.show(context);
+
+      // 👉 GIẢ LẬP delay (hoặc chờ API thật)
+      await Future.delayed(const Duration(seconds: 2));
+
+      if (!mounted) return;
+
+      // 👉 HIDE LOADING
+      LoadingDialog.hide(context);
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text("Verification successful. Token sent."),
+          content: Text(
+            "Your request has been submitted successfully.\n"
+            "Please wait a moment and check Microsoft Teams.",
+          ),
           backgroundColor: Colors.green,
         ),
       );
@@ -152,6 +186,7 @@ class _LoginPageState extends State<LoginPage> {
             passCtrl: _passCtrl,
             passFocus: _passFocus,
             errorMsg: _errorMsg,
+            isServerError: _isServerError,
             showPassword: _showPassword,
             rememberMe: _rememberMe,
             onToggleRemember: (v) => setState(() => _rememberMe = v),
@@ -220,6 +255,7 @@ class LoginCard extends StatelessWidget {
   final FocusNode passFocus;
 
   final String? errorMsg;
+  final bool isServerError;
   final bool showPassword;
   final bool rememberMe;
 
@@ -246,6 +282,7 @@ class LoginCard extends StatelessWidget {
     required this.onChangePassword,
     required this.onInputChanged,
     required this.onForgotPassword,
+    required this.isServerError,
   });
 
   @override
@@ -352,11 +389,14 @@ class LoginCard extends StatelessWidget {
             ),
           ),
 
+          // if (errorMsg != null) ...[
+          //   const SizedBox(height: 10),
+          //   Text(errorMsg!, style: const TextStyle(color: Colors.redAccent)),
+          // ],
           if (errorMsg != null) ...[
             const SizedBox(height: 10),
-            Text(errorMsg!, style: const TextStyle(color: Colors.redAccent)),
+            ErrorBox(message: errorMsg!, isServerError: isServerError),
           ],
-
           const SizedBox(height: 16),
 
           Row(
@@ -459,118 +499,6 @@ class _Title extends StatelessWidget {
         SizedBox(height: 4),
         Text("Sign in to continue", style: TextStyle(color: Colors.white70)),
       ],
-    );
-  }
-}
-
-class ForgotPasswordBottomSheet extends StatefulWidget {
-  const ForgotPasswordBottomSheet({super.key});
-
-  @override
-  State<ForgotPasswordBottomSheet> createState() =>
-      _ForgotPasswordBottomSheetState();
-}
-
-class _ForgotPasswordBottomSheetState extends State<ForgotPasswordBottomSheet> {
-  final _codeCtrl = TextEditingController();
-  final _emailCtrl = TextEditingController();
-
-  String? _error;
-  bool _loading = false;
-
-  Future<void> _verify() async {
-    final code = _codeCtrl.text.trim();
-    final email = _emailCtrl.text.trim();
-
-    if (code.isEmpty || email.isEmpty) {
-      setState(() => _error = "Please enter all fields");
-      return;
-    }
-
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
-
-    final result = await AuthApi.forgotPassword(account: code, email: email);
-
-    setState(() => _loading = false);
-
-    if (!result.success) {
-      setState(() => _error = result.message);
-      return;
-    }
-
-    if (!mounted) return;
-
-    Navigator.pop(context, true); // success
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
-        left: 20,
-        right: 20,
-        top: 20,
-      ),
-      decoration: const BoxDecoration(
-        color: Color(0xFF020617),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Text(
-            "Forgot Password",
-            style: TextStyle(color: Colors.white, fontSize: 18),
-          ),
-
-          const SizedBox(height: 16),
-
-          /// Employee ID
-          TextField(
-            controller: _codeCtrl,
-            style: const TextStyle(color: Colors.white),
-            decoration: const InputDecoration(
-              labelText: "Employee ID",
-              prefixIcon: Icon(Icons.badge),
-            ),
-          ),
-
-          const SizedBox(height: 12),
-
-          /// Email
-          TextField(
-            controller: _emailCtrl,
-            style: const TextStyle(color: Colors.white),
-            decoration: const InputDecoration(
-              labelText: "Email",
-              prefixIcon: Icon(Icons.email),
-            ),
-          ),
-
-          const SizedBox(height: 16),
-
-          if (_error != null)
-            Text(_error!, style: const TextStyle(color: Colors.red)),
-
-          const SizedBox(height: 10),
-
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: _loading ? null : _verify,
-              child: _loading
-                  ? const CircularProgressIndicator()
-                  : const Text("Verify"),
-            ),
-          ),
-
-          const SizedBox(height: 20),
-        ],
-      ),
     );
   }
 }

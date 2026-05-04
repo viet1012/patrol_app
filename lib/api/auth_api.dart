@@ -19,18 +19,24 @@ class AppMessage {
   static const registerSuccess = "Registration successful.";
   static const changePasswordSuccess = "Password changed successfully.";
 
+  /// ===== SUPPORT =====
+  static const support = "IT Support (via Microsoft Teams)";
+
   /// ===== SERVER / NETWORK =====
-  static const serverError = "Server error. Please contact KVH_IT support";
+  static const serverError = "Server error. Please contact IT Support.";
+
   static const cannotConnect =
-      "Cannot connect to server.\nPlease contact KVH_IT support";
+      "Unable to connect to the server.\nPlease contact IT Support.";
+
   static const timeout =
-      "Server timeout. Please try again later.\nPlease contact KVH_IT support";
-  static const networkError = "Network error.\nPlease contact KVH_IT support";
+      "The request timed out.\nPlease try again later or contact IT Support.";
+
+  static const networkError =
+      "Network error occurred.\nPlease contact IT Support.";
 
   /// ===== FALLBACK =====
   static const unknownError = "Something went wrong. Please try again.";
 }
-
 ////////////////////////////////////////////////////////////
 /// API
 ////////////////////////////////////////////////////////////
