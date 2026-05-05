@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 
 import '../api/auth_api.dart';
-import 'login_page.dart';
+import 'error_box.dart';
+import 'login_page.dart'; // chứa AppInput
 
 class ForgotPasswordBottomSheet extends StatefulWidget {
-  const ForgotPasswordBottomSheet({super.key});
+  final String? account;
+
+  const ForgotPasswordBottomSheet({super.key, this.account});
 
   @override
   State<ForgotPasswordBottomSheet> createState() =>
@@ -14,38 +17,69 @@ class ForgotPasswordBottomSheet extends StatefulWidget {
 class _ForgotPasswordBottomSheetState extends State<ForgotPasswordBottomSheet> {
   final _codeCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
+  final _emailFocus = FocusNode();
 
   String? _error;
+  bool _isServerError = false;
   bool _loading = false;
 
+  @override
+  void initState() {
+    super.initState();
+
+    if (widget.account != null) {
+      _codeCtrl.text = widget.account!;
+
+      // 👉 delay để UI render xong rồi mới focus
+      Future.delayed(const Duration(milliseconds: 300), () {
+        if (mounted) {
+          _emailFocus.requestFocus();
+        }
+      });
+    }
+  }
+
+  ////////////////////////////////////////////////////////////
+  /// VERIFY
+  ////////////////////////////////////////////////////////////
   Future<void> _verify() async {
     final code = _codeCtrl.text.trim();
     final email = _emailCtrl.text.trim();
 
     if (code.isEmpty || email.isEmpty) {
-      setState(() => _error = "Please enter all fields");
+      setState(() {
+        _error = "Please enter all fields";
+        _isServerError = false;
+      });
       return;
     }
 
     setState(() {
       _loading = true;
       _error = null;
+      _isServerError = false;
     });
 
     final result = await AuthApi.forgotPassword(account: code, email: email);
 
+    if (!mounted) return;
+
     setState(() => _loading = false);
 
     if (!result.success) {
-      setState(() => _error = result.message);
+      setState(() {
+        _error = result.message;
+        _isServerError = result.isServerError;
+      });
       return;
     }
 
-    if (!mounted) return;
-
-    Navigator.pop(context, true); // success
+    Navigator.pop(context, true);
   }
 
+  ////////////////////////////////////////////////////////////
+  /// UI
+  ////////////////////////////////////////////////////////////
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -73,7 +107,9 @@ class _ForgotPasswordBottomSheetState extends State<ForgotPasswordBottomSheet> {
 
           const SizedBox(height: 16),
 
+          ////////////////////////////////////////////////////////////
           /// Employee ID
+          ////////////////////////////////////////////////////////////
           AppInput(
             controller: _codeCtrl,
             label: "Employee ID",
@@ -81,32 +117,49 @@ class _ForgotPasswordBottomSheetState extends State<ForgotPasswordBottomSheet> {
             isNumber: true,
             onChanged: (_) {
               if (_error != null) {
-                setState(() => _error = null);
+                setState(() {
+                  _error = null;
+                  _isServerError = false;
+                });
               }
             },
           ),
 
           const SizedBox(height: 12),
 
+          ////////////////////////////////////////////////////////////
           /// Email
+          ////////////////////////////////////////////////////////////
           AppInput(
             controller: _emailCtrl,
             label: "Email",
             icon: Icons.email_outlined,
+            focusNode: _emailFocus,
+            // 👈 KEY
             onChanged: (_) {
               if (_error != null) {
-                setState(() => _error = null);
+                setState(() {
+                  _error = null;
+                  _isServerError = false;
+                });
               }
             },
           ),
-
           const SizedBox(height: 16),
 
-          if (_error != null)
-            Text(_error!, style: const TextStyle(color: Colors.red)),
+          ////////////////////////////////////////////////////////////
+          /// ERROR BOX
+          ////////////////////////////////////////////////////////////
+          if (_error != null) ...[
+            const SizedBox(height: 10),
+            ErrorBox(message: _error!, isServerError: _isServerError),
+          ],
 
           const SizedBox(height: 10),
 
+          ////////////////////////////////////////////////////////////
+          /// BUTTON
+          ////////////////////////////////////////////////////////////
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
@@ -118,7 +171,14 @@ class _ForgotPasswordBottomSheetState extends State<ForgotPasswordBottomSheet> {
                 ),
               ),
               child: _loading
-                  ? const CircularProgressIndicator()
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
                   : const Text(
                       "Verify",
                       style: TextStyle(
@@ -134,5 +194,16 @@ class _ForgotPasswordBottomSheetState extends State<ForgotPasswordBottomSheet> {
         ],
       ),
     );
+  }
+
+  ////////////////////////////////////////////////////////////
+  /// DISPOSE
+  ////////////////////////////////////////////////////////////
+  @override
+  void dispose() {
+    _codeCtrl.dispose();
+    _emailCtrl.dispose();
+    _emailFocus.dispose(); // 👈 nhớ
+    super.dispose();
   }
 }

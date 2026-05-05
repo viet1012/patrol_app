@@ -45,6 +45,42 @@ class AuthApi {
   static const String _basePath = '/api/auth';
 
   ////////////////////////////////////////////////////////////
+  /// COMMON ERROR HANDLER (CORE)
+  ////////////////////////////////////////////////////////////
+  static AuthResult _handleDioError(DioException e) {
+    // 👉 NETWORK / NO RESPONSE
+    if (e.response == null) {
+      return AuthResult(
+        success: false,
+        isServerError: true,
+        message: _mapDioError(e),
+      );
+    }
+
+    final status = e.response?.statusCode;
+
+    // 👉 SERVER ERROR (5xx: 500, 502,...)
+    if (status != null && status >= 500) {
+      return AuthResult(
+        success: false,
+        isServerError: true,
+        message: AppMessage.serverError,
+      );
+    }
+
+    // 👉 BUSINESS ERROR (4xx)
+    final data = e.response?.data;
+    final code = data?['code'];
+    final msg = data?['message'];
+
+    return AuthResult(
+      success: false,
+      code: code,
+      message: _mapErrorCode(code, msg),
+    );
+  }
+
+  ////////////////////////////////////////////////////////////
   /// LOGIN
   ////////////////////////////////////////////////////////////
   static Future<AuthResult> login({
@@ -61,51 +97,18 @@ class AuthApi {
         ),
       );
 
-      if (response.statusCode == 200) {
-        return AuthResult(
-          success: true,
-          message: AppMessage.loginSuccess,
-          code: response.data?['code'],
-        );
-      }
-
+      return AuthResult(
+        success: true,
+        message: AppMessage.loginSuccess,
+        code: response.data?['code'],
+      );
+    } on DioException catch (e) {
+      return _handleDioError(e);
+    } catch (_) {
       return AuthResult(
         success: false,
         isServerError: true,
-        message: AppMessage.serverError,
-      );
-    }
-    ////////////////////////////////////////////////////////////
-    /// ERROR HANDLE
-    ////////////////////////////////////////////////////////////
-    on DioException catch (e) {
-      if (e.response == null) {
-        return AuthResult(
-          success: false,
-          isServerError: true,
-          message: _mapDioError(e),
-        );
-      }
-
-      final status = e.response?.statusCode;
-
-      // ?? HANDLE 5xx ERROR (502, 500,...)
-      if (status != null && status >= 500) {
-        return AuthResult(
-          success: false,
-          isServerError: true,
-          message: AppMessage.serverError,
-        );
-      }
-
-      final data = e.response?.data;
-      final code = data?['code'];
-      final msg = data?['message'];
-
-      return AuthResult(
-        success: false,
-        code: code,
-        message: _mapErrorCode(code, msg),
+        message: AppMessage.unknownError,
       );
     }
   }
@@ -123,37 +126,13 @@ class AuthApi {
         data: {'account': account, 'password': password},
       );
 
-      if (response.statusCode == 200) {
-        return AuthResult(
-          success: true,
-          message: AppMessage.registerSuccess,
-          code: response.data?['code'],
-        );
-      }
-
       return AuthResult(
-        success: false,
-        isServerError: true,
-        message: AppMessage.serverError,
+        success: true,
+        message: AppMessage.registerSuccess,
+        code: response.data?['code'],
       );
     } on DioException catch (e) {
-      if (e.response == null) {
-        return AuthResult(
-          success: false,
-          isServerError: true,
-          message: _mapDioError(e),
-        );
-      }
-
-      final data = e.response?.data;
-      final code = data?['code'];
-      final msg = data?['message'];
-
-      return AuthResult(
-        success: false,
-        code: code,
-        message: _mapErrorCode(code, msg),
-      );
+      return _handleDioError(e);
     } catch (_) {
       return AuthResult(
         success: false,
@@ -181,37 +160,38 @@ class AuthApi {
         },
       );
 
-      if (response.statusCode == 200) {
-        return AuthResult(
-          success: true,
-          message: AppMessage.changePasswordSuccess,
-          code: response.data?['code'],
-        );
-      }
-
+      return AuthResult(
+        success: true,
+        message: AppMessage.changePasswordSuccess,
+        code: response.data?['code'],
+      );
+    } on DioException catch (e) {
+      return _handleDioError(e);
+    } catch (_) {
       return AuthResult(
         success: false,
         isServerError: true,
-        message: AppMessage.serverError,
+        message: AppMessage.unknownError,
       );
+    }
+  }
+
+  ////////////////////////////////////////////////////////////
+  /// FORGOT PASSWORD (FIX LUÔN)
+  ////////////////////////////////////////////////////////////
+  static Future<AuthResult> forgotPassword({
+    required String account,
+    required String email,
+  }) async {
+    try {
+      final res = await DioClient.dio.get(
+        '/api/auth/export-password',
+        queryParameters: {'account': account, 'email': email},
+      );
+
+      return AuthResult(success: true, message: res.data ?? "Request sent");
     } on DioException catch (e) {
-      if (e.response == null) {
-        return AuthResult(
-          success: false,
-          isServerError: true,
-          message: _mapDioError(e),
-        );
-      }
-
-      final data = e.response?.data;
-      final code = data?['code'];
-      final msg = data?['message'];
-
-      return AuthResult(
-        success: false,
-        code: code,
-        message: _mapErrorCode(code, msg),
-      );
+      return _handleDioError(e); // 👈 QUAN TRỌNG
     } catch (_) {
       return AuthResult(
         success: false,
@@ -231,40 +211,9 @@ class AuthApi {
         queryParameters: {'account': account},
       );
 
-      if (response.statusCode == 200 && response.data is bool) {
-        return response.data as bool;
-      }
-
-      return false;
+      return response.data == true;
     } catch (_) {
       return false;
-    }
-  }
-
-  static Future<AuthResult> forgotPassword({
-    required String account,
-    required String email,
-  }) async {
-    try {
-      final res = await DioClient.dio.get(
-        '/api/auth/export-password',
-        queryParameters: {'account': account, 'email': email},
-      );
-
-      return AuthResult(success: true, message: res.data ?? "File created");
-    } on DioException catch (e) {
-      if (e.response == null) {
-        return AuthResult(
-          success: false,
-          isServerError: true,
-          message: "Cannot connect to server",
-        );
-      }
-
-      return AuthResult(
-        success: false,
-        message: e.response?.data?['message'] ?? "Failed",
-      );
     }
   }
 

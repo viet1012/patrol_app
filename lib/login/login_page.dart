@@ -183,30 +183,29 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Future<void> _forgotPassword() async {
+    final account = _codeCtrl.text.trim();
+
     final result = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => const ForgotPasswordBottomSheet(),
+      builder: (_) => ForgotPasswordBottomSheet(
+        account: account.isEmpty ? null : account, // 👈 KEY
+      ),
     );
 
     if (result == true) {
-      // 👉 SHOW LOADING
       LoadingDialog.show(context);
-
-      // 👉 GIẢ LẬP delay (hoặc chờ API thật)
       await Future.delayed(const Duration(seconds: 2));
 
       if (!mounted) return;
-
-      // 👉 HIDE LOADING
       LoadingDialog.hide(context);
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
             "Your request has been submitted successfully.\n"
-            "Please wait a moment and check Microsoft Teams.",
+            "Please check Microsoft Teams.",
           ),
           backgroundColor: Colors.green,
         ),
