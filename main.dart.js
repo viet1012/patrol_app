@@ -38577,17 +38577,17 @@ bgA(a,b,c){var s=null
 return c.a(A.btU(a,b,s,s,s,s))},
 bqh(){return"http://192.168.122.16:9299"},
 Tj(a,b){return A.bqp(a,b)},
-bqp(a,b){var s=0,r=A.A(t.Tm),q,p=2,o=[],n,m,l,k,j,i,h,g,f
+bqp(a,b){var s=0,r=A.A(t.Tm),q,p=2,o=[],n,m,l,k,j,i,h,g,f,e
 var $async$Tj=A.B(function(c,d){if(c===1){o.push(d)
 s=p}while(true)switch(s){case 0:p=4
-i=$.ct
-if(i==null)i=$.ct=A.f7()
-h=t.N
+h=$.ct
+if(h==null)h=$.ct=A.f7()
+g=t.N
 s=7
-return A.u(i.BL("/api/auth/login",A.a9(["account",a,"password",b],h,h),A.vW(null,B.hh,B.hh),t.z),$async$Tj)
+return A.u(h.BL("/api/auth/login",A.a9(["account",a,"password",b],g,g),A.vW(null,B.hh,B.hh),t.z),$async$Tj)
 case 7:n=d
-if(n.c===200){i=n.a
-if(i!=null)J.bm(i,"code")
+if(n.c===200){h=n.a
+if(h!=null)J.bm(h,"code")
 q=new A.fj(!0,"Login successful.",!1)
 s=1
 break}q=new A.fj(!1,"Server error. Please contact IT Support.",!0)
@@ -38597,22 +38597,25 @@ p=2
 s=6
 break
 case 4:p=3
-f=o.pop()
-i=A.a6(f)
-if(i instanceof A.eD){m=i
+e=o.pop()
+h=A.a6(e)
+if(h instanceof A.eD){m=h
 if(m.b==null){q=new A.fj(!1,A.b9P(m),!0)
 s=1
-break}i=m.b
-l=i==null?null:i.a
-i=l
-k=i==null?null:J.bm(i,"code")
-i=l
-j=i==null?null:J.bm(i,"message")
-q=new A.fj(!1,A.b9Q(k,j),!1)
+break}h=m.b
+l=h==null?null:h.c
+if(l!=null&&l>=500){q=new A.fj(!1,"Server error. Please contact IT Support.",!0)
 s=1
-break}else{q=new A.fj(!1,"Something went wrong. Please try again.",!0)
+break}h=m.b
+k=h==null?null:h.a
+h=k
+j=h==null?null:J.bm(h,"code")
+h=k
+i=h==null?null:J.bm(h,"message")
+q=new A.fj(!1,A.b9Q(j,i),!1)
 s=1
-break}s=6
+break}else throw e
+s=6
 break
 case 3:s=2
 break
