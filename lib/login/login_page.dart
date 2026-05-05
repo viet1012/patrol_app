@@ -83,6 +83,45 @@ class _LoginPageState extends State<LoginPage> {
       return;
     }
 
+    // 👉 SHOW LOADING
+    LoadingDialog.show(context);
+
+    final result = await AuthApi.login(account: code, password: pass);
+
+    // 👉 HIDE LOADING
+    if (mounted) {
+      LoadingDialog.hide(context);
+    }
+
+    if (!result.success) {
+      setState(() {
+        _errorMsg = result.message;
+        _isServerError = result.isServerError;
+      });
+      return;
+    }
+
+    if (_rememberMe) {
+      await SessionStore.saveCreds(account: code, password: pass);
+    } else {
+      await SessionStore.clear();
+    }
+
+    if (!mounted) return;
+    context.go('/home', extra: {'accountCode': code});
+  }
+
+  Future<void> _login1() async {
+    final code = _codeCtrl.text.trim();
+    final pass = _passCtrl.text.trim();
+
+    setState(() => _errorMsg = null);
+
+    if (code.isEmpty || pass.isEmpty) {
+      setState(() => _errorMsg = "Please enter code and password");
+      return;
+    }
+
     final result = await AuthApi.login(account: code, password: pass);
 
     if (!result.success) {
