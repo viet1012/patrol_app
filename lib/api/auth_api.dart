@@ -87,6 +87,17 @@ class AuthApi {
         );
       }
 
+      final status = e.response?.statusCode;
+
+      // ?? HANDLE 5xx ERROR (502, 500,...)
+      if (status != null && status >= 500) {
+        return AuthResult(
+          success: false,
+          isServerError: true,
+          message: AppMessage.serverError,
+        );
+      }
+
       final data = e.response?.data;
       final code = data?['code'];
       final msg = data?['message'];
@@ -95,12 +106,6 @@ class AuthApi {
         success: false,
         code: code,
         message: _mapErrorCode(code, msg),
-      );
-    } catch (_) {
-      return AuthResult(
-        success: false,
-        isServerError: true,
-        message: AppMessage.unknownError,
       );
     }
   }
