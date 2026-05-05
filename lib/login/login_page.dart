@@ -162,18 +162,49 @@ class _LoginPageState extends State<LoginPage> {
   Future<void> _showChangePassword() async {
     final account = _codeCtrl.text.trim();
 
+    // =========================================================
+    // 👉 1. VALIDATE INPUT
+    // =========================================================
     if (account.isEmpty) {
-      setState(() => _errorMsg = "Please enter Employee ID first");
+      setState(() {
+        _errorMsg = "Please enter Employee ID first";
+        _isServerError = false;
+      });
       return;
     }
 
-    final exists = await AuthApi.checkAccountExists(account);
+    // =========================================================
+    // 👉 2. CALL API
+    // =========================================================
+    final result = await AuthApi.checkAccountExists(account);
+
+    // =========================================================
+    // 👉 3. SERVER / NETWORK ERROR
+    // =========================================================
+    if (!result.success) {
+      setState(() {
+        _errorMsg = result.message;
+        _isServerError = result.isServerError;
+      });
+      return;
+    }
+
+    // =========================================================
+    // 👉 4. BUSINESS ERROR
+    // =========================================================
+    final exists = result.data == true;
 
     if (!exists) {
-      setState(() => _errorMsg = "Account does not exist");
+      setState(() {
+        _errorMsg = "Account does not exist";
+        _isServerError = false;
+      });
       return;
     }
 
+    // =========================================================
+    // 👉 5. SUCCESS → OPEN BOTTOM SHEET
+    // =========================================================
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,

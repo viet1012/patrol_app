@@ -204,16 +204,28 @@ class AuthApi {
   ////////////////////////////////////////////////////////////
   /// CHECK ACCOUNT
   ////////////////////////////////////////////////////////////
-  static Future<bool> checkAccountExists(String account) async {
+  static Future<AuthResult> checkAccountExists(String account) async {
     try {
       final response = await DioClient.dio.get(
         '$_basePath/check-account-exists',
         queryParameters: {'account': account},
       );
 
-      return response.data == true;
+      return AuthResult(
+        success: true,
+        message: "",
+        code: null,
+        isServerError: false,
+        data: response.data,
+      ); // 👈 nếu bạn có field data
+    } on DioException catch (e) {
+      return _handleDioError(e);
     } catch (_) {
-      return false;
+      return AuthResult(
+        success: false,
+        message: AppMessage.unknownError,
+        isServerError: true,
+      );
     }
   }
 
