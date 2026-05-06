@@ -111,37 +111,6 @@ class _LoginPageState extends State<LoginPage> {
     context.go('/home', extra: {'accountCode': code});
   }
 
-  Future<void> _login1() async {
-    final code = _codeCtrl.text.trim();
-    final pass = _passCtrl.text.trim();
-
-    setState(() => _errorMsg = null);
-
-    if (code.isEmpty || pass.isEmpty) {
-      setState(() => _errorMsg = "Please enter code and password");
-      return;
-    }
-
-    final result = await AuthApi.login(account: code, password: pass);
-
-    if (!result.success) {
-      setState(() {
-        _errorMsg = result.message;
-        _isServerError = result.isServerError; // ?? KEY
-      });
-      return;
-    }
-
-    if (_rememberMe) {
-      await SessionStore.saveCreds(account: code, password: pass);
-    } else {
-      await SessionStore.clear();
-    }
-
-    if (!mounted) return;
-    context.go('/home', extra: {'accountCode': code});
-  }
-
   Future<void> _showRegister() async {
     final result = await showModalBottomSheet<String>(
       context: context,
@@ -162,9 +131,6 @@ class _LoginPageState extends State<LoginPage> {
   Future<void> _showChangePassword() async {
     final account = _codeCtrl.text.trim();
 
-    // =========================================================
-    // 👉 1. VALIDATE INPUT
-    // =========================================================
     if (account.isEmpty) {
       setState(() {
         _errorMsg = "Please enter Employee ID first";
@@ -173,14 +139,8 @@ class _LoginPageState extends State<LoginPage> {
       return;
     }
 
-    // =========================================================
-    // 👉 2. CALL API
-    // =========================================================
     final result = await AuthApi.checkAccountExists(account);
 
-    // =========================================================
-    // 👉 3. SERVER / NETWORK ERROR
-    // =========================================================
     if (!result.success) {
       setState(() {
         _errorMsg = result.message;
@@ -189,9 +149,6 @@ class _LoginPageState extends State<LoginPage> {
       return;
     }
 
-    // =========================================================
-    // 👉 4. BUSINESS ERROR
-    // =========================================================
     final exists = result.data == true;
 
     if (!exists) {
@@ -202,9 +159,6 @@ class _LoginPageState extends State<LoginPage> {
       return;
     }
 
-    // =========================================================
-    // 👉 5. SUCCESS → OPEN BOTTOM SHEET
-    // =========================================================
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,

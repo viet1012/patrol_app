@@ -47,7 +47,8 @@ class AuthApi {
   ////////////////////////////////////////////////////////////
   /// COMMON ERROR HANDLER (CORE)
   ////////////////////////////////////////////////////////////
-  static AuthResult _handleDioError(DioException e) {
+
+  static AuthResult handleDioError(DioException e) {
     // 👉 NETWORK / NO RESPONSE
     if (e.response == null) {
       return AuthResult(
@@ -103,7 +104,7 @@ class AuthApi {
         code: response.data?['code'],
       );
     } on DioException catch (e) {
-      return _handleDioError(e);
+      return handleDioError(e);
     } catch (_) {
       return AuthResult(
         success: false,
@@ -132,7 +133,7 @@ class AuthApi {
         code: response.data?['code'],
       );
     } on DioException catch (e) {
-      return _handleDioError(e);
+      return handleDioError(e);
     } catch (_) {
       return AuthResult(
         success: false,
@@ -166,7 +167,7 @@ class AuthApi {
         code: response.data?['code'],
       );
     } on DioException catch (e) {
-      return _handleDioError(e);
+      return handleDioError(e);
     } catch (_) {
       return AuthResult(
         success: false,
@@ -191,7 +192,7 @@ class AuthApi {
 
       return AuthResult(success: true, message: res.data ?? "Request sent");
     } on DioException catch (e) {
-      return _handleDioError(e); // 👈 QUAN TRỌNG
+      return handleDioError(e); // 👈 QUAN TRỌNG
     } catch (_) {
       return AuthResult(
         success: false,
@@ -219,7 +220,7 @@ class AuthApi {
         data: response.data,
       ); // 👈 nếu bạn có field data
     } on DioException catch (e) {
-      return _handleDioError(e);
+      return handleDioError(e);
     } catch (_) {
       return AuthResult(
         success: false,

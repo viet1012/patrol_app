@@ -13,11 +13,13 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
 import 'api/api_config.dart';
+import 'api/auth_api.dart';
 import 'api/auto_cmp_api.dart';
 import 'api/hse_master_service.dart';
 import 'common/common_ui_helper.dart';
 import 'edit/edit_before_screen.dart';
 import 'homeScreen/patrol_home_screen.dart';
+import 'login/login_page.dart';
 import 'model/auto_cmp.dart';
 import 'model/hse_patrol_team_model.dart';
 import 'model/machine_model.dart';
@@ -249,7 +251,7 @@ class _CameraScreenState extends State<CameraScreen> {
     return group == null ? '' : group.replaceAll(' ', '').trim();
   }
 
-  Future<void> _sendReport() async {
+  Future<void> _sendReport1() async {
     final isPatrol = widget.patrolGroup == PatrolGroup.Patrol;
 
     final images = _cameraKey.currentState?.images ?? [];
@@ -350,7 +352,7 @@ class _CameraScreenState extends State<CameraScreen> {
         'images': imageFiles,
       });
 
-      dio.options.headers['ngrok-skip-browser-warning'] = 'true';
+      // dio.options.headers['ngrok-skip-browser-warning'] = 'true';
 
       final response = await dio.post(
         "${ApiConfig.baseUrl}/api/report",
@@ -385,6 +387,176 @@ class _CameraScreenState extends State<CameraScreen> {
       CommonUI.showSnackBar(
         context: context,
         message: 'Error: $e',
+        color: Colors.red,
+      );
+    }
+  }
+
+  Future<void> _sendReport() async {
+    final isPatrol = widget.patrolGroup == PatrolGroup.Patrol;
+    final isQA = widget.patrolGroup == PatrolGroup.QualityPatrol;
+
+    final images = _cameraKey.currentState?.images ?? [];
+    final hasQr = _qrKey.trim().isNotEmpty;
+
+    ////////////////////////////////////////////////////////////
+    /// VALIDATE
+    ////////////////////////////////////////////////////////////
+    if (_qrKey.trim().isEmpty && isPatrol) {
+      CommonUI.showWarning(
+        context: context,
+        icon: Icons.qr_code_rounded,
+        title: "QR Required",
+        message: "Please scan QR code before sending report.",
+      );
+      return;
+    }
+
+    if (_selectedMachine == null && isPatrol) {
+      CommonUI.showWarning(
+        context: context,
+        title: "Information Required",
+        message: "Please select all required information.",
+      );
+      return;
+    }
+
+    if (_comment.trim().isEmpty) {
+      CommonUI.showWarning(
+        context: context,
+        title: "Comment Required",
+        message: "Please enter a comment.",
+      );
+      return;
+    }
+
+    ////////////////////////////////////////////////////////////
+    /// LOADING
+    ////////////////////////////////////////////////////////////
+    LoadingDialog.show(context);
+
+    try {
+      ////////////////////////////////////////////////////////////
+      /// IMAGE
+      ////////////////////////////////////////////////////////////
+      final imageFiles = <MultipartFile>[];
+
+      for (int i = 0; i < images.length; i++) {
+        imageFiles.add(
+          MultipartFile.fromBytes(
+            images[i],
+            filename: 'photo_${i + 1}.jpg',
+            contentType: http.MediaType('image', 'jpeg'),
+          ),
+        );
+      }
+
+      ////////////////////////////////////////////////////////////
+      /// REPORT BASE
+      ////////////////////////////////////////////////////////////
+      final reportMap = <String, dynamic>{
+        'userCreate': '${widget.accountCode}_$_employeeName',
+        'qr_key': _qrKey ?? '',
+        'qr_scan_sts': hasQr ? 'SUCCESS_1st' : '',
+        'plant': _selectedPlant ?? '',
+        'type': widget.patrolGroup.name,
+        'division': _selectedFac ?? '',
+        'area': _selectedArea ?? '',
+        'group': _selectedGroup ?? '',
+        'machine': _selectedMachine ?? '',
+        'comment': _comment,
+        'countermeasure': _counterMeasure,
+        'check': _needRecheck
+            ? (_selectedArea != null
+                  ? ''.combinedViJa(context, 'needRecheck')
+                  : ''.combinedViJa(context, 'needSelectArea'))
+            : '',
+      };
+
+      ////////////////////////////////////////////////////////////
+      /// REPORT TYPE
+      ////////////////////////////////////////////////////////////
+      if (!isQA) {
+        reportMap.addAll({
+          'riskFreq': ''.combinedViJa(context, _freq ?? ''),
+          'riskProb': ''.combinedViJa(context, _prob ?? ''),
+          'riskSev': ''.combinedViJa(context, _sev ?? ''),
+          'riskTotal': getScoreSymbol(),
+        });
+      } else {
+        reportMap.addAll({
+          'riskFreq': ''.combinedViJa(context, _qaFreq ?? ''),
+          'riskProb': ''.combinedViJa(context, _qa5m ?? ''),
+          'riskSev': ''.combinedViJa(context, _qaImpact ?? ''),
+        });
+      }
+
+      ////////////////////////////////////////////////////////////
+      /// FORM DATA
+      ////////////////////////////////////////////////////////////
+      final formData = FormData.fromMap({
+        'report': jsonEncode(reportMap),
+        'images': imageFiles,
+      });
+
+      ////////////////////////////////////////////////////////////
+      /// CALL API
+      ////////////////////////////////////////////////////////////
+      final response = await dio.post(
+        "${ApiConfig.baseUrl}/api/report",
+        data: formData,
+        options: Options(
+          sendTimeout: const Duration(seconds: 120),
+          receiveTimeout: const Duration(seconds: 120),
+        ),
+      );
+
+      ////////////////////////////////////////////////////////////
+      /// SUCCESS
+      ////////////////////////////////////////////////////////////
+      LoadingDialog.hide(context);
+
+      if (response.statusCode != null &&
+          response.statusCode! >= 200 &&
+          response.statusCode! < 300) {
+        CommonUI.showSnackBar(
+          context: context,
+          message: 'Successfully sent ${images.length} images!',
+          color: Colors.green,
+        );
+
+        _resetForm();
+      } else {
+        CommonUI.showSnackBar(
+          context: context,
+          message: AppMessage.serverError,
+          color: Colors.red,
+        );
+      }
+    }
+    ////////////////////////////////////////////////////////////
+    /// DIO ERROR (CHUẨN HỆ THỐNG)
+    ////////////////////////////////////////////////////////////
+    on DioException catch (e) {
+      LoadingDialog.hide(context);
+
+      final result = AuthApi.handleDioError(e);
+
+      CommonUI.showSnackBar(
+        context: context,
+        message: result.message,
+        color: Colors.red,
+      );
+    }
+    ////////////////////////////////////////////////////////////
+    /// UNKNOWN ERROR
+    ////////////////////////////////////////////////////////////
+    catch (e) {
+      LoadingDialog.hide(context);
+
+      CommonUI.showSnackBar(
+        context: context,
+        message: AppMessage.unknownError,
         color: Colors.red,
       );
     }
