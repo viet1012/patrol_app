@@ -69,7 +69,7 @@ class _EditReportDialogState extends State<EditReportDialog> {
   String? _oldPIC;
 
   // ✅ AT Status dropdown
-  static const List<String> atStatusOptions = ['Wait', 'Done', 'Completed'];
+  static const List<String> atStatusOptions = ['Doing', 'Pro_Done', 'Closed'];
   String? _selectedAtStatus;
   String? _oldAtStatus;
 

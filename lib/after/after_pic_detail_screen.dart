@@ -153,10 +153,15 @@ class _AfterPicDetailScreenState extends State<AfterPicDetailScreen> {
     switch (status) {
       case 'Redo':
         return Icons.restart_alt_rounded;
+
       case 'Wait':
+      case 'Doing':
         return Icons.edit_note_rounded;
+
       case 'Done':
+      case 'Pro_Done':
         return Icons.check_circle_rounded;
+
       default:
         return Icons.help_outline_rounded;
     }
@@ -166,10 +171,15 @@ class _AfterPicDetailScreenState extends State<AfterPicDetailScreen> {
     switch (status) {
       case 'Redo':
         return Colors.orangeAccent;
+
       case 'Wait':
+      case 'Doing':
         return Colors.blueAccent;
+
       case 'Done':
+      case 'Pro_Done':
         return Colors.greenAccent;
+
       default:
         return Colors.white70;
     }

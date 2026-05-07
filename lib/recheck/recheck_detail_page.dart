@@ -971,7 +971,7 @@ class _RecheckDetailPageState extends State<RecheckDetailPage> {
   }) async {
     final dio = DioClient.dio;
 
-    final String atStatus = hseJudge == 'OK' ? 'Completed' : 'Redo';
+    final String atStatus = hseJudge == 'OK' ? 'Closed' : 'Redo';
 
     final dataJson = {
       "hseUser": hseUser,

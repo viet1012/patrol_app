@@ -1,20 +1,11 @@
-import 'package:auto_size_text/auto_size_text.dart';
-import 'package:dropdown_search/dropdown_search.dart';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
+
 import '../api/patrol_pivot_api.dart';
-import '../api/patrol_report_api.dart';
-import '../common/common_ui_helper.dart';
-import '../common/due_date_utils.dart';
 import '../homeScreen/patrol_home_screen.dart';
 import '../model/machine_model.dart';
-import '../model/patrol_report_model.dart';
 import '../model/pivot_response.dart';
-import '../redo/redo_detail_page.dart';
-import '../translator.dart';
 import '../widget/error_display.dart';
 import '../widget/glass_action_button.dart';
-import 'after_detail_page.dart';
 import 'after_pic_detail_screen.dart';
 
 class AfterDetailScreen extends StatefulWidget {
@@ -42,7 +33,7 @@ class _AfterDetailScreenState extends State<AfterDetailScreen> {
 
   // filter input
   String? _selectedPlant;
-  String _atStatus = 'Wait'; // 'Wait,Redo'
+  String _atStatus = 'Doing'; // 'Wait,Redo'
 
   @override
   void initState() {
@@ -55,7 +46,7 @@ class _AfterDetailScreenState extends State<AfterDetailScreen> {
   }
 
   List<String> _mapStatusesForApi(String uiStatus) {
-    if (uiStatus == 'Wait') return ['Wait', 'Redo']; // ✅ Wait bao gồm Redo
+    if (uiStatus == 'Doing') return ['Doing', 'Redo']; // ✅ Wait bao gồm Redo
     return [uiStatus]; // Done -> Done
   }
 
@@ -144,7 +135,7 @@ class _AfterDetailScreenState extends State<AfterDetailScreen> {
                 ),
                 style: const TextStyle(color: Colors.white),
                 items: const [
-                  DropdownMenuItem(value: 'Wait', child: Text('Wait')),
+                  DropdownMenuItem(value: 'Doing', child: Text('Doing')),
                   DropdownMenuItem(value: 'Redo', child: Text('Redo')),
                   // DropdownMenuItem(value: 'Done', child: Text('Done')),
                 ],
@@ -287,7 +278,8 @@ class _AfterDetailScreenState extends State<AfterDetailScreen> {
           child: DataTable(
             // ✅ KÉO GẦN LẠI
             columnSpacing: 8,
-            horizontalMargin: 6, //
+            horizontalMargin: 6,
+            //
             checkboxHorizontalMargin: 6,
             headingRowHeight: 42,
             dataRowHeight: 40,
@@ -397,8 +389,8 @@ class _AfterDetailScreenState extends State<AfterDetailScreen> {
                 ? null
                 : () async {
                     // ✅ nếu đang chọn Wait thì detail lấy cả Wait + Redo
-                    final detailStatus = (_atStatus == 'Wait')
-                        ? 'Wait,Redo'
+                    final detailStatus = (_atStatus == 'Doing')
+                        ? 'Doing,Redo'
                         : _atStatus;
 
                     final result = await Navigator.push(
@@ -407,7 +399,8 @@ class _AfterDetailScreenState extends State<AfterDetailScreen> {
                         builder: (_) => AfterPicDetailScreen(
                           accountCode: widget.accountCode,
                           plant: _selectedPlant!,
-                          atStatus: detailStatus, // ✅ truyền Wait,Redo
+                          atStatus: detailStatus,
+                          // ✅ truyền Wait,Redo
                           pic: r.pic,
                           patrolGroup: widget.patrolGroup,
                         ),

@@ -1,17 +1,9 @@
-import 'package:auto_size_text/auto_size_text.dart';
-import 'package:dropdown_search/dropdown_search.dart';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
-import '../after/after_pic_detail_screen.dart';
+
 import '../api/patrol_pivot_api.dart';
-import '../api/patrol_report_api.dart';
-import '../common/common_ui_helper.dart';
-import '../common/due_date_utils.dart';
 import '../homeScreen/patrol_home_screen.dart';
 import '../model/machine_model.dart';
-import '../model/patrol_report_model.dart';
 import '../model/pivot_response.dart';
-import '../translator.dart';
 import '../widget/error_display.dart';
 import '../widget/glass_action_button.dart';
 import 'recheck_pic_detail_screen.dart';
@@ -41,7 +33,7 @@ class _RecheckDetailScreenState extends State<RecheckDetailScreen> {
 
   // filter input
   String? _selectedPlant;
-  String _atStatus = 'Done'; // hoặc 'Wait,Redo'
+  String _atStatus = 'Pro_Done'; // hoặc 'Wait,Redo'
 
   @override
   void initState() {
@@ -53,9 +45,25 @@ class _RecheckDetailScreenState extends State<RecheckDetailScreen> {
     }
   }
 
+  // List<String> _mapStatusesForApi(String uiStatus) {
+  //   if (uiStatus == 'Wait') return ['Wait', 'Redo']; // ✅ Wait bao gồm Redo
+  //   return [uiStatus]; // Done -> Done
+  // }
+  // Cập nhật hàm map
   List<String> _mapStatusesForApi(String uiStatus) {
-    if (uiStatus == 'Wait') return ['Wait', 'Redo']; // ✅ Wait bao gồm Redo
-    return [uiStatus]; // Done -> Done
+    switch (uiStatus) {
+      case 'Wait':
+        return ['Wait', 'Redo'];
+
+      case 'Pro_Done': // ← UI hiển thị
+        return ['Done', 'Pro_Done']; // ← Gọi API lấy cả 2
+
+      case 'Done':
+        return ['Done'];
+
+      default:
+        return [uiStatus];
+    }
   }
 
   void _loadPivot() {
@@ -286,7 +294,8 @@ class _RecheckDetailScreenState extends State<RecheckDetailScreen> {
           child: DataTable(
             // ✅ KÉO GẦN LẠI
             columnSpacing: 8,
-            horizontalMargin: 6, //
+            horizontalMargin: 6,
+            //
             checkboxHorizontalMargin: 6,
             headingRowHeight: 42,
             dataRowHeight: 40,
