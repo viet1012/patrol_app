@@ -99,13 +99,13 @@ class CommonUI {
 
   static Color statusColor(String status) {
     switch (status) {
-      case 'Wait':
-        return Colors.grey;
+      case 'Doing':
+        return Colors.orange;
       case 'Redo':
         return Colors.red;
-      case 'Done':
+      case 'Pro_Done':
         return Colors.blue;
-      case 'Completed':
+      case 'Closed':
         return Colors.green;
       default:
         return Colors.grey;

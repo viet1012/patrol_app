@@ -2970,7 +2970,7 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
 
   Widget _statusBadgeCell(String? statusValue, double width) {
     final status = (statusValue == null || statusValue.isEmpty)
-        ? 'Wait'
+        ? 'Doing'
         : statusValue;
     final color = CommonUI.statusColor(status);
 
