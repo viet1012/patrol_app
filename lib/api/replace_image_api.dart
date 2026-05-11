@@ -160,6 +160,7 @@ Future<void> updateReportApi({
   String? atComment,
   String? atStatus,
   String? atUser,
+  String? atAssign,
 }) async {
   final path = '/api/patrol_report/$id/edit';
 
@@ -186,6 +187,7 @@ Future<void> updateReportApi({
     if (atComment != null) 'atComment': atComment,
     if (atStatus != null) 'atStatus': atStatus,
     if (atUser != null) 'atUser': atUser,
+    if (atAssign != null) 'atAssign': atAssign,
   };
 
   final formData = FormData.fromMap({

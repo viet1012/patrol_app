@@ -56,6 +56,9 @@ class _AfterPatrolState extends State<AfterPatrol> {
   Timer? _debounce;
 
   // ✅ PIC dropdown
+  String? _currentPIC; // readonly
+  String? _selectedAssignPIC; // dropdown
+
   static const String emptyLabel = 'UNKNOWN';
   Future<List<String>>? _futurePics;
   String? _selectedPIC; // UI selected
@@ -100,12 +103,35 @@ class _AfterPatrolState extends State<AfterPatrol> {
           : list.first;
 
       final rawPic = picked.pic?.trim();
-      final selected = (rawPic == null || rawPic.isEmpty) ? emptyLabel : rawPic;
+      final assignUser = picked.atAssign?.trim();
+
+      ////////////////////////////////////////////////////////////
+      /// CURRENT PIC
+      ////////////////////////////////////////////////////////////
+      final currentPic = (rawPic == null || rawPic.isEmpty)
+          ? emptyLabel
+          : rawPic;
+
+      ////////////////////////////////////////////////////////////
+      /// ASSIGN PIC
+      ////////////////////////////////////////////////////////////
+      final assignPic = (assignUser == null || assignUser.isEmpty)
+          ? currentPic
+          : assignUser;
+
       setState(() {
         _report = picked;
-        _selectedPIC = selected;
-        _oldPIC = selected;
+
+        _currentPIC = currentPic;
+
+        _selectedPIC = currentPic;
+
+        _selectedAssignPIC = assignPic;
+
+        _oldPIC = currentPic;
+
         _futurePics = findPicsByPlantFromApi(picked.plant);
+
         _loading = false;
         _enableCamera = true;
       });
@@ -432,21 +458,48 @@ class _AfterPatrolState extends State<AfterPatrol> {
               const SizedBox(height: 12),
               Align(
                 alignment: Alignment.centerLeft,
-                child: SizedBox(
-                  width: 160,
-                  child: Row(
-                    children: [
-                      Text(
+                child: Row(
+                  children: [
+                    ////////////////////////////////////////////////////////////
+                    /// PIC LABEL
+                    ////////////////////////////////////////////////////////////
+                    const SizedBox(
+                      width: 30,
+                      child: Text(
                         'PIC',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontWeight: FontWeight.w600,
                           color: Colors.white,
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      Expanded(child: _buildPicDropdown()),
-                    ],
-                  ),
+                    ),
+
+                    const SizedBox(width: 8),
+
+                    ////////////////////////////////////////////////////////////
+                    /// CURRENT PIC VALUE
+                    ////////////////////////////////////////////////////////////
+                    Flexible(flex: 2, child: _buildPicDropdown()),
+                    const SizedBox(width: 8),
+
+                    ////////////////////////////////////////////////////////////
+                    /// ASSIGN LABEL
+                    ////////////////////////////////////////////////////////////
+                    const Text(
+                      'Assign To',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                    ),
+
+                    const SizedBox(width: 8),
+
+                    ////////////////////////////////////////////////////////////
+                    /// DROPDOWN
+                    ////////////////////////////////////////////////////////////
+                    Flexible(flex: 2, child: _buildAssignDropdown()),
+                  ],
                 ),
               ),
               const SizedBox(height: 12),
@@ -756,6 +809,99 @@ class _AfterPatrolState extends State<AfterPatrol> {
     );
   }
 
+  Widget _buildAssignDropdown() {
+    return FutureBuilder<List<String>>(
+      future: _futurePics,
+      builder: (context, snapshot) {
+        ////////////////////////////////////////////////////////////
+        /// LOADING
+        ////////////////////////////////////////////////////////////
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const SizedBox(
+            height: 48,
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        ////////////////////////////////////////////////////////////
+        /// ERROR
+        ////////////////////////////////////////////////////////////
+        if (snapshot.hasError) {
+          return const Text(
+            'Load PIC failed',
+            style: TextStyle(color: Colors.redAccent),
+          );
+        }
+
+        ////////////////////////////////////////////////////////////
+        /// DATA
+        ////////////////////////////////////////////////////////////
+        final picList = snapshot.data ?? const <String>[];
+
+        final items = <String>{emptyLabel, ...picList}.toList();
+
+        return CommonSearchableDropdown(
+          label: "Assign PIC",
+          selectedValue: _selectedAssignPIC,
+          items: items,
+          isRequired: true,
+
+          ////////////////////////////////////////////////////////////
+          /// CHANGE
+          ////////////////////////////////////////////////////////////
+          onChanged: (v) async {
+            if (v == null || v == _selectedAssignPIC) {
+              return;
+            }
+
+            final prev = _selectedAssignPIC;
+
+            ////////////////////////////////////////////////////////////
+            /// UPDATE UI FIRST
+            ////////////////////////////////////////////////////////////
+            setState(() {
+              _selectedAssignPIC = v;
+            });
+
+            ////////////////////////////////////////////////////////////
+            /// CONFIRM
+            ////////////////////////////////////////////////////////////
+            final ok = await CommonUI.showGlassConfirm(
+              context: context,
+              icon: Icons.assignment_ind_rounded,
+              iconColor: Colors.orangeAccent,
+              title: "Confirm assignment",
+              message: 'Assign report to "$v" ?',
+              cancelText: "Cancel",
+              confirmText: "Assign",
+              confirmColor: const Color(0xFF22C55E),
+            );
+
+            ////////////////////////////////////////////////////////////
+            /// CANCEL
+            ////////////////////////////////////////////////////////////
+            if (!ok) {
+              setState(() {
+                _selectedAssignPIC = prev;
+              });
+              return;
+            }
+
+            ////////////////////////////////////////////////////////////
+            /// SAVE
+            ////////////////////////////////////////////////////////////
+            await _onSaveAssign();
+
+            ////////////////////////////////////////////////////////////
+            /// COMMIT
+            ////////////////////////////////////////////////////////////
+            _oldPIC = _selectedAssignPIC;
+          },
+        );
+      },
+    );
+  }
+
   Widget _buildPicDropdown() {
     return FutureBuilder<List<String>>(
       future: _futurePics,
@@ -807,7 +953,7 @@ class _AfterPatrolState extends State<AfterPatrol> {
             }
 
             // ✅ user confirm -> gọi save
-            await _onSave();
+            await _onSavePic();
 
             // nếu save OK thì commit old
             _oldPIC = _selectedPIC;
@@ -823,7 +969,7 @@ class _AfterPatrolState extends State<AfterPatrol> {
         id: _report!.id!,
         atComment: _commentAfStatusCtrl.text.trim(),
         atUser: '${_msnvCtrl.text.trim()}_$_employeeName',
-        atStatus: 'Wait',
+        atStatus: 'Doing',
       );
 
       if (!mounted) return;
@@ -1051,44 +1197,58 @@ class _AfterPatrolState extends State<AfterPatrol> {
     );
   }
 
-  Future<void> _onSave() async {
+  Future<void> _onSavePic() async {
     try {
-      final picToApi = _selectedPIC; // gửi luôn kể cả UNKNOWN
       final name = await fetchEmployeeName(widget.accountCode);
 
       await updateReportApi(
         id: _report!.id!,
-        pic: picToApi,
+        pic: _selectedPIC,
         editUser: "${widget.accountCode}_$name",
       );
+
       if (!mounted) return;
 
-      CommonUI.showGlassDialog(
+      CommonUI.showSnackBar(
         context: context,
-        icon: Icons.check_circle_rounded,
-        iconColor: Colors.greenAccent,
-        title: 'Update Successful',
-        message: 'The report has been updated successfully.',
-        buttonText: 'OK',
+        message: "PIC updated successfully",
+        color: Colors.green,
       );
-
-      await Future.delayed(const Duration(milliseconds: 500));
+    } catch (e) {
       if (!mounted) return;
-      Navigator.pop(context, true);
-    } catch (e, s) {
-      debugPrint('❌ UPDATE FAILED: $e');
-      debugPrintStack(stackTrace: s);
-
-      if (!mounted) return;
-
-      // ❌ nếu fail thì revert về old cho chắc
-      setState(() => _selectedPIC = _oldPIC);
 
       CommonUI.showWarning(
         context: context,
         title: 'Update Failed',
-        message:
-            'Unable to update the report.\nPlease check your connection or try again.',
+        message: 'Unable to update PIC.',
+      );
+    }
+  }
+
+  Future<void> _onSaveAssign() async {
+    try {
+      final name = await fetchEmployeeName(widget.accountCode);
+
+      await updateReportApi(
+        id: _report!.id!,
+        atAssign: _selectedAssignPIC,
+        editUser: "${widget.accountCode}_$name",
+      );
+
+      if (!mounted) return;
+
+      CommonUI.showSnackBar(
+        context: context,
+        message: "Assignment updated successfully",
+        color: Colors.green,
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      CommonUI.showWarning(
+        context: context,
+        title: 'Update Failed',
+        message: 'Unable to update assignment.',
       );
     }
   }

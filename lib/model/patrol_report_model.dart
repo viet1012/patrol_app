@@ -20,12 +20,14 @@ class PatrolReportModel {
   final DateTime? dueDate;
   final List<String> imageNames;
   final String? patrol_user;
+
   // PATROL_AFTER fields
   final List<String> atImageNames;
   final String? atComment;
   final DateTime? atDate;
   final String? atPic;
   final String? atStatus;
+  final String? atAssign;
 
   // HSE_CHECK fields
   final String? hseJudge;
@@ -67,6 +69,7 @@ class PatrolReportModel {
     this.hseComment,
     this.hseDate,
     this.loadStatus,
+    this.atAssign,
   });
 
   factory PatrolReportModel.fromJson(Map<String, dynamic> json) {
@@ -112,6 +115,7 @@ class PatrolReportModel {
       atDate: parseDate(json['at_date']),
       atPic: json['at_pic'],
       atStatus: json['at_status'],
+      atAssign: json['at_assign'],
       hseJudge: json['hse_judge'],
       hseImageNames: parseImageList(json['hse_imageNames']),
       hseComment: json['hse_comment'],
