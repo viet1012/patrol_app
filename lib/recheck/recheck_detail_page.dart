@@ -56,6 +56,7 @@ class _RecheckDetailPageState extends State<RecheckDetailPage> {
   String? _selectedPIC; // UI selected
   String? _oldPIC;
   String? _hseJudge; // "OK" | "NG"
+  String? _selectedAssignPIC; // dropdown
 
   @override
   void initState() {
@@ -69,6 +70,11 @@ class _RecheckDetailPageState extends State<RecheckDetailPage> {
     final rawPic = widget.report.pic?.trim();
     _selectedPIC = (rawPic == null || rawPic.isEmpty) ? emptyLabel : rawPic;
     _oldPIC = _selectedPIC;
+
+    final assignUser = widget.report.atAssign?.trim();
+    _selectedAssignPIC = (assignUser == null || assignUser.isEmpty)
+        ? emptyLabel
+        : assignUser;
 
     // ✅ cache list PIC theo plant
     _futurePics = findPicsByPlantFromApi(widget.report.plant);
@@ -308,27 +314,71 @@ class _RecheckDetailPageState extends State<RecheckDetailPage> {
                 ),
               ),
               const SizedBox(height: 12),
+              // Align(
+              //   alignment: Alignment.centerLeft,
+              //   child: SizedBox(
+              //     width: 160,
+              //     child: Row(
+              //       children: [
+              //         Text(
+              //           'PIC',
+              //           style: const TextStyle(
+              //             fontWeight: FontWeight.w600,
+              //             color: Colors.white,
+              //           ),
+              //         ),
+              //         const SizedBox(width: 8),
+              //         Expanded(child: _buildPicDropdown()),
+              //       ],
+              //     ),
+              //   ),
+              // ),
               Align(
                 alignment: Alignment.centerLeft,
-
-                child: SizedBox(
-                  width: 160,
-                  child: Row(
-                    children: [
-                      Text(
+                child: Row(
+                  children: [
+                    ////////////////////////////////////////////////////////////
+                    /// PIC LABEL
+                    ////////////////////////////////////////////////////////////
+                    const SizedBox(
+                      width: 30,
+                      child: Text(
                         'PIC',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontWeight: FontWeight.w600,
                           color: Colors.white,
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      Expanded(child: _buildPicDropdown()),
-                    ],
-                  ),
+                    ),
+
+                    const SizedBox(width: 8),
+
+                    ////////////////////////////////////////////////////////////
+                    /// CURRENT PIC VALUE
+                    ////////////////////////////////////////////////////////////
+                    Flexible(flex: 2, child: _buildPicDropdown()),
+                    const SizedBox(width: 8),
+
+                    ////////////////////////////////////////////////////////////
+                    /// ASSIGN LABEL
+                    ////////////////////////////////////////////////////////////
+                    const Text(
+                      'Assign To',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                    ),
+
+                    const SizedBox(width: 8),
+
+                    ////////////////////////////////////////////////////////////
+                    /// DROPDOWN
+                    ////////////////////////////////////////////////////////////
+                    Flexible(flex: 2, child: _buildAssignDropdown()),
+                  ],
                 ),
               ),
-
               const SizedBox(height: 12),
               Column(
                 children: [
@@ -676,6 +726,64 @@ class _RecheckDetailPageState extends State<RecheckDetailPage> {
     );
   }
 
+  Widget _buildAssignDropdown() {
+    return FutureBuilder<List<String>>(
+      future: _futurePics,
+
+      builder: (context, snapshot) {
+        ////////////////////////////////////////////////////////////
+        /// LOADING
+        ////////////////////////////////////////////////////////////
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const SizedBox(
+            height: 48,
+
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        ////////////////////////////////////////////////////////////
+        /// ERROR
+        ////////////////////////////////////////////////////////////
+        if (snapshot.hasError) {
+          return const Text(
+            'Load PIC failed',
+
+            style: TextStyle(color: Colors.redAccent),
+          );
+        }
+
+        ////////////////////////////////////////////////////////////
+        /// DATA
+        ////////////////////////////////////////////////////////////
+        final picList = snapshot.data ?? const <String>[];
+
+        final items = <String>{emptyLabel, ...picList}.toList();
+
+        ////////////////////////////////////////////////////////////
+        /// READ ONLY
+        ////////////////////////////////////////////////////////////
+        return IgnorePointer(
+          ignoring: true,
+
+          child: Opacity(
+            opacity: 0.75,
+
+            child: CommonSearchableDropdown(
+              label: "Assign PIC",
+              selectedValue: _selectedAssignPIC,
+              items: items,
+              isRequired: true,
+              allowAddNew: false,
+              showSearchBox: false,
+              onChanged: (_) {},
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildPicDropdown() {
     return FutureBuilder<List<String>>(
       future: _futurePics,
@@ -696,42 +804,50 @@ class _RecheckDetailPageState extends State<RecheckDetailPage> {
 
         final picList = snapshot.data ?? const <String>[];
 
-        return CommonSearchableDropdown(
-          label: "PIC",
-          selectedValue: _selectedPIC,
-          items: picList,
-          isRequired: true,
-          onChanged: (v) async {
-            if (v == null || v == _selectedPIC) return;
+        return IgnorePointer(
+          ignoring: true,
 
-            final prev = _selectedPIC;
+          child: Opacity(
+            opacity: 0.75,
 
-            // cập nhật UI trước để user thấy họ vừa chọn gì
-            setState(() => _selectedPIC = v);
+            child: CommonSearchableDropdown(
+              label: "PIC",
+              selectedValue: _selectedPIC,
+              items: picList,
+              isRequired: true,
+              onChanged: (v) async {
+                if (v == null || v == _selectedPIC) return;
 
-            final ok = await CommonUI.showGlassConfirm(
-              context: context,
-              icon: Icons.help_outline_rounded,
-              iconColor: Colors.orangeAccent,
-              title: "Confirm update",
-              message: 'Update PIC to "$v" ?',
-              cancelText: "Cancel",
-              confirmText: "Update",
-              confirmColor: const Color(0xFF22C55E),
-            );
+                final prev = _selectedPIC;
 
-            if (!ok) {
-              // ❌ user cancel -> revert lại giá trị cũ
-              setState(() => _selectedPIC = prev);
-              return;
-            }
+                // cập nhật UI trước để user thấy họ vừa chọn gì
+                setState(() => _selectedPIC = v);
 
-            // ✅ user confirm -> gọi save
-            await _onSave();
+                final ok = await CommonUI.showGlassConfirm(
+                  context: context,
+                  icon: Icons.help_outline_rounded,
+                  iconColor: Colors.orangeAccent,
+                  title: "Confirm update",
+                  message: 'Update PIC to "$v" ?',
+                  cancelText: "Cancel",
+                  confirmText: "Update",
+                  confirmColor: const Color(0xFF22C55E),
+                );
 
-            // nếu save OK thì commit old
-            _oldPIC = _selectedPIC;
-          },
+                if (!ok) {
+                  // ❌ user cancel -> revert lại giá trị cũ
+                  setState(() => _selectedPIC = prev);
+                  return;
+                }
+
+                // ✅ user confirm -> gọi save
+                await _onSave();
+
+                // nếu save OK thì commit old
+                _oldPIC = _selectedPIC;
+              },
+            ),
+          ),
         );
       },
     );

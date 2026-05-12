@@ -76,6 +76,19 @@ class _AfterPatrolState extends State<AfterPatrol> {
     return widget.id?.toString() ?? 'NO_ID';
   }
 
+  ////////////////////////////////////////////////////////////
+  /// ONLY CURRENT PIC CAN ASSIGN
+  ////////////////////////////////////////////////////////////
+  bool get canAssign {
+    final loginUser = '${widget.accountCode}_${_employeeName ?? ''}'
+        .trim()
+        .toLowerCase();
+
+    final currentPic = (_currentPIC ?? '').trim().toLowerCase();
+
+    return loginUser == currentPic;
+  }
+
   Future<void> _loadReport() async {
     setState(() {
       _loading = true;
@@ -116,7 +129,7 @@ class _AfterPatrolState extends State<AfterPatrol> {
       /// ASSIGN PIC
       ////////////////////////////////////////////////////////////
       final assignPic = (assignUser == null || assignUser.isEmpty)
-          ? currentPic
+          ? emptyLabel
           : assignUser;
 
       setState(() {
@@ -839,13 +852,12 @@ class _AfterPatrolState extends State<AfterPatrol> {
         final picList = snapshot.data ?? const <String>[];
 
         final items = <String>{emptyLabel, ...picList}.toList();
-
         return CommonSearchableDropdown(
           label: "Assign PIC",
           selectedValue: _selectedAssignPIC,
           items: items,
           isRequired: true,
-
+          allowAddNew: false,
           ////////////////////////////////////////////////////////////
           /// CHANGE
           ////////////////////////////////////////////////////////////
