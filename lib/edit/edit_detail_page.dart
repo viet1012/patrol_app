@@ -662,6 +662,8 @@ class _EditDetailPageState extends State<EditDetailPage> {
   }
 
   void _openAddCameraFromParent(BuildContext context) {
+    const int maxImages = 3;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -678,7 +680,7 @@ class _EditDetailPageState extends State<EditDetailPage> {
                   size: 300,
                   plant: widget.report.plant,
                   type: "ADD",
-                  maxAllowImages: 2 - widget.report.imageNames.length,
+                  maxAllowImages: maxImages - widget.report.imageNames.length,
                   onImagesChanged: (imgs) {
                     setModal(() => captured = imgs);
                   },
