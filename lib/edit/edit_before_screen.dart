@@ -3,6 +3,7 @@ import 'package:chuphinh/edit/edit_detail_page.dart';
 import 'package:dropdown_search/dropdown_search.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+
 import '../api/patrol_report_api.dart';
 import '../common/common_ui_helper.dart';
 import '../homeScreen/patrol_home_screen.dart';
@@ -46,35 +47,6 @@ class _EditBeforeScreenState extends State<EditBeforeScreen> {
 
   Future<List<PatrolReportModel>>? _futureReport;
 
-  // int _riskToScore(String risk) {
-  //   switch (risk) {
-  //     case 'V':
-  //       return 5;
-  //     case 'IV':
-  //       return 4;
-  //     case 'III':
-  //       return 3;
-  //     case 'II':
-  //       return 2;
-  //     case 'I':
-  //       return 1;
-  //     default:
-  //       return 0;
-  //   }
-  // }
-
-  // Color _riskColor(String risk) {
-  //   switch (risk) {
-  //     case 'V':
-  //       return Colors.red;
-  //     case 'IV':
-  //       return Colors.redAccent;
-  //
-  //     default:
-  //       return Colors.grey;
-  //   }
-  // }
-
   void _loadReport() async {
     setState(() {
       _futureReport = null; // reset trước (optional)
@@ -85,7 +57,7 @@ class _EditBeforeScreenState extends State<EditBeforeScreen> {
         plant: widget.selectedPlant!,
         type: widget.patrolGroup.name,
         patrolUser: widget.accountCode,
-        afStatus: 'Wait,Redo',
+        afStatus: 'Doing,Redo',
       );
 
       setState(() {
@@ -116,7 +88,8 @@ class _EditBeforeScreenState extends State<EditBeforeScreen> {
       appBar: AppBar(
         backgroundColor: const Color(0xFF121826),
         centerTitle: false,
-        titleSpacing: 4, // 👈 kéo sát về leading
+        titleSpacing: 4,
+        // 👈 kéo sát về leading
         leading: GlassActionButton(
           icon: Icons.arrow_back_rounded,
           onTap: () => Navigator.pop(context),
@@ -169,7 +142,10 @@ class _EditBeforeScreenState extends State<EditBeforeScreen> {
       ),
 
       body: Container(
-        height: MediaQuery.of(context).size.height,
+        height: MediaQuery
+            .of(context)
+            .size
+            .height,
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             colors: [Color(0xFF121826), Color(0xFF1F2937), Color(0xFF374151)],
@@ -179,64 +155,70 @@ class _EditBeforeScreenState extends State<EditBeforeScreen> {
         ),
         child: SingleChildScrollView(
           child: SizedBox(
-            width: MediaQuery.of(context).size.width,
+            width: MediaQuery
+                .of(context)
+                .size
+                .width,
             child: _futureReport == null
                 ? ConstrainedBox(
-                    constraints: BoxConstraints(
-                      minHeight: MediaQuery.of(context).size.height,
-                    ),
-                    child: Center(
-                      child: Text(
-                        'Please select Group!',
-                        style: TextStyle(color: Colors.grey, fontSize: 25),
-                      ),
-                    ),
-                  )
+              constraints: BoxConstraints(
+                minHeight: MediaQuery
+                    .of(context)
+                    .size
+                    .height,
+              ),
+              child: Center(
+                child: Text(
+                  'Please select Group!',
+                  style: TextStyle(color: Colors.grey, fontSize: 25),
+                ),
+              ),
+            )
                 : FutureBuilder<List<PatrolReportModel>>(
-                    future: _futureReport,
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const Center(child: CircularProgressIndicator());
-                      }
-                      if (snapshot.hasError) {
-                        return ErrorDisplay(
-                          errorMessage: snapshot.error.toString(),
-                          onRetry: () {
-                            _loadReport();
-                          },
-                        );
-                      }
-
-                      /// ❗ API OK nhưng không có data
-                      if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                        return const Padding(
-                          padding: EdgeInsets.all(24),
-                          child: Text(
-                            textAlign: TextAlign.center,
-                            'No data available',
-                            style: TextStyle(color: Colors.grey, fontSize: 25),
-                          ),
-                        );
-                      }
-
-                      return LayoutBuilder(
-                        builder: (context, c) {
-                          return Column(
-                            children: [
-                              _buildFilterHeader(
-                                snapshot.data!
-                                    .map((e) => e.area)
-                                    .toSet()
-                                    .toList(),
-                              ),
-                              const SizedBox(height: 8),
-                              _buildReportTable(snapshot.data!, c.maxWidth),
-                            ],
-                          );
-                        },
-                      );
+              future: _futureReport,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (snapshot.hasError) {
+                  return ErrorDisplay(
+                    errorMessage: snapshot.error.toString(),
+                    onRetry: () {
+                      _loadReport();
                     },
-                  ),
+                  );
+                }
+
+                /// ❗ API OK nhưng không có data
+                if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                  return const Padding(
+                    padding: EdgeInsets.all(24),
+                    child: Text(
+                      textAlign: TextAlign.center,
+                      'No data available',
+                      style: TextStyle(color: Colors.grey, fontSize: 25),
+                    ),
+                  );
+                }
+
+                return LayoutBuilder(
+                  builder: (context, c) {
+                    return Column(
+                      children: [
+                        _buildFilterHeader(
+                          snapshot.data!
+                              .map((e) => e.area)
+                              .toSet()
+                              .toList(),
+                        ),
+                        const SizedBox(height: 8),
+                        _buildReportTable(snapshot.data!, c.maxWidth),
+                      ],
+                    );
+                  },
+                );
+              },
+            ),
           ),
         ),
       ),
@@ -292,41 +274,42 @@ class _EditBeforeScreenState extends State<EditBeforeScreen> {
 
   Widget _buildReportTable(List<PatrolReportModel> list, double maxWidth) {
     final filtered =
-        list.where((r) {
-          if (_filterArea != null && r.area != _filterArea) return false;
-          if (_filterRisk != null && r.riskTotal != _filterRisk) return false;
-          return true;
-        }).toList()..sort((a, b) {
-          // 1️⃣ So sánh risk trước
-          final riskCompare = CommonUI.riskToScore(
-            b.riskTotal,
-          ).compareTo(CommonUI.riskToScore(a.riskTotal));
-          if (riskCompare != 0) return riskCompare;
+    list.where((r) {
+      if (_filterArea != null && r.area != _filterArea) return false;
+      if (_filterRisk != null && r.riskTotal != _filterRisk) return false;
+      return true;
+    }).toList()
+      ..sort((a, b) {
+        // 1️⃣ So sánh risk trước
+        final riskCompare = CommonUI.riskToScore(
+          b.riskTotal,
+        ).compareTo(CommonUI.riskToScore(a.riskTotal));
+        if (riskCompare != 0) return riskCompare;
 
-          // 2️⃣ Cùng risk → so sánh dueDate
-          final now = DateTime.now();
+        // 2️⃣ Cùng risk → so sánh dueDate
+        final now = DateTime.now();
 
-          final aDue = a.dueDate;
-          final bDue = b.dueDate;
+        final aDue = a.dueDate;
+        final bDue = b.dueDate;
 
-          // null xuống cuối
-          if (aDue == null && bDue == null) return 0;
-          if (aDue == null) return 1;
-          if (bDue == null) return -1;
+        // null xuống cuối
+        if (aDue == null && bDue == null) return 0;
+        if (aDue == null) return 1;
+        if (bDue == null) return -1;
 
-          final aOverdue = aDue.isBefore(now);
-          final bOverdue = bDue.isBefore(now);
+        final aOverdue = aDue.isBefore(now);
+        final bOverdue = bDue.isBefore(now);
 
-          // Trễ hạn lên trước
-          if (aOverdue && !bOverdue) return -1;
-          if (!aOverdue && bOverdue) return 1;
+        // Trễ hạn lên trước
+        if (aOverdue && !bOverdue) return -1;
+        if (!aOverdue && bOverdue) return 1;
 
-          // Cùng trạng thái → cái nào gần hôm nay hơn thì lên
-          final aDiff = (aDue.difference(now)).abs();
-          final bDiff = (bDue.difference(now)).abs();
+        // Cùng trạng thái → cái nào gần hôm nay hơn thì lên
+        final aDiff = (aDue.difference(now)).abs();
+        final bDiff = (bDue.difference(now)).abs();
 
-          return aDiff.compareTo(bDiff);
-        });
+        return aDiff.compareTo(bDiff);
+      });
 
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
@@ -409,11 +392,12 @@ class _EditBeforeScreenState extends State<EditBeforeScreen> {
                           final result = await Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => EditDetailPage(
-                                machines: widget.machines,
-                                report: r,
-                                patrolGroup: widget.patrolGroup,
-                              ),
+                              builder: (_) =>
+                                  EditDetailPage(
+                                    machines: widget.machines,
+                                    report: r,
+                                    patrolGroup: widget.patrolGroup,
+                                  ),
                             ),
                           );
                           if (result == true) {
@@ -448,7 +432,9 @@ class _EditBeforeScreenState extends State<EditBeforeScreen> {
     final today = DateTime(now.year, now.month, now.day);
     final due = DateTime(dueDate.year, dueDate.month, dueDate.day);
 
-    final diffDays = due.difference(today).inDays;
+    final diffDays = due
+        .difference(today)
+        .inDays;
     if (diffDays < 0) {
       // Trễ
       return Colors.redAccent;
@@ -579,7 +565,7 @@ class _EditBeforeScreenState extends State<EditBeforeScreen> {
               return result;
             },
             compareFn: (item, selectedItem) =>
-                item.trim() == selectedItem.trim(),
+            item.trim() == selectedItem.trim(),
 
             selectedItem: selectedValue ?? '',
 

@@ -917,8 +917,13 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
             color: color,
             enabled: canTable,
             onTap: () {
+              // context.go(
+              //   '/home/summary?group=${group.name}&plant=$selectedFactory',
+              // );
               context.go(
                 '/home/summary?group=${group.name}&plant=$selectedFactory',
+
+                extra: {'accountCode': widget.accountCode, 'me': _authMe},
               );
             },
           ),

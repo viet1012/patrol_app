@@ -161,6 +161,7 @@ Future<void> updateReportApi({
   String? atStatus,
   String? atUser,
   String? atAssign,
+  String? needRecheck,
 }) async {
   final path = '/api/patrol_report/$id/edit';
 
@@ -188,6 +189,7 @@ Future<void> updateReportApi({
     if (atStatus != null) 'atStatus': atStatus,
     if (atUser != null) 'atUser': atUser,
     if (atAssign != null) 'atAssign': atAssign,
+    if (needRecheck != null) 'checkInfo': needRecheck,
   };
 
   final formData = FormData.fromMap({

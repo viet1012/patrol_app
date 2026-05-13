@@ -5,6 +5,7 @@ import '../after/after_patrol.dart';
 import '../common/common_ui_helper.dart';
 import '../homeScreen/patrol_home_screen.dart';
 import '../login/login_page.dart';
+import '../model/auth_me.dart';
 import '../session/session_store.dart';
 import '../table/patrol_report_table.dart';
 
@@ -16,20 +17,82 @@ final router = GoRouter(
       pageBuilder: (context, state) =>
           NoTransitionPage(key: state.pageKey, child: const LoginPage()),
     ),
+    // GoRoute(
+    //   path: '/home/summary',
+    //   builder: (context, state) {
+    //     final extra = state.extra;
+    //     final group = state.uri.queryParameters['group'] ?? '';
+    //     final plant = state.uri.queryParameters['plant'] ?? '';
+    //     String? accountCode;
+    //     AuthMe me;
+    //     if (extra is Map<String, dynamic>) {
+    //       accountCode = extra['accountCode']?.toString();
+    //
+    //       me = extra['me'] as AuthMe;
+    //     }
+    //
+    //     return PatrolReportTable(
+    //       patrolGroup: group,
+    //       plant: plant,
+    //       accountCode: accountCode ?? '',
+    //       auth: me,
+    //     );
+    //   },
+    // ),
     GoRoute(
       path: '/home/summary',
-      // path: '/',
+
       builder: (context, state) {
+        final extra = state.extra;
+
         final group = state.uri.queryParameters['group'] ?? '';
+
         final plant = state.uri.queryParameters['plant'] ?? '';
 
+        String? accountCode;
+
+        AuthMe? me;
+
+        ////////////////////////////////////////////////////////////
+        /// EXTRA
+        ////////////////////////////////////////////////////////////
+        if (extra is Map<String, dynamic>) {
+          accountCode = extra['accountCode']?.toString();
+
+          me = extra['me'] as AuthMe?;
+        }
+
+        ////////////////////////////////////////////////////////////
+        /// NO AUTH
+        ////////////////////////////////////////////////////////////
+        if (me == null) {
+          ////////////////////////////////////////////////////////////
+          /// AUTO BACK
+          ////////////////////////////////////////////////////////////
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/home');
+            }
+          });
+
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        ////////////////////////////////////////////////////////////
+        /// PAGE
+        ////////////////////////////////////////////////////////////
         return PatrolReportTable(
-          patrolGroup: group, // có thể null
+          patrolGroup: group,
           plant: plant,
+          accountCode: accountCode ?? '',
+          auth: me,
         );
       },
     ),
-
     GoRoute(
       path: '/home',
       builder: (context, state) {

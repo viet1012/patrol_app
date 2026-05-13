@@ -6,6 +6,7 @@ import '../api/replace_image_api.dart';
 import '../common/common_risk_dropdown.dart';
 import '../common/common_searchable_dropdown.dart';
 import '../common/common_ui_helper.dart';
+import '../model/auth_me.dart';
 import '../model/machine_model.dart';
 import '../model/patrol_report_model.dart';
 import '../model/reason_model.dart';
@@ -16,21 +17,24 @@ import '../widget/glass_action_button.dart';
 class EditReportDialog extends StatefulWidget {
   final PatrolReportModel report;
   final BuildContext parentContext;
+  final AuthMe me;
 
   const EditReportDialog({
     super.key,
     required this.report,
     required this.parentContext,
+    required this.me,
   });
 
-  static Future<PatrolReportModel?> show(
-    BuildContext context, {
+  static Future<PatrolReportModel?> show(BuildContext context, {
     required PatrolReportModel model,
+    required AuthMe me,
   }) {
     return showDialog<PatrolReportModel>(
       context: context,
       barrierDismissible: false,
-      builder: (_) => EditReportDialog(report: model, parentContext: context),
+      builder: (_) =>
+          EditReportDialog(report: model, parentContext: context, me: me),
     );
   }
 
@@ -78,6 +82,7 @@ class _EditReportDialogState extends State<EditReportDialog> {
     setState(() => _dirty = true);
   }
 
+
   @override
   void initState() {
     super.initState();
@@ -118,11 +123,9 @@ class _EditReportDialogState extends State<EditReportDialog> {
     _loadHseMaster();
   }
 
-  String? _ensureRiskKey(
-    String? raw,
-    List<RiskOption> options,
-    BuildContext ctx,
-  ) {
+  String? _ensureRiskKey(String? raw,
+      List<RiskOption> options,
+      BuildContext ctx,) {
     if (raw == null) return null;
 
     // Normalize: tách theo newline, trim, bỏ rỗng
@@ -348,24 +351,6 @@ class _EditReportDialogState extends State<EditReportDialog> {
       ),
       child: Column(
         children: [
-          // if (_loadingMaster)
-          //   const Padding(
-          //     padding: EdgeInsets.only(bottom: 10),
-          //     child: Row(
-          //       children: [
-          //         SizedBox(
-          //           width: 16,
-          //           height: 16,
-          //           child: CircularProgressIndicator(strokeWidth: 2),
-          //         ),
-          //         SizedBox(width: 8),
-          //         Text(
-          //           "Loading master data...",
-          //           style: TextStyle(color: Colors.white70, fontSize: 12),
-          //         ),
-          //       ],
-          //     ),
-          //   ),
           if (_masterError != null)
             Padding(
               padding: const EdgeInsets.only(bottom: 10),
@@ -580,8 +565,8 @@ class _EditReportDialogState extends State<EditReportDialog> {
                           _riskScoreSymbol.isEmpty ? "-" : _riskScoreSymbol,
                           style: TextStyle(
                             color:
-                                (_riskScoreSymbol == "V" ||
-                                    _riskScoreSymbol == "IV")
+                            (_riskScoreSymbol == "V" ||
+                                _riskScoreSymbol == "IV")
                                 ? Colors.redAccent
                                 : Colors.white,
                             fontWeight: FontWeight.w800,
@@ -685,6 +670,7 @@ class _EditReportDialogState extends State<EditReportDialog> {
       items: _picItems,
       isRequired: true,
       onChanged: (v) async {
+        debugPrint("DROPDOWN PIC = $v");
         if (v == null || v == _selectedPIC) return;
 
         final prev = _selectedPIC;
@@ -747,8 +733,6 @@ class _EditReportDialogState extends State<EditReportDialog> {
   }
 
   Future<void> _onSave() async {
-    if (!_canSave) return;
-
     try {
       final freqKey = _riskFreq ?? '';
       final probKey = _riskProb ?? '';
@@ -758,7 +742,7 @@ class _EditReportDialogState extends State<EditReportDialog> {
       final freqBi = ''.combinedViJa(context, freqKey);
       final probBi = ''.combinedViJa(context, probKey);
       final sevBi = ''.combinedViJa(context, sevKey);
-
+      debugPrint("SEND PIC TO API = $_selectedPIC");
       await updateReportApi(
         id: widget.report.id!,
         comment: _commentCtrl.text.trim(),
@@ -775,7 +759,6 @@ class _EditReportDialogState extends State<EditReportDialog> {
         atStatus: _selectedAtStatus,
         pic: _selectedPIC,
       );
-
       if (!mounted) return;
 
       // ? build updated model t? report cu + các field m?i
@@ -846,7 +829,7 @@ class _EditReportDialogState extends State<EditReportDialog> {
           context: widget.parentContext,
           title: 'Update Failed',
           message:
-              'Unable to update the report.\nPlease check your connection or try again.',
+          'Unable to update the report.\nPlease check your connection or try again.',
         );
       });
     }
@@ -861,20 +844,24 @@ class _EditReportDialogState extends State<EditReportDialog> {
     super.dispose();
   }
 
-  String get _riskScoreSymbol => RiskScoreCalculator.scoreSymbol(
-    freqKey: _riskFreq,
-    probKey: _riskProb,
-    sevKey: _riskSev,
-    frequencyOptions: frequencyOptions,
-    probabilityOptions: probabilityOptions,
-    severityOptions: severityOptions,
-  );
+  String get _riskScoreSymbol =>
+      RiskScoreCalculator.scoreSymbol(
+        freqKey: _riskFreq,
+        probKey: _riskProb,
+        sevKey: _riskSev,
+        frequencyOptions: frequencyOptions,
+        probabilityOptions: probabilityOptions,
+        severityOptions: severityOptions,
+      );
 
   // ? Dialog UI (thay Scaffold)
   @override
   Widget build(BuildContext context) {
     final maxW = 720.0;
-    final w = MediaQuery.of(context).size.width;
+    final w = MediaQuery
+        .of(context)
+        .size
+        .width;
     final dialogW = w < 520 ? w - 24 : (w < maxW ? w - 48 : maxW);
 
     return Dialog(
@@ -883,7 +870,10 @@ class _EditReportDialogState extends State<EditReportDialog> {
       child: ConstrainedBox(
         constraints: BoxConstraints(
           maxWidth: dialogW,
-          maxHeight: MediaQuery.of(context).size.height * 0.86,
+          maxHeight: MediaQuery
+              .of(context)
+              .size
+              .height * 0.86,
         ),
         child: Container(
           decoration: BoxDecoration(
@@ -948,7 +938,7 @@ class _EditReportDialogState extends State<EditReportDialog> {
                         child: GlassActionButton(
                           icon: Icons.save_rounded,
                           onTap:
-                              null, // hoặc () {} nếu widget bắt buộc non-null
+                          null, // hoặc () {} nếu widget bắt buộc non-null
                         ),
                       ),
                   ],

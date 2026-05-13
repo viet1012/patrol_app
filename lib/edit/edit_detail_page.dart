@@ -1,22 +1,21 @@
 import 'dart:async';
-
 import 'dart:typed_data';
 
-import 'package:auto_size_text/auto_size_text.dart';
-import 'package:dropdown_search/dropdown_search.dart';
 import 'package:flutter/material.dart';
+
 import '../api/replace_image_api.dart';
 import '../common/common_risk_dropdown.dart';
+import '../common/common_searchable_dropdown.dart';
 import '../common/common_ui_helper.dart';
+import '../homeScreen/patrol_home_screen.dart';
 import '../model/machine_model.dart';
+import '../model/patrol_report_model.dart';
 import '../model/reason_model.dart';
 import '../model/risk_score_calculator.dart';
 import '../translator.dart';
-import 'edit_image_item.dart';
-import '../homeScreen/patrol_home_screen.dart';
-import '../model/patrol_report_model.dart';
 import '../widget/glass_action_button.dart';
 import 'camera_edit_box.dart';
+import 'edit_image_item.dart';
 
 class EditDetailPage extends StatefulWidget {
   final PatrolReportModel report;
@@ -49,6 +48,10 @@ class _EditDetailPageState extends State<EditDetailPage> {
   String? _riskProb;
   String? _riskSev;
 
+  bool _needRecheck = false;
+
+  Timer? _debounce;
+
   @override
   void initState() {
     super.initState();
@@ -62,6 +65,12 @@ class _EditDetailPageState extends State<EditDetailPage> {
     _riskFreq = widget.report.riskFreq;
     _riskProb = widget.report.riskProb;
     _riskSev = widget.report.riskSev;
+
+    final checkInfo = widget.report.checkInfo.trim();
+
+    _needRecheck =
+        checkInfo.contains('Cần rà soát lại vấn đề tương tự') ||
+        checkInfo.contains('類似問題を再確認する必要があります');
 
     final m = widget.report.machine.trim();
     _selectedMachine = (m == "<Null>" || m.isEmpty) ? null : m;
@@ -208,17 +217,19 @@ class _EditDetailPageState extends State<EditDetailPage> {
           Row(
             children: [
               Expanded(
-                child: _buildSearchableDropdown(
+                child: CommonSearchableDropdown(
                   label: "Group",
                   selectedValue: _selectedGroup,
                   items: groupList,
                   onChanged: (v) => setState(() => _selectedGroup = v),
+
                   isRequired: true,
                 ),
               ),
+
               const SizedBox(width: 8),
               Expanded(
-                child: _buildSearchableDropdown(
+                child: CommonSearchableDropdown(
                   label: "Division",
                   selectedValue: _selectedDivision,
                   items: facList,
@@ -252,7 +263,7 @@ class _EditDetailPageState extends State<EditDetailPage> {
           Row(
             children: [
               Expanded(
-                child: _buildSearchableDropdown(
+                child: CommonSearchableDropdown(
                   label: "Area",
                   selectedValue: _selectedArea,
                   items: areaList,
@@ -275,9 +286,10 @@ class _EditDetailPageState extends State<EditDetailPage> {
                   isRequired: true,
                 ),
               ),
+
               const SizedBox(width: 8),
               Expanded(
-                child: _buildSearchableDropdown(
+                child: CommonSearchableDropdown(
                   label: "Machine",
                   selectedValue: _selectedMachine,
                   items: machineList,
@@ -376,8 +388,6 @@ class _EditDetailPageState extends State<EditDetailPage> {
     );
   }
 
-  Timer? _debounce;
-
   @override
   void dispose() {
     _debounce?.cancel();
@@ -391,7 +401,8 @@ class _EditDetailPageState extends State<EditDetailPage> {
     return Scaffold(
       appBar: AppBar(
         centerTitle: false,
-        titleSpacing: 4, // 👈 kéo sát về leading
+        titleSpacing: 4,
+        // 👈 kéo sát về leading
         leading: GlassActionButton(
           icon: Icons.arrow_back_rounded,
           onTap: () => Navigator.pop(context, true),
@@ -453,6 +464,31 @@ class _EditDetailPageState extends State<EditDetailPage> {
                   ),
                 ],
               ),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: Row(
+                  children: [
+                    SizedBox(
+                      width: 28,
+                      height: 28,
+                      child: Checkbox(
+                        value: _needRecheck,
+                        onChanged: (v) =>
+                            setState(() => _needRecheck = v ?? false),
+                        activeColor: Colors.orange.shade700,
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    ),
+                    Expanded(
+                      child: Text(
+                        "needRecheck".tr(context),
+                        style: TextStyle(fontSize: 14, color: Colors.white70),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
 
               const SizedBox(height: 8),
               _buildImageGrid(widget.report.imageNames),
@@ -470,11 +506,28 @@ class _EditDetailPageState extends State<EditDetailPage> {
       //   context: context,
       //   message: 'Saving...',
       // );
+
+      if (_selectedMachine == null) {
+        CommonUI.showWarning(
+          context: context,
+          title: "Information Required",
+          message: "Please select all required information.",
+        );
+        return;
+      }
+      final needRecheckValue = _needRecheck
+          ? (_selectedArea != null
+                ? ''.combinedViJa(context, 'needRecheck')
+                : ''.combinedViJa(context, 'needSelectArea'))
+          : '';
+
+      debugPrint("needRecheck = $needRecheckValue");
+
       final freqKey = _riskFreq ?? '';
       final probKey = _riskProb ?? '';
       final sevKey = _riskSev ?? '';
 
-      // ✅ text song ngữ VN + JP (dùng extension của bạn)
+      // ✅ text song ngữ VN + JP
       final freqBi = ''.combinedViJa(context, freqKey);
       final probBi = ''.combinedViJa(context, probKey);
       final sevBi = ''.combinedViJa(context, sevKey);
@@ -491,6 +544,11 @@ class _EditDetailPageState extends State<EditDetailPage> {
         riskProb: probBi,
         riskSev: sevBi,
         riskTotal: _riskScoreSymbol,
+        needRecheck: _needRecheck
+            ? (_selectedArea != null
+                  ? ''.combinedViJa(context, 'needRecheck')
+                  : ''.combinedViJa(context, 'needSelectArea'))
+            : '',
       );
 
       if (!mounted) return;
@@ -557,227 +615,8 @@ class _EditDetailPageState extends State<EditDetailPage> {
     );
   }
 
-  Widget _buildSearchableDropdown({
-    required String label,
-    required String? selectedValue,
-    required List<String> items,
-    required Function(String?)? onChanged,
-    bool isRequired = false,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          child: DropdownSearch<String>(
-            popupProps: PopupProps.menu(
-              showSearchBox: true,
-              isFilterOnline: true,
-              fit: FlexFit.loose,
-              menuProps: MenuProps(
-                backgroundColor: const Color(0xFF161D23),
-                elevation: 12,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(18),
-                ),
-              ),
-
-              /// 🔴 NO DATA FOUND CUSTOM
-              emptyBuilder: (context, searchEntry) {
-                return Center(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 24),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.search_off_rounded,
-                          size: 40,
-                          color: Colors.white.withOpacity(0.5),
-                        ),
-                        const SizedBox(height: 12),
-                        Text(
-                          "No data found", // hoặc "No data found"
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.7),
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-              searchFieldProps: TextFieldProps(
-                decoration: InputDecoration(
-                  hintText: "search_or_add_new".tr(context),
-                  filled: true,
-                  fillColor: Colors.white.withOpacity(0.1),
-                  prefixIcon: Icon(
-                    Icons.search_rounded,
-                    color: Colors.white.withOpacity(0.7),
-                  ),
-                  hintStyle: TextStyle(color: Colors.white.withOpacity(0.6)),
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 12,
-                  ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                ),
-                style: TextStyle(
-                  color: Colors.white, // <-- set màu chữ nhập thành trắng
-                ),
-              ),
-
-              itemBuilder: (context, item, isSelected) {
-                return Container(
-                  margin: const EdgeInsets.symmetric(
-                    horizontal: 6,
-                    vertical: 4,
-                  ),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 12,
-                  ),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                    color: isSelected
-                        ? Colors.white.withOpacity(0.12)
-                        : Colors.transparent,
-                  ),
-                  child: AutoSizeText(
-                    item,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: isSelected
-                          ? FontWeight.w600
-                          : FontWeight.w500,
-                      color: Colors.white,
-                    ),
-                  ),
-                );
-              },
-            ),
-
-            // ... (các logic asyncItems, compareFn, v.v. giữ nguyên)
-            asyncItems: (String filter) async {
-              var result = items
-                  .where((e) => e.toLowerCase().contains(filter.toLowerCase()))
-                  .toList();
-
-              // Nếu filter không rỗng và chưa có trong items thì thêm vào đầu danh sách
-              if (filter.isNotEmpty && !items.contains(filter.trim())) {
-                result.insert(0, filter.trim());
-              }
-              return result;
-            },
-            compareFn: (item, selectedItem) =>
-                item.trim() == selectedItem.trim(),
-
-            selectedItem: selectedValue ?? '',
-
-            dropdownDecoratorProps: DropDownDecoratorProps(
-              dropdownSearchDecoration: InputDecoration(
-                hintText: label,
-                hintMaxLines: 1,
-                floatingLabelBehavior: FloatingLabelBehavior.never,
-
-                /// 🌫️ nền glass
-                filled: true,
-                fillColor: Colors.white.withOpacity(0.08),
-
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: BorderSide(color: Colors.white.withOpacity(0.35)),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: BorderSide(
-                    color: const Color(0xFF4DD0E1).withOpacity(0.45),
-                  ),
-                ),
-
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: const BorderSide(
-                    color: Color(0xFF4DD0E1), // cyan
-                    width: 1.6,
-                  ),
-                ),
-
-                contentPadding: const EdgeInsets.fromLTRB(12, 14, 12, 12),
-
-                /// 📝 hint
-                hintStyle: TextStyle(
-                  color: Colors.white.withOpacity(0.6),
-                  fontSize: 14,
-                ),
-              ),
-            ),
-
-            dropdownBuilder: (context, selectedItem) {
-              final bool isEmpty = selectedItem == null || selectedItem.isEmpty;
-
-              Color textColor;
-              FontWeight fontWeight;
-
-              if (isEmpty && isRequired) {
-                textColor = Colors.red.withOpacity(.6);
-                fontWeight = FontWeight.w600;
-              } else if (!isEmpty) {
-                textColor = Colors.white;
-                fontWeight = FontWeight.bold;
-              } else {
-                textColor = Colors.white.withOpacity(0.6);
-                fontWeight = FontWeight.w500;
-              }
-
-              return Row(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  /// 📝 TEXT
-                  Expanded(
-                    child: AutoSizeText(
-                      isEmpty ? label : selectedItem,
-                      maxLines: 2,
-                      minFontSize: 11,
-                      stepGranularity: 0.5,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: fontWeight,
-                        color: textColor,
-                      ),
-                    ),
-                  ),
-
-                  /// ⭐ REQUIRED ICON
-                  if (isRequired && isEmpty) ...[
-                    const SizedBox(width: 6),
-                    Icon(
-                      Icons.star_rounded, // ⭐
-                      size: 14,
-                      color: Colors.red.withOpacity(.6),
-                    ),
-                  ],
-                ],
-              );
-            },
-
-            onChanged: onChanged,
-          ),
-        ),
-      ],
-    );
-  }
-
   Widget _buildImageGrid(List<String> images) {
-    const int maxImages = 2;
+    const int maxImages = 3;
     final bool canAdd = images.length < maxImages;
 
     return SizedBox(
@@ -878,6 +717,7 @@ class _EditDetailPageState extends State<EditDetailPage> {
 
 class _AddImageTile extends StatelessWidget {
   final VoidCallback onTap;
+
   const _AddImageTile({required this.onTap});
 
   @override

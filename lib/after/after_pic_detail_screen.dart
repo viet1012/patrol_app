@@ -256,7 +256,7 @@ class _AfterPicDetailScreenState extends State<AfterPicDetailScreen> {
       titleSpacing: 4,
       leading: GlassActionButton(
         icon: Icons.arrow_back_rounded,
-        onTap: () => Navigator.pop(context, false),
+        onTap: () => Navigator.pop(context, true),
       ),
       title: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
