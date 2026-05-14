@@ -191,14 +191,14 @@ class _AfterPatrolState extends State<AfterPatrol> {
     if (_redirected) return;
 
     final st = (r.atStatus ?? '').trim();
-    if (st.isEmpty || st == 'Wait' || st == 'Doing') return;
+    if (st.isEmpty || st == 'Doing') return;
 
     _redirected = true;
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
 
-      if (st == 'Done' || st == 'Pro_Done') {
+      if (st == 'Pro_Done') {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(

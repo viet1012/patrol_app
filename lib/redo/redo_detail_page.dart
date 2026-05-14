@@ -130,7 +130,7 @@ class _RedoDetailPageState extends State<RedoDetailPage> {
             Column(
               children: [
                 Text(
-                  'Patrol Recheck',
+                  'Patrol Redo',
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 13,
