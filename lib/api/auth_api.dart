@@ -93,8 +93,8 @@ class AuthApi {
         '$_basePath/login',
         data: {'account': account, 'password': password},
         options: Options(
-          sendTimeout: const Duration(seconds: 5),
-          receiveTimeout: const Duration(seconds: 5),
+          sendTimeout: const Duration(seconds: 15),
+          receiveTimeout: const Duration(seconds: 15),
         ),
       );
 

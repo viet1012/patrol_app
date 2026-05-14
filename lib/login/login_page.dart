@@ -20,7 +20,10 @@ class LoadingDialog {
   ////////////////////////////////////////////////////////////
   /// SHOW
   ////////////////////////////////////////////////////////////
-  static void show(BuildContext context) {
+  static void show(
+    BuildContext context, {
+    String message = "Connecting to server...",
+  }) {
     if (_isShowing) return;
 
     _isShowing = true;
@@ -28,7 +31,71 @@ class LoadingDialog {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (_) => const Center(child: CircularProgressIndicator()),
+      barrierColor: Colors.black54,
+      builder: (_) => Dialog(
+        backgroundColor: Colors.transparent,
+
+        child: Container(
+          padding: const EdgeInsets.all(24),
+
+          decoration: BoxDecoration(
+            color: const Color(0xFF0F172A),
+            borderRadius: BorderRadius.circular(20),
+
+            border: Border.all(color: Colors.white12),
+
+            boxShadow: const [
+              BoxShadow(
+                color: Colors.black54,
+                blurRadius: 20,
+                offset: Offset(0, 10),
+              ),
+            ],
+          ),
+
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ////////////////////////////////////////////////////////////
+              /// LOADING
+              ////////////////////////////////////////////////////////////
+              const SizedBox(
+                width: 42,
+                height: 42,
+                child: CircularProgressIndicator(
+                  strokeWidth: 4,
+                  color: Color(0xFF38BDF8),
+                ),
+              ),
+
+              const SizedBox(height: 20),
+
+              ////////////////////////////////////////////////////////////
+              /// TEXT
+              ////////////////////////////////////////////////////////////
+              Text(
+                message,
+                textAlign: TextAlign.center,
+
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+
+              const SizedBox(height: 8),
+
+              const Text(
+                "Please wait a moment...",
+                textAlign: TextAlign.center,
+
+                style: TextStyle(color: Colors.white60, fontSize: 13),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -43,7 +110,6 @@ class LoadingDialog {
     Navigator.of(context, rootNavigator: true).pop();
   }
 }
-
 ////////////////////////////////////////////////////////////
 /// LOGIN PAGE
 ////////////////////////////////////////////////////////////
@@ -332,8 +398,15 @@ class _LoginPageState extends State<LoginPage> {
   ////////////////////////////////////////////////////////////
   /// LOGIN
   ////////////////////////////////////////////////////////////
+  bool _reloadSuggested = false;
 
-  Future<void> _login() async {
+  Future<void> _login1() async {
+    final idleMinutes = DateTime.now().difference(_lastActivity).inMinutes;
+
+    if (idleMinutes >= 30) {
+      html.window.location.reload();
+      return;
+    }
     ////////////////////////////////////////////////////////////
     /// UPDATE USER ACTIVITY
     ////////////////////////////////////////////////////////////
@@ -423,6 +496,177 @@ class _LoginPageState extends State<LoginPage> {
             "Please refresh the page and try again.";
       }
 
+      ////////////////////////////////////////////////////////////
+      /// NETWORK / CONNECTION LOST
+      ////////////////////////////////////////////////////////////
+      if (result.message == AppMessage.cannotConnect ||
+          result.message == AppMessage.timeout ||
+          result.message == AppMessage.networkError) {
+        ////////////////////////////////////////////////////////////
+        /// FIRST TIME -> ASK RELOAD
+        ////////////////////////////////////////////////////////////
+        if (!_reloadSuggested) {
+          _reloadSuggested = true;
+
+          final shouldReload = await showDialog<bool>(
+            context: context,
+            barrierDismissible: false,
+            barrierColor: Colors.black87,
+
+            builder: (_) => Dialog(
+              backgroundColor: Colors.transparent,
+
+              child: Container(
+                padding: const EdgeInsets.all(20),
+
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0F172A),
+                  borderRadius: BorderRadius.circular(20),
+
+                  border: Border.all(color: Colors.white12),
+
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Colors.black54,
+                      blurRadius: 20,
+                      offset: Offset(0, 10),
+                    ),
+                  ],
+                ),
+
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    //////////////////////////////////////////////////////
+                    /// ICON
+                    //////////////////////////////////////////////////////
+                    Container(
+                      width: 64,
+                      height: 64,
+
+                      decoration: BoxDecoration(
+                        color: Colors.red.withOpacity(0.12),
+                        shape: BoxShape.circle,
+                      ),
+
+                      child: const Icon(
+                        Icons.wifi_off_rounded,
+                        color: Colors.redAccent,
+                        size: 34,
+                      ),
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    //////////////////////////////////////////////////////
+                    /// TITLE
+                    //////////////////////////////////////////////////////
+                    const Text(
+                      "Connection Lost",
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    //////////////////////////////////////////////////////
+                    /// ERROR BOX
+                    //////////////////////////////////////////////////////
+                    const ErrorBox(
+                      message:
+                          "Unable to connect to the server.\n\n"
+                          "The page may be outdated or the connection was interrupted.\n\n"
+                          "Please reload the page and try again.",
+
+                      isServerError: true,
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    //////////////////////////////////////////////////////
+                    /// BUTTONS
+                    //////////////////////////////////////////////////////
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () {
+                              Navigator.pop(context, false);
+                            },
+
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.white70,
+
+                              side: const BorderSide(color: Colors.white24),
+
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+
+                            child: const Text("Cancel"),
+                          ),
+                        ),
+
+                        const SizedBox(width: 12),
+
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: () {
+                              Navigator.pop(context, true);
+                            },
+
+                            icon: const Icon(Icons.refresh),
+
+                            label: const Text("Reload"),
+
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF2563EB),
+
+                              foregroundColor: Colors.white,
+
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+
+          if (shouldReload == true) {
+            html.window.location.reload();
+          }
+
+          return;
+        }
+
+        ////////////////////////////////////////////////////////////
+        /// AFTER RELOAD STILL FAIL
+        ////////////////////////////////////////////////////////////
+        setState(() {
+          _errorMsg =
+              "Unable to connect to the server.\n\n"
+              "Please contact IT Support.";
+
+          _isServerError = true;
+        });
+
+        return;
+      }
+
       setState(() {
         _errorMsg = message;
         _isServerError = result.isServerError;
@@ -445,6 +689,314 @@ class _LoginPageState extends State<LoginPage> {
     ////////////////////////////////////////////////////////////
     if (!mounted) return;
 
+    context.go('/home', extra: {'accountCode': code});
+  }
+
+  Future<void> _login() async {
+    ////////////////////////////////////////////////////////////
+    /// CHECK IDLE BEFORE UPDATE ACTIVITY
+    ////////////////////////////////////////////////////////////
+    final idleMinutes = DateTime.now().difference(_lastActivity).inMinutes;
+
+    if (idleMinutes >= 30) {
+      html.window.location.reload();
+      return;
+    }
+
+    ////////////////////////////////////////////////////////////
+    /// UPDATE USER ACTIVITY
+    ////////////////////////////////////////////////////////////
+    _updateActivity();
+
+    final code = _codeCtrl.text.trim();
+    final pass = _passCtrl.text.trim();
+
+    ////////////////////////////////////////////////////////////
+    /// CLEAR ERROR
+    ////////////////////////////////////////////////////////////
+    setState(() {
+      _errorMsg = null;
+      _isServerError = false;
+    });
+
+    ////////////////////////////////////////////////////////////
+    /// VALIDATE
+    ////////////////////////////////////////////////////////////
+    if (code.isEmpty || pass.isEmpty) {
+      setState(() {
+        _errorMsg = "Please enter code and password";
+      });
+
+      return;
+    }
+
+    ////////////////////////////////////////////////////////////
+    /// SHOW LOADING
+    ////////////////////////////////////////////////////////////
+    LoadingDialog.show(context, message: "Signing in...");
+
+    AuthResult result;
+
+    try {
+      ////////////////////////////////////////////////////////////
+      /// LOGIN
+      ////////////////////////////////////////////////////////////
+      result = await AuthApi.login(account: code, password: pass);
+
+      ////////////////////////////////////////////////////////////
+      /// RETRY ONLY REAL SERVER / NETWORK ERROR
+      ////////////////////////////////////////////////////////////
+      final shouldRetry = !result.success && result.isServerError;
+
+      if (shouldRetry) {
+        await Future.delayed(const Duration(milliseconds: 800));
+
+        result = await AuthApi.login(account: code, password: pass);
+      }
+    } catch (_) {
+      result = AuthResult(
+        success: false,
+        message: AppMessage.serverError,
+        isServerError: true,
+      );
+    } finally {
+      ////////////////////////////////////////////////////////////
+      /// ALWAYS HIDE LOADING
+      ////////////////////////////////////////////////////////////
+      if (mounted) {
+        LoadingDialog.hide(context);
+      }
+    }
+
+    if (!mounted) return;
+
+    ////////////////////////////////////////////////////////////
+    /// LOGIN FAILED
+    ////////////////////////////////////////////////////////////
+    if (!result.success) {
+      String message = result.message;
+
+      ////////////////////////////////////////////////////////////
+      /// NETWORK / CONNECTION LOST
+      ////////////////////////////////////////////////////////////
+      final isNetworkError =
+          result.message == AppMessage.cannotConnect ||
+          result.message == AppMessage.timeout ||
+          result.message == AppMessage.networkError;
+
+      if (isNetworkError) {
+        final alreadyReloaded =
+            html.window.sessionStorage['LOGIN_RELOADED_ONCE'] == 'true';
+
+        //////////////////////////////////////////////////////////
+        /// FIRST TIME -> ASK USER TO RELOAD
+        //////////////////////////////////////////////////////////
+        if (!alreadyReloaded) {
+          final shouldReload = await showDialog<bool>(
+            context: context,
+            barrierDismissible: false,
+            barrierColor: Colors.black87,
+
+            builder: (_) => Dialog(
+              backgroundColor: Colors.transparent,
+
+              child: Container(
+                padding: const EdgeInsets.all(20),
+
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0F172A),
+                  borderRadius: BorderRadius.circular(20),
+
+                  border: Border.all(color: Colors.white12),
+
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Colors.black54,
+                      blurRadius: 20,
+                      offset: Offset(0, 10),
+                    ),
+                  ],
+                ),
+
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    //////////////////////////////////////////////////////
+                    /// ICON
+                    //////////////////////////////////////////////////////
+                    Container(
+                      width: 64,
+                      height: 64,
+
+                      decoration: BoxDecoration(
+                        color: Colors.red.withOpacity(0.12),
+                        shape: BoxShape.circle,
+                      ),
+
+                      child: const Icon(
+                        Icons.wifi_off_rounded,
+                        color: Colors.redAccent,
+                        size: 34,
+                      ),
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    //////////////////////////////////////////////////////
+                    /// TITLE
+                    //////////////////////////////////////////////////////
+                    const Text(
+                      "Connection Lost",
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    //////////////////////////////////////////////////////
+                    /// ERROR BOX
+                    //////////////////////////////////////////////////////
+                    const ErrorBox(
+                      message:
+                          "Unable to connect to the server.\n\n"
+                          "The page may be outdated or the connection was interrupted.\n\n"
+                          "Please reload the page and try again.",
+
+                      isServerError: true,
+                      showContact: false,
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    //////////////////////////////////////////////////////
+                    /// BUTTONS
+                    //////////////////////////////////////////////////////
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () {
+                              Navigator.pop(context, false);
+                            },
+
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.white70,
+
+                              side: const BorderSide(color: Colors.white24),
+
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+
+                            child: const Text("Cancel"),
+                          ),
+                        ),
+
+                        const SizedBox(width: 12),
+
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: () {
+                              Navigator.pop(context, true);
+                            },
+
+                            icon: const Icon(Icons.refresh),
+
+                            label: const Text("Reload"),
+
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF2563EB),
+
+                              foregroundColor: Colors.white,
+
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+
+          if (shouldReload == true) {
+            html.window.sessionStorage['LOGIN_RELOADED_ONCE'] = 'true';
+            html.window.location.reload();
+          }
+
+          return;
+        }
+
+        //////////////////////////////////////////////////////////
+        /// AFTER RELOAD STILL FAIL -> CONTACT IT
+        //////////////////////////////////////////////////////////
+        setState(() {
+          _errorMsg =
+              "Unable to connect to the server.\n\n"
+              "Please contact IT Support.";
+
+          _isServerError = true;
+        });
+
+        return;
+      }
+
+      ////////////////////////////////////////////////////////////
+      /// LONG IDLE MESSAGE
+      ////////////////////////////////////////////////////////////
+      final idleMinutesAfterLogin = DateTime.now()
+          .difference(_lastActivity)
+          .inMinutes;
+
+      if (idleMinutesAfterLogin >= 30 && result.isServerError) {
+        message =
+            "${result.message}\n\n"
+            "This page has been idle for a long time.\n"
+            "Please refresh the page and try again.";
+      }
+
+      ////////////////////////////////////////////////////////////
+      /// NORMAL ERROR
+      ////////////////////////////////////////////////////////////
+      setState(() {
+        _errorMsg = message;
+        _isServerError = result.isServerError;
+      });
+
+      return;
+    }
+
+    ////////////////////////////////////////////////////////////
+    /// LOGIN SUCCESS -> CLEAR RELOAD FLAG
+    ////////////////////////////////////////////////////////////
+    html.window.sessionStorage.remove('LOGIN_RELOADED_ONCE');
+
+    ////////////////////////////////////////////////////////////
+    /// REMEMBER ME
+    ////////////////////////////////////////////////////////////
+    if (_rememberMe) {
+      await SessionStore.saveCreds(account: code, password: pass);
+    } else {
+      await SessionStore.clear();
+    }
+
+    if (!mounted) return;
+
+    ////////////////////////////////////////////////////////////
+    /// NAVIGATE
+    ////////////////////////////////////////////////////////////
     context.go('/home', extra: {'accountCode': code});
   }
 
