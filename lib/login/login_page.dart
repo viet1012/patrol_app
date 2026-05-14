@@ -872,7 +872,7 @@ class _LoginPageState extends State<LoginPage> {
                     const SizedBox(height: 20),
 
                     //////////////////////////////////////////////////////
-                    /// BUTTONS
+                    /// BUTTONS hintText: "search_or_add_new".tr(context),
                     //////////////////////////////////////////////////////
                     Row(
                       children: [
@@ -884,11 +884,8 @@ class _LoginPageState extends State<LoginPage> {
 
                             style: OutlinedButton.styleFrom(
                               foregroundColor: Colors.white70,
-
                               side: const BorderSide(color: Colors.white24),
-
                               padding: const EdgeInsets.symmetric(vertical: 14),
-
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(14),
                               ),
@@ -935,7 +932,6 @@ class _LoginPageState extends State<LoginPage> {
             html.window.sessionStorage['LOGIN_RELOADED_ONCE'] = 'true';
             html.window.location.reload();
           }
-
           return;
         }
 
@@ -946,7 +942,6 @@ class _LoginPageState extends State<LoginPage> {
           _errorMsg =
               "Unable to connect to the server.\n\n"
               "Please contact IT Support.";
-
           _isServerError = true;
         });
 

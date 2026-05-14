@@ -59,7 +59,7 @@ class _AfterPatrolState extends State<AfterPatrol> {
   String? _currentPIC; // readonly
   String? _selectedAssignPIC; // dropdown
 
-  static const String emptyLabel = 'UNKNOWN';
+  static const String emptyLabel = '';
   Future<List<String>>? _futurePics;
   String? _selectedPIC; // UI selected
   String? _oldPIC;

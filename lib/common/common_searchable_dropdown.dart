@@ -31,34 +31,34 @@ class CommonSearchableDropdown extends StatelessWidget {
     required this.selectedValue,
     required this.items,
     required this.onChanged,
-
     this.isRequired = false,
-
-    ////////////////////////////////////////////////////////////
-    /// DEFAULT
-    ////////////////////////////////////////////////////////////
     this.allowAddNew = true,
     this.showSearchBox = true,
   });
 
   @override
   Widget build(BuildContext context) {
+    final cleanSelectedValue =
+        selectedValue == null || selectedValue!.trim().isEmpty
+        ? null
+        : selectedValue!.trim();
+
+    final cleanItems = items
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toSet()
+        .toList();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-
       children: [
         DropdownSearch<String>(
           ////////////////////////////////////////////////////////////
           /// POPUP
           ////////////////////////////////////////////////////////////
           popupProps: PopupProps.menu(
-            ////////////////////////////////////////////////////////////
-            /// SHOW / HIDE SEARCH BOX
-            ////////////////////////////////////////////////////////////
             showSearchBox: showSearchBox,
-
             isFilterOnline: true,
-
             fit: FlexFit.loose,
 
             ////////////////////////////////////////////////////////////
@@ -66,9 +66,7 @@ class CommonSearchableDropdown extends StatelessWidget {
             ////////////////////////////////////////////////////////////
             menuProps: MenuProps(
               backgroundColor: const Color(0xFF161D23),
-
               elevation: 12,
-
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(18),
               ),
@@ -81,16 +79,12 @@ class CommonSearchableDropdown extends StatelessWidget {
               return Center(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: 24),
-
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
-
                     children: [
                       Icon(
                         Icons.search_off_rounded,
-
                         size: 40,
-
                         color: Colors.white.withOpacity(0.5),
                       ),
 
@@ -98,14 +92,10 @@ class CommonSearchableDropdown extends StatelessWidget {
 
                       Text(
                         "No data found",
-
                         textAlign: TextAlign.center,
-
                         style: TextStyle(
                           color: Colors.white.withOpacity(0.7),
-
                           fontSize: 14,
-
                           fontWeight: FontWeight.w500,
                         ),
                       ),
@@ -120,7 +110,9 @@ class CommonSearchableDropdown extends StatelessWidget {
             ////////////////////////////////////////////////////////////
             searchFieldProps: TextFieldProps(
               decoration: InputDecoration(
-                hintText: "search_or_add_new".tr(context),
+                hintText: allowAddNew
+                    ? "search_or_add_new".tr(context)
+                    : "search".tr(context),
                 filled: true,
                 fillColor: Colors.white.withOpacity(0.1),
                 prefixIcon: Icon(
@@ -156,7 +148,6 @@ class CommonSearchableDropdown extends StatelessWidget {
                       ? Colors.white.withOpacity(0.12)
                       : Colors.transparent,
                 ),
-
                 child: AutoSizeText(
                   item,
                   maxLines: 2,
@@ -177,9 +168,10 @@ class CommonSearchableDropdown extends StatelessWidget {
           /// FILTER + ADD NEW
           ////////////////////////////////////////////////////////////
           asyncItems: (String filter) async {
-            final lower = filter.toLowerCase();
+            final trimmedFilter = filter.trim();
+            final lower = trimmedFilter.toLowerCase();
 
-            final result = items
+            final result = cleanItems
                 .where((e) => e.toLowerCase().contains(lower))
                 .toList();
 
@@ -187,10 +179,10 @@ class CommonSearchableDropdown extends StatelessWidget {
             /// ADD NEW ITEM
             ////////////////////////////////////////////////////////////
             if (allowAddNew) {
-              final trimmed = filter.trim();
+              final exists = cleanItems.any((e) => e.toLowerCase() == lower);
 
-              if (trimmed.isNotEmpty && !items.contains(trimmed)) {
-                result.insert(0, trimmed);
+              if (trimmedFilter.isNotEmpty && !exists) {
+                result.insert(0, trimmedFilter);
               }
             }
 
@@ -200,12 +192,14 @@ class CommonSearchableDropdown extends StatelessWidget {
           ////////////////////////////////////////////////////////////
           /// COMPARE
           ////////////////////////////////////////////////////////////
-          compareFn: (item, selectedItem) => item.trim() == selectedItem.trim(),
+          compareFn: (item, selectedItem) {
+            return item.trim() == selectedItem.trim();
+          },
 
           ////////////////////////////////////////////////////////////
           /// SELECTED
           ////////////////////////////////////////////////////////////
-          selectedItem: selectedValue ?? '',
+          selectedItem: cleanSelectedValue,
 
           ////////////////////////////////////////////////////////////
           /// DECORATION
@@ -213,24 +207,18 @@ class CommonSearchableDropdown extends StatelessWidget {
           dropdownDecoratorProps: DropDownDecoratorProps(
             dropdownSearchDecoration: InputDecoration(
               hintText: label,
-
               hintMaxLines: 1,
-
               floatingLabelBehavior: FloatingLabelBehavior.never,
-
               filled: true,
-
               fillColor: Colors.white.withOpacity(0.08),
 
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(14),
-
                 borderSide: BorderSide(color: Colors.white.withOpacity(0.35)),
               ),
 
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(14),
-
                 borderSide: BorderSide(
                   color: const Color(0xFF4DD0E1).withOpacity(0.45),
                 ),
@@ -238,7 +226,6 @@ class CommonSearchableDropdown extends StatelessWidget {
 
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(14),
-
                 borderSide: const BorderSide(
                   color: Color(0xFF4DD0E1),
                   width: 1.6,
@@ -249,7 +236,6 @@ class CommonSearchableDropdown extends StatelessWidget {
 
               hintStyle: TextStyle(
                 color: Colors.white.withOpacity(0.6),
-
                 fontSize: 14,
               ),
             ),
@@ -259,68 +245,47 @@ class CommonSearchableDropdown extends StatelessWidget {
           /// DROPDOWN BUILDER
           ////////////////////////////////////////////////////////////
           dropdownBuilder: (context, selectedItem) {
-            final bool isEmpty = selectedItem == null || selectedItem.isEmpty;
+            final bool isEmpty =
+                selectedItem == null || selectedItem.trim().isEmpty;
 
             Color textColor;
-
             FontWeight fontWeight;
 
             if (isEmpty && isRequired) {
               textColor = Colors.red.withOpacity(.6);
-
               fontWeight = FontWeight.w600;
             } else if (!isEmpty) {
               textColor = Colors.white;
-
               fontWeight = FontWeight.bold;
             } else {
               textColor = Colors.white.withOpacity(0.6);
-
               fontWeight = FontWeight.w500;
             }
 
             return Row(
               mainAxisSize: MainAxisSize.min,
-
               crossAxisAlignment: CrossAxisAlignment.center,
-
               children: [
-                ////////////////////////////////////////////////////////////
-                /// TEXT
-                ////////////////////////////////////////////////////////////
                 Expanded(
                   child: AutoSizeText(
-                    isEmpty ? label : selectedItem,
-
+                    isEmpty ? label : selectedItem.trim(),
                     maxLines: 2,
-
                     minFontSize: 11,
-
                     stepGranularity: 0.5,
-
                     overflow: TextOverflow.ellipsis,
-
                     style: TextStyle(
                       fontSize: 14,
-
                       fontWeight: fontWeight,
-
                       color: textColor,
                     ),
                   ),
                 ),
 
-                ////////////////////////////////////////////////////////////
-                /// REQUIRED
-                ////////////////////////////////////////////////////////////
                 if (isRequired && isEmpty) ...[
                   const SizedBox(width: 6),
-
                   Icon(
                     Icons.star_rounded,
-
                     size: 14,
-
                     color: Colors.red.withOpacity(.6),
                   ),
                 ],
@@ -331,7 +296,13 @@ class CommonSearchableDropdown extends StatelessWidget {
           ////////////////////////////////////////////////////////////
           /// CHANGE
           ////////////////////////////////////////////////////////////
-          onChanged: onChanged,
+          onChanged: (value) {
+            final cleanValue = value == null || value.trim().isEmpty
+                ? null
+                : value.trim();
+
+            onChanged?.call(cleanValue);
+          },
         ),
       ],
     );

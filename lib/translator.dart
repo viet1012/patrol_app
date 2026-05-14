@@ -14,6 +14,7 @@ extension TranslateExtension on String {
     late String value;
 
     switch (this) {
+      case 'search': value = t!.search; break;
       case 'plant': value = t!.plant; break;
       case 'group': value = t!.group; break;
       case 'fac': value = t!.fac; break;
@@ -81,6 +82,7 @@ extension TranslateExtension on String {
 
     switch (key) {
 
+      case 'search': return t.search;
       case 'plant': return t.plant;
       case 'group': return t.group;
       case 'fac': return t.fac;

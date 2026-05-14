@@ -9,6 +9,9 @@ class AppLocalizationsVi extends AppLocalizations {
   AppLocalizationsVi([String locale = 'vi']) : super(locale);
 
   @override
+  String get search => 'Tìm kiếm';
+
+  @override
   String get plant => 'Nhà máy';
 
   @override
