@@ -56160,7 +56160,7 @@ aG3(a){var s,r
 if(this.db)return
 s=a.fy
 r=B.d.aa(s==null?"":s)
-if(r.length===0||r==="Wait"||r==="Doing")return
+if(r.length===0||r==="Doing")return
 this.db=!0
 $.ad.k4$.push(new A.aNd(this,r,a))},
 K(a){var s,r,q,p,o,n,m,l,k,j,i,h=this,g=null
@@ -56453,7 +56453,7 @@ A.aNd.prototype={
 $1(a){var s,r=this,q=r.a,p=q.c
 if(p==null)return
 s=r.b
-if(s==="Done"||s==="Pro_Done")A.bhE(p,A.no(new A.aNb(q,r.c),null,t.z))
+if(s==="Pro_Done")A.bhE(p,A.no(new A.aNb(q,r.c),null,t.z))
 else if(s==="Redo")A.bhE(p,A.no(new A.aNc(q,r.c),null,t.z))},
 $S:3}
 A.aNb.prototype={
@@ -61632,7 +61632,7 @@ s=1
 break
 case 1:return A.y(q,r)}})
 return A.z($async$k0,r)},
-K(a){var s,r,q,p,o=this,n=null,m=t.p,l=A.k5(n,B.aZ,!1,n,A.dJ(n,!0,B.cU,B.aB,new A.b2g(o,a)),A.as(A.b([A.av(A.b([A.T("Patrol Recheck",n,n,n,n,n,n,n,B.eV,n,n,n,n),A.T(o.a.d.f,n,n,n,n,n,n,n,B.cj,n,n,n,n)],m),B.m,B.h,B.l),A.T("ID: "+J.aW(o.a.d.a),n,n,n,n,n,n,n,B.cj,n,n,n,n)],m),B.m,B.cc,B.l,0,n),4),k=A.bt(a,n,t.l).w,j=A.as(A.b([A.aA(A.av(A.b([o.nX(B.kw,B.bo,A.d2("group",a),o.a.d.e),B.ad,o.nX(B.kz,B.pU,A.d2("area",a),o.a.d.w)],m),B.F,B.h,B.l),1),B.aM,A.aA(A.av(A.b([o.nX(B.oK,B.pQ,A.d2("fac",a),o.a.d.r),B.ad,o.nX(B.on,B.pV,A.d2("machine",a),o.a.d.x)],m),B.F,B.h,B.l),1)],m),B.F,B.h,B.l,0,n),i=A.as(A.b([A.aA(o.Fd(B.f9,o.a.d.at,B.hw,"Comment"),1),B.aM,A.aA(o.Fd(B.iR,o.a.d.ax,B.pT,"Countermeasure"),1)],m),B.bM,B.h,B.l,0,n),h=o.a.d.db
+K(a){var s,r,q,p,o=this,n=null,m=t.p,l=A.k5(n,B.aZ,!1,n,A.dJ(n,!0,B.cU,B.aB,new A.b2g(o,a)),A.as(A.b([A.av(A.b([A.T("Patrol Redo",n,n,n,n,n,n,n,B.eV,n,n,n,n),A.T(o.a.d.f,n,n,n,n,n,n,n,B.cj,n,n,n,n)],m),B.m,B.h,B.l),A.T("ID: "+J.aW(o.a.d.a),n,n,n,n,n,n,n,B.cj,n,n,n,n)],m),B.m,B.cc,B.l,0,n),4),k=A.bt(a,n,t.l).w,j=A.as(A.b([A.aA(A.av(A.b([o.nX(B.kw,B.bo,A.d2("group",a),o.a.d.e),B.ad,o.nX(B.kz,B.pU,A.d2("area",a),o.a.d.w)],m),B.F,B.h,B.l),1),B.aM,A.aA(A.av(A.b([o.nX(B.oK,B.pQ,A.d2("fac",a),o.a.d.r),B.ad,o.nX(B.on,B.pV,A.d2("machine",a),o.a.d.x)],m),B.F,B.h,B.l),1)],m),B.F,B.h,B.l,0,n),i=A.as(A.b([A.aA(o.Fd(B.f9,o.a.d.at,B.hw,"Comment"),1),B.aM,A.aA(o.Fd(B.iR,o.a.d.ax,B.pT,"Countermeasure"),1)],m),B.bM,B.h,B.l,0,n),h=o.a.d.db
 h.toString
 h=o.nX(B.A,B.bo,"Patrol User",h)
 s=A.aA(A.av(A.b([o.nX(B.A,B.bo,"Patrol at",o.q7(o.a.d.ch)),B.ad,o.aFt(B.A,B.bo,"Review Similar Cases",o.a.d.ay)],m),B.F,B.h,B.l),1)
