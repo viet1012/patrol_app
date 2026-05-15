@@ -968,6 +968,30 @@ class ExcelLikeTable extends StatelessWidget {
     );
   }
 
+  String _displayValue(dynamic cell) {
+    ////////////////////////////////////////////////////////////
+    /// NUMBER = 0 -> "-"
+    ////////////////////////////////////////////////////////////
+    if (cell is num && cell == 0) {
+      return '-';
+    }
+
+    ////////////////////////////////////////////////////////////
+    /// NULL / EMPTY
+    ////////////////////////////////////////////////////////////
+    if (cell == null) {
+      return '-';
+    }
+
+    final text = cell.toString().trim();
+
+    if (text.isEmpty) {
+      return '-';
+    }
+
+    return text;
+  }
+
   @override
   Widget build(BuildContext context) {
     final columnWidths = _buildColumnWidths();
@@ -1135,12 +1159,16 @@ class ExcelLikeTable extends StatelessWidget {
                           padding: const EdgeInsets.symmetric(horizontal: 6),
                           child: Align(
                             alignment: isNumber
-                                ? Alignment.center
+                                ? Alignment.centerRight
                                 : Alignment.centerLeft,
+
                             child: Text(
-                              cell.toString(),
+                              _displayValue(cell),
+
                               maxLines: 1,
+
                               overflow: TextOverflow.ellipsis,
+
                               style: TextStyle(
                                 fontSize: 14,
                                 fontWeight: row.isTotal
