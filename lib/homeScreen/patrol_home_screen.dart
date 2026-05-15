@@ -567,7 +567,7 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
                                     _patrolGroupCard(
                                       group: PatrolGroup.AssetUpdate,
                                       title: 'Asset Update',
-                                      icon: Icons.fact_check_outlined,
+                                      icon: Icons.inventory_rounded,
                                       prefix: 'Asset Patrol',
                                       enabled: true,
                                       titleScreen: 'Asset Patrol',
