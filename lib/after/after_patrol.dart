@@ -856,7 +856,7 @@ class _AfterPatrolState extends State<AfterPatrol> {
           label: "Assign PIC",
           selectedValue: _selectedAssignPIC,
           items: items,
-          isRequired: true,
+          isRequired: false,
           allowAddNew: false,
           ////////////////////////////////////////////////////////////
           /// CHANGE
