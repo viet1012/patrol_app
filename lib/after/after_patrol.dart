@@ -1174,6 +1174,13 @@ class _AfterPatrolState extends State<AfterPatrol> {
                               'Update AF successful!',
                               Colors.green,
                             );
+                            await Future.delayed(
+                              const Duration(milliseconds: 500),
+                            );
+
+                            if (!mounted) return;
+
+                            Navigator.pop(context, true);
                           } catch (e) {
                             debugPrint('Update AT error: $e');
                             _showSnackBar('Server error: $e', Colors.red);
