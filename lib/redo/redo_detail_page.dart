@@ -247,7 +247,7 @@ class _RedoDetailPageState extends State<RedoDetailPage> {
                   icon: Icons.groups_rounded,
                   label: "Patrol User",
                   color: Colors.white70,
-                  value: widget.report.patrol_user!,
+                  value: widget.report.patrol_user ?? '-',
                 ),
               ),
               const SizedBox(height: 12),
@@ -556,14 +556,15 @@ class _RedoDetailPageState extends State<RedoDetailPage> {
                   icon: Icons.groups_rounded,
                   label: "After PIC:",
                   color: Colors.white70,
-                  value: widget.report.atPic!,
+                  value: widget.report.atPic ?? '-',
                 ),
+
               if (isRedo)
                 _buildInfoCard(
                   icon: Icons.groups_rounded,
                   label: "HSE Judge:",
                   color: Colors.white70,
-                  value: widget.report.hseJudge!,
+                  value: widget.report.hseJudge ?? '-',
                 ),
             ],
           ),
@@ -574,16 +575,17 @@ class _RedoDetailPageState extends State<RedoDetailPage> {
             Center(
               child: _buildSectionCard(
                 title: 'Comment',
-                content: widget.report.atComment!,
+                content: widget.report.atComment ?? '-',
                 icon: Icons.comment_rounded,
                 accentColor: Colors.amber.shade600,
               ),
             ),
+
           if (isRedo)
             Center(
               child: _buildSectionCard(
                 title: 'Comment',
-                content: widget.report.hseComment!,
+                content: widget.report.hseComment ?? '-',
                 icon: Icons.comment_rounded,
                 accentColor: Colors.amber.shade600,
               ),
