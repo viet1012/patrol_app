@@ -60,6 +60,8 @@ class _PatrolRiskSummarySfPageState extends State<PatrolRiskSummarySfPage> {
   late final DateTime _initialFrom;
   late final DateTime _initialTo;
 
+  bool get _isMobile => MediaQuery.of(context).size.width < 600;
+
   @override
   void initState() {
     super.initState();
@@ -305,41 +307,85 @@ class _PatrolRiskSummarySfPageState extends State<PatrolRiskSummarySfPage> {
     // }
 
     return Padding(
-      padding: const EdgeInsets.all(12),
+      padding: EdgeInsets.all(_isMobile ? 6 : 12),
       child: Card(
         elevation: 1.5,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         child: Padding(
-          padding: const EdgeInsets.all(8),
+          padding: EdgeInsets.all(_isMobile ? 6 : 8),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Row(
-                children: [
-                  const Icon(Icons.stacked_bar_chart_rounded, size: 18),
-                  const SizedBox(width: 8),
-                  const Text(
-                    'Patrol Summary',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
-                  ),
-                  const Spacer(),
-                  _DateField(
-                    ctrl: _fromCtrl,
-                    label: 'From',
-                    onTap: () => _pickDate(isFrom: true),
-                  ),
-                  const SizedBox(width: 8),
-                  _DateField(
-                    ctrl: _toCtrl,
-                    label: 'To',
-                    onTap: () => _pickDate(isFrom: false),
-                  ),
-                ],
-              ),
+              _isMobile
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Row(
+                          children: [
+                            Icon(Icons.stacked_bar_chart_rounded, size: 18),
+                            SizedBox(width: 8),
+                            Text(
+                              'Patrol Summary',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _DateField(
+                                ctrl: _fromCtrl,
+                                label: 'From',
+                                onTap: () => _pickDate(isFrom: true),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: _DateField(
+                                ctrl: _toCtrl,
+                                label: 'To',
+                                onTap: () => _pickDate(isFrom: false),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    )
+                  : Row(
+                      children: [
+                        const Icon(Icons.stacked_bar_chart_rounded, size: 18),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'Patrol Summary',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const Spacer(),
+                        _DateField(
+                          ctrl: _fromCtrl,
+                          label: 'From',
+                          onTap: () => _pickDate(isFrom: true),
+                        ),
+                        const SizedBox(width: 8),
+                        _DateField(
+                          ctrl: _toCtrl,
+                          label: 'To',
+                          onTap: () => _pickDate(isFrom: false),
+                        ),
+                      ],
+                    ),
+
               if (totalItem != null) ...[
                 const SizedBox(height: 10),
                 _TotalRiskBar(totalItem),
               ],
+
               if (_noData) ...[
                 const SizedBox(height: 10),
                 Container(
@@ -363,10 +409,16 @@ class _PatrolRiskSummarySfPageState extends State<PatrolRiskSummarySfPage> {
                   ),
                 ),
               ],
+
               const SizedBox(height: 8),
+
               if (!_noData && chartItems.isNotEmpty)
                 SizedBox(
-                  height: chartItems.length * 20 + 80,
+                  height: _isMobile
+                      ? (chartItems.length * 26 + 110)
+                            .clamp(220, 420)
+                            .toDouble()
+                      : chartItems.length * 20 + 80,
                   child: _RiskStackedBarChart(
                     items: chartItems,
                     onSelect: widget.onSelect,
@@ -529,14 +581,16 @@ class _DateField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isMobile = MediaQuery.of(context).size.width < 600;
+
     return SizedBox(
-      width: 130,
+      width: isMobile ? null : 130,
       height: 38,
       child: TextField(
         controller: ctrl,
         readOnly: true,
         onTap: onTap,
-        style: const TextStyle(fontSize: 12),
+        style: TextStyle(fontSize: isMobile ? 11 : 12),
         decoration: InputDecoration(
           labelText: label,
           isDense: true,
@@ -561,8 +615,10 @@ class _TotalRiskBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isMobile = MediaQuery.of(context).size.width < 600;
+
     Widget chip(String label, int v) => Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      padding: EdgeInsets.symmetric(horizontal: isMobile ? 6 : 8, vertical: 6),
       decoration: BoxDecoration(
         color: Colors.black.withOpacity(0.06),
         borderRadius: BorderRadius.circular(999),
@@ -571,6 +627,7 @@ class _TotalRiskBar extends StatelessWidget {
       child: Text(
         '$label: $v',
         style: TextStyle(
+          fontSize: isMobile ? 11 : 13,
           fontWeight: FontWeight.w700,
           color: CommonUI.riskColor(label),
         ),
@@ -584,29 +641,58 @@ class _TotalRiskBar extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.blueGrey.withOpacity(0.25)),
       ),
-      child: Row(
-        children: [
-          const Icon(Icons.summarize_rounded, size: 18),
-          const SizedBox(width: 8),
-          Text(
-            'Total Risk: $total',
-            style: const TextStyle(fontWeight: FontWeight.w900),
-          ),
-          const Spacer(),
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            children: [
-              chip('-', t.minus),
-              chip('I', t.i),
-              chip('II', t.ii),
-              chip('III', t.iii),
-              chip('IV', t.iv),
-              chip('V', t.v),
-            ],
-          ),
-        ],
-      ),
+      child: isMobile
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.summarize_rounded, size: 18),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Total Risk: $total',
+                      style: const TextStyle(fontWeight: FontWeight.w900),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    chip('-', t.minus),
+                    chip('I', t.i),
+                    chip('II', t.ii),
+                    chip('III', t.iii),
+                    chip('IV', t.iv),
+                    chip('V', t.v),
+                  ],
+                ),
+              ],
+            )
+          : Row(
+              children: [
+                const Icon(Icons.summarize_rounded, size: 18),
+                const SizedBox(width: 8),
+                Text(
+                  'Total Risk: $total',
+                  style: const TextStyle(fontWeight: FontWeight.w900),
+                ),
+                const Spacer(),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    chip('-', t.minus),
+                    chip('I', t.i),
+                    chip('II', t.ii),
+                    chip('III', t.iii),
+                    chip('IV', t.iv),
+                    chip('V', t.v),
+                  ],
+                ),
+              ],
+            ),
     );
   }
 }

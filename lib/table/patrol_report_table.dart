@@ -60,6 +60,8 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
   String? _patrolUser;
   bool _isLoadingName = false;
 
+  final ScrollController _pageScrollCtrl = ScrollController();
+
   @override
   void initState() {
     super.initState();
@@ -126,6 +128,7 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
 
   @override
   void dispose() {
+    _pageScrollCtrl.dispose();
     _horizontalScrollCtrl.dispose();
     _verticalScrollCtrl.dispose();
     _filterListScrollCtrl.dispose();
@@ -196,28 +199,14 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
     return {for (final key in sortedKeys) key: counts[key]!};
   }
 
-  List<String> get _availableGroups {
-    final base = PatrolReportTableHelper.applyFilters(
-      source: _reports,
-      query: _viewState.searchQuery,
-      fromDate: _viewState.fromDate,
-      toDate: _viewState.toDate,
-      filterValues: _viewState.filterValues,
-      columns: _columns,
-      excludeColumn: 'Group',
-    );
-
-    return PatrolReportTableHelper.distinctColumnValues(
-      columnLabel: 'Group',
-      source: base,
-      columns: _columns,
-    );
-  }
-
   String? get _selectedGroup {
     final values = _viewState.filterValues['Group'];
     if (values == null || values.isEmpty) return null;
     return values.first;
+  }
+
+  bool get isHse {
+    return widget.auth.role == "HSE";
   }
 
   void _onTapGroup(String group) {
@@ -427,10 +416,6 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
   //   });
   // }
 
-  bool get isHse {
-    return widget.auth.role == "HSE";
-  }
-
   Future<void> _editReport(PatrolReportModel report) async {
     final canEdit =
         report.patrol_user?.trim() == _patrolUser?.trim() ||
@@ -520,52 +505,205 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
             final filtered = _filteredReports;
             final currentItems = _currentPageItems;
 
-            return Column(
-              children: [
-                _buildSummaryToggle(),
-                AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 250),
-                  switchInCurve: Curves.easeOut,
-                  switchOutCurve: Curves.easeIn,
-                  child: _viewState.showSummary
-                      ? Padding(
-                          key: const ValueKey('summary'),
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: PatrolRiskSummarySfPage(
-                            onSelect: _applySummaryFilter,
-                            onDateChanged: (from, to) {
-                              setState(() {
-                                _viewState = _viewState.copyWith(
-                                  fromDate: from,
-                                  toDate: to,
-                                  page: 0,
-                                );
-                              });
-                            },
-                            fromD: _viewState.fromDate,
-                            toD: _viewState.toDate,
-                            plant: widget.plant,
-                            patrolGroup: widget.patrolGroup,
+            return LayoutBuilder(
+              builder: (context, constraints) {
+                final isMobile = constraints.maxWidth < 700;
+
+                if (!isMobile) {
+                  return Column(
+                    children: [
+                      Expanded(
+                        child: ScrollbarTheme(
+                          data: ScrollbarThemeData(
+                            thumbColor: WidgetStateProperty.all(
+                              Colors.black.withOpacity(0.8),
+                            ),
+
+                            trackColor: WidgetStateProperty.all(Colors.grey),
+
+                            trackBorderColor: WidgetStateProperty.all(
+                              Colors.transparent,
+                            ),
+
+                            radius: const Radius.circular(999),
+
+                            thickness: WidgetStateProperty.all(10),
+
+                            thumbVisibility: WidgetStateProperty.all(true),
+
+                            trackVisibility: WidgetStateProperty.all(true),
                           ),
-                        )
-                      : const SizedBox(key: ValueKey('summary_empty')),
-                ),
-                _buildTopBar(total: _reports.length, shown: filtered.length),
-                // if (_viewState.activeFilterColumn == null) _buildGroupBar(),
-                if (_viewState.downloading)
-                  CommonUI.exportLoadingBanner(
-                    accentColor: Colors.amber,
-                    title: 'Exporting Excel',
-                    subtitle: 'Large dataset detected, please wait…',
-                  ),
-                Expanded(
-                  child: _buildTable(context: context, reports: currentItems),
-                ),
-                _buildPager(
-                  totalItems: filtered.length,
-                  totalPages: _totalPages,
-                ),
-              ],
+
+                          child: Column(
+                            children: [
+                              _buildSummaryToggle(),
+
+                              AnimatedSwitcher(
+                                duration: const Duration(milliseconds: 250),
+                                switchInCurve: Curves.easeOut,
+                                switchOutCurve: Curves.easeIn,
+                                child: _viewState.showSummary
+                                    ? Padding(
+                                        key: const ValueKey('summary'),
+                                        padding: const EdgeInsets.only(
+                                          bottom: 8,
+                                        ),
+                                        child: PatrolRiskSummarySfPage(
+                                          onSelect: _applySummaryFilter,
+                                          onDateChanged: (from, to) {
+                                            setState(() {
+                                              _viewState = _viewState.copyWith(
+                                                fromDate: from,
+                                                toDate: to,
+                                                page: 0,
+                                              );
+                                            });
+                                          },
+                                          fromD: _viewState.fromDate,
+                                          toD: _viewState.toDate,
+                                          plant: widget.plant,
+                                          patrolGroup: widget.patrolGroup,
+                                        ),
+                                      )
+                                    : const SizedBox(
+                                        key: ValueKey('summary_empty'),
+                                      ),
+                              ),
+
+                              _buildTopBar(
+                                total: _reports.length,
+                                shown: filtered.length,
+                              ),
+
+                              if (_viewState.downloading)
+                                CommonUI.exportLoadingBanner(
+                                  accentColor: Colors.amber,
+                                  title: 'Exporting Excel',
+                                  subtitle:
+                                      'Large dataset detected, please wait…',
+                                ),
+
+                              Expanded(
+                                child: _buildTable(
+                                  context: context,
+                                  reports: currentItems,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+
+                      _buildPager(
+                        totalItems: filtered.length,
+                        totalPages: _totalPages,
+                      ),
+                    ],
+                  );
+                }
+
+                return Column(
+                  children: [
+                    Expanded(
+                      child: ScrollbarTheme(
+                        data: ScrollbarThemeData(
+                          thumbColor: WidgetStateProperty.all(
+                            Colors.black.withOpacity(0.8),
+                          ),
+                          trackColor: WidgetStateProperty.all(
+                            Colors.grey.withOpacity(0.8),
+                          ),
+                          trackBorderColor: WidgetStateProperty.all(
+                            Colors.transparent,
+                          ),
+                          radius: const Radius.circular(999),
+                          thickness: WidgetStateProperty.all(10),
+                          thumbVisibility: WidgetStateProperty.all(true),
+                          trackVisibility: WidgetStateProperty.all(true),
+                        ),
+
+                        child: Scrollbar(
+                          controller: _pageScrollCtrl,
+                          thumbVisibility: true,
+                          trackVisibility: true,
+                          thickness: 10,
+                          radius: const Radius.circular(999),
+
+                          child: SingleChildScrollView(
+                            controller: _pageScrollCtrl,
+                            padding: const EdgeInsets.only(bottom: 8),
+
+                            child: Column(
+                              children: [
+                                _buildSummaryToggle(),
+
+                                AnimatedSwitcher(
+                                  duration: const Duration(milliseconds: 250),
+                                  switchInCurve: Curves.easeOut,
+                                  switchOutCurve: Curves.easeIn,
+                                  child: _viewState.showSummary
+                                      ? Padding(
+                                          key: const ValueKey('summary'),
+                                          padding: const EdgeInsets.only(
+                                            bottom: 8,
+                                          ),
+                                          child: PatrolRiskSummarySfPage(
+                                            onSelect: _applySummaryFilter,
+                                            onDateChanged: (from, to) {
+                                              setState(() {
+                                                _viewState = _viewState
+                                                    .copyWith(
+                                                      fromDate: from,
+                                                      toDate: to,
+                                                      page: 0,
+                                                    );
+                                              });
+                                            },
+                                            fromD: _viewState.fromDate,
+                                            toD: _viewState.toDate,
+                                            plant: widget.plant,
+                                            patrolGroup: widget.patrolGroup,
+                                          ),
+                                        )
+                                      : const SizedBox(
+                                          key: ValueKey('summary_empty'),
+                                        ),
+                                ),
+
+                                _buildTopBar(
+                                  total: _reports.length,
+                                  shown: filtered.length,
+                                ),
+
+                                if (_viewState.downloading)
+                                  CommonUI.exportLoadingBanner(
+                                    accentColor: Colors.amber,
+                                    title: 'Exporting Excel',
+                                    subtitle:
+                                        'Large dataset detected, please wait…',
+                                  ),
+
+                                SizedBox(
+                                  height: constraints.maxHeight * 0.62,
+                                  child: _buildTable(
+                                    context: context,
+                                    reports: currentItems,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    _buildPager(
+                      totalItems: filtered.length,
+                      totalPages: _totalPages,
+                    ),
+                  ],
+                );
+              },
             );
           },
         ),
@@ -574,13 +712,64 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
   }
 
   Widget _buildSummaryToggle() {
+    final isMobile = MediaQuery.of(context).size.width < 700;
+
+    if (isMobile) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(8, 6, 8, 0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (_viewState.activeFilterColumn == null) _buildGroupBar(),
+
+            const SizedBox(height: 6),
+
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton.icon(
+                  onPressed: () {
+                    setState(() {
+                      _viewState = _viewState.copyWith(
+                        showSummary: !_viewState.showSummary,
+                      );
+                    });
+                  },
+                  icon: Icon(
+                    _viewState.showSummary
+                        ? Icons.expand_less_rounded
+                        : Icons.expand_more_rounded,
+                    color: Colors.white,
+                  ),
+                  label: Text(
+                    _viewState.showSummary ? 'Hide' : 'Show',
+                    style: const TextStyle(color: Colors.white70),
+                  ),
+                ),
+                TextButton.icon(
+                  onPressed: _openBeforeAfterSummary,
+                  icon: const Icon(
+                    Icons.analytics_outlined,
+                    color: Colors.white,
+                  ),
+                  label: const Text(
+                    'Report',
+                    style: TextStyle(color: Colors.white70),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+    }
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 6, 12, 0),
       child: Row(
         children: [
           if (_viewState.activeFilterColumn == null)
             Expanded(child: _buildGroupBar()),
-
           TextButton.icon(
             onPressed: () {
               setState(() {
@@ -740,6 +929,8 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
   }
 
   Widget _buildGroupBar() {
+    final isMobile = MediaQuery.of(context).size.width < 700;
+
     final groupCounts = _groupCaseCounts;
     final groups = groupCounts.keys.toList();
     final selectedGroup = _selectedGroup;
@@ -747,6 +938,7 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
     final fromText = _viewState.fromDate != null
         ? PatrolReportTableHelper.fmtDate(_viewState.fromDate!)
         : '--';
+
     final toText = _viewState.toDate != null
         ? PatrolReportTableHelper.fmtDate(_viewState.toDate!)
         : '--';
@@ -758,6 +950,64 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
       return const SizedBox.shrink();
     }
 
+    final chips = groups.map((group) {
+      final selected = group == selectedGroup;
+      final count = groupCounts[group] ?? 0;
+
+      return FilterChip(
+        visualDensity: isMobile
+            ? VisualDensity.compact
+            : VisualDensity.standard,
+        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        label: Text('$group ($count)', overflow: TextOverflow.ellipsis),
+        selected: selected,
+        onSelected: (_) => _onTapGroup(group),
+        selectedColor: Colors.blue.withOpacity(0.22),
+        backgroundColor: Colors.white,
+        checkmarkColor: Colors.blue,
+        labelStyle: TextStyle(
+          fontSize: isMobile ? 12 : 13,
+          color: selected ? Colors.blue.shade900 : Colors.black87,
+          fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+        ),
+        side: BorderSide(color: selected ? Colors.blue : Colors.grey.shade300),
+      );
+    }).toList();
+
+    if (isMobile) {
+      return Container(
+        padding: const EdgeInsets.fromLTRB(4, 4, 4, 4),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Wrap(spacing: 6, runSpacing: 6, children: chips),
+
+            const SizedBox(height: 8),
+
+            Row(
+              children: [
+                Expanded(
+                  child: _buildDateChip(
+                    label: 'From',
+                    value: fromText,
+                    onTap: () => _pickTableDate(isFrom: true),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _buildDateChip(
+                    label: 'To',
+                    value: toText,
+                    onTap: () => _pickTableDate(isFrom: false),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+    }
+
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 6, 12, 6),
       child: Wrap(
@@ -765,33 +1015,12 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
         runSpacing: 8,
         crossAxisAlignment: WrapCrossAlignment.center,
         children: [
-          ...groups.map((group) {
-            final selected = group == selectedGroup;
-            final count = groupCounts[group] ?? 0;
-
-            return FilterChip(
-              label: Text('$group ($count)'),
-              selected: selected,
-              onSelected: (_) => _onTapGroup(group),
-              selectedColor: Colors.blue.withOpacity(0.22),
-              backgroundColor: Colors.white,
-              checkmarkColor: Colors.blue,
-              labelStyle: TextStyle(
-                color: selected ? Colors.blue.shade900 : Colors.black87,
-                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-              ),
-              side: BorderSide(
-                color: selected ? Colors.blue : Colors.grey.shade300,
-              ),
-            );
-          }),
-
+          ...chips,
           _buildDateChip(
             label: 'From',
             value: fromText,
             onTap: () => _pickTableDate(isFrom: true),
           ),
-
           _buildDateChip(
             label: 'To',
             value: toText,
