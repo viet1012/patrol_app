@@ -61602,8 +61602,7 @@ break
 case 1:return A.y(q,r)}})
 return A.z($async$k0,r)},
 K(a){var s,r,q,p,o=this,n=null,m=t.p,l=A.k4(n,B.aZ,!1,n,A.dI(n,!0,B.cV,B.aB,new A.b2p(o,a)),A.aq(A.b([A.ap(A.b([A.T("Patrol Redo",n,n,n,n,n,n,n,B.eV,n,n,n,n),A.T(o.a.d.f,n,n,n,n,n,n,n,B.cj,n,n,n,n)],m),B.m,B.h,B.l),A.T("ID: "+J.aX(o.a.d.a),n,n,n,n,n,n,n,B.cj,n,n,n,n)],m),B.m,B.cc,B.l,0,n),4),k=A.bl(a,n,t.l).w,j=A.aq(A.b([A.au(A.ap(A.b([o.nX(B.kw,B.bp,A.d2("group",a),o.a.d.e),B.a4,o.nX(B.ky,B.pR,A.d2("area",a),o.a.d.w)],m),B.D,B.h,B.l),1),B.aM,A.au(A.ap(A.b([o.nX(B.oI,B.pN,A.d2("fac",a),o.a.d.r),B.a4,o.nX(B.ol,B.pS,A.d2("machine",a),o.a.d.x)],m),B.D,B.h,B.l),1)],m),B.D,B.h,B.l,0,n),i=A.aq(A.b([A.au(o.Fe(B.f9,o.a.d.at,B.hy,"Comment"),1),B.aM,A.au(o.Fe(B.iS,o.a.d.ax,B.pQ,"Countermeasure"),1)],m),B.bx,B.h,B.l,0,n),h=o.a.d.db
-h.toString
-h=o.nX(B.z,B.bp,"Patrol User",h)
+h=o.nX(B.z,B.bp,"Patrol User",h==null?"-":h)
 s=A.au(A.ap(A.b([o.nX(B.z,B.bp,"Patrol at",o.q7(o.a.d.ch)),B.a4,o.aFz(B.z,B.bp,"Review Similar Cases",o.a.d.ay)],m),B.D,B.h,B.l),1)
 r=o.nX(B.z,B.bp,"Deadline",o.q7(o.a.d.cx))
 q=A.d2("label_risk",a)
@@ -61622,15 +61621,11 @@ Fe(a,b,c,d){var s=null,r=A.E(20,B.c.k()>>>16&255,B.c.k()>>>8&255,B.c.k()&255),q=
 return A.a6(s,A.dw(A.ap(A.b([o,B.ia,A.T(n,s,s,s,s,s,s,s,A.b5(s,s,A.E(217,B.c.k()>>>16&255,B.c.k()>>>8&255,B.c.k()&255),s,s,s,s,s,s,s,s,13,s,s,s,s,1.4,!0,s,s,s,s,s,s,s,s),s,s,s,s)],t.p),B.D,B.h,B.L),s,s,s,B.a0),B.k,s,s,new A.ai(r,s,p,q,s,s,B.t),s,s,s,B.ao,s,s,s)},
 Oj(a,b,c,d,e){var s,r=this,q=null,p=A.E(56,B.j.k()>>>16&255,B.j.k()>>>8&255,B.j.k()&255),o=A.V(16),n=A.bT(A.E(31,B.c.k()>>>16&255,B.c.k()>>>8&255,B.c.k()&255),1),m=t.p,l=A.b([A.T(e,q,q,q,q,q,q,q,B.rO,q,q,q,q)],m)
 if(b){s=r.a.d.fx
-s.toString
-l.push(r.nX(B.z,B.bp,"After PIC:",s))}if(c){s=r.a.d.id
-s.toString
-l.push(r.nX(B.z,B.bp,"HSE Judge:",s))}m=A.b([A.aq(l,B.m,B.cc,B.l,0,q),B.a4,r.aFw(a,d),B.a4],m)
+l.push(r.nX(B.z,B.bp,"After PIC:",s==null?"-":s))}if(c){s=r.a.d.id
+l.push(r.nX(B.z,B.bp,"HSE Judge:",s==null?"-":s))}m=A.b([A.aq(l,B.m,B.cc,B.l,0,q),B.a4,r.aFw(a,d),B.a4],m)
 if(b){l=r.a.d.dy
-l.toString
-m.push(A.c5(r.Fe(B.f9,l,B.hy,"Comment"),q,q))}if(c){l=r.a.d.k2
-l.toString
-m.push(A.c5(r.Fe(B.f9,l,B.hy,"Comment"),q,q))}return A.a6(q,A.ap(m,B.D,B.h,B.l),B.k,q,q,new A.ai(p,q,n,o,q,q,B.t),q,q,q,B.ao,q,q,q)},
+m.push(A.c5(r.Fe(B.f9,l==null?"-":l,B.hy,"Comment"),q,q))}if(c){l=r.a.d.k2
+m.push(A.c5(r.Fe(B.f9,l==null?"-":l,B.hy,"Comment"),q,q))}return A.a6(q,A.ap(m,B.D,B.h,B.l),B.k,q,q,new A.ai(p,q,n,o,q,q,B.t),q,q,q,B.ao,q,q,q)},
 aAx(a,b,c){return this.Oj(a,!1,!1,b,c)},
 aAy(a,b,c,d){return this.Oj(a,b,!1,c,d)},
 aAz(a,b,c,d){return this.Oj(a,!1,b,c,d)},
