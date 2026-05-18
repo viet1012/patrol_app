@@ -26,7 +26,8 @@ class EditReportDialog extends StatefulWidget {
     required this.me,
   });
 
-  static Future<PatrolReportModel?> show(BuildContext context, {
+  static Future<PatrolReportModel?> show(
+    BuildContext context, {
     required PatrolReportModel model,
     required AuthMe me,
   }) {
@@ -77,11 +78,13 @@ class _EditReportDialogState extends State<EditReportDialog> {
   String? _selectedAtStatus;
   String? _oldAtStatus;
 
+  String? _employeeName;
+  bool _isLoadingName = false;
+
   void _markDirty() {
     if (_dirty) return;
     setState(() => _dirty = true);
   }
-
 
   @override
   void initState() {
@@ -119,13 +122,17 @@ class _EditReportDialogState extends State<EditReportDialog> {
         !atStatusOptions.contains(_selectedAtStatus)) {
       _selectedAtStatus = null;
     }
-
+    fetchEmployeeName(
+      widget.me.empId,
+    ).then((name) => debugPrint('EMPLOYEE NAME = $name'));
     _loadHseMaster();
   }
 
-  String? _ensureRiskKey(String? raw,
-      List<RiskOption> options,
-      BuildContext ctx,) {
+  String? _ensureRiskKey(
+    String? raw,
+    List<RiskOption> options,
+    BuildContext ctx,
+  ) {
     if (raw == null) return null;
 
     // Normalize: tách theo newline, trim, bỏ rỗng
@@ -181,6 +188,31 @@ class _EditReportDialogState extends State<EditReportDialog> {
   String _norm(String? s) => (s ?? '').trim();
 
   bool _eq(String? a, String? b) => _norm(a) == _norm(b);
+
+  Future<String?> fetchEmployeeName(String code) async {
+    final empCode = code.trim();
+    if (empCode.isEmpty) return null;
+
+    if (!mounted) return null;
+    setState(() => _isLoadingName = true);
+
+    try {
+      final name = await HseMasterService.fetchEmployeeName(empCode);
+
+      if (!mounted) return null;
+      setState(() => _employeeName = name);
+      return name;
+    } catch (e) {
+      debugPrint('Error fetching employee name: $e');
+
+      if (!mounted) return null;
+      setState(() => _employeeName = null);
+      return null;
+    } finally {
+      if (!mounted) return null;
+      setState(() => _isLoadingName = false);
+    }
+  }
 
   Future<void> _loadHseMaster() async {
     setState(() {
@@ -565,8 +597,8 @@ class _EditReportDialogState extends State<EditReportDialog> {
                           _riskScoreSymbol.isEmpty ? "-" : _riskScoreSymbol,
                           style: TextStyle(
                             color:
-                            (_riskScoreSymbol == "V" ||
-                                _riskScoreSymbol == "IV")
+                                (_riskScoreSymbol == "V" ||
+                                    _riskScoreSymbol == "IV")
                                 ? Colors.redAccent
                                 : Colors.white,
                             fontWeight: FontWeight.w800,
@@ -758,6 +790,7 @@ class _EditReportDialogState extends State<EditReportDialog> {
         riskTotal: _riskScoreSymbol,
         atStatus: _selectedAtStatus,
         pic: _selectedPIC,
+        editUser: "${widget.me.empId}_$_employeeName",
       );
       if (!mounted) return;
 
@@ -829,7 +862,7 @@ class _EditReportDialogState extends State<EditReportDialog> {
           context: widget.parentContext,
           title: 'Update Failed',
           message:
-          'Unable to update the report.\nPlease check your connection or try again.',
+              'Unable to update the report.\nPlease check your connection or try again.',
         );
       });
     }
@@ -844,24 +877,20 @@ class _EditReportDialogState extends State<EditReportDialog> {
     super.dispose();
   }
 
-  String get _riskScoreSymbol =>
-      RiskScoreCalculator.scoreSymbol(
-        freqKey: _riskFreq,
-        probKey: _riskProb,
-        sevKey: _riskSev,
-        frequencyOptions: frequencyOptions,
-        probabilityOptions: probabilityOptions,
-        severityOptions: severityOptions,
-      );
+  String get _riskScoreSymbol => RiskScoreCalculator.scoreSymbol(
+    freqKey: _riskFreq,
+    probKey: _riskProb,
+    sevKey: _riskSev,
+    frequencyOptions: frequencyOptions,
+    probabilityOptions: probabilityOptions,
+    severityOptions: severityOptions,
+  );
 
   // ? Dialog UI (thay Scaffold)
   @override
   Widget build(BuildContext context) {
     final maxW = 720.0;
-    final w = MediaQuery
-        .of(context)
-        .size
-        .width;
+    final w = MediaQuery.of(context).size.width;
     final dialogW = w < 520 ? w - 24 : (w < maxW ? w - 48 : maxW);
 
     return Dialog(
@@ -870,10 +899,7 @@ class _EditReportDialogState extends State<EditReportDialog> {
       child: ConstrainedBox(
         constraints: BoxConstraints(
           maxWidth: dialogW,
-          maxHeight: MediaQuery
-              .of(context)
-              .size
-              .height * 0.86,
+          maxHeight: MediaQuery.of(context).size.height * 0.86,
         ),
         child: Container(
           decoration: BoxDecoration(
@@ -938,7 +964,7 @@ class _EditReportDialogState extends State<EditReportDialog> {
                         child: GlassActionButton(
                           icon: Icons.save_rounded,
                           onTap:
-                          null, // hoặc () {} nếu widget bắt buộc non-null
+                              null, // hoặc () {} nếu widget bắt buộc non-null
                         ),
                       ),
                   ],
