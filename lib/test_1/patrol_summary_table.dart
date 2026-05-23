@@ -4,6 +4,8 @@ import 'package:chuphinh/api/api_config.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
+import 'mobile/patrol_mobile_summary_tables.dart';
+
 String kBaseUrl = ApiConfig.baseUrl;
 
 class RiskBreakdownDto {
@@ -399,80 +401,104 @@ class _FacSummaryCardState extends State<FacSummaryCard> {
     return 370;
   }
 
+  bool _isMobile(double width) {
+    return width < 900;
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.06),
-        borderRadius: BorderRadius.circular(TableUiConfig.borderRadius),
-        border: Border.all(color: Colors.white.withOpacity(0.5)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isMobile = _isMobile(constraints.maxWidth);
+
+        return Container(
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.06),
+            borderRadius: BorderRadius.circular(TableUiConfig.borderRadius),
+            border: Border.all(color: Colors.white.withOpacity(0.5)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.08),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _SummaryHeader(
-            facName: widget.fac.fac,
-            finishedRate: _percent(widget.fac.finishedRate),
-            remainRate: _percent(widget.fac.remainRate),
-            okRate: _percent(widget.fac.okRate),
-            ngRate: _percent(widget.fac.ngRate),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _SummaryHeader(
+                facName: widget.fac.fac,
+                finishedRate: _percent(widget.fac.finishedRate),
+                remainRate: _percent(widget.fac.remainRate),
+                okRate: _percent(widget.fac.okRate),
+                ngRate: _percent(widget.fac.ngRate),
+              ),
+
+              const SizedBox(height: 10),
+
+              if (isMobile)
+                PatrolMobileSummaryTables(
+                  rows: _displayRows,
+                  tableHeight: _tableHeight,
+                  finishedRate: widget.fac.finishedRate,
+                  remainRate: widget.fac.remainRate,
+                  okRate: widget.fac.okRate,
+                  ngRate: widget.fac.ngRate,
+                )
+              else
+                _buildDesktopTables(),
+            ],
           ),
-          const SizedBox(height: 10),
-          SizedBox(
-            height: _tableHeight,
-            child: Scrollbar(
-              controller: _horizontalController,
-              thumbVisibility: true,
-              trackVisibility: true,
-              notificationPredicate: (notification) =>
-                  notification.metrics.axis == Axis.horizontal,
-              child: SingleChildScrollView(
-                controller: _horizontalController,
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    SizedBox(
-                      width: TableUiConfig.tableWidth(
-                        TableUiConfig.beforeColumns,
-                      ),
-                      child: BeforeTable(rows: _displayRows),
-                    ),
-                    const SizedBox(width: TableUiConfig.gapBetweenTables),
-                    SizedBox(
-                      width: TableUiConfig.tableWidth(
-                        TableUiConfig.afterColumns,
-                      ),
-                      child: AfterTable(
-                        rows: _displayRows,
-                        finishedRate: widget.fac.finishedRate,
-                        remainRate: widget.fac.remainRate,
-                      ),
-                    ),
-                    const SizedBox(width: TableUiConfig.gapBetweenTables),
-                    SizedBox(
-                      width: TableUiConfig.tableWidth(
-                        TableUiConfig.recheckColumns,
-                      ),
-                      child: RecheckTable(
-                        rows: _displayRows,
-                        okRate: widget.fac.okRate,
-                        ngRate: widget.fac.ngRate,
-                      ),
-                    ),
-                  ],
+        );
+      },
+    );
+  }
+
+  Widget _buildDesktopTables() {
+    return SizedBox(
+      height: _tableHeight,
+      child: Scrollbar(
+        controller: _horizontalController,
+        thumbVisibility: true,
+        trackVisibility: true,
+        notificationPredicate: (notification) =>
+            notification.metrics.axis == Axis.horizontal,
+        child: SingleChildScrollView(
+          controller: _horizontalController,
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(
+                width: TableUiConfig.tableWidth(TableUiConfig.beforeColumns),
+                child: BeforeTable(rows: _displayRows),
+              ),
+
+              const SizedBox(width: TableUiConfig.gapBetweenTables),
+
+              SizedBox(
+                width: TableUiConfig.tableWidth(TableUiConfig.afterColumns),
+                child: AfterTable(
+                  rows: _displayRows,
+                  finishedRate: widget.fac.finishedRate,
+                  remainRate: widget.fac.remainRate,
                 ),
               ),
-            ),
+
+              const SizedBox(width: TableUiConfig.gapBetweenTables),
+
+              SizedBox(
+                width: TableUiConfig.tableWidth(TableUiConfig.recheckColumns),
+                child: RecheckTable(
+                  rows: _displayRows,
+                  okRate: widget.fac.okRate,
+                  ngRate: widget.fac.ngRate,
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -520,60 +546,6 @@ class _SummaryHeader extends StatelessWidget {
         // _SummaryPill(label: 'OK', value: okRate),
         // _SummaryPill(label: 'NG', value: ngRate),
       ],
-    );
-  }
-}
-
-class _SummaryPill extends StatelessWidget {
-  final String label;
-  final String value;
-
-  const _SummaryPill({required this.label, required this.value});
-
-  Color _valueColor() {
-    switch (label) {
-      case 'Finished':
-      case 'OK':
-        return Colors.greenAccent;
-      case 'Remain':
-      case 'NG':
-        return Colors.orangeAccent;
-      default:
-        return Colors.white;
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(999),
-        color: Colors.black.withOpacity(0.18),
-        border: Border.all(color: Colors.white.withOpacity(0.08)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(
-              color: Colors.white70,
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(width: 6),
-          Text(
-            value,
-            style: TextStyle(
-              color: _valueColor(),
-              fontSize: 14,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
@@ -893,45 +865,116 @@ class ExcelLikeTable extends StatelessWidget {
   bool _isRecheckNgColumn(int index) => index >= 8 && index <= 13;
 
   Color? _cellBackground(int index) {
-    if (index == 0) return const Color(0xFFF7F8FA);
-    if (titleLeft == 'AFTER TOTAL') {
-      if (_isAfterFinishedColumn(index)) return TableUiConfig.finishedBg;
-      if (_isAfterRemainColumn(index)) return TableUiConfig.remainBg;
+    if (index == 0) {
+      return const Color(0xFFF7F8FA);
     }
 
-    if (titleCenter == 'HSE re-check (All)') {
-      if (_isRecheckOkColumn(index)) return TableUiConfig.okBg;
-      if (_isRecheckNgColumn(index)) return TableUiConfig.ngBg;
+    //////////////////////////////////////////////////////
+    /// FINISHED
+    //////////////////////////////////////////////////////
+    if (titleLeft == 'AFTER TOTAL' || titleLeft == 'FINISHED') {
+      if (_isAfterFinishedColumn(index)) {
+        return TableUiConfig.finishedBg;
+      }
+    }
+
+    //////////////////////////////////////////////////////
+    /// REMAIN
+    //////////////////////////////////////////////////////
+    if (titleLeft == 'AFTER TOTAL' || titleLeft == 'REMAIN') {
+      if ((titleLeft == 'AFTER TOTAL' && _isAfterRemainColumn(index)) ||
+          (titleLeft == 'REMAIN' && index >= 1 && index <= 6)) {
+        return TableUiConfig.remainBg;
+      }
+    }
+
+    //////////////////////////////////////////////////////
+    /// OK
+    //////////////////////////////////////////////////////
+    if (titleCenter == 'HSE re-check (All)' || titleLeft == 'OK') {
+      if ((titleCenter == 'HSE re-check (All)' && _isRecheckOkColumn(index)) ||
+          (titleLeft == 'OK' && index >= 1 && index <= 6)) {
+        return TableUiConfig.okBg;
+      }
+    }
+
+    //////////////////////////////////////////////////////
+    /// NG
+    //////////////////////////////////////////////////////
+    if (titleCenter == 'HSE re-check (All)' || titleLeft == 'NG') {
+      if ((titleCenter == 'HSE re-check (All)' && _isRecheckNgColumn(index)) ||
+          (titleLeft == 'NG' && index >= 1 && index <= 6)) {
+        return TableUiConfig.ngBg;
+      }
     }
 
     return null;
   }
 
   Border _cellBorder(int index) {
-    final normal = BorderSide(color: const Color(0xFFBFC7D3), width: 1);
-
+    final normal = BorderSide(color: const Color(0xFFD7DCE5), width: 1);
     final rowLine = BorderSide(color: const Color(0xFFD7DCE5), width: 1);
-
-    final picDivider = BorderSide(color: const Color(0xFF98A2B3), width: 2);
 
     final finishedStrong = BorderSide(
       color: TableUiConfig.finishedBorder,
       width: 2,
     );
-
     final remainStrong = BorderSide(
       color: TableUiConfig.remainBorder,
       width: 2,
     );
-
     final okStrong = BorderSide(color: TableUiConfig.okBorder, width: 2);
-
     final ngStrong = BorderSide(color: TableUiConfig.ngBorder, width: 2);
 
     if (index == 0) {
-      return Border(bottom: rowLine);
+      return Border(right: normal, bottom: rowLine);
     }
 
+    // MOBILE FINISHED
+    if (titleLeft == 'FINISHED') {
+      if (index == 1) {
+        return Border(left: finishedStrong, right: normal, bottom: rowLine);
+      }
+      if (index == 6) {
+        return Border(right: finishedStrong, bottom: rowLine);
+      }
+      return Border(right: normal, bottom: rowLine);
+    }
+
+    // MOBILE REMAIN
+    if (titleLeft == 'REMAIN') {
+      if (index == 1) {
+        return Border(left: remainStrong, right: normal, bottom: rowLine);
+      }
+      if (index == 6) {
+        return Border(right: remainStrong, bottom: rowLine);
+      }
+      return Border(right: normal, bottom: rowLine);
+    }
+
+    // MOBILE OK
+    if (titleLeft == 'OK') {
+      if (index == 1) {
+        return Border(left: okStrong, right: normal, bottom: rowLine);
+      }
+      if (index == 6) {
+        return Border(right: okStrong, bottom: rowLine);
+      }
+      return Border(right: normal, bottom: rowLine);
+    }
+
+    // MOBILE NG
+    if (titleLeft == 'NG') {
+      if (index == 1) {
+        return Border(left: ngStrong, right: normal, bottom: rowLine);
+      }
+      if (index == 6) {
+        return Border(right: ngStrong, bottom: rowLine);
+      }
+      return Border(right: normal, bottom: rowLine);
+    }
+
+    // DESKTOP AFTER
     if (titleLeft == 'AFTER TOTAL') {
       if (index == 1) {
         return Border(left: finishedStrong, right: normal, bottom: rowLine);
@@ -940,32 +983,30 @@ class ExcelLikeTable extends StatelessWidget {
         return Border(right: finishedStrong, bottom: rowLine);
       }
       if (index == 7) {
-        return Border(left: remainStrong, bottom: rowLine);
+        return Border(left: remainStrong, right: normal, bottom: rowLine);
       }
       if (index == 12) {
         return Border(right: remainStrong, bottom: rowLine);
       }
     }
 
+    // DESKTOP RECHECK
     if (titleCenter == 'HSE re-check (All)') {
       if (index == 2) {
-        return Border(left: okStrong, bottom: rowLine);
+        return Border(left: okStrong, right: normal, bottom: rowLine);
       }
       if (index == 7) {
         return Border(right: okStrong, bottom: rowLine);
       }
       if (index == 8) {
-        return Border(left: ngStrong, bottom: rowLine);
+        return Border(left: ngStrong, right: normal, bottom: rowLine);
       }
       if (index == 13) {
         return Border(right: ngStrong, bottom: rowLine);
       }
     }
 
-    return Border(
-      right: BorderSide(color: const Color(0xFFD7DCE5), width: 1),
-      bottom: rowLine,
-    );
+    return Border(right: normal, bottom: rowLine);
   }
 
   String _displayValue(dynamic cell) {

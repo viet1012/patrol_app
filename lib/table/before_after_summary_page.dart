@@ -106,37 +106,88 @@ class _BeforeAfterSummaryDialogState extends State<BeforeAfterSummaryDialog> {
             children: [
               // ===== Header giống AppBar =====
               Padding(
-                padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
-                child: Row(
-                  children: [
-                    GlassActionButton(
-                      icon: Icons.close_rounded,
-                      onTap: () => Navigator.of(context).pop(),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            'HSE PATROL SUMMARY → ${widget.fac}',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          Text(
-                            '${widget.fromD} → ${widget.toD}   •   ${widget.type}',
-                            style: const TextStyle(
-                              color: Colors.white70,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+                padding: const EdgeInsets.fromLTRB(8, 8, 8, 6),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final isMobile = constraints.maxWidth < 520;
+
+                    return Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        GlassActionButton(
+                          icon: Icons.close_rounded,
+                          onTap: () => Navigator.of(context).pop(),
+                        ),
+
+                        const SizedBox(width: 8),
+
+                        Expanded(
+                          child: isMobile
+                              ? Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'HSE PATROL SUMMARY → ${widget.fac}',
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+
+                                    const SizedBox(height: 4),
+
+                                    Text(
+                                      '${widget.fromD} → ${widget.toD} • ${widget.type}',
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        color: Colors.white70,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
+                                )
+                              : Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Flexible(
+                                      child: Text(
+                                        'HSE PATROL SUMMARY → ${widget.fac}',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ),
+
+                                    const SizedBox(width: 12),
+
+                                    Flexible(
+                                      child: Text(
+                                        '${widget.fromD} → ${widget.toD}   •   ${widget.type}',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        textAlign: TextAlign.right,
+                                        style: const TextStyle(
+                                          color: Colors.white70,
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                        ),
+                      ],
+                    );
+                  },
                 ),
               ),
 
@@ -264,9 +315,6 @@ class _AfterCard extends StatelessWidget {
     required this.controller,
   });
 
-  static const double _wDiv = 150;
-  static const double _wNum = 68;
-
   static const Color _sumBg = Color(0xFFDDD6FE);
   static const Color _pctTtlBg = Color(0xFFBA94E1);
 
@@ -275,44 +323,144 @@ class _AfterCard extends StatelessWidget {
   static const Color _remainBg = Color(0xFFFFC2C2);
   static const Color _hseBg = Color(0xFFBFE0F2);
 
+  static const double _wDiv = 150;
+
+  /// Desktop giữ nguyên như ban đầu
+  static const double _wNum = 68;
+
+  /// Mobile mới dùng size compact
+  static const double _mobileWTotal = 68;
+  static const double _mobileWRisk = 42;
+  static const double _mobileGroupWidth = _mobileWTotal + (_mobileWRisk * 5);
+
   double get _tableWidth => _wDiv + (_wNum * 24);
+
+  double get _mobileTableWidth => _wDiv + _mobileGroupWidth;
+
+  bool _isMobile(BuildContext context) {
+    return MediaQuery.of(context).size.width < 700;
+  }
 
   @override
   Widget build(BuildContext context) {
-    return _Glass(
-      child: Scrollbar(
+    return _Glass(child: _isMobile(context) ? _buildMobile() : _buildDesktop());
+  }
+
+  Widget _buildDesktop() {
+    return Scrollbar(
+      controller: controller,
+      thumbVisibility: true,
+      child: SingleChildScrollView(
         controller: controller,
-        thumbVisibility: true,
-        child: SingleChildScrollView(
-          controller: controller,
-          scrollDirection: Axis.horizontal,
-          child: SizedBox(
-            width: _tableWidth,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _TitleBar(
-                  text: 'SUMMARY',
-                  color: const Color(0xFFD8F5C7),
-                  width: _tableWidth,
-                ),
-
-                const SizedBox(height: 6),
-
-                _buildGroupHeader(),
-
-                _buildColumnHeader(),
-
-                const SizedBox(height: 6),
-
-                ...rows.map(_buildDataRow),
-
-                const SizedBox(height: 10),
-              ],
-            ),
+        scrollDirection: Axis.horizontal,
+        child: SizedBox(
+          width: _tableWidth,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _TitleBar(
+                text: 'SUMMARY',
+                color: const Color(0xFFD8F5C7),
+                width: _tableWidth,
+              ),
+              const SizedBox(height: 6),
+              _buildGroupHeader(),
+              _buildColumnHeader(),
+              const SizedBox(height: 6),
+              ...rows.map(_buildDataRow),
+              const SizedBox(height: 10),
+            ],
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildMobile() {
+    return Column(
+      children: [
+        _MobileSummaryGroup(
+          title: 'Before',
+          titleColor: Colors.yellow,
+          headerColor: const Color(0xFFEFE28F),
+          bodyColor: _beforeBg,
+          sumBg: _sumBg,
+          pctTtlBg: _pctTtlBg,
+          width: _mobileTableWidth,
+          rows: rows,
+          valueBuilder: (r) => [
+            r.allTtl,
+            r.allI,
+            r.allII,
+            r.allIII,
+            r.allIV,
+            r.allV,
+          ],
+        ),
+
+        const SizedBox(height: 10),
+
+        _MobileSummaryGroup(
+          title: 'Finished (Pro)',
+          titleColor: Colors.greenAccent,
+          headerColor: const Color(0xFF8FEFA0),
+          bodyColor: _proBg,
+          sumBg: _sumBg,
+          pctTtlBg: _pctTtlBg,
+          width: _mobileTableWidth,
+          rows: rows,
+          valueBuilder: (r) => [
+            r.proDoneTtl,
+            r.proDoneI,
+            r.proDoneII,
+            r.proDoneIII,
+            r.proDoneIV,
+            r.proDoneV,
+          ],
+        ),
+
+        const SizedBox(height: 10),
+
+        _MobileSummaryGroup(
+          title: 'Remain',
+          titleColor: Colors.redAccent,
+          headerColor: const Color(0xFFF89292),
+          bodyColor: _remainBg,
+          sumBg: _sumBg,
+          pctTtlBg: _pctTtlBg,
+          width: _mobileTableWidth,
+          rows: rows,
+          valueBuilder: (r) => [
+            r.remainTtl,
+            r.remainI,
+            r.remainII,
+            r.remainIII,
+            r.remainIV,
+            r.remainV,
+          ],
+        ),
+
+        const SizedBox(height: 10),
+
+        _MobileSummaryGroup(
+          title: 'Finished (HSE recheck)',
+          titleColor: Colors.blueAccent,
+          headerColor: const Color(0xFF72C7F4),
+          bodyColor: _hseBg,
+          sumBg: _sumBg,
+          pctTtlBg: _pctTtlBg,
+          width: _mobileTableWidth,
+          rows: rows,
+          valueBuilder: (r) => [
+            r.hseDoneTtl,
+            r.hseDoneI,
+            r.hseDoneII,
+            r.hseDoneIII,
+            r.hseDoneIV,
+            r.hseDoneV,
+          ],
+        ),
+      ],
     );
   }
 
@@ -335,13 +483,9 @@ class _AfterCard extends StatelessWidget {
           header: true,
           cells: [_CellSpec('Area', w: _wDiv, align: TextAlign.left)],
         ),
-
         _metricHeader(const Color(0xFFEFE28F)),
-
         _metricHeader(const Color(0xFF8FEFA0)),
-
         _metricHeader(const Color(0xFFF89292)),
-
         _metricHeader(const Color(0xFF72C7F4)),
       ],
     );
@@ -366,7 +510,6 @@ class _AfterCard extends StatelessWidget {
             ),
           ],
         ),
-
         _metricRow(
           bg: rowBg ?? (isPct ? null : _beforeBg),
           isPct: isPct,
@@ -378,7 +521,6 @@ class _AfterCard extends StatelessWidget {
           iv: r.allIV,
           v: r.allV,
         ),
-
         _metricRow(
           bg: rowBg ?? (isPct ? null : _proBg),
           isPct: isPct,
@@ -390,7 +532,6 @@ class _AfterCard extends StatelessWidget {
           iv: r.proDoneIV,
           v: r.proDoneV,
         ),
-
         _metricRow(
           bg: rowBg ?? (isPct ? null : _remainBg),
           isPct: isPct,
@@ -402,7 +543,6 @@ class _AfterCard extends StatelessWidget {
           iv: r.remainIV,
           v: r.remainV,
         ),
-
         _metricRow(
           bg: rowBg ?? (isPct ? null : _hseBg),
           isPct: isPct,
@@ -484,6 +624,134 @@ class _AfterCard extends StatelessWidget {
       _CellSpec(value(iv), w: _wNum),
       _CellSpec(value(v), w: _wNum),
     ];
+  }
+}
+
+class _MobileSummaryGroup extends StatelessWidget {
+  final String title;
+  final Color titleColor;
+  final Color headerColor;
+  final Color bodyColor;
+  final Color sumBg;
+  final Color pctTtlBg;
+  final double width;
+  final List<DivisionSummary> rows;
+  final List<double> Function(DivisionSummary row) valueBuilder;
+
+  const _MobileSummaryGroup({
+    required this.title,
+    required this.titleColor,
+    required this.headerColor,
+    required this.bodyColor,
+    required this.sumBg,
+    required this.pctTtlBg,
+    required this.width,
+    required this.rows,
+    required this.valueBuilder,
+  });
+
+  static const double _wDiv = 150;
+  static const double _wTotal = 68;
+  static const double _wRisk = 42;
+  static const double _groupWidth = _wTotal + (_wRisk * 5);
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRect(
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: SizedBox(
+          width: width,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _TitleBar(text: title, color: titleColor, width: width),
+
+              const SizedBox(height: 6),
+
+              Row(
+                children: [
+                  const SizedBox(width: _wDiv),
+                  _groupHeader(title, titleColor, _groupWidth),
+                ],
+              ),
+
+              Row(
+                children: [
+                  const _Row(
+                    header: true,
+                    cells: [_CellSpec('Area', w: _wDiv, align: TextAlign.left)],
+                  ),
+                  _metricHeader(),
+                ],
+              ),
+
+              const SizedBox(height: 6),
+
+              ...rows.map(_buildRow),
+
+              const SizedBox(height: 10),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _metricHeader() {
+    return _Row(
+      header: true,
+      bg: headerColor,
+      cells: const [
+        _CellSpec('TTL', w: _wTotal, bold: true),
+        _CellSpec('I', w: _wRisk),
+        _CellSpec('II', w: _wRisk),
+        _CellSpec('III', w: _wRisk),
+        _CellSpec('IV', w: _wRisk),
+        _CellSpec('V', w: _wRisk),
+      ],
+    );
+  }
+
+  Widget _buildRow(DivisionSummary r) {
+    final isSum = r.division == 'SUM';
+    final isPct = r.division == '%';
+    final values = valueBuilder(r);
+
+    final rowBg = isSum ? sumBg : null;
+    final bg = rowBg ?? (isPct ? null : bodyColor);
+    final ttlBg = isPct ? pctTtlBg : null;
+
+    return Row(
+      children: [
+        _Row(
+          cells: [
+            _CellSpec(
+              r.division,
+              w: _wDiv,
+              align: TextAlign.left,
+              bold: isSum || isPct,
+            ),
+          ],
+        ),
+        _Row(
+          bg: bg,
+          cells: [
+            _CellSpec(
+              isPct ? fmtPct(values[0]) : fmtNum(values[0]),
+              w: _wTotal,
+              bold: true,
+              bg: ttlBg,
+            ),
+            _CellSpec(isPct ? '' : fmtNum(values[1]), w: _wRisk),
+            _CellSpec(isPct ? '' : fmtNum(values[2]), w: _wRisk),
+            _CellSpec(isPct ? '' : fmtNum(values[3]), w: _wRisk),
+            _CellSpec(isPct ? '' : fmtNum(values[4]), w: _wRisk),
+            _CellSpec(isPct ? '' : fmtNum(values[5]), w: _wRisk),
+          ],
+        ),
+      ],
+    );
   }
 }
 
