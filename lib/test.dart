@@ -112,6 +112,8 @@ class _CameraScreenState extends State<CameraScreen> {
   bool _isLoadingMachineInfo = false;
   String? _loadingMacId;
 
+  HseMachineInfo? _qrFallbackMachine;
+
   @override
   void initState() {
     // _selectedPlant = widget.selectedPlant;
@@ -283,6 +285,30 @@ class _CameraScreenState extends State<CameraScreen> {
     return text;
   }
 
+  String? _extractAreaFromQr(String qr) {
+    final parts = qr.trim().split('_');
+
+    // KVH_A-2003_1F_A35-2_Ejector Pin
+    if (parts.length >= 5) {
+      final area = parts.sublist(4).join('_').trim();
+      return area.isEmpty ? null : area;
+    }
+
+    return null;
+  }
+
+  HseMachineInfo _buildFallbackMachineInfoFromQr({
+    required String rawQr,
+    required String macId,
+  }) {
+    return HseMachineInfo(
+      plant: _selectedPlant ?? widget.selectedPlant ?? '',
+      fac: _selectedFac ?? '',
+      area: _extractAreaFromQr(rawQr) ?? _selectedArea ?? '',
+      macId: macId,
+    );
+  }
+
   Future<HseMachineInfo?> _fetchMachineInfoByMacId(String macId) async {
     try {
       final response = await DioClient.get(
@@ -330,6 +356,8 @@ class _CameraScreenState extends State<CameraScreen> {
   }
 
   Future<void> _handleQrDetected(String qr) async {
+    if (_isLoadingMachineInfo) return;
+
     final rawQr = qr.trim();
     final isQrNumber = RegExp(r'^\d+$').hasMatch(rawQr);
     final macId = _extractMacIdFromQr(rawQr);
@@ -344,52 +372,61 @@ class _CameraScreenState extends State<CameraScreen> {
     setState(() {
       _isLoadingMachineInfo = true;
       _loadingMacId = macId;
+      _qrKey = rawQr;
     });
 
     try {
-      final info = await _fetchMachineInfoByMacId(macId);
+      final apiInfo = await _fetchMachineInfoByMacId(macId);
 
       if (!mounted) return;
 
-      if (info == null) {
-        CommonUI.showSnackBar(
-          context: context,
-          message: 'Machine not found: $macId',
-          color: Colors.red,
-        );
-        return;
-      }
+      final fallbackInfo = _buildFallbackMachineInfoFromQr(
+        rawQr: rawQr,
+        macId: macId,
+      );
+
+      final info = apiInfo ?? fallbackInfo;
 
       final validInMaster = _existsInLocalMaster(info);
       final samePlant = _norm(info.plant) == _norm(widget.selectedPlant);
 
-      if (!validInMaster) {
-        CommonUI.showSnackBar(
-          context: context,
-          message:
-              'Machine $macId is not available in the current master data '
-              '(${info.plant} / ${info.fac} / ${info.area})',
-          color: Colors.orange,
-        );
-        return;
-      }
+      final shouldUseFallback = apiInfo == null || !validInMaster || !samePlant;
 
-      if (!samePlant) {
-        CommonUI.showSnackBar(
-          context: context,
-          message:
-              'Machine $macId belongs to plant ${info.plant}, not ${widget.selectedPlant}',
-          color: Colors.orange,
-        );
-        return;
-      }
+      final selectedInfo = shouldUseFallback ? fallbackInfo : info;
 
       setState(() {
-        _selectedPlant = info.plant;
-        _selectedFac = info.fac;
-        _selectedArea = info.area;
-        _selectedMachine = info.macId;
+        if (shouldUseFallback) {
+          _qrFallbackMachine = fallbackInfo;
+        } else {
+          _qrFallbackMachine = null;
+        }
+
+        _selectedPlant = selectedInfo.plant;
+        _selectedFac = selectedInfo.fac;
+        _selectedArea = selectedInfo.area;
+        _selectedMachine = selectedInfo.macId;
       });
+
+      // setState(() {
+      //   _selectedPlant = selectedInfo.plant;
+      //   _selectedFac = selectedInfo.fac;
+      //   _selectedArea = selectedInfo.area;
+      //   _selectedMachine = selectedInfo.macId;
+      // });
+
+      if (shouldUseFallback) {
+        CommonUI.showSnackBar(
+          context: context,
+          message: 'Machine added from QR: ${selectedInfo.macId}',
+          color: Colors.orange,
+        );
+      } else {
+        CommonUI.showSnackBar(
+          context: context,
+          message: 'Machine detected: ${selectedInfo.macId}',
+          color: Colors.green,
+        );
+      }
     } finally {
       if (mounted) {
         setState(() {
@@ -510,14 +547,7 @@ class _CameraScreenState extends State<CameraScreen> {
       ////////////////////////////////////////////////////////////
       /// CALL API
       ////////////////////////////////////////////////////////////
-      // final response = await DioClient.dio.post(
-      //   "${ApiConfig.baseUrl}/api/report",
-      //   data: formData,
-      //   options: Options(
-      //     sendTimeout: const Duration(seconds: 120),
-      //     receiveTimeout: const Duration(seconds: 120),
-      //   ),
-      // );
+
       final response = await DioClient.postUpload(
         '/api/report',
         data: formData,
@@ -695,18 +725,51 @@ class _CameraScreenState extends State<CameraScreen> {
     final plantList = getPlants();
     final groupList = getGroupsByPlant();
 
-    final facList = _selectedPlant == null
-        ? []
-        : getFacByPlant(_selectedPlant!);
+    // final facList = _selectedPlant == null
+    //     ? []
+    //     : getFacByPlant(_selectedPlant!);
 
-    final areaList = _selectedPlant == null || _selectedFac == null
-        ? []
-        : getAreaByFac(_selectedPlant!, _selectedFac!);
+    // final areaList = _selectedPlant == null || _selectedFac == null
+    //     ? []
+    //     : getAreaByFac(_selectedPlant!, _selectedFac!);
 
-    final machineList =
-        _selectedPlant == null || _selectedFac == null || _selectedArea == null
-        ? []
-        : getMachineByArea(_selectedPlant!, _selectedFac!, _selectedArea!);
+    // final machineList =
+    //     _selectedPlant == null || _selectedFac == null || _selectedArea == null
+    //     ? []
+    //     : getMachineByArea(_selectedPlant!, _selectedFac!, _selectedArea!);
+    final facList = <String>[
+      if (_selectedPlant != null) ...getFacByPlant(_selectedPlant!),
+
+      if (_qrFallbackMachine != null &&
+          _norm(_qrFallbackMachine!.plant) == _norm(_selectedPlant) &&
+          _qrFallbackMachine!.fac.isNotEmpty)
+        _qrFallbackMachine!.fac,
+    ].toSet().toList();
+
+    final areaList = <String>[
+      if (_selectedPlant != null && _selectedFac != null)
+        ...getAreaByFac(_selectedPlant!, _selectedFac!),
+
+      if (_qrFallbackMachine != null &&
+          _norm(_qrFallbackMachine!.plant) == _norm(_selectedPlant) &&
+          _norm(_qrFallbackMachine!.fac) == _norm(_selectedFac) &&
+          _qrFallbackMachine!.area.isNotEmpty)
+        _qrFallbackMachine!.area,
+    ].toSet().toList();
+
+    final machineList = <String>[
+      if (_selectedPlant != null &&
+          _selectedFac != null &&
+          _selectedArea != null)
+        ...getMachineByArea(_selectedPlant!, _selectedFac!, _selectedArea!),
+
+      if (_qrFallbackMachine != null &&
+          _norm(_qrFallbackMachine!.plant) == _norm(_selectedPlant) &&
+          _norm(_qrFallbackMachine!.fac) == _norm(_selectedFac) &&
+          _norm(_qrFallbackMachine!.area) == _norm(_selectedArea) &&
+          _qrFallbackMachine!.macId.isNotEmpty)
+        _qrFallbackMachine!.macId,
+    ].toSet().toList();
 
     final imageCount = _cameraKey.currentState?.images.length ?? 0;
     final hasImages = imageCount > 0;
@@ -890,10 +953,32 @@ class _CameraScreenState extends State<CameraScreen> {
                           setState(() {
                             _selectedFac = v;
                             _selectedArea = null;
-                            _selectedMachine = null;
+
+                            final isFallbackMachine =
+                                _qrFallbackMachine != null &&
+                                _norm(_qrFallbackMachine!.macId) ==
+                                    _norm(_selectedMachine);
+
+                            if (!isFallbackMachine) {
+                              _selectedMachine = null;
+                            }
+
+                            if (isFallbackMachine) {
+                              _qrFallbackMachine = HseMachineInfo(
+                                plant:
+                                    _selectedPlant ??
+                                    widget.selectedPlant ??
+                                    '',
+                                fac: v ?? '',
+                                area: _selectedArea ?? '',
+                                macId:
+                                    _selectedMachine ??
+                                    _qrFallbackMachine!.macId,
+                              );
+                            }
 
                             final areas = getAreaByFac(_selectedPlant!, v!);
-                            if (areas.length == 1) {
+                            if (!isFallbackMachine && areas.length == 1) {
                               _selectedArea = areas.first;
 
                               final machines = getMachineByArea(
@@ -901,6 +986,7 @@ class _CameraScreenState extends State<CameraScreen> {
                                 v,
                                 areas.first,
                               );
+
                               if (machines.length == 1) {
                                 _selectedMachine = machines.first;
                               }
@@ -928,14 +1014,37 @@ class _CameraScreenState extends State<CameraScreen> {
                           onChanged: (v) {
                             setState(() {
                               _selectedArea = v;
-                              _selectedMachine = null;
+
+                              final isFallbackMachine =
+                                  _qrFallbackMachine != null &&
+                                  _norm(_qrFallbackMachine!.macId) ==
+                                      _norm(_selectedMachine);
+
+                              if (!isFallbackMachine) {
+                                _selectedMachine = null;
+                              }
+
+                              if (isFallbackMachine) {
+                                _qrFallbackMachine = HseMachineInfo(
+                                  plant:
+                                      _selectedPlant ??
+                                      widget.selectedPlant ??
+                                      '',
+                                  fac: _selectedFac ?? '',
+                                  area: v ?? '',
+                                  macId:
+                                      _selectedMachine ??
+                                      _qrFallbackMachine!.macId,
+                                );
+                              }
 
                               final machines = getMachineByArea(
                                 _selectedPlant!,
                                 _selectedFac!,
                                 v!,
                               );
-                              if (machines.length == 1) {
+
+                              if (!isFallbackMachine && machines.length == 1) {
                                 _selectedMachine = machines.first;
                               }
                             });
