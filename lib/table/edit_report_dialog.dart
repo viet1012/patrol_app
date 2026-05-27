@@ -47,6 +47,8 @@ class _EditReportDialogState extends State<EditReportDialog> {
   final TextEditingController _commentCtrl = TextEditingController();
   final TextEditingController _counterCtrl = TextEditingController();
 
+  final TextEditingController _afterCommentCtrl = TextEditingController();
+
   String? _selectedGroup;
   String? _selectedDivision; // fac
   String? _selectedArea;
@@ -89,6 +91,8 @@ class _EditReportDialogState extends State<EditReportDialog> {
   @override
   void initState() {
     super.initState();
+    _afterCommentCtrl.text = widget.report.atComment ?? '';
+    _afterCommentCtrl.addListener(_markDirty);
 
     _commentCtrl.text = widget.report.comment;
     _counterCtrl.text = widget.report.countermeasure;
@@ -764,6 +768,116 @@ class _EditReportDialogState extends State<EditReportDialog> {
     );
   }
 
+  Widget _buildAfterSection() {
+    final hasAfter =
+        (widget.report.atStatus ?? '').trim().isNotEmpty ||
+        (widget.report.atComment ?? '').trim().isNotEmpty ||
+        (widget.report.atPic ?? '').trim().isNotEmpty ||
+        (widget.report.atAssign ?? '').trim().isNotEmpty ||
+        widget.report.atDate != null ||
+        widget.report.atImageNames.isNotEmpty;
+
+    if (!hasAfter) {
+      return const SizedBox();
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.green.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.greenAccent.withOpacity(0.18)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'After Information',
+            style: TextStyle(
+              color: Colors.greenAccent,
+              fontSize: 14,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+
+          const SizedBox(height: 10),
+
+          Row(
+            children: [
+              Expanded(child: _infoText('AT Status', widget.report.atStatus)),
+              const SizedBox(width: 8),
+              Expanded(child: _infoText('AT PIC', widget.report.atPic)),
+            ],
+          ),
+
+          const SizedBox(height: 8),
+
+          Row(
+            children: [
+              Expanded(child: _infoText('AT Assign', widget.report.atAssign)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _infoText(
+                  'AT Date',
+                  widget.report.atDate?.toString().split('.').first,
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 12),
+
+          _sectionInlineEdit('After Comment', _afterCommentCtrl),
+
+          if (widget.report.atImageNames.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Text(
+              'After Images: ${widget.report.atImageNames.length}',
+              style: const TextStyle(
+                color: Colors.white70,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _infoText(String label, String? value) {
+    final text = (value == null || value.trim().isEmpty) ? '-' : value.trim();
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.white.withOpacity(0.08)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(color: Colors.white54, fontSize: 11),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            text,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _onSave() async {
     try {
       final freqKey = _riskFreq ?? '';
@@ -791,6 +905,7 @@ class _EditReportDialogState extends State<EditReportDialog> {
         atStatus: _selectedAtStatus,
         pic: _selectedPIC,
         editUser: "${widget.me.empId}_$_employeeName",
+        atComment: _afterCommentCtrl.text.trim(),
       );
       if (!mounted) return;
 
@@ -823,7 +938,7 @@ class _EditReportDialogState extends State<EditReportDialog> {
 
         imageNames: widget.report.imageNames,
         atImageNames: widget.report.atImageNames,
-        atComment: widget.report.atComment,
+        atComment: _afterCommentCtrl.text.trim(),
         atDate: widget.report.atDate,
         atPic: widget.report.atPic,
         atStatus: _selectedAtStatus ?? widget.report.atStatus,
@@ -874,6 +989,9 @@ class _EditReportDialogState extends State<EditReportDialog> {
     _counterCtrl.removeListener(_markDirty);
     _commentCtrl.dispose();
     _counterCtrl.dispose();
+    _afterCommentCtrl.removeListener(_markDirty);
+    _afterCommentCtrl.dispose();
+
     super.dispose();
   }
 
@@ -998,6 +1116,10 @@ class _EditReportDialogState extends State<EditReportDialog> {
                           ),
                         ],
                       ),
+                      const SizedBox(height: 10),
+
+                      _buildAfterSection(),
+
                       const SizedBox(height: 10),
                     ],
                   ),
