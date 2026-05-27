@@ -1346,11 +1346,8 @@ class _AfterPatrolState extends State<AfterPatrol> {
     debugPrint('Full URL: ${dio.options.baseUrl}$url');
 
     try {
-      final response = await dio.put(
-        url,
-        data: formData,
-        options: Options(contentType: 'multipart/form-data'),
-      );
+      final response = await DioClient.putUpload(url, data: formData);
+
       debugPrint('Response status: ${response.statusCode}');
       debugPrint('Response data: ${response.data}');
     } catch (e) {

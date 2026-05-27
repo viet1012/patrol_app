@@ -104,17 +104,15 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
 
   Future<void> _loadAuthMe() async {
     try {
-      final dio = DioClient.dio;
-      final res = await dio.get(
+      final res = await DioClient.get(
         '/api/hr/me',
         queryParameters: {'code': widget.accountCode},
       );
 
-      if (res.statusCode == 200) {
+      if (res.statusCode == 200 && res.data != null) {
         setState(() {
-          _authMe = AuthMe.fromJson(res.data);
+          _authMe = AuthMe.fromJson(Map<String, dynamic>.from(res.data));
         });
-        // debugPrint("RAW JSON: ${res.data}");
       }
     } catch (e) {
       debugPrint('Load auth me error: $e');
@@ -169,31 +167,6 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
       );
     } catch (e) {
       errorMessage = e.toString();
-    }
-  }
-
-  Future<void> _loadHseMaster1() async {
-    try {
-      final data = await HseMasterService.fetchMachines();
-
-      setState(() {
-        isLoading = true;
-        errorMessage = null;
-      });
-
-      setState(() {
-        machines = data;
-        if (_autoTeam == null) {
-          selectedFactory = null;
-        }
-        isLoading = false;
-      });
-    } catch (e) {
-      debugPrint('Load HSE master error: $e');
-      setState(() {
-        errorMessage = e.toString();
-        isLoading = false;
-      });
     }
   }
 
@@ -266,7 +239,9 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
   );
 
   Future<void> fetchEmployeeName(String code) async {
-    if (code.trim().isEmpty) {
+    final empCode = code.trim();
+
+    if (empCode.isEmpty) {
       setState(() {
         _employeeName = '';
       });
@@ -274,15 +249,14 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
     }
 
     try {
-      final dio = DioClient.dio;
-      final response = await dio.get(
+      final response = await DioClient.get(
         '/api/hr/name',
-        queryParameters: {'code': code.trim()},
+        queryParameters: {'code': empCode},
       );
 
       if (response.statusCode == 200) {
         setState(() {
-          _employeeName = response.data.toString();
+          _employeeName = response.data?.toString() ?? '';
         });
       } else {
         setState(() {
@@ -294,7 +268,7 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
       setState(() {
         _employeeName = '';
       });
-    } finally {}
+    }
   }
 
   @override

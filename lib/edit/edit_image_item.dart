@@ -1,12 +1,13 @@
 import 'dart:typed_data';
 import 'dart:ui';
+
 import 'package:chuphinh/edit/camera_edit_box.dart';
 import 'package:flutter/material.dart';
+
 import '../api/api_config.dart';
 import '../api/replace_image_api.dart';
 import '../homeScreen/patrol_home_screen.dart';
 import '../model/patrol_report_model.dart';
-import '../widget/glass_action_button.dart';
 
 class EditImageItem extends StatefulWidget {
   final String imageName;
@@ -42,7 +43,9 @@ class _EditImageItemState extends State<EditImageItem> {
   static const int maxTotalImages = 2;
   late int _currentImageCount; // ✅ THÊM
   int get existingImages => _currentImageCount;
+
   int get remainAllow => maxTotalImages - existingImages;
+
   bool get _canAddImage => remainAllow > 0;
 
   // ================= ADD IMAGE =================
@@ -195,7 +198,7 @@ class _EditImageItemState extends State<EditImageItem> {
                   maxScale: 5,
                   child: Image.network(
                     imageUrl,
-                    headers: {'ngrok-skip-browser-warning': 'true'},
+                    // headers: {'ngrok-skip-browser-warning': 'true'},
                     fit: BoxFit.contain,
                   ),
                 ),
@@ -237,7 +240,7 @@ class _EditImageItemState extends State<EditImageItem> {
                 fit: BoxFit.cover,
                 width: double.infinity,
                 height: double.infinity,
-                headers: {'ngrok-skip-browser-warning': 'true'},
+                // headers: {'ngrok-skip-browser-warning': 'true'},
               ),
             ),
           ),

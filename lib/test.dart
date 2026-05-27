@@ -12,9 +12,9 @@ import 'package:dropdown_search/dropdown_search.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
-import 'api/api_config.dart';
 import 'api/auth_api.dart';
 import 'api/auto_cmp_api.dart';
+import 'api/dio_client.dart';
 import 'api/hse_master_service.dart';
 import 'common/common_ui_helper.dart';
 import 'edit/edit_before_screen.dart';
@@ -25,6 +25,29 @@ import 'model/hse_patrol_team_model.dart';
 import 'model/machine_model.dart';
 import 'model/reason_model.dart';
 import 'model/risk_score_calculator.dart';
+
+class HseMachineInfo {
+  final String plant;
+  final String fac;
+  final String area;
+  final String macId;
+
+  const HseMachineInfo({
+    required this.plant,
+    required this.fac,
+    required this.area,
+    required this.macId,
+  });
+
+  factory HseMachineInfo.fromJson(Map<String, dynamic> json) {
+    return HseMachineInfo(
+      plant: (json['plant'] ?? '').toString().trim(),
+      fac: (json['fac'] ?? '').toString().trim(),
+      area: (json['area'] ?? '').toString().trim(),
+      macId: (json['macId'] ?? '').toString().trim(),
+    );
+  }
+}
 
 class CameraScreen extends StatefulWidget {
   final List<MachineModel> machines;
@@ -85,6 +108,9 @@ class _CameraScreenState extends State<CameraScreen> {
   String? _qaFreq; // dùng chung key frequency_often...
   String? _qa5m; // 1 lựa chọn
   String? _qaImpact; // 1 lựa chọn
+
+  bool _isLoadingMachineInfo = false;
+  String? _loadingMacId;
 
   @override
   void initState() {
@@ -185,14 +211,6 @@ class _CameraScreenState extends State<CameraScreen> {
   final GlobalKey<CameraPreviewBoxState> _cameraKey =
       GlobalKey<CameraPreviewBoxState>();
 
-  final Dio dio = Dio(
-    BaseOptions(
-      connectTimeout: const Duration(seconds: 30),
-      receiveTimeout: const Duration(seconds: 30),
-      sendTimeout: const Duration(seconds: 30),
-    ),
-  );
-
   List<String> get groupList =>
       List.generate(numbersGroup, (index) => 'Group ${index + 1}');
 
@@ -249,6 +267,137 @@ class _CameraScreenState extends State<CameraScreen> {
 
   String normalizeGroup(String? group) {
     return group == null ? '' : group.replaceAll(' ', '').trim();
+  }
+
+  String _extractMacIdFromQr(String qr) {
+    final text = qr.trim();
+
+    // KVH_A-2681_1F_A32-1_Retainer
+    final match = RegExp(r'[A-Z]-\d+').firstMatch(text);
+
+    if (match != null) {
+      return match.group(0)!;
+    }
+
+    // A-769
+    return text;
+  }
+
+  Future<HseMachineInfo?> _fetchMachineInfoByMacId(String macId) async {
+    try {
+      final response = await DioClient.get(
+        '/api/hse_master/by-macid',
+        queryParameters: {'macId': macId},
+      );
+
+      final data = response.data;
+
+      if (data == null) return null;
+
+      if (data is List && data.isNotEmpty) {
+        final first = data.first;
+
+        if (first is Map) {
+          return HseMachineInfo.fromJson(Map<String, dynamic>.from(first));
+        }
+      }
+
+      if (data is Map) {
+        return HseMachineInfo.fromJson(Map<String, dynamic>.from(data));
+      }
+
+      return null;
+    } catch (e) {
+      debugPrint('FETCH MACHINE INFO ERROR: $e');
+      return null;
+    }
+  }
+
+  String _norm(String? v) {
+    return (v ?? '')
+        .replaceAll(String.fromCharCode(160), ' ')
+        .trim()
+        .toLowerCase();
+  }
+
+  bool _existsInLocalMaster(HseMachineInfo info) {
+    return widget.machines.any((m) {
+      return _norm(m.plant.toString()) == _norm(info.plant) &&
+          _norm(m.fac.toString()) == _norm(info.fac) &&
+          _norm(m.area.toString()) == _norm(info.area) &&
+          _norm(m.macId.toString()) == _norm(info.macId);
+    });
+  }
+
+  Future<void> _handleQrDetected(String qr) async {
+    final rawQr = qr.trim();
+    final isQrNumber = RegExp(r'^\d+$').hasMatch(rawQr);
+    final macId = _extractMacIdFromQr(rawQr);
+
+    if (isQrNumber) {
+      setState(() {
+        _qrKey = rawQr;
+      });
+      return;
+    }
+
+    setState(() {
+      _isLoadingMachineInfo = true;
+      _loadingMacId = macId;
+    });
+
+    try {
+      final info = await _fetchMachineInfoByMacId(macId);
+
+      if (!mounted) return;
+
+      if (info == null) {
+        CommonUI.showSnackBar(
+          context: context,
+          message: 'Machine not found: $macId',
+          color: Colors.red,
+        );
+        return;
+      }
+
+      final validInMaster = _existsInLocalMaster(info);
+      final samePlant = _norm(info.plant) == _norm(widget.selectedPlant);
+
+      if (!validInMaster) {
+        CommonUI.showSnackBar(
+          context: context,
+          message:
+              'Machine $macId is not available in the current master data '
+              '(${info.plant} / ${info.fac} / ${info.area})',
+          color: Colors.orange,
+        );
+        return;
+      }
+
+      if (!samePlant) {
+        CommonUI.showSnackBar(
+          context: context,
+          message:
+              'Machine $macId belongs to plant ${info.plant}, not ${widget.selectedPlant}',
+          color: Colors.orange,
+        );
+        return;
+      }
+
+      setState(() {
+        _selectedPlant = info.plant;
+        _selectedFac = info.fac;
+        _selectedArea = info.area;
+        _selectedMachine = info.macId;
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoadingMachineInfo = false;
+          _loadingMacId = null;
+        });
+      }
+    }
   }
 
   Future<void> _sendReport() async {
@@ -361,15 +510,18 @@ class _CameraScreenState extends State<CameraScreen> {
       ////////////////////////////////////////////////////////////
       /// CALL API
       ////////////////////////////////////////////////////////////
-      final response = await dio.post(
-        "${ApiConfig.baseUrl}/api/report",
+      // final response = await DioClient.dio.post(
+      //   "${ApiConfig.baseUrl}/api/report",
+      //   data: formData,
+      //   options: Options(
+      //     sendTimeout: const Duration(seconds: 120),
+      //     receiveTimeout: const Duration(seconds: 120),
+      //   ),
+      // );
+      final response = await DioClient.postUpload(
+        '/api/report',
         data: formData,
-        options: Options(
-          sendTimeout: const Duration(seconds: 120),
-          receiveTimeout: const Duration(seconds: 120),
-        ),
       );
-
       ////////////////////////////////////////////////////////////
       /// SUCCESS
       ////////////////////////////////////////////////////////////
@@ -454,6 +606,89 @@ class _CameraScreenState extends State<CameraScreen> {
   }
 
   String _qrKey = '';
+
+  Widget _buildMachineInfoLoadingCard() {
+    return Center(
+      child: TweenAnimationBuilder<double>(
+        tween: Tween(begin: .94, end: 1),
+        duration: const Duration(milliseconds: 450),
+        curve: Curves.easeOutCubic,
+        builder: (context, scale, child) {
+          return Transform.scale(scale: scale, child: child);
+        },
+
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(22),
+            color: Colors.black.withOpacity(.58),
+
+            border: Border.all(color: Colors.white.withOpacity(.08)),
+
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(.28),
+                blurRadius: 24,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ////////////////////////////////////////////////////////////
+              /// LOADING DOT
+              ////////////////////////////////////////////////////////////
+              SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.cyanAccent.withOpacity(.9),
+                ),
+              ),
+
+              const SizedBox(width: 12),
+
+              ////////////////////////////////////////////////////////////
+              /// TEXT
+              ////////////////////////////////////////////////////////////
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'Scanning QR Machine',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: .2,
+                    ),
+                  ),
+
+                  if ((_loadingMacId ?? '').isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(
+                        _loadingMacId!,
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(.6),
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -598,18 +833,30 @@ class _CameraScreenState extends State<CameraScreen> {
           child: Column(
             children: [
               // CAMERA + GRID ẢNH
-              CameraPreviewBox(
-                key: _cameraKey,
-                size: 340,
-                plant: _selectedPlant,
-                type: widget.patrolGroup.name,
-                group: _selectedGroup,
-                onImagesChanged: (_) => setState(() {}),
-                patrolGroup: widget.patrolGroup,
-                onQrDetected: (qr) {
-                  setState(() => _qrKey = qr); // ✅ nhận về đây
-                  debugPrint("PARENT GOT QR: $qr");
-                },
+              Stack(
+                children: [
+                  CameraPreviewBox(
+                    key: _cameraKey,
+                    size: 340,
+                    plant: _selectedPlant,
+                    type: widget.patrolGroup.name,
+                    group: _selectedGroup,
+                    onImagesChanged: (_) => setState(() {}),
+                    patrolGroup: widget.patrolGroup,
+                    onQrDetected: (qr) async {
+                      await _handleQrDetected(qr);
+                    },
+                  ),
+
+                  if (_isLoadingMachineInfo)
+                    Positioned.fill(
+                      child: Container(
+                        alignment: Alignment.center,
+                        color: Colors.black.withOpacity(.18),
+                        child: _buildMachineInfoLoadingCard(),
+                      ),
+                    ),
+                ],
               ),
 
               const SizedBox(height: 16),

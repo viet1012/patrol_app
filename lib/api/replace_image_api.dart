@@ -4,7 +4,6 @@ import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:flutter/cupertino.dart';
 
-import 'api_config.dart';
 import 'dio_client.dart';
 
 Future<String> replaceImageApi({
@@ -14,9 +13,9 @@ Future<String> replaceImageApi({
 }) async {
   final String path = '/api/patrol_report/$id/replace_image';
 
-  print('PUT ${ApiConfig.baseUrl}$path');
-  print('oldImage gửi lên = $oldImage');
-  print('bytes length = ${newImageBytes.length}');
+  debugPrint('PUT ${DioClient.dio.options.baseUrl}$path');
+  debugPrint('oldImage = $oldImage');
+  debugPrint('bytes length = ${newImageBytes.length}');
 
   final formData = FormData.fromMap({
     'oldImage': oldImage,
@@ -27,27 +26,22 @@ Future<String> replaceImageApi({
     ),
   });
 
-  final response = await DioClient.dio.put(
-    path,
-    data: formData,
-    options: Options(contentType: 'multipart/form-data'),
-  );
+  final response = await DioClient.putUpload(path, data: formData);
 
-  print('status = ${response.statusCode}');
-  print('data = ${response.data}');
+  debugPrint('status = ${response.statusCode}');
+  debugPrint('data = ${response.data}');
 
   if (response.statusCode != 200) {
     throw Exception('Replace image failed: ${response.data}');
   }
 
-  /// backend PHẢI trả:
-  /// { "newImage": "xxx.jpg" }
+  if (response.data == null || response.data['newImage'] == null) {
+    throw Exception('Response missing newImage: ${response.data}');
+  }
+
   return response.data['newImage'] as String;
 }
 
-/// ===============================
-/// ➕ ADD IMAGE
-/// ===============================
 Future<String> addImageApi({
   required int id,
   required Uint8List imageBytes,
@@ -63,13 +57,8 @@ Future<String> addImageApi({
       ),
     });
 
-    final response = await DioClient.dio.post(
-      path,
-      data: formData,
-      options: Options(contentType: 'multipart/form-data'),
-    );
+    final response = await DioClient.postUpload(path, data: formData);
 
-    /// LOG RESPONSE
     debugPrint('✅ ADD IMAGE SUCCESS');
     debugPrint('Status: ${response.statusCode}');
     debugPrint('Data: ${response.data}');
@@ -81,30 +70,20 @@ Future<String> addImageApi({
     }
 
     if (response.data == null || response.data['newImage'] == null) {
-      throw Exception('Response thiếu imageName: ${response.data}');
+      throw Exception('Response missing newImage: ${response.data}');
     }
 
     return response.data['newImage'] as String;
-  }
-  /// 🎯 BẮT LỖI DIO
-  on DioException catch (e) {
+  } on DioException catch (e) {
     debugPrint('❌ DIO ERROR - ADD IMAGE');
     debugPrint('Message: ${e.message}');
     debugPrint('Type: ${e.type}');
     debugPrint('Path: ${e.requestOptions.path}');
-
-    if (e.response != null) {
-      debugPrint('StatusCode: ${e.response?.statusCode}');
-      debugPrint('ResponseData: ${e.response?.data}');
-      debugPrint('Headers: ${e.response?.headers}');
-    } else {
-      debugPrint('No response from server');
-    }
+    debugPrint('StatusCode: ${e.response?.statusCode}');
+    debugPrint('ResponseData: ${e.response?.data}');
 
     throw Exception('Add image Dio error: ${e.response?.data ?? e.message}');
-  }
-  /// 🎯 BẮT LỖI KHÁC
-  catch (e, stack) {
+  } catch (e, stack) {
     debugPrint('❌ UNKNOWN ERROR - ADD IMAGE');
     debugPrint('Error: $e');
     debugPrint('StackTrace: $stack');
@@ -112,16 +91,13 @@ Future<String> addImageApi({
   }
 }
 
-/// ===============================
-/// 🗑 DELETE IMAGE
-/// ===============================
 Future<void> deleteImageApi({
   required int id,
   required String imageName,
 }) async {
   final String path = '/api/patrol_report/$id/delete_image';
 
-  final response = await DioClient.dio.delete(
+  final response = await DioClient.delete(
     path,
     queryParameters: {'image': imageName},
   );
@@ -137,23 +113,19 @@ Future<void> updateReportApi({
   String? countermeasure,
   String? pic,
 
-  // ✅ meta fields
   String? grp,
   String? plant,
   String? division,
   String? area,
   String? machine,
 
-  // ✅ risk fields (NEW)
   String? riskFreq,
   String? riskProb,
   String? riskSev,
   String? riskTotal,
 
-  // ✅ audit
   String? editUser,
 
-  // ✅ images
   List<Uint8List>? images,
   List<String>? deleteImages,
 
@@ -176,7 +148,6 @@ Future<void> updateReportApi({
     if (area != null) 'area': area,
     if (machine != null) 'machine': machine,
 
-    // ✅ risk (NEW)
     if (riskFreq != null) 'riskFreq': riskFreq,
     if (riskProb != null) 'riskProb': riskProb,
     if (riskSev != null) 'riskSev': riskSev,
@@ -200,18 +171,15 @@ Future<void> updateReportApi({
             (e) => MultipartFile.fromBytes(
               e,
               filename: 'edit_${DateTime.now().millisecondsSinceEpoch}.jpg',
+              contentType: DioMediaType('image', 'jpeg'),
             ),
           )
           .toList(),
   });
 
-  final res = await DioClient.dio.post(
-    path,
-    data: formData,
-    options: Options(contentType: 'multipart/form-data'),
-  );
+  final response = await DioClient.postUpload(path, data: formData);
 
-  if (res.statusCode != 200) {
-    throw Exception('Update failed: ${res.statusCode}');
+  if (response.statusCode != 200) {
+    throw Exception('Update failed: ${response.statusCode}');
   }
 }

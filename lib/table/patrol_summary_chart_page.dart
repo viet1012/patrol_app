@@ -1,8 +1,7 @@
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
 
-import '../api/api_config.dart';
+import '../api/patrol_risk_summary_api.dart';
 import '../common/common_ui_helper.dart';
 import '../model/risk_summary.dart';
 
@@ -35,7 +34,7 @@ class PatrolRiskSummarySfPage extends StatefulWidget {
 }
 
 class _PatrolRiskSummarySfPageState extends State<PatrolRiskSummarySfPage> {
-  late final PatrolApi api;
+  late final PatrolRiskSummaryApi api;
 
   late TextEditingController _fromCtrl;
   late TextEditingController _toCtrl;
@@ -66,15 +65,7 @@ class _PatrolRiskSummarySfPageState extends State<PatrolRiskSummarySfPage> {
   void initState() {
     super.initState();
 
-    api = PatrolApi(
-      dio: Dio(
-        BaseOptions(
-          connectTimeout: const Duration(seconds: 8),
-          receiveTimeout: const Duration(seconds: 12),
-        ),
-      ),
-      baseUrl: ApiConfig.baseUrl,
-    );
+    api = const PatrolRiskSummaryApi();
 
     // ✅ 1) init range ưu tiên từ parent, nếu null thì default
     final now = DateTime.now();

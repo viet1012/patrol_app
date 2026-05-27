@@ -3,26 +3,18 @@ import 'package:dio/dio.dart';
 import '../model/auth_result.dart';
 import 'dio_client.dart';
 
-////////////////////////////////////////////////////////////
-/// MESSAGE SYSTEM
-////////////////////////////////////////////////////////////
-
 class AppMessage {
-  /// ===== USER ERRORS =====
   static const accountNotFound = "Account not found.";
   static const wrongPassword = "Incorrect password.";
   static const accountExists = "Account already exists.";
   static const invalidData = "Invalid input data.";
 
-  /// ===== SUCCESS =====
   static const loginSuccess = "Login successful.";
   static const registerSuccess = "Registration successful.";
   static const changePasswordSuccess = "Password changed successfully.";
 
-  /// ===== SUPPORT =====
   static const support = "IT Support (via Microsoft Teams)";
 
-  /// ===== SERVER / NETWORK =====
   static const serverError = "Server error. Please contact IT Support.";
 
   static const cannotConnect =
@@ -34,22 +26,13 @@ class AppMessage {
   static const networkError =
       "Network error occurred.\nPlease contact IT Support.";
 
-  /// ===== FALLBACK =====
   static const unknownError = "Something went wrong. Please try again.";
 }
-////////////////////////////////////////////////////////////
-/// API
-////////////////////////////////////////////////////////////
 
 class AuthApi {
   static const String _basePath = '/api/auth';
 
-  ////////////////////////////////////////////////////////////
-  /// COMMON ERROR HANDLER (CORE)
-  ////////////////////////////////////////////////////////////
-
   static AuthResult handleDioError(DioException e) {
-    // 👉 NETWORK / NO RESPONSE
     if (e.response == null) {
       return AuthResult(
         success: false,
@@ -60,7 +43,6 @@ class AuthApi {
 
     final status = e.response?.statusCode;
 
-    // 👉 SERVER ERROR (5xx: 500, 502,...)
     if (status != null && status >= 500) {
       return AuthResult(
         success: false,
@@ -69,10 +51,15 @@ class AuthApi {
       );
     }
 
-    // 👉 BUSINESS ERROR (4xx)
     final data = e.response?.data;
-    final code = data?['code'];
-    final msg = data?['message'];
+
+    String? code;
+    String? msg;
+
+    if (data is Map) {
+      code = data['code']?.toString();
+      msg = data['message']?.toString();
+    }
 
     return AuthResult(
       success: false,
@@ -81,15 +68,12 @@ class AuthApi {
     );
   }
 
-  ////////////////////////////////////////////////////////////
-  /// LOGIN
-  ////////////////////////////////////////////////////////////
   static Future<AuthResult> login({
     required String account,
     required String password,
   }) async {
     try {
-      final response = await DioClient.dio.post(
+      final response = await DioClient.post(
         '$_basePath/login',
         data: {'account': account, 'password': password},
         options: Options(
@@ -114,15 +98,12 @@ class AuthApi {
     }
   }
 
-  ////////////////////////////////////////////////////////////
-  /// REGISTER
-  ////////////////////////////////////////////////////////////
   static Future<AuthResult> register({
     required String account,
     required String password,
   }) async {
     try {
-      final response = await DioClient.dio.post(
+      final response = await DioClient.post(
         '$_basePath/register',
         data: {'account': account, 'password': password},
       );
@@ -143,16 +124,13 @@ class AuthApi {
     }
   }
 
-  ////////////////////////////////////////////////////////////
-  /// CHANGE PASSWORD
-  ////////////////////////////////////////////////////////////
   static Future<AuthResult> changePassword({
     required String account,
     required String oldPassword,
     required String newPassword,
   }) async {
     try {
-      final response = await DioClient.dio.post(
+      final response = await DioClient.post(
         '$_basePath/change_password',
         data: {
           'account': account,
@@ -177,22 +155,22 @@ class AuthApi {
     }
   }
 
-  ////////////////////////////////////////////////////////////
-  /// FORGOT PASSWORD (FIX LUÔN)
-  ////////////////////////////////////////////////////////////
   static Future<AuthResult> forgotPassword({
     required String account,
     required String email,
   }) async {
     try {
-      final res = await DioClient.dio.get(
-        '/api/auth/export-password',
+      final response = await DioClient.get(
+        '$_basePath/export-password',
         queryParameters: {'account': account, 'email': email},
       );
 
-      return AuthResult(success: true, message: res.data ?? "Request sent");
+      return AuthResult(
+        success: true,
+        message: response.data?.toString() ?? "Request sent",
+      );
     } on DioException catch (e) {
-      return handleDioError(e); // 👈 QUAN TRỌNG
+      return handleDioError(e);
     } catch (_) {
       return AuthResult(
         success: false,
@@ -202,12 +180,9 @@ class AuthApi {
     }
   }
 
-  ////////////////////////////////////////////////////////////
-  /// CHECK ACCOUNT
-  ////////////////////////////////////////////////////////////
   static Future<AuthResult> checkAccountExists(String account) async {
     try {
-      final response = await DioClient.dio.get(
+      final response = await DioClient.get(
         '$_basePath/check-account-exists',
         queryParameters: {'account': account},
       );
@@ -218,7 +193,7 @@ class AuthApi {
         code: null,
         isServerError: false,
         data: response.data,
-      ); // 👈 nếu bạn có field data
+      );
     } on DioException catch (e) {
       return handleDioError(e);
     } catch (_) {
@@ -230,35 +205,26 @@ class AuthApi {
     }
   }
 
-  ////////////////////////////////////////////////////////////
-  /// MAP ERROR CODE
-  ////////////////////////////////////////////////////////////
   static String _mapErrorCode(String? code, String? msg) {
     switch (code) {
       case "AUTH_001":
         return AppMessage.accountNotFound;
-
       case "AUTH_002":
         return AppMessage.wrongPassword;
-
       case "AUTH_003":
         return AppMessage.accountExists;
-
       case "AUTH_004":
         return AppMessage.invalidData;
-
       default:
         return msg ?? AppMessage.unknownError;
     }
   }
 
-  ////////////////////////////////////////////////////////////
-  /// MAP NETWORK ERROR
-  ////////////////////////////////////////////////////////////
   static String _mapDioError(DioException e) {
     switch (e.type) {
       case DioExceptionType.connectionTimeout:
       case DioExceptionType.receiveTimeout:
+      case DioExceptionType.sendTimeout:
         return AppMessage.timeout;
 
       case DioExceptionType.connectionError:

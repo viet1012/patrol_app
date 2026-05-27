@@ -1080,13 +1080,11 @@ class _RecheckDetailPageState extends State<RecheckDetailPage> {
 
   Future<void> updateHseReport({
     required int reportId,
-    required String hseUser, // accountCode / user login
-    required String hseJudge, // PASS/FAIL/OK/NG...
-    required String comment, // hseComment
+    required String hseUser,
+    required String hseJudge,
+    required String comment,
     required List<Uint8List> images,
   }) async {
-    final dio = DioClient.dio;
-
     final String atStatus = hseJudge == 'OK' ? 'Closed' : 'Redo';
 
     final dataJson = {
@@ -1098,10 +1096,10 @@ class _RecheckDetailPageState extends State<RecheckDetailPage> {
 
     final formData = FormData();
 
-    // ✅ data (JSON STRING)
+    // JSON
     formData.fields.add(MapEntry('data', jsonEncode(dataJson)));
 
-    // ✅ images (BYTES)
+    // Images
     for (int i = 0; i < images.length; i++) {
       formData.files.add(
         MapEntry(
@@ -1115,23 +1113,30 @@ class _RecheckDetailPageState extends State<RecheckDetailPage> {
       );
     }
 
-    final url = '/api/patrol_report/$reportId/hse_recheck'; // ✅ đổi endpoint
-
-    // debugPrint('Calling PUT $url');
-    // debugPrint('Base URL: ${dio.options.baseUrl}');
-    // debugPrint('Full URL: ${dio.options.baseUrl}$url');
+    final path = '/api/patrol_report/$reportId/hse_recheck';
 
     try {
-      final response = await dio.put(
-        url,
-        data: formData,
-        options: Options(contentType: 'multipart/form-data'),
+      final response = await DioClient.putUpload(path, data: formData);
+
+      debugPrint('=========== HSE UPDATE SUCCESS ==========');
+      debugPrint('STATUS : ${response.statusCode}');
+      debugPrint('DATA   : ${response.data}');
+      debugPrint('=========================================');
+
+      if (response.statusCode != 200 && response.statusCode != 201) {
+        throw Exception('Upload failed: ${response.statusCode}');
+      }
+    } on DioException catch (e) {
+      debugPrint('============= HSE UPDATE ERROR ==========');
+      debugPrint('TYPE    : ${e.type}');
+      debugPrint('MESSAGE : ${e.message}');
+      debugPrint('STATUS  : ${e.response?.statusCode}');
+      debugPrint('DATA    : ${e.response?.data}');
+      debugPrint('=========================================');
+
+      throw Exception(
+        e.response?.data?.toString() ?? e.message ?? 'Upload failed',
       );
-      debugPrint('Response status: ${response.statusCode}');
-      debugPrint('Response data: ${response.data}');
-    } catch (e) {
-      debugPrint('Error during PUT request: $e');
-      rethrow;
     }
   }
 

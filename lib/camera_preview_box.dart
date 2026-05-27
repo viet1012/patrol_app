@@ -190,6 +190,10 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
     });
   }
 
+  bool _isQrNumber(String value) {
+    return RegExp(r'^\d+$').hasMatch(value.trim());
+  }
+
   // =========================
   // Camera
   // =========================
@@ -247,19 +251,22 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
 
     if (value != null && value.isNotEmpty) {
       // Nếu type là Patrol thì chỉ nhận đúng 4 số
-      if (widget.type == 'Patrol' && !RegExp(r'^\d{4}$').hasMatch(value)) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('QR Patrol chỉ được đúng 4 số'),
-            backgroundColor: Colors.redAccent,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-        return;
-      }
+
+      // if (widget.type == 'Patrol' && !RegExp(r'^\d{4}$').hasMatch(value)) {
+      //   ScaffoldMessenger.of(context).showSnackBar(
+      //     const SnackBar(
+      //       content: Text('QR Patrol chỉ được đúng 4 số'),
+      //       backgroundColor: Colors.redAccent,
+      //       behavior: SnackBarBehavior.floating,
+      //     ),
+      //   );
+      //   return;
+      // }
 
       setState(() {
-        _lastQr = value;
+        // _lastQr = value;
+        _lastQr = _isQrNumber(value) ? value : null;
+
         _lastQrAt = DateTime.now();
       });
 
@@ -382,13 +389,6 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
     // ✅ đọc detail an toàn (đừng cast Map cứng)
     final detail = e.detail;
 
-    // final text = detail['text']?.toString() ?? '';
-    // final err = detail['error']?.toString() ?? '';
-    // if (err.isNotEmpty) {
-    //   debugPrint("QR err: $err");
-    //   return;
-    // }
-    // if (text.isEmpty) return;
     final text = detail['text']?.toString().trim() ?? '';
     final err = detail['error']?.toString() ?? '';
 
@@ -396,9 +396,9 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
     if (text.isEmpty) return;
 
     // 👉 Nếu type là Patrol thì chỉ nhận số
-    if (widget.type == 'Patrol') {
-      if (!RegExp(r'^\d{4}$').hasMatch(text)) return;
-    }
+    // if (widget.type == 'Patrol') {
+    //   if (!RegExp(r'^\d{4}$').hasMatch(text)) return;
+    // }
 
     // ✅ dedupe
     final now = DateTime.now();
@@ -411,7 +411,10 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
     // ✅ rung đúng lúc: chỉ khi QR mới (qua dedupe)
     HapticFeedback.mediumImpact();
 
-    _lastQr = text;
+    // _lastQr = text;
+    // _lastQrAt = now;
+
+    _lastQr = _isQrNumber(text) ? text : null;
     _lastQrAt = now;
 
     _qrChangeCount++;
@@ -688,18 +691,34 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
           // ✅ decode QR từ ảnh đã chuẩn hóa
           final qrText = await _decodeQrFromBytes(bytes);
 
-          if (qrText != null && qrText.isNotEmpty) {
-            if (widget.type != 'Patrol' ||
-                RegExp(r'^\d{4}$').hasMatch(qrText)) {
-              setState(() {
-                _lastQr = qrText;
-                _lastQrAt = DateTime.now();
-              });
+          // if (qrText != null && qrText.isNotEmpty) {
+          //   if (widget.type != 'Patrol' ||
+          //       RegExp(r'^\d{4}$').hasMatch(qrText)) {
+          //     setState(() {
+          //       _lastQr = qrText;
+          //       _lastQrAt = DateTime.now();
+          //     });
+          //
+          //     widget.onQrDetected?.call(qrText);
+          //     HapticFeedback.mediumImpact();
+          //     _playQrChangedFx();
+          //   }
+          // }
 
-              widget.onQrDetected?.call(qrText);
-              HapticFeedback.mediumImpact();
-              _playQrChangedFx();
-            }
+          if (qrText != null && qrText.isNotEmpty) {
+            // setState(() {
+            //   _lastQr = qrText;
+            //   _lastQrAt = DateTime.now();
+            // });
+
+            setState(() {
+              _lastQr = _isQrNumber(qrText) ? qrText : null;
+              _lastQrAt = DateTime.now();
+            });
+
+            widget.onQrDetected?.call(qrText);
+            HapticFeedback.mediumImpact();
+            _playQrChangedFx();
           }
 
           // ✅ add preview bytes

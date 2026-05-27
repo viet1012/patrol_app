@@ -9,9 +9,18 @@ import 'dio_client.dart';
 class HseMasterService {
   static Future<List<MachineModel>> fetchMachines() async {
     try {
-      final res = await DioClient.dio.get('/api/hse_master');
-      final List data = res.data;
-      return data.map((e) => MachineModel.fromJson(e)).toList();
+      final res = await DioClient.get('/api/hse_master');
+
+      if (res.statusCode == 200 && res.data is List) {
+        final List data = res.data as List;
+        return data
+            .map((e) => MachineModel.fromJson(Map<String, dynamic>.from(e)))
+            .toList();
+      }
+
+      throw Exception(
+        'Invalid machine response | status=${res.statusCode} | data=${res.data}',
+      );
     } on DioException catch (e) {
       throw Exception(DioErrorHandler.handle(e));
     }
@@ -19,9 +28,20 @@ class HseMasterService {
 
   static Future<List<HsePatrolTeamModel>> fetchAll() async {
     try {
-      final res = await DioClient.dio.get('/api/patrol_teams');
-      final List data = res.data;
-      return data.map((e) => HsePatrolTeamModel.fromJson(e)).toList();
+      final res = await DioClient.get('/api/patrol_teams');
+
+      if (res.statusCode == 200 && res.data is List) {
+        final List data = res.data as List;
+        return data
+            .map(
+              (e) => HsePatrolTeamModel.fromJson(Map<String, dynamic>.from(e)),
+            )
+            .toList();
+      }
+
+      throw Exception(
+        'Invalid patrol team response | status=${res.statusCode} | data=${res.data}',
+      );
     } on DioException catch (e) {
       throw Exception(DioErrorHandler.handle(e));
     }
@@ -32,13 +52,12 @@ class HseMasterService {
     PatrolGroup groupType,
     List<HsePatrolTeamModel> teams,
   ) {
-    if (empCode.trim().isEmpty) return null;
+    final code = empCode.trim();
+    if (code.isEmpty) return null;
 
     final typeStr = groupType.name;
-    // PatrolGroup.Patrol → "Patrol"
 
     for (final t in teams) {
-      // 🔹 filter theo type trước
       if (t.type != typeStr) continue;
 
       final pics = [
@@ -54,10 +73,11 @@ class HseMasterService {
         t.pic10,
       ];
 
-      if (pics.any((p) => p != null && p.trim() == empCode)) {
+      if (pics.any((p) => p != null && p.trim() == code)) {
         return t;
       }
     }
+
     return null;
   }
 
@@ -66,12 +86,11 @@ class HseMasterService {
     if (empCode.isEmpty) return null;
 
     try {
-      final res = await DioClient.dio.get(
+      final res = await DioClient.get(
         '/api/hr/name',
         queryParameters: {'code': empCode},
       );
 
-      // Backend bạn trả string thuần (response.data)
       if (res.statusCode == 200) {
         final name = res.data?.toString().trim();
         return (name == null || name.isEmpty) ? null : name;

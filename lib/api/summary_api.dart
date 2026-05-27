@@ -13,12 +13,20 @@ class SummaryApi {
     required String fac,
     required String type,
   }) async {
-    final Response res = await DioClient.dio.get(
+    final Response res = await DioClient.get(
       '/api/patrol_report/summary/division',
       queryParameters: {'fromD': fromD, 'toD': toD, 'fac': fac, 'type': type},
     );
 
     final data = res.data;
+
+    if (res.statusCode != 200) {
+      throw DioException(
+        requestOptions: res.requestOptions,
+        response: res,
+        error: 'Fetch division summary failed: ${res.statusCode}',
+      );
+    }
 
     if (data is List) {
       return data
@@ -35,6 +43,7 @@ class SummaryApi {
 
     throw DioException(
       requestOptions: res.requestOptions,
+      response: res,
       error: 'Invalid response format: ${data.runtimeType}',
     );
   }
@@ -46,19 +55,26 @@ class SummaryApi {
     required String type,
     required List<String> lvls,
   }) async {
-    final Response res = await DioClient.dio.get(
+    final Response res = await DioClient.get(
       '/api/patrol_report/pic-summary',
       queryParameters: {
         'fromD': fromD,
         'toD': toD,
         'fac': fac,
         'type': type,
-        // ✅ multi: lvls=I&lvls=II...
         'lvls': ListParam(lvls, ListFormat.multi),
       },
     );
 
     final data = res.data;
+
+    if (res.statusCode != 200) {
+      throw DioException(
+        requestOptions: res.requestOptions,
+        response: res,
+        error: 'Fetch PIC summary failed: ${res.statusCode}',
+      );
+    }
 
     if (data is List) {
       return data
@@ -75,6 +91,7 @@ class SummaryApi {
 
     throw DioException(
       requestOptions: res.requestOptions,
+      response: res,
       error: 'Invalid response format: ${data.runtimeType}',
     );
   }

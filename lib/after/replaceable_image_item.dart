@@ -1,7 +1,7 @@
 import 'dart:typed_data';
+
 import 'package:chuphinh/api/api_config.dart';
 import 'package:flutter/material.dart';
-import 'package:image/image.dart' as img;
 
 import '../api/replace_image_api.dart';
 import '../homeScreen/patrol_home_screen.dart';
@@ -217,7 +217,7 @@ class _ReplaceableImageItemState extends State<ReplaceableImageItem> {
                   height: double.infinity,
                   fit: BoxFit.cover,
                   key: ValueKey(imageUrl),
-                  headers: {'ngrok-skip-browser-warning': 'true'},
+                  // headers: {'ngrok-skip-browser-warning': 'true'},
                 ),
               ),
             ),
@@ -276,7 +276,7 @@ class _ReplaceableImageItemState extends State<ReplaceableImageItem> {
                           fit: BoxFit.contain,
                           child: Image.network(
                             imageUrl,
-                            headers: {'ngrok-skip-browser-warning': 'true'},
+                            // headers: {'ngrok-skip-browser-warning': 'true'},
                           ),
                         ),
                       ),

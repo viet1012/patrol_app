@@ -975,16 +975,12 @@ class _RedoDetailPageState extends State<RedoDetailPage> {
     required String comment,
     required List<Uint8List> images,
   }) async {
-    final dio = DioClient.dio;
-
     final dataJson = {"atComment": comment, "atPic": atPic};
 
     final formData = FormData();
 
-    // data (JSON STRING)
     formData.fields.add(MapEntry('data', jsonEncode(dataJson)));
 
-    // images (BYTES)
     for (int i = 0; i < images.length; i++) {
       formData.files.add(
         MapEntry(
@@ -998,22 +994,31 @@ class _RedoDetailPageState extends State<RedoDetailPage> {
       );
     }
 
-    final url = '/api/patrol_report/$reportId/update_at';
+    final path = '/api/patrol_report/$reportId/update_at';
 
-    debugPrint('Calling PUT $url');
-    debugPrint('Base URL: ${dio.options.baseUrl}');
-    debugPrint('Full URL: ${dio.options.baseUrl}$url');
+    debugPrint('Calling PUT $path');
+    debugPrint('Base URL: ${DioClient.dio.options.baseUrl}');
+    debugPrint('Full URL: ${DioClient.dio.options.baseUrl}$path');
 
     try {
-      final response = await dio.put(
-        url,
-        data: formData,
-        options: Options(contentType: 'multipart/form-data'),
-      );
+      final response = await DioClient.putUpload(path, data: formData);
+
       debugPrint('Response status: ${response.statusCode}');
       debugPrint('Response data: ${response.data}');
+
+      if (response.statusCode != 200 && response.statusCode != 201) {
+        throw Exception('Update AT failed: ${response.statusCode}');
+      }
+    } on DioException catch (e) {
+      debugPrint('Update AT Dio error: ${e.message}');
+      debugPrint('Status: ${e.response?.statusCode}');
+      debugPrint('Data: ${e.response?.data}');
+
+      throw Exception(
+        e.response?.data?.toString() ?? e.message ?? 'Update AT failed',
+      );
     } catch (e) {
-      debugPrint('Error during PUT request: $e');
+      debugPrint('Update AT error: $e');
       rethrow;
     }
   }
