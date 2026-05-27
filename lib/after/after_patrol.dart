@@ -1127,70 +1127,249 @@ class _AfterPatrolState extends State<AfterPatrol> {
               /// ===== SAVE =====
               // if (_commentAfStatusCtrl.text.trim().isNotEmpty)
               SizedBox(
-                width: 60,
-                height: 60,
-                child: GlassActionButton(
-                  onTap:
-                      (_cameraKey.currentState != null &&
-                          _cameraKey.currentState!.images.isNotEmpty &&
-                          _msnvCtrl.text.trim().isNotEmpty)
-                      ? () async {
-                          if (_commentAfStatusCtrl.text.trim().isEmpty) {
-                            _showSnackBar(
-                              'Please enter comment before saving.',
-                              Colors.orange,
-                            );
-                            return;
-                          }
+                height: 58,
+                child: Builder(
+                  builder: (context) {
+                    final canSend =
+                        _cameraKey.currentState != null &&
+                        _cameraKey.currentState!.images.isNotEmpty &&
+                        _msnvCtrl.text.trim().isNotEmpty;
 
-                          try {
-                            showLoading(context);
+                    return AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      curve: Curves.easeOut,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(16),
+                        gradient: canSend
+                            ? const LinearGradient(
+                                colors: [Color(0xFF606F8F), Color(0xFF08265C)],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              )
+                            : LinearGradient(
+                                colors: [
+                                  Colors.grey.shade700,
+                                  Colors.grey.shade800,
+                                ],
+                              ),
+                        boxShadow: canSend
+                            ? [
+                                BoxShadow(
+                                  color: const Color(
+                                    0xFF1647A3,
+                                  ).withOpacity(.38),
+                                  blurRadius: 18,
+                                  offset: const Offset(0, 8),
+                                ),
+                              ]
+                            : [],
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(16),
+                        child: Stack(
+                          children: [
+                            if (canSend)
+                              Positioned.fill(
+                                child: TweenAnimationBuilder<double>(
+                                  key: ValueKey(
+                                    DateTime.now().millisecondsSinceEpoch,
+                                  ),
+                                  tween: Tween(begin: -1.2, end: 1.8),
+                                  duration: const Duration(seconds: 2),
+                                  curve: Curves.linear,
+                                  onEnd: () {
+                                    if (mounted) setState(() {});
+                                  },
+                                  builder: (context, value, child) {
+                                    return Transform.translate(
+                                      offset: Offset(value * 220, 0),
+                                      child: Transform.rotate(
+                                        angle: -0.35,
+                                        child: Container(
+                                          width: 56,
+                                          decoration: BoxDecoration(
+                                            gradient: LinearGradient(
+                                              colors: [
+                                                Colors.white.withOpacity(0),
+                                                Colors.white.withOpacity(.10),
+                                                Colors.white.withOpacity(.24),
+                                                Colors.white.withOpacity(.10),
+                                                Colors.white.withOpacity(0),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
 
-                            await updateAtReport(
-                              userAfter: widget.accountCode,
-                              reportId: report.id!,
-                              atPic: '${_msnvCtrl.text.trim()}_$_employeeName',
-                              // comment: _commentCtrl.text.trim(),
-                              comment: _commentAfStatusCtrl.text.trim(),
+                            Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(16),
+                                onTap: canSend
+                                    ? () async {
+                                        if (_commentAfStatusCtrl.text
+                                            .trim()
+                                            .isEmpty) {
+                                          _showSnackBar(
+                                            'Please enter comment before saving.',
+                                            Colors.orange,
+                                          );
+                                          return;
+                                        }
 
-                              images: _cameraKey.currentState!.images,
-                            );
-                            hideLoading(context);
+                                        try {
+                                          showLoading(context);
 
-                            /// RESET UI → cho phép chụp lại tiếp
-                            setState(() {
-                              _commentCtrl.clear();
-                              _enableCamera = false;
-                            });
-                            _cameraKey.currentState?.clearAll(); // xóa hết ảnh
+                                          await updateAtReport(
+                                            userAfter: widget.accountCode,
+                                            reportId: report.id!,
+                                            atPic:
+                                                '${_msnvCtrl.text.trim()}_$_employeeName',
+                                            comment: _commentAfStatusCtrl.text
+                                                .trim(),
+                                            images:
+                                                _cameraKey.currentState!.images,
+                                          );
 
-                            /// FORCE reload camera
-                            await Future.delayed(
-                              const Duration(milliseconds: 200),
-                            );
-                            setState(() => _enableCamera = true);
+                                          hideLoading(context);
 
-                            _showSnackBar(
-                              'Update AF successful!',
-                              Colors.green,
-                            );
-                            await Future.delayed(
-                              const Duration(milliseconds: 500),
-                            );
+                                          setState(() {
+                                            _commentCtrl.clear();
+                                            _enableCamera = false;
+                                          });
 
-                            if (!mounted) return;
+                                          _cameraKey.currentState?.clearAll();
 
-                            Navigator.pop(context, true);
-                          } catch (e) {
-                            debugPrint('Update AT error: $e');
-                            _showSnackBar('Server error: $e', Colors.red);
-                          }
-                        }
-                      : null,
-                  icon: Icons.save,
-                  backgroundColor: Color(0xFF2665B6),
+                                          await Future.delayed(
+                                            const Duration(milliseconds: 200),
+                                          );
+
+                                          setState(() => _enableCamera = true);
+
+                                          _showSnackBar(
+                                            'Update AF successful!',
+                                            Colors.green,
+                                          );
+
+                                          await Future.delayed(
+                                            const Duration(milliseconds: 500),
+                                          );
+
+                                          if (!mounted) return;
+
+                                          Navigator.pop(context, true);
+                                        } catch (e) {
+                                          hideLoading(context);
+
+                                          debugPrint('Update AT error: $e');
+
+                                          _showSnackBar(
+                                            'Server error: $e',
+                                            Colors.red,
+                                          );
+                                        }
+                                      }
+                                    : null,
+                                child: const Center(
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.send_rounded,
+                                        color: Colors.white,
+                                        size: 20,
+                                      ),
+                                      SizedBox(width: 8),
+                                      Text(
+                                        'SEND',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w800,
+                                          letterSpacing: .5,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
                 ),
               ),
+              // SizedBox(
+              //   width: 60,
+              //   height: 60,
+              //   child: GlassActionButton(
+              //     onTap:
+              //         (_cameraKey.currentState != null &&
+              //             _cameraKey.currentState!.images.isNotEmpty &&
+              //             _msnvCtrl.text.trim().isNotEmpty)
+              //         ? () async {
+              //             if (_commentAfStatusCtrl.text.trim().isEmpty) {
+              //               _showSnackBar(
+              //                 'Please enter comment before saving.',
+              //                 Colors.orange,
+              //               );
+              //               return;
+              //             }
+              //
+              //             try {
+              //               showLoading(context);
+              //
+              //               await updateAtReport(
+              //                 userAfter: widget.accountCode,
+              //                 reportId: report.id!,
+              //                 atPic: '${_msnvCtrl.text.trim()}_$_employeeName',
+              //                 // comment: _commentCtrl.text.trim(),
+              //                 comment: _commentAfStatusCtrl.text.trim(),
+              //
+              //                 images: _cameraKey.currentState!.images,
+              //               );
+              //               hideLoading(context);
+              //
+              //               /// RESET UI → cho phép chụp lại tiếp
+              //               setState(() {
+              //                 _commentCtrl.clear();
+              //                 _enableCamera = false;
+              //               });
+              //               _cameraKey.currentState?.clearAll(); // xóa hết ảnh
+              //
+              //               /// FORCE reload camera
+              //               await Future.delayed(
+              //                 const Duration(milliseconds: 200),
+              //               );
+              //               setState(() => _enableCamera = true);
+              //
+              //               _showSnackBar(
+              //                 'Update AF successful!',
+              //                 Colors.green,
+              //               );
+              //               await Future.delayed(
+              //                 const Duration(milliseconds: 500),
+              //               );
+              //
+              //               if (!mounted) return;
+              //
+              //               Navigator.pop(context, true);
+              //             } catch (e) {
+              //               debugPrint('Update AT error: $e');
+              //               _showSnackBar('Server error: $e', Colors.red);
+              //             }
+              //           }
+              //         : null,
+              //     icon: Icons.save,
+              //     backgroundColor: Color(0xFF2665B6),
+              //   ),
+              // ),
             ],
           ],
         ),

@@ -83,6 +83,9 @@ class _EditReportDialogState extends State<EditReportDialog> {
   String? _employeeName;
   bool _isLoadingName = false;
 
+  static const String nullLabel = '<NULL>';
+  bool _saving = false;
+
   void _markDirty() {
     if (_dirty) return;
     setState(() => _dirty = true);
@@ -107,13 +110,13 @@ class _EditReportDialogState extends State<EditReportDialog> {
     _riskProb = widget.report.riskProb;
     _riskSev = widget.report.riskSev;
 
-    // final m = widget.report.machine.trim();
-    // _selectedMachine = (m == "<Null>" || m.isEmpty) ? null : m;
-    _selectedMachine = _norm(widget.report.machine);
-    if (_selectedMachine!.isEmpty || _selectedMachine == "<Null>") {
-      _selectedMachine = null;
-    }
+    final rawMachine = _norm(widget.report.machine);
 
+    if (rawMachine.isEmpty || rawMachine == '<Null>') {
+      _selectedMachine = nullLabel;
+    } else {
+      _selectedMachine = rawMachine;
+    }
     _selectedPIC = widget.report.pic;
 
     _selectedAtStatus = _norm(widget.report.atStatus);
@@ -314,38 +317,6 @@ class _EditReportDialogState extends State<EditReportDialog> {
         .toList();
   }
 
-  void _autoFixInvalidSelections() {
-    final plant = widget.report.plant;
-
-    final facList = getFacByPlant(plant);
-    if (facList.isEmpty) {
-      _selectedDivision = null;
-      _selectedArea = null;
-      _selectedMachine = null;
-      return;
-    }
-
-    if (_selectedDivision == null ||
-        !facList.any((f) => _eq(f, _selectedDivision))) {
-      _selectedDivision = facList.first;
-    } else {
-      _selectedDivision = facList.firstWhere((f) => _eq(f, _selectedDivision));
-    }
-
-    final areaList = getAreaByFac(plant, _selectedDivision!);
-    if (areaList.isEmpty) {
-      _selectedArea = null;
-      _selectedMachine = null;
-      return;
-    }
-
-    if (_selectedArea == null || !areaList.any((a) => _eq(a, _selectedArea))) {
-      _selectedArea = areaList.first;
-    } else {
-      _selectedArea = areaList.firstWhere((a) => _eq(a, _selectedArea));
-    }
-  }
-
   bool get _canSave {
     if (_loadingMaster) return false;
     if (_selectedGroup == null) return false;
@@ -372,9 +343,12 @@ class _EditReportDialogState extends State<EditReportDialog> {
     final areaList = (_selectedDivision == null)
         ? <String>[]
         : getAreaByFac(plant, _selectedDivision!);
-    final machineList = (_selectedDivision == null || _selectedArea == null)
-        ? <String>[]
-        : getMachineByArea(plant, _selectedDivision!, _selectedArea!);
+    final machineList = <String>[
+      if (_selectedDivision != null && _selectedArea != null)
+        ...getMachineByArea(plant, _selectedDivision!, _selectedArea!),
+
+      if (_selectedMachine == nullLabel) nullLabel,
+    ].toSet().toList();
 
     final disabled = _loadingMaster || machines.isEmpty;
 
@@ -784,7 +758,6 @@ class _EditReportDialogState extends State<EditReportDialog> {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.green.withOpacity(0.08),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: Colors.greenAccent.withOpacity(0.18)),
       ),
@@ -878,83 +851,148 @@ class _EditReportDialogState extends State<EditReportDialog> {
     );
   }
 
+  String _firstLine(String? value) {
+    final text = (value ?? '').replaceAll('\r', '').trim();
+    if (text.isEmpty) return '';
+
+    return text
+            .split('\n')
+            .map((e) => e.trim())
+            .where((e) => e.isNotEmpty)
+            .firstOrNull ??
+        '';
+  }
+
+  bool _textChanged(String? oldValue, String newValue) {
+    return _firstLine(oldValue) != _firstLine(newValue);
+  }
+
   Future<void> _onSave() async {
+    if (_saving) return;
+
+    setState(() {
+      _saving = true;
+    });
+
     try {
+      final picToSend = _selectedPIC != widget.report.pic ? _selectedPIC : null;
+
+      final atStatusToSend = _selectedAtStatus != widget.report.atStatus
+          ? _selectedAtStatus
+          : null;
+      final commentToSend =
+          _textChanged(widget.report.comment, _commentCtrl.text)
+          ? _firstLine(_commentCtrl.text)
+          : null;
+
+      final counterToSend =
+          _textChanged(widget.report.countermeasure, _counterCtrl.text)
+          ? _firstLine(_counterCtrl.text)
+          : null;
+
+      final atCommentToSend =
+          _textChanged(widget.report.atComment, _afterCommentCtrl.text)
+          ? _firstLine(_afterCommentCtrl.text)
+          : null;
+
       final freqKey = _riskFreq ?? '';
       final probKey = _riskProb ?? '';
       final sevKey = _riskSev ?? '';
 
-      // ✅ text song ngữ VN + JP (dùng extension của bạn)
       final freqBi = ''.combinedViJa(context, freqKey);
       final probBi = ''.combinedViJa(context, probKey);
       final sevBi = ''.combinedViJa(context, sevKey);
+      final machineToSave = _selectedMachine == nullLabel
+          ? null
+          : _selectedMachine;
       debugPrint("SEND PIC TO API = $_selectedPIC");
+
+      debugPrint('COMMENT SEND = $commentToSend');
+      debugPrint('COUNTER SEND = $counterToSend');
+      debugPrint('AT COMMENT SEND = $atCommentToSend');
+      ////////////////////////////////////////////////////////////
+      /// 1. UPDATE REPORT
+      ////////////////////////////////////////////////////////////
       await updateReportApi(
         id: widget.report.id!,
-        comment: _commentCtrl.text.trim(),
-        countermeasure: _counterCtrl.text.trim(),
+        comment: commentToSend,
+        countermeasure: counterToSend,
         grp: _selectedGroup,
         plant: widget.report.plant,
         division: _selectedDivision,
         area: _selectedArea,
-        machine: _selectedMachine,
+        machine: machineToSave,
         riskFreq: freqBi,
         riskProb: probBi,
         riskSev: sevBi,
         riskTotal: _riskScoreSymbol,
-        atStatus: _selectedAtStatus,
-        pic: _selectedPIC,
+        atStatus: atStatusToSend,
+        pic: picToSend,
         editUser: "${widget.me.empId}_$_employeeName",
-        atComment: _afterCommentCtrl.text.trim(),
+        atComment: atCommentToSend,
       );
+
       if (!mounted) return;
 
-      // ? build updated model t? report cu + các field m?i
-      final updated = PatrolReportModel(
-        id: widget.report.id,
-        stt: widget.report.stt,
-        type: widget.report.type,
-        qr_key: widget.report.qr_key,
-
-        grp: _selectedGroup ?? widget.report.grp,
+      ////////////////////////////////////////////////////////////
+      /// 2. FETCH LẠI REPORT SAU KHI BACKEND DỊCH
+      ////////////////////////////////////////////////////////////
+      final reports = await PatrolReportApi.fetchReports(
         plant: widget.report.plant,
-        division: _selectedDivision ?? widget.report.division,
-        area: _selectedArea ?? widget.report.area,
-        machine: _selectedMachine ?? widget.report.machine,
-
-        riskFreq: freqBi,
-        riskProb: probBi,
-        riskSev: sevBi,
-        riskTotal: widget.report.riskTotal,
-
-        comment: _commentCtrl.text.trim(),
-        countermeasure: _counterCtrl.text.trim(),
-        checkInfo: widget.report.checkInfo,
-
-        createdAt: widget.report.createdAt,
-        pic: _selectedPIC ?? widget.report.pic,
-        dueDate: widget.report.dueDate,
-        patrol_user: widget.report.patrol_user,
-
-        imageNames: widget.report.imageNames,
-        atImageNames: widget.report.atImageNames,
-        atComment: _afterCommentCtrl.text.trim(),
-        atDate: widget.report.atDate,
-        atPic: widget.report.atPic,
-        atStatus: _selectedAtStatus ?? widget.report.atStatus,
-
-        hseJudge: widget.report.hseJudge,
-        hseImageNames: widget.report.hseImageNames,
-        hseComment: widget.report.hseComment,
-        hseDate: widget.report.hseDate,
-
-        loadStatus: widget.report.loadStatus,
       );
 
-      // ? 1) dóng dialog edit và tr? updated v? màn cha
-      Navigator.of(context).pop(updated);
+      final savedReport = reports.firstWhere(
+        (e) => e.id == widget.report.id,
+        orElse: () {
+          return PatrolReportModel(
+            id: widget.report.id,
+            stt: widget.report.stt,
+            type: widget.report.type,
+            qr_key: widget.report.qr_key,
 
-      // ? 2) show success ? parentContext (né _debugLocked)
+            grp: _selectedGroup ?? widget.report.grp,
+            plant: widget.report.plant,
+            division: _selectedDivision ?? widget.report.division,
+            area: _selectedArea ?? widget.report.area,
+            machine: machineToSave ?? nullLabel,
+
+            riskFreq: freqBi,
+            riskProb: probBi,
+            riskSev: sevBi,
+            riskTotal: _riskScoreSymbol,
+
+            comment: _commentCtrl.text.trim(),
+            countermeasure: _counterCtrl.text.trim(),
+            checkInfo: widget.report.checkInfo,
+
+            createdAt: widget.report.createdAt,
+            pic: _selectedPIC ?? widget.report.pic,
+            dueDate: widget.report.dueDate,
+            patrol_user: widget.report.patrol_user,
+
+            imageNames: widget.report.imageNames,
+            atImageNames: widget.report.atImageNames,
+            atComment: _afterCommentCtrl.text.trim(),
+            atDate: widget.report.atDate,
+            atPic: widget.report.atPic,
+            atStatus: _selectedAtStatus ?? widget.report.atStatus,
+            atAssign: widget.report.atAssign,
+
+            hseJudge: widget.report.hseJudge,
+            hseImageNames: widget.report.hseImageNames,
+            hseComment: widget.report.hseComment,
+            hseDate: widget.report.hseDate,
+
+            loadStatus: widget.report.loadStatus,
+          );
+        },
+      );
+
+      ////////////////////////////////////////////////////////////
+      /// 3. ĐÓNG DIALOG VÀ TRẢ REPORT ĐÃ DỊCH VỀ MÀN CHA
+      ////////////////////////////////////////////////////////////
+      Navigator.of(context).pop(savedReport);
+
       WidgetsBinding.instance.addPostFrameCallback((_) {
         CommonUI.showGlassDialog(
           context: widget.parentContext,
@@ -971,7 +1009,6 @@ class _EditReportDialogState extends State<EditReportDialog> {
 
       if (!mounted) return;
 
-      // ? show warning ? parentContext (không dùng context dialog)
       WidgetsBinding.instance.addPostFrameCallback((_) {
         CommonUI.showWarning(
           context: widget.parentContext,
@@ -980,6 +1017,15 @@ class _EditReportDialogState extends State<EditReportDialog> {
               'Unable to update the report.\nPlease check your connection or try again.',
         );
       });
+    } finally {
+      ////////////////////////////////////////////////////////////
+      /// STOP LOADING
+      ////////////////////////////////////////////////////////////
+      if (mounted) {
+        setState(() {
+          _saving = false;
+        });
+      }
     }
   }
 
@@ -1019,114 +1065,213 @@ class _EditReportDialogState extends State<EditReportDialog> {
           maxWidth: dialogW,
           maxHeight: MediaQuery.of(context).size.height * 0.86,
         ),
-        child: Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(18),
-            gradient: const LinearGradient(
-              colors: [Color(0xFF121826), Color(0xFF1F2937), Color(0xFF374151)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            border: Border.all(color: Colors.white.withOpacity(0.10)),
-            boxShadow: [
-              BoxShadow(
-                blurRadius: 24,
-                spreadRadius: 2,
-                color: Colors.black.withOpacity(0.35),
+        child: Stack(
+          children: [
+            ////////////////////////////////////////////////////////////
+            /// MAIN DIALOG
+            ////////////////////////////////////////////////////////////
+            Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(18),
+                gradient: const LinearGradient(
+                  colors: [
+                    Color(0xFF121826),
+                    Color(0xFF1F2937),
+                    Color(0xFF374151),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                border: Border.all(color: Colors.white.withOpacity(0.10)),
+                boxShadow: [
+                  BoxShadow(
+                    blurRadius: 24,
+                    spreadRadius: 2,
+                    color: Colors.black.withOpacity(0.35),
+                  ),
+                ],
               ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // ===== Header (like AppBar) =====
-              Padding(
-                padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
-                child: Row(
-                  children: [
-                    GlassActionButton(
-                      icon: Icons.close_rounded,
-                      onTap: () => Navigator.of(context).pop(),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ////////////////////////////////////////////////////////////
+                  /// HEADER
+                  ////////////////////////////////////////////////////////////
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
+                    child: Row(
+                      children: [
+                        GlassActionButton(
+                          icon: Icons.close_rounded,
+                          onTap: _saving
+                              ? null
+                              : () => Navigator.of(context).pop(),
+                        ),
+
+                        const SizedBox(width: 8),
+
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Edit Detail',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              Text(
+                                '${widget.report.plant} • ID: ${widget.report.id}',
+                                style: const TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        if (_dirty)
+                          GlassActionButton(
+                            icon: Icons.save_rounded,
+                            onTap: _saving
+                                ? null
+                                : (_canSave ? _onSave : _showInvalidToast),
+                          )
+                        else
+                          Opacity(
+                            opacity: 0.3,
+                            child: GlassActionButton(
+                              icon: Icons.save_rounded,
+                              onTap: null,
+                            ),
+                          ),
+                      ],
                     ),
-                    const SizedBox(width: 8),
-                    Expanded(
+                  ),
+
+                  const SizedBox(height: 8),
+
+                  Divider(color: Colors.white.withOpacity(0.08), height: 1),
+
+                  ////////////////////////////////////////////////////////////
+                  /// BODY
+                  ////////////////////////////////////////////////////////////
+                  Expanded(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.all(12),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            'Edit Detail',
+                          _buildEditableMeta(),
+
+                          const SizedBox(height: 14),
+
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                child: _sectionInlineEdit(
+                                  'Comment',
+                                  _commentCtrl,
+                                ),
+                              ),
+
+                              const SizedBox(width: 16),
+
+                              Expanded(
+                                child: _sectionInlineEdit(
+                                  'Countermeasure',
+                                  _counterCtrl,
+                                ),
+                              ),
+                            ],
+                          ),
+
+                          const SizedBox(height: 10),
+
+                          _buildAfterSection(),
+
+                          const SizedBox(height: 10),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            ////////////////////////////////////////////////////////////
+            /// CENTER LOADING OVERLAY
+            ////////////////////////////////////////////////////////////
+            if (_saving)
+              Positioned.fill(
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(.50),
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                  child: Center(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 22,
+                        vertical: 18,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0F172A),
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(
+                          color: Colors.white.withOpacity(.12),
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(.35),
+                            blurRadius: 24,
+                            offset: const Offset(0, 10),
+                          ),
+                        ],
+                      ),
+                      child: const Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          SizedBox(
+                            width: 34,
+                            height: 34,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 3,
+                              color: Colors.cyanAccent,
+                            ),
+                          ),
+
+                          SizedBox(height: 14),
+
+                          Text(
+                            'Updating report...',
                             style: TextStyle(
                               color: Colors.white,
                               fontSize: 14,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
+
+                          SizedBox(height: 4),
+
                           Text(
-                            '${widget.report.plant} • ID: ${widget.report.id}',
-                            style: const TextStyle(
-                              color: Colors.white70,
-                              fontSize: 11,
+                            'Please wait a moment',
+                            style: TextStyle(
+                              color: Colors.white60,
+                              fontSize: 12,
                             ),
                           ),
                         ],
                       ),
                     ),
-                    if (_dirty)
-                      GlassActionButton(
-                        icon: Icons.save_rounded,
-                        onTap: _canSave ? _onSave : _showInvalidToast,
-                      )
-                    else
-                      Opacity(
-                        opacity: 0.3,
-                        child: GlassActionButton(
-                          icon: Icons.save_rounded,
-                          onTap:
-                              null, // hoặc () {} nếu widget bắt buộc non-null
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 8),
-              Divider(color: Colors.white.withOpacity(0.08), height: 1),
-
-              // ===== Body (scroll) =====
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildEditableMeta(),
-                      const SizedBox(height: 14),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: _sectionInlineEdit('Comment', _commentCtrl),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: _sectionInlineEdit(
-                              'Countermeasure',
-                              _counterCtrl,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-
-                      _buildAfterSection(),
-
-                      const SizedBox(height: 10),
-                    ],
                   ),
                 ),
               ),
-            ],
-          ),
+          ],
         ),
       ),
     );
