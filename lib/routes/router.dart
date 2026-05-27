@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../after/after_patrol.dart';
+import '../app_idle_detector.dart';
 import '../common/common_ui_helper.dart';
 import '../homeScreen/patrol_home_screen.dart';
 import '../login/login_page.dart';
@@ -10,89 +11,15 @@ import '../session/session_store.dart';
 import '../table/patrol_report_table.dart';
 
 final router = GoRouter(
+  navigatorKey: appNavigatorKey,
+
   routes: [
-    // GoRoute(path: '/', builder: (context, state) => const LoginPage()),
     GoRoute(
       path: '/',
       pageBuilder: (context, state) =>
           NoTransitionPage(key: state.pageKey, child: const LoginPage()),
     ),
-    // GoRoute(
-    //   path: '/home/summary',
-    //   builder: (context, state) {
-    //     final extra = state.extra;
-    //     final group = state.uri.queryParameters['group'] ?? '';
-    //     final plant = state.uri.queryParameters['plant'] ?? '';
-    //     String? accountCode;
-    //     AuthMe me;
-    //     if (extra is Map<String, dynamic>) {
-    //       accountCode = extra['accountCode']?.toString();
-    //
-    //       me = extra['me'] as AuthMe;
-    //     }
-    //
-    //     return PatrolReportTable(
-    //       patrolGroup: group,
-    //       plant: plant,
-    //       accountCode: accountCode ?? '',
-    //       auth: me,
-    //     );
-    //   },
-    // ),
-    GoRoute(
-      path: '/home/summary',
 
-      builder: (context, state) {
-        final extra = state.extra;
-
-        final group = state.uri.queryParameters['group'] ?? '';
-
-        final plant = state.uri.queryParameters['plant'] ?? '';
-
-        String? accountCode;
-
-        AuthMe? me;
-
-        ////////////////////////////////////////////////////////////
-        /// EXTRA
-        ////////////////////////////////////////////////////////////
-        if (extra is Map<String, dynamic>) {
-          accountCode = extra['accountCode']?.toString();
-
-          me = extra['me'] as AuthMe?;
-        }
-
-        ////////////////////////////////////////////////////////////
-        /// NO AUTH
-        ////////////////////////////////////////////////////////////
-        if (me == null) {
-          ////////////////////////////////////////////////////////////
-          /// AUTO BACK
-          ////////////////////////////////////////////////////////////
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (context.canPop()) {
-              context.pop();
-            } else {
-              context.go('/home');
-            }
-          });
-
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
-          );
-        }
-
-        ////////////////////////////////////////////////////////////
-        /// PAGE
-        ////////////////////////////////////////////////////////////
-        return PatrolReportTable(
-          patrolGroup: group,
-          plant: plant,
-          accountCode: accountCode ?? '',
-          auth: me,
-        );
-      },
-    ),
     GoRoute(
       path: '/home',
       builder: (context, state) {
@@ -104,11 +31,11 @@ final router = GoRouter(
         }
 
         return FutureBuilder<(String, String)?>(
-          // (account, password)
           future: SessionStore.getCreds(),
           builder: (context, snap) {
             final creds = snap.data;
-            final fromStore = creds?.$1; // account
+            final fromStore = creds?.$1;
+
             final finalAcc = (accountCode?.trim().isNotEmpty == true)
                 ? accountCode!.trim()
                 : (fromStore ?? '');
@@ -128,6 +55,40 @@ final router = GoRouter(
     ),
 
     GoRoute(
+      path: '/home/summary',
+      builder: (context, state) {
+        final extra = state.extra;
+        final group = state.uri.queryParameters['group'] ?? '';
+        final plant = state.uri.queryParameters['plant'] ?? '';
+
+        String? accountCode;
+        AuthMe? me;
+
+        if (extra is Map<String, dynamic>) {
+          accountCode = extra['accountCode']?.toString();
+          me = extra['me'] as AuthMe?;
+        }
+
+        if (me == null) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            context.go('/home');
+          });
+
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        return PatrolReportTable(
+          patrolGroup: group,
+          plant: plant,
+          accountCode: accountCode ?? '',
+          auth: me,
+        );
+      },
+    ),
+
+    GoRoute(
       path: '/after/:qr',
       builder: (context, state) {
         final qr = state.pathParameters['qr'] ?? '';
@@ -135,13 +96,12 @@ final router = GoRouter(
 
         if (extra is Map<String, dynamic>) {
           final accountCode = extra['accountCode']?.toString();
-          final qrCode = (extra['qrCode']?.toString()) ?? qr;
-
+          final qrCode = extra['qrCode']?.toString() ?? qr;
           final pg = extra['patrolGroup'];
+
           if (accountCode == null ||
               accountCode.isEmpty ||
               pg is! PatrolGroup) {
-            debugPrint('[ROUTER] invalid extra=$extra');
             return const _MissingExtraPage();
           }
 
@@ -152,7 +112,6 @@ final router = GoRouter(
           );
         }
 
-        debugPrint('[ROUTER] extra is null or wrong type: $extra');
         return const _MissingExtraPage();
       },
     ),

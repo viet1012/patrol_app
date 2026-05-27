@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import 'app_idle_detector.dart';
 import 'l10n/app_localizations.dart';
 
 void main() {
@@ -14,19 +15,6 @@ void main() {
   runApp(const MyApp());
 }
 
-// class MyApp extends StatelessWidget {
-//   const MyApp({super.key});
-//
-//   @override
-//   Widget build(BuildContext context) {
-//     return MaterialApp(
-//       title: 'Camera App',
-//       theme: ThemeData(primarySwatch: Colors.blue),
-//       home: const CameraScreen(),
-//       debugShowCheckedModeBanner: false,
-//     );
-//   }
-// }
 class MyApp extends StatefulWidget {
   const MyApp({super.key});
 
@@ -46,24 +34,40 @@ class _MyAppState extends State<MyApp> {
     checkWebVersionAndReload();
   }
 
+  ////////////////////////////////////////////////////////////
+  /// CHANGE LANGUAGE
+  ////////////////////////////////////////////////////////////
   void setLocale(Locale locale) {
     setState(() {
       _locale = locale;
     });
   }
 
+  ////////////////////////////////////////////////////////////
+  /// AUTO RELOAD WHEN NEW VERSION
+  ////////////////////////////////////////////////////////////
   void checkWebVersionAndReload() {
     if (!kIsWeb) return;
+
     final meta = html.document.querySelector('meta[name="app-version"]');
+
     final v = meta?.getAttribute('content') ?? '';
-    final key = 'last_app_version';
+
+    const key = 'last_app_version';
 
     final last = html.window.localStorage[key] ?? '';
+
     if (last.isNotEmpty && last != v) {
       html.window.localStorage[key] = v;
-      html.window.location.reload(); // tự reload khi có bản mới
+
+      ////////////////////////////////////////////////////////////
+      /// RELOAD WHEN VERSION CHANGED
+      ////////////////////////////////////////////////////////////
+      html.window.location.reload();
+
       return;
     }
+
     html.window.localStorage[key] = v;
   }
 
@@ -76,11 +80,13 @@ class _MyAppState extends State<MyApp> {
       supportedLocales: const [Locale('vi'), Locale('en'), Locale('ja')],
       localeResolutionCallback: (locale, supportedLocales) {
         if (locale == null) return supportedLocales.first;
-        for (var supportedLocale in supportedLocales) {
+
+        for (final supportedLocale in supportedLocales) {
           if (supportedLocale.languageCode == locale.languageCode) {
             return supportedLocale;
           }
         }
+
         return supportedLocales.first;
       },
       localizationsDelegates: const [
@@ -93,8 +99,9 @@ class _MyAppState extends State<MyApp> {
       theme: ThemeData(
         textTheme: GoogleFonts.notoSansTextTheme(Theme.of(context).textTheme),
       ),
-      // home: const LoginPage(),
-      // home: const PatrolReportTable(),
+      builder: (context, child) {
+        return AppIdleDetector(child: child ?? const SizedBox());
+      },
     );
   }
 }
