@@ -339,6 +339,10 @@ class _CameraScreenState extends State<CameraScreen> {
     }
   }
 
+  bool _isBlank(String? value) {
+    return value == null || value.trim().isEmpty;
+  }
+
   String _norm(String? v) {
     return (v ?? '')
         .replaceAll(String.fromCharCode(160), ' ')
@@ -457,11 +461,15 @@ class _CameraScreenState extends State<CameraScreen> {
       return;
     }
 
-    if (_selectedMachine == null && isPatrol) {
+    if (isPatrol &&
+        (_isBlank(_selectedPlant) ||
+            _isBlank(_selectedFac) ||
+            _isBlank(_selectedArea) ||
+            _isBlank(_selectedMachine))) {
       CommonUI.showWarning(
         context: context,
         title: "Information Required",
-        message: "Please select all required information.",
+        message: "Please select Plant, Fac, Area and Machine.",
       );
       return;
     }
@@ -503,12 +511,12 @@ class _CameraScreenState extends State<CameraScreen> {
         'userCreate': '${widget.accountCode}_$_employeeName',
         'qr_key': _qrKey ?? '',
         'qr_scan_sts': hasQr ? 'SUCCESS_1st' : '',
-        'plant': _selectedPlant ?? '',
         'type': widget.patrolGroup.name,
-        'division': _selectedFac ?? '',
-        'area': _selectedArea ?? '',
         'group': _selectedGroup ?? '',
-        'machine': _selectedMachine ?? '',
+        'plant': _selectedPlant!.trim(),
+        'division': _selectedFac!.trim(),
+        'area': _selectedArea!.trim(),
+        'machine': _selectedMachine!.trim(),
         'comment': _comment,
         'countermeasure': _counterMeasure,
         'check': _needRecheck
