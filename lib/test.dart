@@ -12,6 +12,8 @@ import 'package:dropdown_search/dropdown_search.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
+import 'ai/ai_analysis_toggle.dart';
+import 'ai/machine_ai_alert_card.dart';
 import 'api/auth_api.dart';
 import 'api/auto_cmp_api.dart';
 import 'api/dio_client.dart';
@@ -114,6 +116,11 @@ class _CameraScreenState extends State<CameraScreen> {
 
   HseMachineInfo? _qrFallbackMachine;
 
+  MachineAiSummary? _machineAiSummary;
+  bool _isLoadingMachineAi = false;
+  String? _machineAiError;
+  String? _lastAiMachine;
+
   @override
   void initState() {
     // _selectedPlant = widget.selectedPlant;
@@ -142,6 +149,55 @@ class _CameraScreenState extends State<CameraScreen> {
     _commentFocusNode.dispose();
     _counterFocusNode.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadMachineAiSummary(String? machine) async {
+    final mac = machine?.trim();
+
+    if (mac == null || mac.isEmpty) return;
+    if (_lastAiMachine == mac && _machineAiSummary != null) return;
+
+    setState(() {
+      _isLoadingMachineAi = true;
+      _machineAiError = null;
+      _machineAiSummary = null;
+      _lastAiMachine = mac;
+    });
+
+    try {
+      final response = await DioClient.get(
+        '/api/patrol_report/analyze-machine',
+        queryParameters: {'machine': mac},
+      );
+
+      final data = response.data;
+
+      if (!mounted) return;
+
+      if (data is Map) {
+        setState(() {
+          _machineAiSummary = MachineAiSummary.fromJson(
+            Map<String, dynamic>.from(data),
+          );
+        });
+      } else {
+        setState(() {
+          _machineAiError = 'Invalid AI response';
+        });
+      }
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        _machineAiError = 'Unable to load AI summary';
+      });
+    } finally {
+      if (!mounted) return;
+
+      setState(() {
+        _isLoadingMachineAi = false;
+      });
+    }
   }
 
   Future<String?> fetchEmployeeName(String code) async {
@@ -411,6 +467,11 @@ class _CameraScreenState extends State<CameraScreen> {
         _selectedMachine = selectedInfo.macId;
       });
 
+      if (_aiEnabled) {
+        _loadMachineAiSummary(selectedInfo.macId);
+      }
+      // _loadMachineAiSummary(selectedInfo.macId);
+
       // setState(() {
       //   _selectedPlant = selectedInfo.plant;
       //   _selectedFac = selectedInfo.fac;
@@ -645,6 +706,162 @@ class _CameraScreenState extends State<CameraScreen> {
 
   String _qrKey = '';
 
+  bool _aiEnabled = false;
+
+  void _onMachineChanged(String? machine) {
+    final mac = machine?.trim();
+
+    setState(() {
+      _selectedMachine = mac == null || mac.isEmpty ? null : mac;
+      _machineAiSummary = null;
+      _machineAiError = null;
+      _lastAiMachine = null;
+    });
+
+    if (_aiEnabled && mac != null && mac.isNotEmpty) {
+      _loadMachineAiSummary(mac);
+    }
+  }
+
+  Widget _buildAiAnalyzeSwitch() {
+    final mac = _selectedMachine?.trim() ?? '';
+    final hasMachine = mac.isNotEmpty;
+    final active = _aiEnabled && hasMachine;
+
+    return Align(
+      alignment: Alignment.centerRight,
+      child: TweenAnimationBuilder<double>(
+        tween: Tween(begin: active ? .96 : 1, end: 1),
+        duration: const Duration(milliseconds: 380),
+        curve: Curves.easeOutBack,
+        builder: (context, scale, child) {
+          return Transform.scale(scale: scale, child: child);
+        },
+        child: InkWell(
+          borderRadius: BorderRadius.circular(99),
+          onTap: !hasMachine || _isLoadingMachineAi
+              ? null
+              : () {
+                  final value = !_aiEnabled;
+
+                  setState(() {
+                    _aiEnabled = value;
+                  });
+
+                  if (value) {
+                    _loadMachineAiSummary(mac);
+                  } else {
+                    setState(() {
+                      _machineAiSummary = null;
+                      _machineAiError = null;
+                      _lastAiMachine = null;
+                    });
+                  }
+                },
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 260),
+            curve: Curves.easeOutCubic,
+            padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(99),
+              gradient: active
+                  ? LinearGradient(
+                      colors: [
+                        const Color(0xFF38BDF8).withOpacity(.30),
+                        const Color(0xFF22C55E).withOpacity(.22),
+                      ],
+                    )
+                  : null,
+              color: active ? null : Colors.white.withOpacity(.05),
+              border: Border.all(
+                color: active
+                    ? const Color(0xFF67E8F9).withOpacity(.55)
+                    : Colors.white.withOpacity(.08),
+              ),
+              boxShadow: active
+                  ? [
+                      BoxShadow(
+                        color: const Color(0xFF38BDF8).withOpacity(.25),
+                        blurRadius: 18,
+                        spreadRadius: 1,
+                      ),
+                      BoxShadow(
+                        color: const Color(0xFF22C55E).withOpacity(.12),
+                        blurRadius: 28,
+                        offset: const Offset(0, 8),
+                      ),
+                    ]
+                  : [],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (_isLoadingMachineAi)
+                  SizedBox(
+                    width: 15,
+                    height: 15,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.cyanAccent.withOpacity(.95),
+                    ),
+                  )
+                else
+                  Icon(
+                    active
+                        ? Icons.auto_awesome_rounded
+                        : Icons.auto_awesome_outlined,
+                    size: 16,
+                    color: hasMachine
+                        ? active
+                              ? const Color(0xFFFFFFFF)
+                              : const Color(0xFF67E8F9)
+                        : Colors.white.withOpacity(.35),
+                  ),
+
+                const SizedBox(width: 7),
+
+                Text(
+                  _isLoadingMachineAi
+                      ? 'THINKING'
+                      : active
+                      ? 'AI ACTIVE'
+                      : 'AI OFF',
+                  style: TextStyle(
+                    color: active
+                        ? Colors.white
+                        : Colors.white.withOpacity(.55),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: .5,
+                  ),
+                ),
+
+                if (active && !_isLoadingMachineAi) ...[
+                  const SizedBox(width: 7),
+                  Container(
+                    width: 6,
+                    height: 6,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: const Color(0xFF86EFAC),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF86EFAC).withOpacity(.8),
+                          blurRadius: 8,
+                          spreadRadius: 1,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildMachineInfoLoadingCard() {
     return Center(
       child: TweenAnimationBuilder<double>(
@@ -784,7 +1001,6 @@ class _CameraScreenState extends State<CameraScreen> {
     final images = _cameraKey.currentState?.images ?? [];
 
     final symbol = getScoreSymbol();
-    final displayScore = symbol.isEmpty ? "" : symbol;
     final minLength = (widget.lang == 'JP') ? 1 : 2;
 
     return Scaffold(
@@ -1020,6 +1236,8 @@ class _CameraScreenState extends State<CameraScreen> {
                               ? <String>[]
                               : areaList.cast<String>(),
                           onChanged: (v) {
+                            String? autoMachine;
+
                             setState(() {
                               _selectedArea = v;
 
@@ -1053,9 +1271,17 @@ class _CameraScreenState extends State<CameraScreen> {
                               );
 
                               if (!isFallbackMachine && machines.length == 1) {
-                                _selectedMachine = machines.first;
+                                autoMachine = machines.first;
+                                _selectedMachine = autoMachine;
                               }
                             });
+
+                            // if (autoMachine != null) {
+                            //   _loadMachineAiSummary(autoMachine);
+                            // }
+                            if (_aiEnabled && autoMachine != null) {
+                              _loadMachineAiSummary(autoMachine);
+                            }
                           },
                           isRequired: true,
                         ),
@@ -1071,15 +1297,54 @@ class _CameraScreenState extends State<CameraScreen> {
                                 _selectedArea == null)
                             ? <String>[]
                             : machineList.cast<String>(),
-                        onChanged: (v) {
-                          setState(() => _selectedMachine = v);
-                        },
+
+                        // onChanged: (v) {
+                        //   setState(() => _selectedMachine = v);
+                        //
+                        //   // _loadMachineAiSummary(v);
+                        // },
+                        onChanged: _onMachineChanged,
                         isRequired: true,
                       ),
                     ),
                   ],
                 ),
               ],
+              const SizedBox(height: 10),
+
+              // _buildAiAnalyzeSwitch(),
+              AiAnalysisToggle(
+                enabled: _aiEnabled,
+                loading: _isLoadingMachineAi,
+                hasMachine: (_selectedMachine?.isNotEmpty ?? false),
+                onTap: () {
+                  final mac = _selectedMachine ?? '';
+
+                  setState(() {
+                    _aiEnabled = !_aiEnabled;
+                  });
+
+                  if (_aiEnabled) {
+                    _loadMachineAiSummary(mac);
+                  } else {
+                    setState(() {
+                      _machineAiSummary = null;
+                      _machineAiError = null;
+                      _lastAiMachine = null;
+                    });
+                  }
+                },
+              ),
+              if (_aiEnabled)
+                MachineAiAlertCard(
+                  lang: widget.lang,
+                  machine: _selectedMachine,
+                  loading: _isLoadingMachineAi,
+                  error: _machineAiError,
+                  summary: _machineAiSummary,
+                  onRetry: () => _loadMachineAiSummary(_selectedMachine),
+                ),
+
               const SizedBox(height: 16),
               // CÁC DROPDOWN RISK
               if (widget.patrolGroup != PatrolGroup.AssetUpdate)
