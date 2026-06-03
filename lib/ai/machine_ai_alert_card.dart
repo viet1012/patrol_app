@@ -72,6 +72,12 @@ class _MachineAiAlertCardState extends State<MachineAiAlertCard> {
               text: _isJp
                   ? widget.summary?.summaryJp
                   : widget.summary?.summaryVi,
+              onRetry: widget.onRetry,
+              onToggleCollapse: () {
+                setState(() {
+                  _collapsed = !_collapsed;
+                });
+              },
             ),
           ),
 
@@ -125,13 +131,12 @@ class _MachineAiBody extends StatelessWidget {
     }
 
     if (summary == null) {
-      return _EmptyState(isJp: isJp);
+      return _EmptyState(isJp: isJp, onRetry: onRetry);
     }
-
     final text = isJp ? summary!.summaryJp : summary!.summaryVi;
 
     if (text.trim().isEmpty) {
-      return _EmptyState(isJp: isJp);
+      return _EmptyState(isJp: isJp, onRetry: onRetry);
     }
 
     return Column(
@@ -146,11 +151,15 @@ class _AiHeader extends StatelessWidget {
   final String machine;
   final bool collapsed;
   final String? text;
+  final VoidCallback onRetry;
+  final VoidCallback onToggleCollapse;
 
   const _AiHeader({
     required this.isJp,
     required this.machine,
     required this.collapsed,
+    required this.onRetry,
+    required this.onToggleCollapse,
     this.text,
   });
 
@@ -198,32 +207,54 @@ class _AiHeader extends StatelessWidget {
           ),
         ),
 
-        if ((text ?? '').isNotEmpty)
-          IconButton(
-            tooltip: 'Copy',
-            splashRadius: 18,
-            iconSize: 18,
-            icon: const Icon(Icons.copy_rounded, color: Colors.white70),
-            onPressed: () async {
-              await Clipboard.setData(ClipboardData(text: text!));
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if ((text ?? '').isNotEmpty)
+              IconButton(
+                tooltip: 'Refresh',
+                splashRadius: 18,
+                iconSize: 18,
+                icon: const Icon(
+                  Icons.refresh_rounded,
+                  color: Color(0xFF67E8F9),
+                ),
+                onPressed: onRetry,
+              ),
 
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Copied'),
-                    duration: Duration(seconds: 1),
-                  ),
-                );
-              }
-            },
-          ),
+            if ((text ?? '').isNotEmpty)
+              IconButton(
+                tooltip: 'Copy',
+                splashRadius: 18,
+                iconSize: 18,
+                icon: const Icon(Icons.copy_rounded, color: Colors.white70),
+                onPressed: () async {
+                  await Clipboard.setData(ClipboardData(text: text!));
 
-        AnimatedRotation(
-          turns: collapsed ? 0 : 0.5,
-          duration: const Duration(milliseconds: 250),
-          child: Icon(
-            Icons.keyboard_arrow_down_rounded,
-            color: Colors.white.withOpacity(.7),
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Copied'),
+                        duration: Duration(seconds: 1),
+                      ),
+                    );
+                  }
+                },
+              ),
+          ],
+        ),
+        IconButton(
+          tooltip: collapsed ? 'Expand' : 'Collapse',
+          splashRadius: 18,
+          iconSize: 22,
+          onPressed: onToggleCollapse,
+          icon: AnimatedRotation(
+            turns: collapsed ? 0 : 0.5,
+            duration: const Duration(milliseconds: 250),
+            child: Icon(
+              Icons.keyboard_arrow_down_rounded,
+              color: Colors.white.withOpacity(.7),
+            ),
           ),
         ),
       ],
@@ -235,6 +266,282 @@ class _AiReportBlock extends StatelessWidget {
   final String text;
 
   const _AiReportBlock({required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    final sections = _parseAiSections(text);
+
+    if (sections.isEmpty) {
+      return _PlainAiText(text: text);
+    }
+
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(.04),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        children: sections.map((section) {
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 2),
+            child: _AiSectionBlock(section: section),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  List<_AiSectionData> _parseAiSections(String raw) {
+    final lines = raw
+        .split('\n')
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
+
+    final result = <_AiSectionData>[];
+    _AiSectionData? current;
+
+    void startSection({
+      required IconData icon,
+      required String title,
+      required Color color,
+      String? firstItem,
+    }) {
+      current = _AiSectionData(
+        icon: icon,
+        title: title,
+        color: color,
+        items: [],
+      );
+
+      final item = firstItem?.trim() ?? '';
+      if (item.isNotEmpty) {
+        current!.items.add(item);
+      }
+
+      result.add(current!);
+    }
+
+    String afterPrefix(String text, String prefix) {
+      return text.substring(prefix.length).trim();
+    }
+
+    for (final line in lines) {
+      final normalized = line.replaceAll('：', ':').trim();
+
+      if (normalized == 'Tổng quan:') {
+        startSection(
+          icon: Icons.analytics_outlined,
+          title: 'Tổng quan',
+          color: const Color(0xFF67E8F9),
+        );
+        continue;
+      }
+
+      if (normalized.startsWith('Tổng quan:')) {
+        startSection(
+          icon: Icons.analytics_outlined,
+          title: 'Tổng quan',
+          color: const Color(0xFF67E8F9),
+          firstItem: afterPrefix(normalized, 'Tổng quan:'),
+        );
+        continue;
+      }
+
+      if (normalized.startsWith('Khoảng') ||
+          normalized.startsWith('Phần lớn') ||
+          normalized.startsWith('Các lỗi') ||
+          normalized.startsWith('Nhóm lỗi') ||
+          normalized.startsWith('Che chắn') ||
+          normalized.startsWith('Thiếu')) {
+        startSection(
+          icon: Icons.analytics_outlined,
+          title: 'Tổng quan',
+          color: const Color(0xFF67E8F9),
+          firstItem: normalized,
+        );
+        continue;
+      }
+
+      if (normalized == '概要:') {
+        startSection(
+          icon: Icons.analytics_outlined,
+          title: '概要',
+          color: const Color(0xFF67E8F9),
+        );
+        continue;
+      }
+
+      if (normalized.startsWith('概要:')) {
+        startSection(
+          icon: Icons.analytics_outlined,
+          title: '概要',
+          color: const Color(0xFF67E8F9),
+          firstItem: afterPrefix(normalized, '概要:'),
+        );
+        continue;
+      }
+
+      if (normalized == 'Top lỗi thường gặp:') {
+        startSection(
+          icon: Icons.warning_amber_rounded,
+          title: 'Top lỗi thường gặp',
+          color: const Color(0xFFFBBF24),
+        );
+        continue;
+      }
+
+      if (normalized.startsWith('Top lỗi thường gặp:')) {
+        startSection(
+          icon: Icons.warning_amber_rounded,
+          title: 'Top lỗi thường gặp',
+          color: const Color(0xFFFBBF24),
+          firstItem: afterPrefix(normalized, 'Top lỗi thường gặp:'),
+        );
+        continue;
+      }
+
+      if (normalized == '上位頻発問題:') {
+        startSection(
+          icon: Icons.warning_amber_rounded,
+          title: '上位頻発問題',
+          color: const Color(0xFFFBBF24),
+        );
+        continue;
+      }
+
+      if (normalized.startsWith('上位頻発問題:')) {
+        startSection(
+          icon: Icons.warning_amber_rounded,
+          title: '上位頻発問題',
+          color: const Color(0xFFFBBF24),
+          firstItem: afterPrefix(normalized, '上位頻発問題:'),
+        );
+        continue;
+      }
+
+      if (normalized == 'Khuyến nghị:') {
+        startSection(
+          icon: Icons.lightbulb_outline_rounded,
+          title: 'Khuyến nghị',
+          color: const Color(0xFF86EFAC),
+        );
+        continue;
+      }
+
+      if (normalized.startsWith('Khuyến nghị:')) {
+        startSection(
+          icon: Icons.lightbulb_outline_rounded,
+          title: 'Khuyến nghị',
+          color: const Color(0xFF86EFAC),
+          firstItem: afterPrefix(normalized, 'Khuyến nghị:'),
+        );
+        continue;
+      }
+
+      if (normalized == '推奨対策:') {
+        startSection(
+          icon: Icons.lightbulb_outline_rounded,
+          title: '推奨対策',
+          color: const Color(0xFF86EFAC),
+        );
+        continue;
+      }
+
+      if (normalized.startsWith('推奨対策:')) {
+        startSection(
+          icon: Icons.lightbulb_outline_rounded,
+          title: '推奨対策',
+          color: const Color(0xFF86EFAC),
+          firstItem: afterPrefix(normalized, '推奨対策:'),
+        );
+        continue;
+      }
+
+      current?.items.add(line);
+    }
+
+    result.removeWhere((e) => e.items.isEmpty);
+    return result;
+  }
+}
+
+class _AiSectionData {
+  final IconData icon;
+  final String title;
+  final Color color;
+  final List<String> items;
+
+  const _AiSectionData({
+    required this.icon,
+    required this.title,
+    required this.color,
+    required this.items,
+  });
+}
+
+class _AiSectionBlock extends StatelessWidget {
+  final _AiSectionData section;
+
+  const _AiSectionBlock({required this.section});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: section.color.withOpacity(.055),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: section.color.withOpacity(.16)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(section.icon, size: 15, color: section.color),
+              const SizedBox(width: 6),
+              Text(
+                section.title,
+                style: TextStyle(
+                  color: section.color,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 7),
+
+          ...section.items.map((item) {
+            final clean = item.replaceFirst(RegExp(r'^-\s*'), '');
+
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: SelectableText(
+                clean,
+                style: TextStyle(
+                  color: Colors.white.withOpacity(.90),
+                  fontSize: 13,
+                  height: 1.35,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+}
+
+class _PlainAiText extends StatelessWidget {
+  final String text;
+
+  const _PlainAiText({required this.text});
 
   @override
   Widget build(BuildContext context) {
@@ -331,8 +638,9 @@ class _ErrorState extends StatelessWidget {
 
 class _EmptyState extends StatelessWidget {
   final bool isJp;
+  final VoidCallback onRetry;
 
-  const _EmptyState({required this.isJp});
+  const _EmptyState({required this.isJp, required this.onRetry});
 
   @override
   Widget build(BuildContext context) {
@@ -343,7 +651,9 @@ class _EmptyState extends StatelessWidget {
           color: Color(0xFF67E8F9),
           size: 21,
         ),
+
         const SizedBox(width: 10),
+
         Expanded(
           child: Text(
             isJp
@@ -354,6 +664,18 @@ class _EmptyState extends StatelessWidget {
               fontSize: 14,
               fontWeight: FontWeight.w800,
             ),
+          ),
+        ),
+
+        const SizedBox(width: 8),
+
+        OutlinedButton.icon(
+          onPressed: onRetry,
+          icon: const Icon(Icons.refresh_rounded, size: 16),
+          label: Text(isJp ? '再分析' : 'Retry'),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: const Color(0xFF67E8F9),
+            side: BorderSide(color: const Color(0xFF67E8F9).withOpacity(.4)),
           ),
         ),
       ],

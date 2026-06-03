@@ -151,7 +151,62 @@ class _CameraScreenState extends State<CameraScreen> {
     super.dispose();
   }
 
-  Future<void> _loadMachineAiSummary(String? machine) async {
+  Future<void> _loadMachineAiSummary(
+    String? machine, {
+    bool force = false,
+  }) async {
+    final mac = machine?.trim();
+
+    if (mac == null || mac.isEmpty) return;
+
+    if (!force && _lastAiMachine == mac && _machineAiSummary != null) {
+      return;
+    }
+
+    setState(() {
+      _isLoadingMachineAi = true;
+      _machineAiError = null;
+      _machineAiSummary = null;
+      _lastAiMachine = mac;
+    });
+
+    try {
+      final response = await DioClient.get(
+        '/api/patrol_report/analyze-machine',
+        queryParameters: {'machine': mac},
+      );
+
+      final data = response.data;
+
+      if (!mounted) return;
+
+      if (data is Map) {
+        setState(() {
+          _machineAiSummary = MachineAiSummary.fromJson(
+            Map<String, dynamic>.from(data),
+          );
+        });
+      } else {
+        setState(() {
+          _machineAiError = 'Invalid AI response';
+        });
+      }
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        _machineAiError = 'Unable to load AI summary';
+      });
+    } finally {
+      if (!mounted) return;
+
+      setState(() {
+        _isLoadingMachineAi = false;
+      });
+    }
+  }
+
+  Future<void> _loadMachineAiSummary1(String? machine) async {
     final mac = machine?.trim();
 
     if (mac == null || mac.isEmpty) return;
@@ -1342,7 +1397,8 @@ class _CameraScreenState extends State<CameraScreen> {
                   loading: _isLoadingMachineAi,
                   error: _machineAiError,
                   summary: _machineAiSummary,
-                  onRetry: () => _loadMachineAiSummary(_selectedMachine),
+                  onRetry: () =>
+                      _loadMachineAiSummary(_selectedMachine, force: true),
                 ),
 
               const SizedBox(height: 16),
