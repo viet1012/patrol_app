@@ -121,13 +121,34 @@ class _CameraScreenState extends State<CameraScreen> {
   String? _machineAiError;
   String? _lastAiMachine;
 
+  // @override
+  // void initState() {
+  //   // _selectedPlant = widget.selectedPlant;
+  //   super.initState();
+  //   final team = widget.autoTeam;
+  //
+  //   // auto select Plant - Fac - Group
+  //   if (team != null) {
+  //     _selectedPlant = team.plant;
+  //     _selectedFac = team.fac;
+  //     _selectedGroup = team.grp;
+  //   } else {
+  //     _selectedPlant = widget.selectedPlant;
+  //   }
+  //   fetchEmployeeName(
+  //     widget.accountCode,
+  //   ).then((name) => debugPrint('EMPLOYEE NAME = $name'));
+  //   _loadInitialDataComment();
+  //   _loadInitialDataCounter();
+  // }
+
   @override
   void initState() {
-    // _selectedPlant = widget.selectedPlant;
     super.initState();
+
     final team = widget.autoTeam;
 
-    // auto select Plant - Fac - Group
+    // ✅ Patrol Before ưu tiên nhận Plant / Fac / Group từ _loadTeams
     if (team != null) {
       _selectedPlant = team.plant;
       _selectedFac = team.fac;
@@ -135,9 +156,15 @@ class _CameraScreenState extends State<CameraScreen> {
     } else {
       _selectedPlant = widget.selectedPlant;
     }
+
+    debugPrint('Camera selectedPlant = $_selectedPlant');
+    debugPrint('Camera selectedFac = $_selectedFac');
+    debugPrint('Camera selectedGroup = $_selectedGroup');
+
     fetchEmployeeName(
       widget.accountCode,
     ).then((name) => debugPrint('EMPLOYEE NAME = $name'));
+
     _loadInitialDataComment();
     _loadInitialDataCounter();
   }
@@ -778,145 +805,6 @@ class _CameraScreenState extends State<CameraScreen> {
     }
   }
 
-  Widget _buildAiAnalyzeSwitch() {
-    final mac = _selectedMachine?.trim() ?? '';
-    final hasMachine = mac.isNotEmpty;
-    final active = _aiEnabled && hasMachine;
-
-    return Align(
-      alignment: Alignment.centerRight,
-      child: TweenAnimationBuilder<double>(
-        tween: Tween(begin: active ? .96 : 1, end: 1),
-        duration: const Duration(milliseconds: 380),
-        curve: Curves.easeOutBack,
-        builder: (context, scale, child) {
-          return Transform.scale(scale: scale, child: child);
-        },
-        child: InkWell(
-          borderRadius: BorderRadius.circular(99),
-          onTap: !hasMachine || _isLoadingMachineAi
-              ? null
-              : () {
-                  final value = !_aiEnabled;
-
-                  setState(() {
-                    _aiEnabled = value;
-                  });
-
-                  if (value) {
-                    _loadMachineAiSummary(mac);
-                  } else {
-                    setState(() {
-                      _machineAiSummary = null;
-                      _machineAiError = null;
-                      _lastAiMachine = null;
-                    });
-                  }
-                },
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 260),
-            curve: Curves.easeOutCubic,
-            padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(99),
-              gradient: active
-                  ? LinearGradient(
-                      colors: [
-                        const Color(0xFF38BDF8).withOpacity(.30),
-                        const Color(0xFF22C55E).withOpacity(.22),
-                      ],
-                    )
-                  : null,
-              color: active ? null : Colors.white.withOpacity(.05),
-              border: Border.all(
-                color: active
-                    ? const Color(0xFF67E8F9).withOpacity(.55)
-                    : Colors.white.withOpacity(.08),
-              ),
-              boxShadow: active
-                  ? [
-                      BoxShadow(
-                        color: const Color(0xFF38BDF8).withOpacity(.25),
-                        blurRadius: 18,
-                        spreadRadius: 1,
-                      ),
-                      BoxShadow(
-                        color: const Color(0xFF22C55E).withOpacity(.12),
-                        blurRadius: 28,
-                        offset: const Offset(0, 8),
-                      ),
-                    ]
-                  : [],
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (_isLoadingMachineAi)
-                  SizedBox(
-                    width: 15,
-                    height: 15,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.cyanAccent.withOpacity(.95),
-                    ),
-                  )
-                else
-                  Icon(
-                    active
-                        ? Icons.auto_awesome_rounded
-                        : Icons.auto_awesome_outlined,
-                    size: 16,
-                    color: hasMachine
-                        ? active
-                              ? const Color(0xFFFFFFFF)
-                              : const Color(0xFF67E8F9)
-                        : Colors.white.withOpacity(.35),
-                  ),
-
-                const SizedBox(width: 7),
-
-                Text(
-                  _isLoadingMachineAi
-                      ? 'THINKING'
-                      : active
-                      ? 'AI ACTIVE'
-                      : 'AI OFF',
-                  style: TextStyle(
-                    color: active
-                        ? Colors.white
-                        : Colors.white.withOpacity(.55),
-                    fontSize: 11,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: .5,
-                  ),
-                ),
-
-                if (active && !_isLoadingMachineAi) ...[
-                  const SizedBox(width: 7),
-                  Container(
-                    width: 6,
-                    height: 6,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: const Color(0xFF86EFAC),
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFF86EFAC).withOpacity(.8),
-                          blurRadius: 8,
-                          spreadRadius: 1,
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _buildMachineInfoLoadingCard() {
     return Center(
       child: TweenAnimationBuilder<double>(
@@ -1092,7 +980,7 @@ class _CameraScreenState extends State<CameraScreen> {
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  '${widget.selectedPlant}',
+                  _selectedPlant ?? '',
                   style: const TextStyle(color: Colors.white70, fontSize: 11),
                 ),
               ),

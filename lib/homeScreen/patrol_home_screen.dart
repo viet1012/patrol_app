@@ -86,21 +86,47 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
     _init();
   }
 
+  // Future<void> _init() async {
+  //   ////////////////////////////////////////////////////////////
+  //   /// LOAD SAVED PLANT FIRST
+  //   ////////////////////////////////////////////////////////////
+  //   await _loadPlant();
+  //
+  //   ////////////////////////////////////////////////////////////
+  //   /// OTHER
+  //   ////////////////////////////////////////////////////////////
+  //   _initEmployee();
+  //
+  //   _loadAuthMe();
+  //   await _loadHseMaster(); // load machines trước
+  //   await _loadTeams(); // sau đó mới auto set plant
+  // }
   Future<void> _init() async {
-    ////////////////////////////////////////////////////////////
-    /// LOAD SAVED PLANT FIRST
-    ////////////////////////////////////////////////////////////
-    await _loadPlant();
+    await _loadAuthMe(); // lấy plant từ api/hr/me
+    await _loadPlant(); // chỉ fallback nếu api/hr/me không có plant
 
-    ////////////////////////////////////////////////////////////
-    /// OTHER
-    ////////////////////////////////////////////////////////////
     _initEmployee();
 
-    _loadAuthMe();
-    await _loadHseMaster(); // load machines trước
-    await _loadTeams(); // sau đó mới auto set plant
+    await _loadHseMaster();
+    await _loadTeams(); // chỉ set autoTeam / expandedGroup
   }
+
+  // Future<void> _loadAuthMe() async {
+  //   try {
+  //     final res = await DioClient.get(
+  //       '/api/hr/me',
+  //       queryParameters: {'code': widget.accountCode},
+  //     );
+  //
+  //     if (res.statusCode == 200 && res.data != null) {
+  //       setState(() {
+  //         _authMe = AuthMe.fromJson(Map<String, dynamic>.from(res.data));
+  //       });
+  //     }
+  //   } catch (e) {
+  //     debugPrint('Load auth me error: $e');
+  //   }
+  // }
 
   Future<void> _loadAuthMe() async {
     try {
@@ -110,9 +136,23 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
       );
 
       if (res.statusCode == 200 && res.data != null) {
+        final me = AuthMe.fromJson(Map<String, dynamic>.from(res.data));
+
         setState(() {
-          _authMe = AuthMe.fromJson(Map<String, dynamic>.from(res.data));
+          _authMe = me;
+
+          // ✅ Ưu tiên plant từ API HR
+          if (me.plant != null && me.plant!.trim().isNotEmpty) {
+            selectedFactory = me.plant!.trim();
+          }
         });
+
+        if (selectedFactory != null) {
+          await SessionStore.savePlant(widget.accountCode, selectedFactory!);
+        }
+
+        debugPrint('HR ME Plant = ${me.plant}');
+        debugPrint('selectedFactory from HR = $selectedFactory');
       }
     } catch (e) {
       debugPrint('Load auth me error: $e');
@@ -120,6 +160,13 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
   }
 
   Future<void> _loadPlant() async {
+    if (selectedFactory != null && selectedFactory!.isNotEmpty) {
+      debugPrint(
+        'Skip Session plant because HR plant exists: $selectedFactory',
+      );
+      return;
+    }
+
     final plant = await SessionStore.getPlant(widget.accountCode);
 
     if (plant != null && mounted) {
@@ -127,7 +174,8 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
         selectedFactory = plant;
       });
     }
-    print("selectedFactory: ${selectedFactory}");
+
+    debugPrint("selectedFactory from Session: $selectedFactory");
   }
 
   Future<void> _loadTeams() async {
@@ -137,14 +185,15 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
       HsePatrolTeamModel? found;
       PatrolGroup? foundGroup;
 
-      for (final g in PatrolGroup.values) {
-        final t = HseMasterService.findTeamByEmp(widget.accountCode, g, data);
-        if (t != null) {
-          found = t;
-          foundGroup = g;
-          break;
-        }
-      }
+      // ✅ Chỉ tìm team của PatrolGroup.Patrol
+      final patrolTeam = HseMasterService.findTeamByEmp(
+        widget.accountCode,
+        PatrolGroup.Patrol,
+        data,
+      );
+
+      found = patrolTeam;
+      foundGroup = patrolTeam != null ? PatrolGroup.Patrol : null;
 
       setState(() {
         teams = data;
@@ -152,23 +201,72 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
         expandedGroup = foundGroup;
         _needManualSelect = found == null;
 
-        // if (found != null) {
-        //   selectedFactory = found.plant;
-        // }
-        ////////////////////////////////////////////////////////////
-        /// ONLY AUTO SELECT FIRST TIME
-        ////////////////////////////////////////////////////////////
-        if (found != null && selectedFactory == null) {
-          selectedFactory = found.plant;
-        }
+        // ❌ Không set selectedFactory ở đây nữa
+        // selectedFactory phải theo api/hr/me
       });
-      print(
-        "Plant: ${found?.plant} - Fac: ${found?.fac} - Group: ${found?.grp} ",
+
+      debugPrint(
+        "Patrol Team Plant: ${found?.plant} - Fac: ${found
+            ?.fac} - Group: ${found?.grp}",
       );
+      debugPrint("selectedFactory KEEP from HR/API: $selectedFactory");
     } catch (e) {
-      errorMessage = e.toString();
+      setState(() {
+        errorMessage = e.toString();
+      });
     }
   }
+
+  // Future<void> _loadPlant() async {
+  //   final plant = await SessionStore.getPlant(widget.accountCode);
+  //
+  //   if (plant != null && mounted) {
+  //     setState(() {
+  //       selectedFactory = plant;
+  //     });
+  //   }
+  //   print("selectedFactory: ${selectedFactory}");
+  // }
+
+  // Future<void> _loadTeams() async {
+  //   try {
+  //     final data = await HseMasterService.fetchAll();
+  //
+  //     HsePatrolTeamModel? found;
+  //     PatrolGroup? foundGroup;
+  //
+  //     for (final g in PatrolGroup.values) {
+  //       final t = HseMasterService.findTeamByEmp(widget.accountCode, g, data);
+  //       if (t != null) {
+  //         found = t;
+  //         foundGroup = g;
+  //         break;
+  //       }
+  //     }
+  //
+  //     setState(() {
+  //       teams = data;
+  //       _autoTeam = found;
+  //       expandedGroup = foundGroup;
+  //       _needManualSelect = found == null;
+  //
+  //       // if (found != null) {
+  //       //   selectedFactory = found.plant;
+  //       // }
+  //       ////////////////////////////////////////////////////////////
+  //       /// ONLY AUTO SELECT FIRST TIME
+  //       ////////////////////////////////////////////////////////////
+  //       if (found != null && selectedFactory == null) {
+  //         selectedFactory = found.plant;
+  //       }
+  //     });
+  //     print(
+  //       "Plant: ${found?.plant} - Fac: ${found?.fac} - Group: ${found?.grp} ",
+  //     );
+  //   } catch (e) {
+  //     errorMessage = e.toString();
+  //   }
+  // }
 
   Future<void> _loadHseMaster() async {
     try {
@@ -283,7 +381,10 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
         : null;
     print("valid Value: $validValue");
     factories.sort((a, b) {
-      int getNum(String s) => int.tryParse(s.split('_').last) ?? 0;
+      int getNum(String s) =>
+          int.tryParse(s
+              .split('_')
+              .last) ?? 0;
 
       return getNum(a).compareTo(getNum(b));
     });
@@ -336,286 +437,287 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
         child: SafeArea(
           child: isLoading
               ? Center(
-                  child: CircularProgressIndicator(
-                    color: Colors.lightBlueAccent.shade400,
-                  ),
-                )
+            child: CircularProgressIndicator(
+              color: Colors.lightBlueAccent.shade400,
+            ),
+          )
               : errorMessage != null && errorMessage!.isNotEmpty
               ? CommonUI.errorPage(
-                  message: errorMessage.toString(),
-                  context: context,
-                )
+            message: errorMessage.toString(),
+            context: context,
+          )
               : Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 24,
-                    vertical: 8,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 24,
+              vertical: 8,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      "Welcome:",
+                      style: const TextStyle(
+                        fontSize: 16,
+                        color: Colors.white70,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                    SizedBox(width: 8),
+                    Text(
+                      (_employeeName.isNotEmpty)
+                          ? _employeeName
+                          : (widget.accountCode ?? ''),
+                      style: const TextStyle(
+                        fontSize: 18,
+                        color: Colors.lightBlueAccent,
+                      ),
+                    ),
+                  ],
+                ),
+
+                SizedBox(height: 8),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 6,
+                      ),
+                      decoration: glassDecorationSmall,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(
-                            "Welcome:",
-                            style: const TextStyle(
-                              fontSize: 16,
-                              color: Colors.white70,
-                              fontStyle: FontStyle.italic,
-                            ),
+
+                          /// 🌐 LANGUAGE
+                          LanguageToggleSwitch(
+                            onLanguageChanged: (lang) {
+                              setState(() {
+                                currentLang = lang;
+                              });
+                            },
                           ),
-                          SizedBox(width: 8),
-                          Text(
-                            (_employeeName.isNotEmpty)
-                                ? _employeeName
-                                : (widget.accountCode ?? ''),
-                            style: const TextStyle(
-                              fontSize: 18,
-                              color: Colors.lightBlueAccent,
+                          SizedBox(
+                            width: 150,
+                            child: DropdownButtonFormField<String>(
+                              value: validValue,
+                              // null lúc đầu
+                              isExpanded: true,
+                              dropdownColor: Colors.blueGrey.shade900
+                                  .withOpacity(0.95),
+                              icon: const Icon(
+                                Icons.arrow_drop_down,
+                                color: Colors.white70,
+                                size: 30,
+                              ),
+                              decoration: InputDecoration(
+                                labelText: "plant".tr(context),
+                                filled: true,
+                                fillColor: Colors.white.withOpacity(0.12),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                  borderSide: BorderSide(
+                                    color: Colors.white.withOpacity(0.35),
+                                    width: 1.2,
+                                  ),
+                                ),
+
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                  borderSide: BorderSide(
+                                    color: Colors.white.withOpacity(0.35),
+                                  ),
+                                ),
+
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                  borderSide: const BorderSide(
+                                    color: Color(0xFF7986CB),
+                                    width: 1.8,
+                                  ),
+                                ),
+
+                                /// 🏷️ label bình thường
+                                labelStyle: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white70,
+                                ),
+
+                                /// 🏷️ label khi bay lên
+                                floatingLabelStyle: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF7986CB),
+                                ),
+
+                                contentPadding:
+                                const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 14,
+                                ),
+                              ),
+
+                              style: const TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+
+                              items: factories.map((f) {
+                                return DropdownMenuItem<String>(
+                                  value: f,
+                                  child: Text(f),
+                                );
+                              }).toList(),
+
+                              onChanged: (val) async {
+                                setState(() {
+                                  selectedFactory = val;
+
+                                  // 👇 nếu user đổi plant thì coi như chọn tay
+                                  _autoTeam = null;
+                                  _needManualSelect = true;
+                                });
+
+                                if (val != null) {
+                                  await SessionStore.savePlant(
+                                    widget.accountCode,
+                                    val,
+                                  );
+                                }
+                              },
                             ),
                           ),
                         ],
                       ),
+                    ),
+                  ),
+                ),
 
-                      SizedBox(height: 8),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(16),
-                        child: BackdropFilter(
-                          filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 6,
-                            ),
-                            decoration: glassDecorationSmall,
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                /// 🌐 LANGUAGE
-                                LanguageToggleSwitch(
-                                  onLanguageChanged: (lang) {
-                                    setState(() {
-                                      currentLang = lang;
-                                    });
-                                  },
-                                ),
-                                SizedBox(
-                                  width: 150,
-                                  child: DropdownButtonFormField<String>(
-                                    value: validValue,
-                                    // null lúc đầu
-                                    isExpanded: true,
-                                    dropdownColor: Colors.blueGrey.shade900
-                                        .withOpacity(0.95),
-                                    icon: const Icon(
-                                      Icons.arrow_drop_down,
-                                      color: Colors.white70,
-                                      size: 30,
-                                    ),
-                                    decoration: InputDecoration(
-                                      labelText: "plant".tr(context),
-                                      filled: true,
-                                      fillColor: Colors.white.withOpacity(0.12),
-                                      border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(14),
-                                        borderSide: BorderSide(
-                                          color: Colors.white.withOpacity(0.35),
-                                          width: 1.2,
-                                        ),
-                                      ),
+                const SizedBox(height: 18),
 
-                                      enabledBorder: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(14),
-                                        borderSide: BorderSide(
-                                          color: Colors.white.withOpacity(0.35),
-                                        ),
-                                      ),
-
-                                      focusedBorder: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(14),
-                                        borderSide: const BorderSide(
-                                          color: Color(0xFF7986CB),
-                                          width: 1.8,
-                                        ),
-                                      ),
-
-                                      /// 🏷️ label bình thường
-                                      labelStyle: TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.w600,
-                                        color: Colors.white70,
-                                      ),
-
-                                      /// 🏷️ label khi bay lên
-                                      floatingLabelStyle: const TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.bold,
-                                        color: Color(0xFF7986CB),
-                                      ),
-
-                                      contentPadding:
-                                          const EdgeInsets.symmetric(
-                                            horizontal: 16,
-                                            vertical: 14,
-                                          ),
-                                    ),
-
-                                    style: const TextStyle(
-                                      fontSize: 20,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.white,
-                                    ),
-
-                                    items: factories.map((f) {
-                                      return DropdownMenuItem<String>(
-                                        value: f,
-                                        child: Text(f),
-                                      );
-                                    }).toList(),
-
-                                    onChanged: (val) async {
-                                      setState(() {
-                                        selectedFactory = val;
-
-                                        // 👇 nếu user đổi plant thì coi như chọn tay
-                                        _autoTeam = null;
-                                        _needManualSelect = true;
-                                      });
-
-                                      if (val != null) {
-                                        await SessionStore.savePlant(
-                                          widget.accountCode,
-                                          val,
-                                        );
-                                      }
-                                    },
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
+                Expanded(
+                  child: selectedFactory == null
+                      ? const SizedBox()
+                      : ListView(
+                    key: ValueKey(selectedFactory),
+                    children: [
+                      _animatedCard(
+                        0,
+                        _patrolGroupCard(
+                          group: PatrolGroup.Patrol,
+                          title: 'Weekly Safety Patrol',
+                          icon: Icons.security,
+                          prefix: 'Patrol',
+                          titleScreen: 'Safety Patrol',
                         ),
                       ),
-
-                      const SizedBox(height: 18),
-
-                      Expanded(
-                        child: selectedFactory == null
-                            ? const SizedBox()
-                            : ListView(
-                                key: ValueKey(selectedFactory),
-                                children: [
-                                  _animatedCard(
-                                    0,
-                                    _patrolGroupCard(
-                                      group: PatrolGroup.Patrol,
-                                      title: 'Weekly Safety Patrol',
-                                      icon: Icons.security,
-                                      prefix: 'Patrol',
-                                      titleScreen: 'Safety Patrol',
-                                    ),
-                                  ),
-                                  _animatedCard(
-                                    1,
-                                    _patrolGroupCard(
-                                      group: PatrolGroup.Audit,
-                                      title: 'SRG Safety Audit',
-                                      icon: Icons.groups,
-                                      enabled: true,
-                                      prefix: 'Audit',
-                                      titleScreen: 'Safety Audit',
-                                    ),
-                                  ),
-                                  _animatedCard(
-                                    2,
-                                    _patrolGroupCard(
-                                      group: PatrolGroup.QualityPatrol,
-                                      title: 'QA Quality Patrol',
-                                      icon: Icons.verified,
-                                      prefix: 'QA Patrol',
-                                      enabled: true,
-                                      titleScreen: 'QA Patrol',
-                                    ),
-                                  ),
-                                  _animatedCard(
-                                    3,
-                                    _patrolGroupCard(
-                                      group: PatrolGroup.AssetUpdate,
-                                      title: 'Asset Update',
-                                      icon: Icons.inventory_rounded,
-                                      prefix: 'Asset Patrol',
-                                      enabled: true,
-                                      titleScreen: 'Asset Patrol',
-                                    ),
-                                  ),
-                                ],
-                              ),
+                      _animatedCard(
+                        1,
+                        _patrolGroupCard(
+                          group: PatrolGroup.Audit,
+                          title: 'SRG Safety Audit',
+                          icon: Icons.groups,
+                          enabled: true,
+                          prefix: 'Audit',
+                          titleScreen: 'Safety Audit',
+                        ),
                       ),
-                      Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          // ⬅️ LOGOUT (LEFT)
-                          Positioned(
-                            left: 0,
-                            child: GlassActionButton(
-                              icon: Icons.logout,
-                              onTap: () async {
-                                final confirm = await CommonUI.showGlassConfirm(
-                                  context: context,
-                                  icon: Icons.logout_rounded,
-                                  iconColor: Colors.redAccent,
-                                  title: "Logout",
-                                  message: "Do you want to logout?",
-                                  cancelText: "Cancel",
-                                  confirmText: "Logout",
-                                  confirmColor: Colors.redAccent,
-                                );
-
-                                if (!confirm || !context.mounted) return;
-
-                                await SessionStore.clear();
-                                if (!context.mounted) return;
-
-                                context.go('/'); // ✅ QUAY VỀ LOGIN
-                              },
-
-                              // onTap: () async {
-                              //   final confirm = await CommonUI.showGlassConfirm(
-                              //     context: context,
-                              //     icon: Icons.logout_rounded,
-                              //     iconColor: Colors.redAccent,
-                              //     title: "Logout",
-                              //     message: "Do you want to logout?",
-                              //     cancelText: "Cancel",
-                              //     confirmText: "Logout",
-                              //     confirmColor: Colors.redAccent,
-                              //   );
-                              //
-                              //   if (!confirm || !context.mounted) return;
-                              //
-                              //   await SessionStore.clear();
-                              //   if (!context.mounted) return;
-                              //
-                              //   Navigator.pushAndRemoveUntil(
-                              //     context,
-                              //     MaterialPageRoute(
-                              //       builder: (_) => const LoginPage(),
-                              //     ),
-                              //     (_) => false,
-                              //   );
-                              // },
-                            ),
-                          ),
-                          Center(
-                            child: QrScanGlassButton(
-                              onTap: _openQrScannerDialog,
-                              duration: Duration(milliseconds: 900),
-                            ),
-                          ),
-                        ],
+                      _animatedCard(
+                        2,
+                        _patrolGroupCard(
+                          group: PatrolGroup.QualityPatrol,
+                          title: 'QA Quality Patrol',
+                          icon: Icons.verified,
+                          prefix: 'QA Patrol',
+                          enabled: true,
+                          titleScreen: 'QA Patrol',
+                        ),
+                      ),
+                      _animatedCard(
+                        3,
+                        _patrolGroupCard(
+                          group: PatrolGroup.AssetUpdate,
+                          title: 'Asset Update',
+                          icon: Icons.inventory_rounded,
+                          prefix: 'Asset Patrol',
+                          enabled: true,
+                          titleScreen: 'Asset Patrol',
+                        ),
                       ),
                     ],
                   ),
                 ),
+                Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    // ⬅️ LOGOUT (LEFT)
+                    Positioned(
+                      left: 0,
+                      child: GlassActionButton(
+                        icon: Icons.logout,
+                        onTap: () async {
+                          final confirm = await CommonUI.showGlassConfirm(
+                            context: context,
+                            icon: Icons.logout_rounded,
+                            iconColor: Colors.redAccent,
+                            title: "Logout",
+                            message: "Do you want to logout?",
+                            cancelText: "Cancel",
+                            confirmText: "Logout",
+                            confirmColor: Colors.redAccent,
+                          );
+
+                          if (!confirm || !context.mounted) return;
+
+                          await SessionStore.clear();
+                          if (!context.mounted) return;
+
+                          context.go('/'); // ✅ QUAY VỀ LOGIN
+                        },
+
+                        // onTap: () async {
+                        //   final confirm = await CommonUI.showGlassConfirm(
+                        //     context: context,
+                        //     icon: Icons.logout_rounded,
+                        //     iconColor: Colors.redAccent,
+                        //     title: "Logout",
+                        //     message: "Do you want to logout?",
+                        //     cancelText: "Cancel",
+                        //     confirmText: "Logout",
+                        //     confirmColor: Colors.redAccent,
+                        //   );
+                        //
+                        //   if (!confirm || !context.mounted) return;
+                        //
+                        //   await SessionStore.clear();
+                        //   if (!context.mounted) return;
+                        //
+                        //   Navigator.pushAndRemoveUntil(
+                        //     context,
+                        //     MaterialPageRoute(
+                        //       builder: (_) => const LoginPage(),
+                        //     ),
+                        //     (_) => false,
+                        //   );
+                        // },
+                      ),
+                    ),
+                    Center(
+                      child: QrScanGlassButton(
+                        onTap: _openQrScannerDialog,
+                        duration: Duration(milliseconds: 900),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -628,37 +730,38 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
     await showDialog<void>(
       context: context,
       barrierDismissible: true,
-      builder: (ctx) => Dialog(
-        backgroundColor: Colors.transparent,
-        insetPadding: const EdgeInsets.all(12),
-        child: QrScannerDialog(
-          key: dialogKey,
-          onDetected: (qr) async {
-            if (_qrHandled) return;
-            _qrHandled = true;
+      builder: (ctx) =>
+          Dialog(
+            backgroundColor: Colors.transparent,
+            insetPadding: const EdgeInsets.all(12),
+            child: QrScannerDialog(
+              key: dialogKey,
+              onDetected: (qr) async {
+                if (_qrHandled) return;
+                _qrHandled = true;
 
-            await dialogKey.currentState?.stopCamera(); // ✅ dùng key local
+                await dialogKey.currentState?.stopCamera(); // ✅ dùng key local
 
-            final nav = Navigator.of(ctx, rootNavigator: true);
-            if (nav.canPop()) nav.pop();
+                final nav = Navigator.of(ctx, rootNavigator: true);
+                if (nav.canPop()) nav.pop();
 
-            await Future.delayed(const Duration(milliseconds: 150));
-            if (!mounted) return;
+                await Future.delayed(const Duration(milliseconds: 150));
+                if (!mounted) return;
 
-            final rawQr = qr.trim();
-            final safeQr = Uri.encodeComponent(rawQr);
+                final rawQr = qr.trim();
+                final safeQr = Uri.encodeComponent(rawQr);
 
-            context.go(
-              '/after/$safeQr',
-              extra: {
-                'accountCode': widget.accountCode,
-                'qrCode': rawQr,
-                'patrolGroup': PatrolGroup.Patrol,
+                context.go(
+                  '/after/$safeQr',
+                  extra: {
+                    'accountCode': widget.accountCode,
+                    'qrCode': rawQr,
+                    'patrolGroup': PatrolGroup.Patrol,
+                  },
+                );
               },
-            );
-          },
-        ),
-      ),
+            ),
+          ),
     ).whenComplete(() {
       _qrHandled = false;
     });
@@ -710,7 +813,6 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
   }
 
   void _onExpandGroup(PatrolGroup group) {
-    // Nếu đang mở → click lại thì đóng
     if (expandedGroup == group) {
       setState(() {
         expandedGroup = null;
@@ -720,7 +822,6 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
       return;
     }
 
-    // Nếu click group khác → mở group mới
     final team = HseMasterService.findTeamByEmp(
       widget.accountCode,
       group,
@@ -732,11 +833,39 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
       _autoTeam = team;
       _needManualSelect = team == null;
 
-      if (team != null) {
-        selectedFactory = team.plant;
-      }
+      // ❌ Không đổi selectedFactory theo team
+      // selectedFactory = team.plant;
     });
   }
+
+  // void _onExpandGroup(PatrolGroup group) {
+  //   // Nếu đang mở → click lại thì đóng
+  //   if (expandedGroup == group) {
+  //     setState(() {
+  //       expandedGroup = null;
+  //       _autoTeam = null;
+  //       _needManualSelect = true;
+  //     });
+  //     return;
+  //   }
+  //
+  //   // Nếu click group khác → mở group mới
+  //   final team = HseMasterService.findTeamByEmp(
+  //     widget.accountCode,
+  //     group,
+  //     teams,
+  //   );
+  //
+  //   setState(() {
+  //     expandedGroup = group;
+  //     _autoTeam = team;
+  //     _needManualSelect = team == null;
+  //
+  //     if (team != null) {
+  //       selectedFactory = team.plant;
+  //     }
+  //   });
+  // }
 
   Widget _patrolGroupCard({
     required PatrolGroup group,
@@ -762,12 +891,13 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
           ),
           child: Column(
             children: [
+
               /// 🔹 PARENT HEADER
               InkWell(
                 onTap: enabled
                     ? () {
-                        _onExpandGroup(group);
-                      }
+                  _onExpandGroup(group);
+                }
                     : null,
 
                 child: Padding(
@@ -792,14 +922,14 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
                       ),
                       enabled
                           ? AnimatedRotation(
-                              turns: isExpanded ? 0.5 : 0,
-                              duration: const Duration(milliseconds: 300),
-                              child: Icon(
-                                Icons.expand_more,
-                                size: 34,
-                                color: color,
-                              ),
-                            )
+                        turns: isExpanded ? 0.5 : 0,
+                        duration: const Duration(milliseconds: 300),
+                        child: Icon(
+                          Icons.expand_more,
+                          size: 34,
+                          color: color,
+                        ),
+                      )
                           : Icon(Icons.lock_outline, color: color, size: 26),
                     ],
                   ),
@@ -851,16 +981,17 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => CameraScreen(
-                    machines: machines,
-                    patrolTeams: teams,
-                    lang: currentLang,
-                    selectedPlant: selectedFactory,
-                    patrolGroup: group,
-                    titleScreen: titleScreen,
-                    accountCode: widget.accountCode,
-                    autoTeam: _autoTeam,
-                  ),
+                  builder: (_) =>
+                      CameraScreen(
+                        machines: machines,
+                        patrolTeams: teams,
+                        lang: currentLang,
+                        selectedPlant: selectedFactory,
+                        patrolGroup: group,
+                        titleScreen: titleScreen,
+                        accountCode: widget.accountCode,
+                        autoTeam: _autoTeam,
+                      ),
                 ),
               );
             },
@@ -875,13 +1006,14 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => AfterDetailScreen(
-                    accountCode: widget.accountCode,
-                    machines: machines,
-                    selectedPlant: selectedFactory,
-                    titleScreen: titleScreen,
-                    patrolGroup: group,
-                  ),
+                  builder: (_) =>
+                      AfterDetailScreen(
+                        accountCode: widget.accountCode,
+                        machines: machines,
+                        selectedPlant: selectedFactory,
+                        titleScreen: titleScreen,
+                        patrolGroup: group,
+                      ),
                 ),
               );
             },
@@ -897,13 +1029,14 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => RecheckDetailScreen(
-                    accountCode: widget.accountCode,
-                    machines: machines,
-                    selectedPlant: selectedFactory,
-                    titleScreen: titleScreen,
-                    patrolGroup: group,
-                  ),
+                  builder: (_) =>
+                      RecheckDetailScreen(
+                        accountCode: widget.accountCode,
+                        machines: machines,
+                        selectedPlant: selectedFactory,
+                        titleScreen: titleScreen,
+                        patrolGroup: group,
+                      ),
                 ),
               );
             },
