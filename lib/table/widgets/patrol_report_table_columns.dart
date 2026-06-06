@@ -113,6 +113,28 @@ class PatrolReportTableColumns {
         align: TextAlign.center,
         valueGetter: (e) => CommonUI.fmtDate(e.dueDate),
       ),
+
+      PatrolReportColumnSpec(
+        label: 'Due At',
+        width: 100,
+        align: TextAlign.center,
+        valueGetter: (e) => CommonUI.fmtDate(e.dueDateUpdatedAt),
+      ),
+
+      PatrolReportColumnSpec(
+        label: 'Due Rev',
+        width: 120,
+        align: TextAlign.center,
+        valueGetter: (e) => '${e.dueDateUpdateCount}',
+      ),
+
+      PatrolReportColumnSpec(
+        label: 'Due By',
+        width: 120,
+        align: TextAlign.left,
+        valueGetter: (e) => e.dueDateUpdatedBy ?? '',
+      ),
+
       PatrolReportColumnSpec(
         label: 'PIC',
         width: 90,

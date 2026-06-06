@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:intl/intl.dart';
 
 import 'dio_client.dart';
 
@@ -134,6 +135,8 @@ Future<void> updateReportApi({
   String? atUser,
   String? atAssign,
   String? needRecheck,
+
+  DateTime? dueDate,
 }) async {
   final path = '/api/patrol_report/$id/edit';
 
@@ -161,6 +164,7 @@ Future<void> updateReportApi({
     if (atUser != null) 'atUser': atUser,
     if (atAssign != null) 'atAssign': atAssign,
     if (needRecheck != null) 'checkInfo': needRecheck,
+    if (dueDate != null) 'dueDate': DateFormat('yyyy-MM-dd').format(dueDate),
   };
 
   final formData = FormData.fromMap({

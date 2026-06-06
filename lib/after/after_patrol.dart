@@ -89,6 +89,8 @@ class _AfterPatrolState extends State<AfterPatrol> {
     return loginUser == currentPic;
   }
 
+  DateTime? _selectedDueDate;
+
   Future<void> _loadReport() async {
     setState(() {
       _loading = true;
@@ -142,6 +144,8 @@ class _AfterPatrolState extends State<AfterPatrol> {
         _selectedAssignPIC = assignPic;
 
         _oldPIC = currentPic;
+
+        _selectedDueDate = picked.dueDate;
 
         _futurePics = findPicsByPlantFromApi(picked.plant);
 
@@ -404,44 +408,85 @@ class _AfterPatrolState extends State<AfterPatrol> {
 
               const SizedBox(height: 14),
 
+              // IntrinsicHeight(
+              //   child: Row(
+              //     crossAxisAlignment: CrossAxisAlignment.stretch,
+              //     children: [
+              //       Expanded(
+              //         child: Column(
+              //           crossAxisAlignment: CrossAxisAlignment.start,
+              //           children: [
+              //             _buildInfoCard(
+              //               icon: Icons.groups_rounded,
+              //               label: "Patrol at",
+              //               color: Colors.white70,
+              //               value: formatDateTime(report.createdAt),
+              //             ),
+              //             const SizedBox(height: 8),
+              //             _buildRiskCard(
+              //               icon: Icons.groups_rounded,
+              //               label: "Review Similar Cases",
+              //               value: report.checkInfo,
+              //               color: Colors.white70,
+              //             ),
+              //           ],
+              //         ),
+              //       ),
+              //       const SizedBox(width: 12),
+              //       Expanded(
+              //         child: Column(
+              //           crossAxisAlignment: CrossAxisAlignment.start,
+              //           children: [
+              //             _buildInfoCard(
+              //               icon: Icons.groups_rounded,
+              //               label: "Deadline",
+              //               value: formatDateTime(report.dueDate),
+              //               color: Colors.white70,
+              //             ),
+              //             const SizedBox(height: 8),
+              //
+              //             _buildRiskCard(
+              //               icon: Icons.groups_rounded,
+              //               label: "label_risk".tr(context),
+              //               value: report.riskTotal,
+              //               color:
+              //                   (report.riskTotal == "V" ||
+              //                       report.riskTotal == "IV")
+              //                   ? Colors.red
+              //                   : Colors.white70,
+              //               riskTotal: true,
+              //             ),
+              //           ],
+              //         ),
+              //       ),
+              //       const SizedBox(height: 4),
+              //     ],
+              //   ),
+              // ),
+              const SizedBox(height: 8),
               IntrinsicHeight(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                child: Column(
                   children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _buildInfoCard(
-                            icon: Icons.groups_rounded,
-                            label: "Patrol at",
-                            color: Colors.white70,
-                            value: formatDateTime(report.createdAt),
-                          ),
-                          const SizedBox(height: 8),
-                          _buildRiskCard(
-                            icon: Icons.groups_rounded,
-                            label: "Review Similar Cases",
-                            value: report.checkInfo,
-                            color: Colors.white70,
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _buildInfoCard(
-                            icon: Icons.groups_rounded,
+                    ////////////////////////////////////////////////////////////
+                    /// DEADLINE + RISK
+                    ////////////////////////////////////////////////////////////
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: _buildInfoCard(
+                            icon: Icons.event_rounded,
                             label: "Deadline",
                             value: formatDateTime(report.dueDate),
-                            color: Colors.white70,
+                            color: Colors.orangeAccent,
                           ),
-                          const SizedBox(height: 8),
-                          _buildRiskCard(
-                            icon: Icons.groups_rounded,
+                        ),
+
+                        const SizedBox(width: 8),
+
+                        Expanded(
+                          child: _buildRiskCard(
+                            icon: Icons.warning_amber_rounded,
                             label: "label_risk".tr(context),
                             value: report.riskTotal,
                             color:
@@ -451,13 +496,29 @@ class _AfterPatrolState extends State<AfterPatrol> {
                                 : Colors.white70,
                             riskTotal: true,
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 8),
+
+                    ////////////////////////////////////////////////////////////
+                    /// UPDATE DUE DATE + COUNT
+                    ////////////////////////////////////////////////////////////
+                    Row(
+                      children: [
+                        Expanded(flex: 1, child: _buildDueDateUpdateBox()),
+
+                        const SizedBox(width: 8),
+
+                        Expanded(child: _buildDueDateUpdateCountBox(report)),
+                      ],
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 12),
+
+              const SizedBox(height: 14),
 
               IntrinsicHeight(
                 child: _buildInfoCard(
@@ -616,10 +677,7 @@ class _AfterPatrolState extends State<AfterPatrol> {
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.10),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: color.withOpacity(0.45),
-          width: 1,
-        ), // ✅ dùng color
+        border: Border.all(color: color.withOpacity(0.45), width: 1),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.12),
@@ -629,36 +687,26 @@ class _AfterPatrolState extends State<AfterPatrol> {
         ],
       ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Align(
-                  alignment: riskTotal
-                      ? Alignment.center
-                      : Alignment.centerLeft,
-                  child: Text(
-                    value.trim().isEmpty ? '-' : value.trim(),
-                    style: TextStyle(
-                      color: color, // ✅ dùng color
-                      fontSize: 13,
-                      fontWeight: FontWeight.w900,
-                      height: 1.2,
-                    ),
-                  ),
-                ),
-              ],
+            child: Text(
+              label,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            value.trim().isEmpty ? '-' : value.trim(),
+            style: TextStyle(
+              color: color,
+              fontSize: 20,
+              fontWeight: FontWeight.w900,
             ),
           ),
         ],
@@ -972,6 +1020,121 @@ class _AfterPatrolState extends State<AfterPatrol> {
           },
         );
       },
+    );
+  }
+
+  Widget _buildDueDateUpdateCountBox(PatrolReportModel report) {
+    final count = report.dueDateUpdateCount ?? 0;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.orangeAccent.withOpacity(0.14),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.orangeAccent.withOpacity(0.35)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(
+            Icons.history_rounded,
+            color: Colors.orangeAccent,
+            size: 18,
+          ),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              '$count Revisions',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDueDateUpdateBox() {
+    final text = _selectedDueDate == null
+        ? '--'
+        : formatDateTime(_selectedDueDate);
+
+    return InkWell(
+      onTap: _pickAndConfirmDueDate,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: Colors.orangeAccent.withOpacity(0.35)),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Revise Deadline',
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+
+                  const SizedBox(height: 4),
+
+                  Text(
+                    text,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            ////////////////////////////////////////////////////
+            /// ACTION
+            ////////////////////////////////////////////////////
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.white70.withOpacity(.15),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.edit_calendar_rounded,
+                    size: 16,
+                    color: Colors.white70,
+                  ),
+                  SizedBox(width: 4),
+                  Text(
+                    'Select',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -1305,71 +1468,6 @@ class _AfterPatrolState extends State<AfterPatrol> {
                   },
                 ),
               ),
-              // SizedBox(
-              //   width: 60,
-              //   height: 60,
-              //   child: GlassActionButton(
-              //     onTap:
-              //         (_cameraKey.currentState != null &&
-              //             _cameraKey.currentState!.images.isNotEmpty &&
-              //             _msnvCtrl.text.trim().isNotEmpty)
-              //         ? () async {
-              //             if (_commentAfStatusCtrl.text.trim().isEmpty) {
-              //               _showSnackBar(
-              //                 'Please enter comment before saving.',
-              //                 Colors.orange,
-              //               );
-              //               return;
-              //             }
-              //
-              //             try {
-              //               showLoading(context);
-              //
-              //               await updateAtReport(
-              //                 userAfter: widget.accountCode,
-              //                 reportId: report.id!,
-              //                 atPic: '${_msnvCtrl.text.trim()}_$_employeeName',
-              //                 // comment: _commentCtrl.text.trim(),
-              //                 comment: _commentAfStatusCtrl.text.trim(),
-              //
-              //                 images: _cameraKey.currentState!.images,
-              //               );
-              //               hideLoading(context);
-              //
-              //               /// RESET UI → cho phép chụp lại tiếp
-              //               setState(() {
-              //                 _commentCtrl.clear();
-              //                 _enableCamera = false;
-              //               });
-              //               _cameraKey.currentState?.clearAll(); // xóa hết ảnh
-              //
-              //               /// FORCE reload camera
-              //               await Future.delayed(
-              //                 const Duration(milliseconds: 200),
-              //               );
-              //               setState(() => _enableCamera = true);
-              //
-              //               _showSnackBar(
-              //                 'Update AF successful!',
-              //                 Colors.green,
-              //               );
-              //               await Future.delayed(
-              //                 const Duration(milliseconds: 500),
-              //               );
-              //
-              //               if (!mounted) return;
-              //
-              //               Navigator.pop(context, true);
-              //             } catch (e) {
-              //               debugPrint('Update AT error: $e');
-              //               _showSnackBar('Server error: $e', Colors.red);
-              //             }
-              //           }
-              //         : null,
-              //     icon: Icons.save,
-              //     backgroundColor: Color(0xFF2665B6),
-              //   ),
-              // ),
             ],
           ],
         ),
@@ -1393,6 +1491,98 @@ class _AfterPatrolState extends State<AfterPatrol> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );
+  }
+
+  Future<void> _pickAndConfirmDueDate() async {
+    if (_report == null) return;
+
+    final now = DateTime.now();
+    final prev = _selectedDueDate ?? _report?.dueDate;
+
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: prev ?? now,
+      firstDate: DateTime(now.year - 1),
+      lastDate: DateTime(now.year + 3),
+    );
+
+    if (picked == null) return;
+
+    final sameDate =
+        prev != null &&
+        prev.year == picked.year &&
+        prev.month == picked.month &&
+        prev.day == picked.day;
+
+    if (sameDate) return;
+
+    setState(() {
+      _selectedDueDate = picked;
+    });
+
+    final ok = await CommonUI.showGlassConfirm(
+      context: context,
+      icon: Icons.event_available_rounded,
+      iconColor: Colors.orangeAccent,
+      title: "Confirm Due Date",
+      message: "Update Due Date to ${formatDateTime(picked)} ?",
+      cancelText: "Cancel",
+      confirmText: "Update",
+      confirmColor: const Color(0xFF22C55E),
+    );
+
+    if (!ok) {
+      setState(() {
+        _selectedDueDate = prev;
+      });
+      return;
+    }
+
+    await _onSaveDueDate(picked, rollbackDate: prev);
+  }
+
+  Future<void> _onSaveDueDate(
+    DateTime newDueDate, {
+    DateTime? rollbackDate,
+  }) async {
+    if (_report == null) return;
+
+    try {
+      final name = await fetchEmployeeName(widget.accountCode);
+
+      await updateReportApi(
+        id: _report!.id!,
+        dueDate: newDueDate,
+        editUser: "${widget.accountCode}_$name",
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        _report = _report!.copyWith(
+          dueDate: newDueDate,
+          dueDateUpdateCount: (_report!.dueDateUpdateCount ?? 0) + 1,
+        );
+      });
+
+      CommonUI.showSnackBar(
+        context: context,
+        message: "Due Date updated successfully",
+        color: Colors.green,
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        _selectedDueDate = rollbackDate;
+      });
+
+      CommonUI.showWarning(
+        context: context,
+        title: 'Update Failed',
+        message: 'Unable to update Due Date.',
+      );
+    }
   }
 
   Future<void> _onSavePic() async {

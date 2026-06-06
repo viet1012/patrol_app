@@ -1432,6 +1432,23 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
             align: TextAlign.center,
           ),
           _textCell(
+            CommonUI.fmtDate(report.dueDateUpdatedAt),
+            PatrolReportTableHelper.widthOf(_columns, 'Due At'),
+            align: TextAlign.center,
+          ),
+
+          _dueRevCell(
+            report.dueDateUpdateCount,
+            PatrolReportTableHelper.widthOf(_columns, 'Due Rev'),
+          ),
+
+          _textCell(
+            report.dueDateUpdatedBy ?? '-',
+            PatrolReportTableHelper.widthOf(_columns, 'Due By'),
+            tooltip: true,
+          ),
+
+          _textCell(
             report.pic ?? '-',
             PatrolReportTableHelper.widthOf(_columns, 'PIC'),
             tooltip: true,
@@ -1564,6 +1581,34 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
               ),
             )
           : const Text('-'),
+    );
+  }
+
+  Widget _dueRevCell(int count, double width) {
+    final color = count >= 3
+        ? Colors.red
+        : count >= 1
+        ? Colors.orange
+        : Colors.green;
+
+    return _boxedCell(
+      width: width,
+      align: TextAlign.center,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: color.withOpacity(.12),
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Text(
+          '$count',
+          style: TextStyle(
+            color: color,
+            fontWeight: FontWeight.bold,
+            fontSize: 14,
+          ),
+        ),
+      ),
     );
   }
 
