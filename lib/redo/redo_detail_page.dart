@@ -57,10 +57,16 @@ class _RedoDetailPageState extends State<RedoDetailPage> {
   String? _oldPIC;
   String? _hseJudge; // "OK" | "NG"
 
+  DateTime? _selectedDueDate;
+  int? _dueDateUpdateCount;
+
   @override
   void initState() {
     super.initState();
     _msnvCtrl.text = widget.accountCode;
+    _selectedDueDate = widget.report.dueDate;
+    _dueDateUpdateCount = widget.report.dueDateUpdateCount;
+
     fetchEmployeeName(
       widget.accountCode,
     ).then((name) => debugPrint('EMPLOYEE NAME = $name'));
@@ -215,6 +221,7 @@ class _RedoDetailPageState extends State<RedoDetailPage> {
                 ],
               ),
               const SizedBox(height: 14),
+
               IntrinsicHeight(
                 child: Row(
                   crossAxisAlignment:
@@ -305,7 +312,20 @@ class _RedoDetailPageState extends State<RedoDetailPage> {
                   ],
                 ),
               ),
+              const SizedBox(height: 12),
 
+              ////////////////////////////////////////////////////////////
+              /// UPDATE DUE DATE + COUNT
+              ////////////////////////////////////////////////////////////
+              Row(
+                children: [
+                  Expanded(flex: 1, child: _buildDueDateUpdateBox()),
+
+                  const SizedBox(width: 8),
+
+                  Expanded(child: _buildDueDateUpdateCountBox(widget.report)),
+                ],
+              ),
               const SizedBox(height: 12),
               Align(
                 alignment: Alignment.centerLeft,
@@ -760,6 +780,120 @@ class _RedoDetailPageState extends State<RedoDetailPage> {
     );
   }
 
+  Widget _buildDueDateUpdateCountBox(PatrolReportModel report) {
+    final count = _dueDateUpdateCount ?? 0;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.orangeAccent.withOpacity(0.14),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.orangeAccent.withOpacity(0.35)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(
+            Icons.history_rounded,
+            color: Colors.orangeAccent,
+            size: 18,
+          ),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              '$count Revisions',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDueDateUpdateBox() {
+    final text = _selectedDueDate == null
+        ? '--'
+        : formatDateTime(_selectedDueDate);
+
+    return InkWell(
+      onTap: _pickAndConfirmDueDate,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: Colors.orangeAccent.withOpacity(0.35)),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Revise Deadline',
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+
+                  const SizedBox(height: 4),
+
+                  Text(
+                    text,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            ////////////////////////////////////////////////////
+            /// ACTION
+            ////////////////////////////////////////////////////
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.white70.withOpacity(.15),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.edit_calendar_rounded,
+                    size: 16,
+                    color: Colors.white70,
+                  ),
+                  SizedBox(width: 4),
+                  Text(
+                    'Select',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildRetakeSection() {
     return Card(
       color: const Color(0xFF121826).withOpacity(.4),
@@ -927,6 +1061,92 @@ class _RedoDetailPageState extends State<RedoDetailPage> {
         title: 'Update Failed',
         message:
             'Unable to update the report.\nPlease check your connection or try again.',
+      );
+    }
+  }
+
+  Future<void> _pickAndConfirmDueDate() async {
+    final now = DateTime.now();
+    final prev = _selectedDueDate ?? widget.report.dueDate;
+
+    final today = DateTime(now.year, now.month, now.day);
+
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: today,
+      firstDate: DateTime(now.year - 1),
+      lastDate: DateTime(now.year + 3),
+    );
+
+    if (picked == null) return;
+
+    final sameDate =
+        prev != null &&
+        prev.year == picked.year &&
+        prev.month == picked.month &&
+        prev.day == picked.day;
+
+    if (sameDate) return;
+
+    final ok = await CommonUI.showGlassConfirm(
+      context: context,
+      icon: Icons.event_available_rounded,
+      iconColor: Colors.orangeAccent,
+      title: "Confirm Due Date",
+      message: "Update Due Date to ${formatDateTime(picked)} ?",
+      cancelText: "Cancel",
+      confirmText: "Update",
+      confirmColor: const Color(0xFF22C55E),
+    );
+
+    if (!ok) return;
+
+    setState(() {
+      _selectedDueDate = picked;
+    });
+
+    await _onSaveDueDate(picked, rollbackDate: prev);
+  }
+
+  Future<void> _onSaveDueDate(
+    DateTime newDueDate, {
+    DateTime? rollbackDate,
+  }) async {
+    try {
+      showLoading(context);
+
+      await updateReportApi(id: widget.report.id!, dueDate: newDueDate);
+
+      hideLoading(context);
+
+      if (!mounted) return;
+
+      setState(() {
+        _selectedDueDate = newDueDate;
+        _dueDateUpdateCount = (widget.report.dueDateUpdateCount ?? 0) + 1;
+      });
+
+      CommonUI.showGlassDialog(
+        context: context,
+        icon: Icons.check_circle_rounded,
+        iconColor: Colors.greenAccent,
+        title: 'Update Successful',
+        message: 'Due date has been updated successfully.',
+        buttonText: 'OK',
+      );
+    } catch (e) {
+      hideLoading(context);
+
+      if (!mounted) return;
+
+      setState(() {
+        _selectedDueDate = rollbackDate;
+      });
+
+      CommonUI.showWarning(
+        context: context,
+        title: 'Update Failed',
+        message: 'Unable to update due date.\nPlease try again.',
       );
     }
   }

@@ -1498,10 +1498,12 @@ class _AfterPatrolState extends State<AfterPatrol> {
 
     final now = DateTime.now();
     final prev = _selectedDueDate ?? _report?.dueDate;
+    final today = DateTime(now.year, now.month, now.day);
 
     final picked = await showDatePicker(
       context: context,
-      initialDate: prev ?? now,
+      // initialDate: prev ?? now,
+      initialDate: today,
       firstDate: DateTime(now.year - 1),
       lastDate: DateTime(now.year + 3),
     );

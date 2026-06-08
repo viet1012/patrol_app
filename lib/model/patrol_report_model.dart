@@ -26,7 +26,7 @@ class PatrolReportModel {
   final String? patrol_user;
 
   // Due Date update tracking
-  final int dueDateUpdateCount;
+  final int? dueDateUpdateCount;
   final String? dueDateUpdatedBy;
   final DateTime? dueDateUpdatedAt;
 

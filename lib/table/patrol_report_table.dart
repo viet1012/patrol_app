@@ -1438,7 +1438,7 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
           ),
 
           _dueRevCell(
-            report.dueDateUpdateCount,
+            report.dueDateUpdateCount ?? 0,
             PatrolReportTableHelper.widthOf(_columns, 'Due Rev'),
           ),
 
