@@ -355,12 +355,17 @@ class _AiReportBlock extends StatelessWidget {
           normalized.startsWith('Nhóm lỗi') ||
           normalized.startsWith('Che chắn') ||
           normalized.startsWith('Thiếu')) {
-        startSection(
-          icon: Icons.analytics_outlined,
-          title: 'Tổng quan',
-          color: const Color(0xFF67E8F9),
-          firstItem: normalized,
-        );
+        if (current != null && current!.title == 'Tổng quan') {
+          current!.items.add(normalized);
+        } else {
+          startSection(
+            icon: Icons.analytics_outlined,
+            title: 'Tổng quan',
+            color: const Color(0xFF67E8F9),
+            firstItem: normalized,
+          );
+        }
+
         continue;
       }
 
