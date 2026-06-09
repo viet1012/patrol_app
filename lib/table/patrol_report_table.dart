@@ -62,6 +62,8 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
 
   final ScrollController _pageScrollCtrl = ScrollController();
 
+  int? _selectedFy;
+
   @override
   void initState() {
     super.initState();
@@ -537,7 +539,6 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
                           child: Column(
                             children: [
                               _buildSummaryToggle(),
-
                               AnimatedSwitcher(
                                 duration: const Duration(milliseconds: 250),
                                 switchInCurve: Curves.easeOut,
@@ -593,7 +594,6 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
                           ),
                         ),
                       ),
-
                       _buildPager(
                         totalItems: filtered.length,
                         totalPages: _totalPages,
@@ -725,8 +725,11 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
             const SizedBox(height: 6),
 
             Row(
-              mainAxisAlignment: MainAxisAlignment.end,
               children: [
+                _buildFyDropdown(),
+
+                const Spacer(),
+
                 TextButton.icon(
                   onPressed: () {
                     setState(() {
@@ -770,6 +773,13 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
         children: [
           if (_viewState.activeFilterColumn == null)
             Expanded(child: _buildGroupBar()),
+
+          const SizedBox(width: 8),
+
+          _buildFyDropdown(),
+
+          const SizedBox(width: 8),
+
           TextButton.icon(
             onPressed: () {
               setState(() {
@@ -798,6 +808,77 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  List<int> get _fyList {
+    final now = DateTime.now();
+
+    // FY hiện tại
+    final currentFy = now.month >= 4 ? now.year % 100 : (now.year - 1) % 100;
+
+    // bắt đầu từ FY25
+    const startFy = 25;
+
+    return List.generate(currentFy - startFy + 1, (i) => startFy + i);
+  }
+
+  DateTime _fyFromDate(int fy) {
+    return DateTime(2000 + fy, 4, 1);
+  }
+
+  DateTime _fyToDate(int fy) {
+    return DateTime(2000 + fy + 1, 3, 31);
+  }
+
+  Widget _buildFyDropdown() {
+    return Container(
+      height: 36,
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.white.withOpacity(0.12)),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<int>(
+          value: _selectedFy,
+          hint: const Text(
+            'FY',
+            style: TextStyle(
+              color: Colors.white70,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          dropdownColor: const Color(0xFF1E293B),
+          iconEnabledColor: Colors.white70,
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
+          ),
+          items: _fyList.map((fy) {
+            return DropdownMenuItem<int>(value: fy, child: Text('FY$fy'));
+          }).toList(),
+          isDense: true,
+          borderRadius: BorderRadius.circular(12),
+
+          onChanged: (fy) {
+            if (fy == null) return;
+
+            setState(() {
+              _selectedFy = fy;
+
+              _viewState = _viewState.copyWith(
+                fromDate: _fyFromDate(fy),
+                toDate: _fyToDate(fy),
+              );
+            });
+
+            // reload data
+            // _fetchReports();
+          },
+        ),
       ),
     );
   }
