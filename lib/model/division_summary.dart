@@ -7,6 +7,9 @@ class DivisionSummary {
   final double hseDoneTtl, hseDoneI, hseDoneII, hseDoneIII, hseDoneIV, hseDoneV;
 
   final double remainTtl, remainI, remainII, remainIII, remainIV, remainV;
+  final double stillTime;
+  final double threeDaysAgo;
+  final double late;
 
   DivisionSummary({
     required this.division,
@@ -34,6 +37,9 @@ class DivisionSummary {
     required this.remainIII,
     required this.remainIV,
     required this.remainV,
+    required this.stillTime,
+    required this.threeDaysAgo,
+    required this.late,
   });
 
   factory DivisionSummary.fromJson(Map<String, dynamic> j) => DivisionSummary(
@@ -62,5 +68,8 @@ class DivisionSummary {
     remainIII: (j['remainIII'] ?? 0) as double,
     remainIV: (j['remainIV'] ?? 0) as double,
     remainV: (j['remainV'] ?? 0) as double,
+    stillTime: (j['stillTime'] ?? 0) as double,
+    threeDaysAgo: (j['threeDaysAgo'] ?? 0) as double,
+    late: (j['late'] ?? 0) as double,
   );
 }

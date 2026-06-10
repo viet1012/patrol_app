@@ -3,14 +3,12 @@ import 'package:flutter/services.dart';
 
 class MachineAiSummary {
   final String summaryVi;
-  final String summaryJp;
 
-  const MachineAiSummary({required this.summaryVi, required this.summaryJp});
+  const MachineAiSummary({required this.summaryVi});
 
   factory MachineAiSummary.fromJson(Map<String, dynamic> json) {
     return MachineAiSummary(
       summaryVi: (json['summaryVi'] ?? '').toString().trim(),
-      summaryJp: (json['summaryJp'] ?? '').toString().trim(),
     );
   }
 }
@@ -22,6 +20,9 @@ class MachineAiAlertCard extends StatefulWidget {
   final String? error;
   final MachineAiSummary? summary;
   final VoidCallback onRetry;
+  final String? summaryJp;
+  final bool translatingJp;
+  final VoidCallback onTranslateJp;
 
   const MachineAiAlertCard({
     super.key,
@@ -31,6 +32,9 @@ class MachineAiAlertCard extends StatefulWidget {
     required this.error,
     required this.summary,
     required this.onRetry,
+    this.summaryJp,
+    this.translatingJp = false,
+    required this.onTranslateJp,
   });
 
   @override
@@ -69,9 +73,7 @@ class _MachineAiAlertCardState extends State<MachineAiAlertCard> {
               isJp: _isJp,
               machine: mac,
               collapsed: _collapsed,
-              text: _isJp
-                  ? widget.summary?.summaryJp
-                  : widget.summary?.summaryVi,
+              text: _isJp ? widget.summaryJp : widget.summary?.summaryVi,
               onRetry: widget.onRetry,
               onToggleCollapse: () {
                 setState(() {
@@ -96,6 +98,9 @@ class _MachineAiAlertCardState extends State<MachineAiAlertCard> {
                 error: widget.error,
                 summary: widget.summary,
                 onRetry: widget.onRetry,
+                summaryJp: widget.summaryJp,
+                translatingJp: widget.translatingJp,
+                onTranslateJp: widget.onTranslateJp,
               ),
             ),
           ),
@@ -112,6 +117,9 @@ class _MachineAiBody extends StatelessWidget {
   final String? error;
   final MachineAiSummary? summary;
   final VoidCallback onRetry;
+  final String? summaryJp;
+  final bool translatingJp;
+  final VoidCallback onTranslateJp;
 
   const _MachineAiBody({
     required this.isJp,
@@ -120,6 +128,9 @@ class _MachineAiBody extends StatelessWidget {
     required this.error,
     required this.summary,
     required this.onRetry,
+    required this.summaryJp,
+    required this.translatingJp,
+    required this.onTranslateJp,
   });
 
   @override
@@ -133,15 +144,31 @@ class _MachineAiBody extends StatelessWidget {
     if (summary == null) {
       return _EmptyState(isJp: isJp, onRetry: onRetry);
     }
-    final text = isJp ? summary!.summaryJp : summary!.summaryVi;
+    final viText = summary!.summaryVi.trim();
 
-    if (text.trim().isEmpty) {
-      return _EmptyState(isJp: isJp, onRetry: onRetry);
+    if (!isJp) {
+      if (viText.isEmpty) {
+        return _EmptyState(isJp: isJp, onRetry: onRetry);
+      }
+
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [_AiReportBlock(text: viText)],
+      );
+    }
+
+    final jpText = summaryJp?.trim() ?? '';
+
+    if (jpText.isEmpty) {
+      return _TranslateJpState(
+        translating: translatingJp,
+        onTranslateJp: onTranslateJp,
+      );
     }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: [_AiReportBlock(text: text)],
+      children: [_AiReportBlock(text: jpText)],
     );
   }
 }
@@ -678,6 +705,71 @@ class _EmptyState extends StatelessWidget {
           onPressed: onRetry,
           icon: const Icon(Icons.refresh_rounded, size: 16),
           label: Text(isJp ? '再分析' : 'Retry'),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: const Color(0xFF67E8F9),
+            side: BorderSide(color: const Color(0xFF67E8F9).withOpacity(.4)),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _TranslateJpState extends StatelessWidget {
+  final bool translating;
+  final VoidCallback onTranslateJp;
+
+  const _TranslateJpState({
+    required this.translating,
+    required this.onTranslateJp,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (translating) {
+      return Row(
+        children: [
+          SizedBox(
+            width: 18,
+            height: 18,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: Colors.cyanAccent.withOpacity(.9),
+            ),
+          ),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Text(
+              '日本語に翻訳中です...',
+              style: TextStyle(
+                color: Colors.white70,
+                fontSize: 14,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    return Row(
+      children: [
+        const Icon(Icons.translate_rounded, color: Color(0xFF67E8F9), size: 21),
+        const SizedBox(width: 10),
+        const Expanded(
+          child: Text(
+            '日本語版はまだ作成されていません。',
+            style: TextStyle(
+              color: Colors.white70,
+              fontSize: 14,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+        OutlinedButton.icon(
+          onPressed: onTranslateJp,
+          icon: const Icon(Icons.translate_rounded, size: 16),
+          label: const Text('翻訳'),
           style: OutlinedButton.styleFrom(
             foregroundColor: const Color(0xFF67E8F9),
             side: BorderSide(color: const Color(0xFF67E8F9).withOpacity(.4)),

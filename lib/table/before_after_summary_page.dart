@@ -321,6 +321,7 @@ class _AfterCard extends StatelessWidget {
   static const Color _beforeBg = Color(0xFFF1E6A7);
   static const Color _proBg = Color(0xFFBFF2C8);
   static const Color _remainBg = Color(0xFFFFC2C2);
+  static const Color _deadlineBg = Color(0xFFFFF3C4);
   static const Color _hseBg = Color(0xFFBFE0F2);
 
   static const double _wDiv = 150;
@@ -333,7 +334,7 @@ class _AfterCard extends StatelessWidget {
   static const double _mobileWRisk = 42;
   static const double _mobileGroupWidth = _mobileWTotal + (_mobileWRisk * 5);
 
-  double get _tableWidth => _wDiv + (_wNum * 24);
+  double get _tableWidth => _wDiv + (_wNum * 27);
 
   double get _mobileTableWidth => _wDiv + _mobileGroupWidth;
 
@@ -439,7 +440,17 @@ class _AfterCard extends StatelessWidget {
             r.remainV,
           ],
         ),
+        const SizedBox(height: 10),
 
+        _MobileDeadlineGroup(
+          title: 'Deadline',
+          titleColor: Colors.orangeAccent,
+          headerColor: const Color(0xFFFFE7A3),
+          bodyColor: _deadlineBg,
+          sumBg: _sumBg,
+          width: _mobileTableWidth,
+          rows: rows,
+        ),
         const SizedBox(height: 10),
 
         _MobileSummaryGroup(
@@ -471,7 +482,20 @@ class _AfterCard extends StatelessWidget {
         _groupHeader('Before', Colors.yellow, _wNum * 6),
         _groupHeader('Finished (Pro)', Colors.greenAccent, _wNum * 6),
         _groupHeader('Remain', Colors.redAccent, _wNum * 6),
+        _groupHeader('Deadline', Colors.orange, _wNum * 3),
         _groupHeader('Finished (HSE recheck)', Colors.blueAccent, _wNum * 6),
+      ],
+    );
+  }
+
+  Widget _deadlineHeader() {
+    return _Row(
+      header: true,
+      bg: const Color(0xFFFFE7A3),
+      cells: const [
+        _CellSpec('Still', w: _wNum, bold: true),
+        _CellSpec('3 Days', w: _wNum, bold: true),
+        _CellSpec('Late', w: _wNum, bold: true),
       ],
     );
   }
@@ -483,9 +507,13 @@ class _AfterCard extends StatelessWidget {
           header: true,
           cells: [_CellSpec('Area', w: _wDiv, align: TextAlign.left)],
         ),
+
         _metricHeader(const Color(0xFFEFE28F)),
         _metricHeader(const Color(0xFF8FEFA0)),
         _metricHeader(const Color(0xFFF89292)),
+
+        _deadlineHeader(),
+
         _metricHeader(const Color(0xFF72C7F4)),
       ],
     );
@@ -543,6 +571,15 @@ class _AfterCard extends StatelessWidget {
           iv: r.remainIV,
           v: r.remainV,
         ),
+        _Row(
+          bg: rowBg ?? (isPct ? null : _deadlineBg),
+          cells: [
+            _CellSpec(isPct ? '' : fmtNum(r.stillTime), w: _wNum),
+            _CellSpec(isPct ? '' : fmtNum(r.threeDaysAgo), w: _wNum),
+            _CellSpec(isPct ? '' : fmtNum(r.late), w: _wNum),
+          ],
+        ),
+
         _metricRow(
           bg: rowBg ?? (isPct ? null : _hseBg),
           isPct: isPct,
@@ -748,6 +785,112 @@ class _MobileSummaryGroup extends StatelessWidget {
             _CellSpec(isPct ? '' : fmtNum(values[3]), w: _wRisk),
             _CellSpec(isPct ? '' : fmtNum(values[4]), w: _wRisk),
             _CellSpec(isPct ? '' : fmtNum(values[5]), w: _wRisk),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _MobileDeadlineGroup extends StatelessWidget {
+  final String title;
+  final Color titleColor;
+  final Color headerColor;
+  final Color bodyColor;
+  final Color sumBg;
+  final double width;
+  final List<DivisionSummary> rows;
+
+  const _MobileDeadlineGroup({
+    required this.title,
+    required this.titleColor,
+    required this.headerColor,
+    required this.bodyColor,
+    required this.sumBg,
+    required this.width,
+    required this.rows,
+  });
+
+  static const double _wDiv = 150;
+  static const double _wNum = 76;
+
+  double get _tableWidth => _wDiv + (_wNum * 3);
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRect(
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: SizedBox(
+          width: _tableWidth,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _TitleBar(text: title, color: titleColor, width: _tableWidth),
+
+              const SizedBox(height: 6),
+
+              Row(
+                children: [
+                  const SizedBox(width: _wDiv),
+                  _groupHeader(title, titleColor, _wNum * 3),
+                ],
+              ),
+
+              Row(
+                children: [
+                  const _Row(
+                    header: true,
+                    cells: [_CellSpec('Area', w: _wDiv, align: TextAlign.left)],
+                  ),
+                  _Row(
+                    header: true,
+                    bg: headerColor,
+                    cells: const [
+                      _CellSpec('Still', w: _wNum, bold: true),
+                      _CellSpec('3 Days', w: _wNum, bold: true),
+                      _CellSpec('Late', w: _wNum, bold: true),
+                    ],
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 6),
+
+              ...rows.map(_buildRow),
+
+              const SizedBox(height: 10),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRow(DivisionSummary r) {
+    final isSum = r.division == 'SUM';
+    final isPct = r.division == '%';
+
+    final bg = isSum ? sumBg : (isPct ? null : bodyColor);
+
+    return Row(
+      children: [
+        _Row(
+          cells: [
+            _CellSpec(
+              r.division,
+              w: _wDiv,
+              align: TextAlign.left,
+              bold: isSum || isPct,
+            ),
+          ],
+        ),
+        _Row(
+          bg: bg,
+          cells: [
+            _CellSpec(isPct ? '' : fmtNum(r.stillTime), w: _wNum),
+            _CellSpec(isPct ? '' : fmtNum(r.threeDaysAgo), w: _wNum),
+            _CellSpec(isPct ? '' : fmtNum(r.late), w: _wNum),
           ],
         ),
       ],
