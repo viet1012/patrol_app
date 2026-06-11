@@ -689,8 +689,8 @@ class _EmptyState extends StatelessWidget {
         Expanded(
           child: Text(
             isJp
-                ? 'AI分析に十分な履歴データがありません。継続的な巡回記録が必要です。'
-                : 'AI analysis unavailable. More patrol records are required to identify risk patterns.',
+                ? 'この機械カテゴリには現在十分な履歴データがありません。今後データを追加して改善していきます。'
+                : 'There is currently no historical data available for this machine category. We will continue expanding our database in future updates.',
             style: const TextStyle(
               color: Colors.white70,
               fontSize: 14,
