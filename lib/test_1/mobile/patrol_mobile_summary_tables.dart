@@ -64,6 +64,13 @@ class PatrolMobileSummaryTables extends StatelessWidget {
         const SizedBox(height: 12),
 
         _mobileTable(
+          width: TableUiConfig.tableWidth(TableUiConfig.deadlineColumns),
+          child: MobileDeadlineTable(rows: rows),
+        ),
+
+        const SizedBox(height: 12),
+
+        _mobileTable(
           width: TableUiConfig.tableWidth(TableUiConfig.beforeColumns),
           child: MobileRiskTable(
             title: 'OK',
@@ -162,6 +169,44 @@ class MobileRiskTable extends StatelessWidget {
             data.iii,
             data.iv,
             data.v,
+          ],
+        );
+      }).toList(),
+    );
+  }
+}
+
+class MobileDeadlineTable extends StatelessWidget {
+  final List<PatrolPicRowDto> rows;
+
+  const MobileDeadlineTable({
+    super.key,
+    required this.rows,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ExcelLikeTable(
+      titleLeft: 'DEADLINE',
+      titleCenter: 'Remain due',
+      columns: TableUiConfig.deadlineColumns,
+      groupedHeaders: const [
+        GroupedHeader(
+          label: 'Deadline',
+          startCol: 1,
+          colSpan: 3,
+          backgroundColor: TableUiConfig.deadlineBg,
+          borderColor: TableUiConfig.deadlineBorder,
+        ),
+      ],
+      rows: rows.map((row) {
+        return TableRowData(
+          isTotal: row.pic.toUpperCase() == 'TOTAL',
+          cells: [
+            row.pic,
+            row.stillTimeTtl,
+            row.threeDaysTtl,
+            row.lateTtl,
           ],
         );
       }).toList(),

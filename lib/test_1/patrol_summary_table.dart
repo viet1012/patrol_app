@@ -48,6 +48,10 @@ class PatrolPicRowDto {
   final RiskBreakdownDto recheckOk;
   final RiskBreakdownDto recheckNg;
 
+  final int stillTimeTtl;
+  final int threeDaysTtl;
+  final int lateTtl;
+
   const PatrolPicRowDto({
     required this.pic,
     required this.before,
@@ -56,6 +60,9 @@ class PatrolPicRowDto {
     required this.recheckAllTotal,
     required this.recheckOk,
     required this.recheckNg,
+    required this.stillTimeTtl,
+    required this.threeDaysTtl,
+    required this.lateTtl,
   });
 
   factory PatrolPicRowDto.fromJson(Map<String, dynamic> json) {
@@ -79,6 +86,9 @@ class PatrolPicRowDto {
       recheckNg: RiskBreakdownDto.fromJson(
         (json['recheckNg'] ?? const {}) as Map<String, dynamic>,
       ),
+      stillTimeTtl: toInt(json['stillTimeTtl']),
+      threeDaysTtl: toInt(json['threeDaysTtl']),
+      lateTtl: toInt(json['lateTtl']),
     );
   }
 }
@@ -292,6 +302,10 @@ class TableUiConfig {
   static const Color remainBorder = Color(0xFFF89292);
   static const Color okBorder = Color(0xFF7BCB8D);
   static const Color ngBorder = Color(0xFFF89292);
+
+  static const Color deadlineBg = Color(0xFFFFF3CD);
+  static const Color deadlineBorder = Color(0xFFFFA726);
+
   static const List<String> beforeColumns = [
     'PIC',
     'Total',
@@ -304,18 +318,17 @@ class TableUiConfig {
 
   static const List<String> afterColumns = [
     'PIC',
-    'Total',
-    'I',
-    'II',
-    'III',
-    'IV',
-    'V',
-    'Total',
-    'I',
-    'II',
-    'III',
-    'IV',
-    'V',
+
+    // Finished
+    'Total', 'I', 'II', 'III', 'IV', 'V',
+
+    // Remain
+    'Total', 'I', 'II', 'III', 'IV', 'V',
+
+    // Deadline
+    'Still',
+    '3 Days',
+    'Late',
   ];
 
   static const List<String> recheckColumns = [
@@ -334,6 +347,12 @@ class TableUiConfig {
     'IV',
     'V',
   ];
+  static const List<String> deadlineColumns = [
+    'PIC',
+    'Still',
+    '3 Days',
+    'Late',
+  ];
 
   static double columnWidth(String column) {
     switch (column) {
@@ -348,6 +367,14 @@ class TableUiConfig {
       case 'IV':
       case 'V':
         return 42;
+      case 'Still':
+        return 85;
+
+      case '3 Days':
+        return 85;
+
+      case 'Late':
+        return 75;
       default:
         return 58;
     }
@@ -651,6 +678,13 @@ class AfterTable extends StatelessWidget {
           backgroundColor: TableUiConfig.remainHeaderBg,
           borderColor: TableUiConfig.remainBorder,
         ),
+        GroupedHeader(
+          label: 'Deadline',
+          startCol: 13,
+          colSpan: 3,
+          backgroundColor: Color(0xFFFFE6B5),
+          borderColor: Color(0xFFFFA726),
+        ),
       ],
       rows: rows.map((row) {
         final finished = row.finished;
@@ -659,18 +693,24 @@ class AfterTable extends StatelessWidget {
           isTotal: row.pic.toUpperCase() == 'TOTAL',
           cells: [
             row.pic,
+
             finished.total,
             finished.i,
             finished.ii,
             finished.iii,
             finished.iv,
             finished.v,
+
             remain.total,
             remain.i,
             remain.ii,
             remain.iii,
             remain.iv,
             remain.v,
+
+            row.stillTimeTtl,
+            row.threeDaysTtl,
+            row.lateTtl,
           ],
         );
       }).toList(),
@@ -869,18 +909,14 @@ class ExcelLikeTable extends StatelessWidget {
       return const Color(0xFFF7F8FA);
     }
 
-    //////////////////////////////////////////////////////
-    /// FINISHED
-    //////////////////////////////////////////////////////
+    // FINISHED
     if (titleLeft == 'AFTER TOTAL' || titleLeft == 'FINISHED') {
       if (_isAfterFinishedColumn(index)) {
         return TableUiConfig.finishedBg;
       }
     }
 
-    //////////////////////////////////////////////////////
-    /// REMAIN
-    //////////////////////////////////////////////////////
+    // REMAIN
     if (titleLeft == 'AFTER TOTAL' || titleLeft == 'REMAIN') {
       if ((titleLeft == 'AFTER TOTAL' && _isAfterRemainColumn(index)) ||
           (titleLeft == 'REMAIN' && index >= 1 && index <= 6)) {
@@ -888,9 +924,14 @@ class ExcelLikeTable extends StatelessWidget {
       }
     }
 
-    //////////////////////////////////////////////////////
-    /// OK
-    //////////////////////////////////////////////////////
+    // DEADLINE
+    if (titleLeft == 'AFTER TOTAL') {
+      if (index >= 13 && index <= 15) {
+        return TableUiConfig.deadlineBg;
+      }
+    }
+
+    // OK
     if (titleCenter == 'HSE re-check (All)' || titleLeft == 'OK') {
       if ((titleCenter == 'HSE re-check (All)' && _isRecheckOkColumn(index)) ||
           (titleLeft == 'OK' && index >= 1 && index <= 6)) {
@@ -898,9 +939,7 @@ class ExcelLikeTable extends StatelessWidget {
       }
     }
 
-    //////////////////////////////////////////////////////
-    /// NG
-    //////////////////////////////////////////////////////
+    // NG
     if (titleCenter == 'HSE re-check (All)' || titleLeft == 'NG') {
       if ((titleCenter == 'HSE re-check (All)' && _isRecheckNgColumn(index)) ||
           (titleLeft == 'NG' && index >= 1 && index <= 6)) {
@@ -919,11 +958,19 @@ class ExcelLikeTable extends StatelessWidget {
       color: TableUiConfig.finishedBorder,
       width: 2,
     );
+
     final remainStrong = BorderSide(
       color: TableUiConfig.remainBorder,
       width: 2,
     );
+
+    final deadlineStrong = BorderSide(
+      color: TableUiConfig.deadlineBorder,
+      width: 2,
+    );
+
     final okStrong = BorderSide(color: TableUiConfig.okBorder, width: 2);
+
     final ngStrong = BorderSide(color: TableUiConfig.ngBorder, width: 2);
 
     if (index == 0) {
@@ -976,17 +1023,28 @@ class ExcelLikeTable extends StatelessWidget {
 
     // DESKTOP AFTER
     if (titleLeft == 'AFTER TOTAL') {
+      // Finished group: col 1 -> 6
       if (index == 1) {
         return Border(left: finishedStrong, right: normal, bottom: rowLine);
       }
       if (index == 6) {
         return Border(right: finishedStrong, bottom: rowLine);
       }
+
+      // Remain group: col 7 -> 12
       if (index == 7) {
         return Border(left: remainStrong, right: normal, bottom: rowLine);
       }
       if (index == 12) {
         return Border(right: remainStrong, bottom: rowLine);
+      }
+
+      // Deadline group: col 13 -> 15
+      if (index == 13) {
+        return Border(left: deadlineStrong, right: normal, bottom: rowLine);
+      }
+      if (index == 15) {
+        return Border(right: deadlineStrong, bottom: rowLine);
       }
     }
 
