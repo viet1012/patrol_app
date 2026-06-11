@@ -37,21 +37,21 @@ class PatrolReportTableColumns {
       ),
       PatrolReportColumnSpec(
         label: 'Group',
-        width: 70,
+        width: 100,
         align: TextAlign.left,
         queryKey: 'grp',
         valueGetter: (e) => e.grp,
       ),
       PatrolReportColumnSpec(
         label: 'Plant',
-        width: 70,
+        width: 100,
         align: TextAlign.left,
         queryKey: 'plant',
         valueGetter: (e) => e.plant,
       ),
       PatrolReportColumnSpec(
         label: 'Division',
-        width: 90,
+        width: 100,
         align: TextAlign.left,
         queryKey: 'division',
         valueGetter: (e) => e.division,
@@ -108,15 +108,15 @@ class PatrolReportTableColumns {
         valueGetter: (e) => CommonUI.fmtDate(e.createdAt),
       ),
       PatrolReportColumnSpec(
-        label: 'Due',
+        label: 'Deadline',
         width: 100,
         align: TextAlign.center,
         valueGetter: (e) => CommonUI.fmtDate(e.dueDate),
       ),
 
       PatrolReportColumnSpec(
-        label: 'Due At',
-        width: 100,
+        label: 'Revise Deadline',
+        width: 150,
         align: TextAlign.center,
         valueGetter: (e) => CommonUI.fmtDate(e.dueDateUpdatedAt),
       ),
@@ -136,12 +136,33 @@ class PatrolReportTableColumns {
       ),
 
       PatrolReportColumnSpec(
+        label: 'Due Status',
+        width: 120,
+        align: TextAlign.center,
+        valueGetter: (e) {
+          final due = e.dueDateUpdatedAt ?? e.dueDate;
+          if (due == null) return '';
+
+          final now = DateTime.now();
+          final today = DateTime(now.year, now.month, now.day);
+          final dueDate = DateTime(due.year, due.month, due.day);
+
+          final diff = dueDate.difference(today).inDays;
+
+          if (diff < 0) return 'Late';
+          if (diff <= 3) return '3 Days Ago';
+          return 'Still Time';
+        },
+      ),
+
+      PatrolReportColumnSpec(
         label: 'PIC',
         width: 90,
         align: TextAlign.left,
         queryKey: 'pic',
         valueGetter: (e) => e.pic ?? '',
       ),
+
       PatrolReportColumnSpec(
         label: 'Check Info',
         width: 120,

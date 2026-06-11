@@ -145,7 +145,7 @@ class _AfterPatrolState extends State<AfterPatrol> {
 
         _oldPIC = currentPic;
 
-        _selectedDueDate = picked.dueDate;
+        _selectedDueDate = picked.dueDateUpdatedAt;
 
         _futurePics = findPicsByPlantFromApi(picked.plant);
 
@@ -1551,7 +1551,9 @@ class _AfterPatrolState extends State<AfterPatrol> {
 
     try {
       final name = await fetchEmployeeName(widget.accountCode);
+      final editUser = "${widget.accountCode}_${name ?? ''}".trim();
 
+      debugPrint("SAVE DUE DATE editUser = [$editUser]");
       await updateReportApi(
         id: _report!.id!,
         dueDate: newDueDate,
@@ -1561,8 +1563,9 @@ class _AfterPatrolState extends State<AfterPatrol> {
       if (!mounted) return;
 
       setState(() {
+        _selectedDueDate = newDueDate;
+
         _report = _report!.copyWith(
-          dueDate: newDueDate,
           dueDateUpdateCount: (_report!.dueDateUpdateCount ?? 0) + 1,
         );
       });

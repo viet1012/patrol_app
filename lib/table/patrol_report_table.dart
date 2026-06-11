@@ -50,7 +50,7 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
 
   late final Future<List<PatrolReportModel>> _futureReports;
   late final List<PatrolReportColumnSpec> _columns =
-      PatrolReportTableColumns.build();
+  PatrolReportTableColumns.build();
 
   List<PatrolReportModel> _reports = [];
 
@@ -196,7 +196,8 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
       counts[group] = (counts[group] ?? 0) + 1;
     }
 
-    final sortedKeys = counts.keys.toList()..sort();
+    final sortedKeys = counts.keys.toList()
+      ..sort();
 
     return {for (final key in sortedKeys) key: counts[key]!};
   }
@@ -421,13 +422,13 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
   Future<void> _editReport(PatrolReportModel report) async {
     final canEdit =
         report.patrol_user?.trim() == _patrolUser?.trim() ||
-        report.atAssign?.trim() == _employeeName?.trim();
+            report.atAssign?.trim() == _employeeName?.trim();
 
     debugPrint(
       "COMPARE => "
-      "report.patrol_user = [${report.patrol_user?.trim()}] | "
-      "_patrolUser = [${_patrolUser?.trim()}] | "
-      "RESULT = $canEdit",
+          "report.patrol_user = [${report.patrol_user?.trim()}] | "
+          "_patrolUser = [${_patrolUser?.trim()}] | "
+          "RESULT = $canEdit",
     );
     if (!canEdit && !isHse) {
       CommonUI.showWarning(
@@ -435,7 +436,7 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
         title: "Permission denied",
 
         message:
-            "You are not allowed to edit this report.\n\n"
+        "You are not allowed to edit this report.\n\n"
             "Only the creator can edit this content.",
       );
 
@@ -545,30 +546,30 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
                                 switchOutCurve: Curves.easeIn,
                                 child: _viewState.showSummary
                                     ? Padding(
-                                        key: const ValueKey('summary'),
-                                        padding: const EdgeInsets.only(
-                                          bottom: 8,
-                                        ),
-                                        child: PatrolRiskSummarySfPage(
-                                          onSelect: _applySummaryFilter,
-                                          onDateChanged: (from, to) {
-                                            setState(() {
-                                              _viewState = _viewState.copyWith(
-                                                fromDate: from,
-                                                toDate: to,
-                                                page: 0,
-                                              );
-                                            });
-                                          },
-                                          fromD: _viewState.fromDate,
-                                          toD: _viewState.toDate,
-                                          plant: widget.plant,
-                                          patrolGroup: widget.patrolGroup,
-                                        ),
-                                      )
+                                  key: const ValueKey('summary'),
+                                  padding: const EdgeInsets.only(
+                                    bottom: 8,
+                                  ),
+                                  child: PatrolRiskSummarySfPage(
+                                    onSelect: _applySummaryFilter,
+                                    onDateChanged: (from, to) {
+                                      setState(() {
+                                        _viewState = _viewState.copyWith(
+                                          fromDate: from,
+                                          toDate: to,
+                                          page: 0,
+                                        );
+                                      });
+                                    },
+                                    fromD: _viewState.fromDate,
+                                    toD: _viewState.toDate,
+                                    plant: widget.plant,
+                                    patrolGroup: widget.patrolGroup,
+                                  ),
+                                )
                                     : const SizedBox(
-                                        key: ValueKey('summary_empty'),
-                                      ),
+                                  key: ValueKey('summary_empty'),
+                                ),
                               ),
 
                               _buildTopBar(
@@ -581,7 +582,7 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
                                   accentColor: Colors.amber,
                                   title: 'Exporting Excel',
                                   subtitle:
-                                      'Large dataset detected, please wait…',
+                                  'Large dataset detected, please wait…',
                                 ),
 
                               Expanded(
@@ -643,31 +644,31 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
                                   switchOutCurve: Curves.easeIn,
                                   child: _viewState.showSummary
                                       ? Padding(
-                                          key: const ValueKey('summary'),
-                                          padding: const EdgeInsets.only(
-                                            bottom: 8,
-                                          ),
-                                          child: PatrolRiskSummarySfPage(
-                                            onSelect: _applySummaryFilter,
-                                            onDateChanged: (from, to) {
-                                              setState(() {
-                                                _viewState = _viewState
-                                                    .copyWith(
-                                                      fromDate: from,
-                                                      toDate: to,
-                                                      page: 0,
-                                                    );
-                                              });
-                                            },
-                                            fromD: _viewState.fromDate,
-                                            toD: _viewState.toDate,
-                                            plant: widget.plant,
-                                            patrolGroup: widget.patrolGroup,
-                                          ),
-                                        )
+                                    key: const ValueKey('summary'),
+                                    padding: const EdgeInsets.only(
+                                      bottom: 8,
+                                    ),
+                                    child: PatrolRiskSummarySfPage(
+                                      onSelect: _applySummaryFilter,
+                                      onDateChanged: (from, to) {
+                                        setState(() {
+                                          _viewState = _viewState
+                                              .copyWith(
+                                            fromDate: from,
+                                            toDate: to,
+                                            page: 0,
+                                          );
+                                        });
+                                      },
+                                      fromD: _viewState.fromDate,
+                                      toD: _viewState.toDate,
+                                      plant: widget.plant,
+                                      patrolGroup: widget.patrolGroup,
+                                    ),
+                                  )
                                       : const SizedBox(
-                                          key: ValueKey('summary_empty'),
-                                        ),
+                                    key: ValueKey('summary_empty'),
+                                  ),
                                 ),
 
                                 _buildTopBar(
@@ -680,7 +681,7 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
                                     accentColor: Colors.amber,
                                     title: 'Exporting Excel',
                                     subtitle:
-                                        'Large dataset detected, please wait…',
+                                    'Large dataset detected, please wait…',
                                   ),
 
                                 SizedBox(
@@ -712,7 +713,10 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
   }
 
   Widget _buildSummaryToggle() {
-    final isMobile = MediaQuery.of(context).size.width < 700;
+    final isMobile = MediaQuery
+        .of(context)
+        .size
+        .width < 700;
 
     if (isMobile) {
       return Padding(
@@ -1010,7 +1014,10 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
   }
 
   Widget _buildGroupBar() {
-    final isMobile = MediaQuery.of(context).size.width < 700;
+    final isMobile = MediaQuery
+        .of(context)
+        .size
+        .width < 700;
 
     final groupCounts = _groupCaseCounts;
     final groups = groupCounts.keys.toList();
@@ -1118,7 +1125,7 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
   }) {
     final totalWidth = _columns.fold<double>(
       0,
-      (sum, column) => sum + column.width,
+          (sum, column) => sum + column.width,
     );
 
     return Card(
@@ -1235,10 +1242,11 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
 
     final shownValues = mergedValues
         .where(
-          (value) => value.toLowerCase().contains(
+          (value) =>
+          value.toLowerCase().contains(
             _viewState.filterSearch.toLowerCase(),
           ),
-        )
+    )
         .toList();
 
     return CompositedTransformFollower(
@@ -1334,73 +1342,73 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
               Expanded(
                 child: shownValues.isEmpty
                     ? const Center(
-                        child: Text(
-                          'No values',
-                          style: TextStyle(color: Colors.white54),
-                        ),
-                      )
+                  child: Text(
+                    'No values',
+                    style: TextStyle(color: Colors.white54),
+                  ),
+                )
                     : Scrollbar(
-                        controller: _filterListScrollCtrl,
-                        thumbVisibility: true,
-                        child: ListView.builder(
-                          controller: _filterListScrollCtrl,
-                          primary: false,
-                          padding: EdgeInsets.zero,
-                          itemCount: shownValues.length,
-                          itemBuilder: (_, index) {
-                            final value = shownValues[index];
-                            final checked = selected.contains(value);
+                  controller: _filterListScrollCtrl,
+                  thumbVisibility: true,
+                  child: ListView.builder(
+                    controller: _filterListScrollCtrl,
+                    primary: false,
+                    padding: EdgeInsets.zero,
+                    itemCount: shownValues.length,
+                    itemBuilder: (_, index) {
+                      final value = shownValues[index];
+                      final checked = selected.contains(value);
 
-                            return InkWell(
-                              onTap: () {
-                                _toggleFilterValue(
-                                  column: column,
-                                  value: value,
-                                  checked: !checked,
-                                );
-                              },
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 6,
+                      return InkWell(
+                        onTap: () {
+                          _toggleFilterValue(
+                            column: column,
+                            value: value,
+                            checked: !checked,
+                          );
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
+                          child: Row(
+                            children: [
+                              Checkbox(
+                                value: checked,
+                                onChanged: (ok) {
+                                  _toggleFilterValue(
+                                    column: column,
+                                    value: value,
+                                    checked: ok == true,
+                                  );
+                                },
+                                checkColor: Colors.white,
+                                side: const BorderSide(
+                                  color: Colors.white54,
                                 ),
-                                child: Row(
-                                  children: [
-                                    Checkbox(
-                                      value: checked,
-                                      onChanged: (ok) {
-                                        _toggleFilterValue(
-                                          column: column,
-                                          value: value,
-                                          checked: ok == true,
-                                        );
-                                      },
-                                      checkColor: Colors.white,
-                                      side: const BorderSide(
-                                        color: Colors.white54,
-                                      ),
-                                      materialTapTargetSize:
-                                          MaterialTapTargetSize.shrinkWrap,
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Expanded(
-                                      child: Text(
-                                        value,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 13,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
+                                materialTapTargetSize:
+                                MaterialTapTargetSize.shrinkWrap,
+                              ),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  value,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 13,
+                                  ),
                                 ),
                               ),
-                            );
-                          },
+                            ],
+                          ),
                         ),
-                      ),
+                      );
+                    },
+                  ),
+                ),
               ),
               Container(
                 padding: const EdgeInsets.symmetric(
@@ -1509,12 +1517,12 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
           ),
           _textCell(
             CommonUI.fmtDate(report.dueDate),
-            PatrolReportTableHelper.widthOf(_columns, 'Due'),
+            PatrolReportTableHelper.widthOf(_columns, 'Deadline'),
             align: TextAlign.center,
           ),
           _textCell(
             CommonUI.fmtDate(report.dueDateUpdatedAt),
-            PatrolReportTableHelper.widthOf(_columns, 'Due At'),
+            PatrolReportTableHelper.widthOf(_columns, 'Revise Deadline'),
             align: TextAlign.center,
           ),
 
@@ -1527,6 +1535,11 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
             report.dueDateUpdatedBy ?? '-',
             PatrolReportTableHelper.widthOf(_columns, 'Due By'),
             tooltip: true,
+          ),
+
+          _dueStatusCell(
+            report,
+            PatrolReportTableHelper.widthOf(_columns, 'Due Status'),
           ),
 
           _textCell(
@@ -1631,36 +1644,36 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
       align: TextAlign.center,
       child: hasQr
           ? Container(
-              margin: const EdgeInsets.only(bottom: 6),
-              width: 50,
-              height: 50,
-              decoration: BoxDecoration(
-                color: Colors.blueGrey.shade50,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.blueGrey.shade200),
+        margin: const EdgeInsets.only(bottom: 6),
+        width: 50,
+        height: 50,
+        decoration: BoxDecoration(
+          color: Colors.blueGrey.shade50,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.blueGrey.shade200),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.qr_code_2_rounded,
+              size: 24,
+              color: Colors.blueGrey,
+            ),
+            const SizedBox(height: 2),
+            Text(
+              value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 13,
+                color: Colors.grey.shade800,
+                height: 1,
               ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(
-                    Icons.qr_code_2_rounded,
-                    size: 24,
-                    color: Colors.blueGrey,
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    value,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.grey.shade800,
-                      height: 1,
-                    ),
-                  ),
-                ],
-              ),
-            )
+            ),
+          ],
+        ),
+      )
           : const Text('-'),
     );
   }
@@ -1693,13 +1706,87 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
     );
   }
 
-  Widget _textCell(
-    String text,
-    double width, {
-    TextAlign align = TextAlign.left,
-    bool tooltip = false,
-  }) {
-    final value = text.trim().isEmpty ? '-' : text.trim();
+  Widget _dueStatusCell(PatrolReportModel report, double width) {
+    final baseDueDate = report.dueDateUpdatedAt ?? report.dueDate;
+
+    String label;
+    Color color;
+    IconData icon;
+
+    if (baseDueDate == null) {
+      label = '-';
+      color = Colors.grey;
+      icon = Icons.remove_rounded;
+    } else {
+      final now = DateTime.now();
+
+      final today = DateTime(now.year, now.month, now.day);
+      final due = DateTime(
+        baseDueDate.year,
+        baseDueDate.month,
+        baseDueDate.day,
+      );
+
+      final diff = due
+          .difference(today)
+          .inDays;
+
+      if (diff < 0) {
+        label = 'Late';
+        color = Colors.red;
+        icon = Icons.error_rounded;
+      } else if (diff <= 3) {
+        label = '3 Days Ago';
+        color = Colors.orange;
+        icon = Icons.warning_amber_rounded;
+      } else {
+        label = 'Still Time';
+        color = Colors.green;
+        icon = Icons.check_circle_rounded;
+      }
+    }
+
+    return _boxedCell(
+      width: width,
+      align: TextAlign.center,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+        decoration: BoxDecoration(
+          color: color.withOpacity(.12),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: color.withOpacity(.35)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 14, color: color),
+            const SizedBox(width: 4),
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _textCell(String text,
+      double width, {
+        TextAlign align = TextAlign.left,
+        bool tooltip = false,
+      }) {
+    final value = text
+        .trim()
+        .isEmpty ? '-' : text.trim();
 
     final content = Padding(
       padding: const EdgeInsets.symmetric(horizontal: 2),
@@ -1715,10 +1802,10 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
       align: align,
       child: tooltip
           ? Tooltip(
-              message: value,
-              waitDuration: const Duration(milliseconds: 350),
-              child: content,
-            )
+        message: value,
+        waitDuration: const Duration(milliseconds: 350),
+        child: content,
+      )
           : content,
     );
   }
@@ -1887,10 +1974,10 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
             onPressed: _safePage == 0
                 ? null
                 : () {
-                    setState(() {
-                      _viewState = _viewState.copyWith(page: _safePage - 1);
-                    });
-                  },
+              setState(() {
+                _viewState = _viewState.copyWith(page: _safePage - 1);
+              });
+            },
             icon: const Icon(Icons.chevron_left),
             color: Colors.white,
             disabledColor: Colors.white38,
@@ -1899,10 +1986,10 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
             onPressed: (_safePage + 1 >= totalPages)
                 ? null
                 : () {
-                    setState(() {
-                      _viewState = _viewState.copyWith(page: _safePage + 1);
-                    });
-                  },
+              setState(() {
+                _viewState = _viewState.copyWith(page: _safePage + 1);
+              });
+            },
             icon: const Icon(Icons.chevron_right),
             color: Colors.white,
             disabledColor: Colors.white38,
@@ -1923,11 +2010,12 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
               style: const TextStyle(color: Colors.white),
               items: _pageSizeOptions
                   .map(
-                    (size) => DropdownMenuItem<int>(
+                    (size) =>
+                    DropdownMenuItem<int>(
                       value: size,
                       child: Text('$size / page'),
                     ),
-                  )
+              )
                   .toList(),
               onChanged: (value) {
                 if (value == null) return;

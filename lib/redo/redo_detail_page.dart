@@ -64,7 +64,8 @@ class _RedoDetailPageState extends State<RedoDetailPage> {
   void initState() {
     super.initState();
     _msnvCtrl.text = widget.accountCode;
-    _selectedDueDate = widget.report.dueDate;
+
+    _selectedDueDate = widget.report.dueDateUpdatedAt;
     _dueDateUpdateCount = widget.report.dueDateUpdateCount;
 
     fetchEmployeeName(
@@ -1114,8 +1115,15 @@ class _RedoDetailPageState extends State<RedoDetailPage> {
   }) async {
     try {
       showLoading(context);
+      final name = await fetchEmployeeName(widget.accountCode);
+      final editUser = "${widget.accountCode}_${name ?? ''}".trim();
 
-      await updateReportApi(id: widget.report.id!, dueDate: newDueDate);
+      debugPrint("SAVE DUE DATE editUser = [$editUser]");
+      await updateReportApi(
+        id: widget.report.id!,
+        dueDate: newDueDate,
+        editUser: "${widget.accountCode}_$name",
+      );
 
       hideLoading(context);
 
