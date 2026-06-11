@@ -374,7 +374,7 @@ class TableUiConfig {
         return 85;
 
       case 'Late':
-        return 75;
+        return 85;
       default:
         return 58;
     }
