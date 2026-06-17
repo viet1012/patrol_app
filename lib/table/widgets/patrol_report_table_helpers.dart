@@ -40,6 +40,7 @@ class PatrolReportTableHelper {
     return source.where((row) {
       if (query.isNotEmpty) {
         final haystack = [
+          row.qr_key.toString(),
           row.stt.toString(),
           row.type ?? '',
           row.grp,

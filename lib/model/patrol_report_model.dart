@@ -43,6 +43,7 @@ class PatrolReportModel {
   final List<String> hseImageNames;
   final String? hseComment;
   final DateTime? hseDate;
+  final String? hseUser;
 
   final String? loadStatus;
 
@@ -84,6 +85,7 @@ class PatrolReportModel {
     required this.hseImageNames,
     this.hseComment,
     this.hseDate,
+    this.hseUser,
 
     this.loadStatus,
   });
@@ -154,7 +156,7 @@ class PatrolReportModel {
       hseImageNames: parseImageList(json['hse_imageNames']),
       hseComment: json['hse_comment']?.toString(),
       hseDate: parseDate(json['hse_date']),
-
+      hseUser: json['hse_user']?.toString(),
       loadStatus: json['load_status']?.toString(),
     );
   }

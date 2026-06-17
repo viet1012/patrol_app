@@ -219,23 +219,30 @@ class PatrolReportTableColumns {
         valueGetter: (_) => '',
       ),
       PatrolReportColumnSpec(
-        label: 'HSE J',
-        width: 90,
+        label: 'HSE User',
+        width: 150,
+        align: TextAlign.left,
+        valueGetter: (e) => e.hseUser ?? '',
+      ),
+      PatrolReportColumnSpec(
+        label: 'HSE Judge',
+        width: 140,
         align: TextAlign.center,
         valueGetter: (e) => e.hseJudge ?? '',
       ),
       PatrolReportColumnSpec(
-        label: 'HSE D',
-        width: 100,
+        label: 'HSE Updated',
+        width: 140,
         align: TextAlign.center,
         valueGetter: (e) => CommonUI.fmtDate(e.hseDate),
       ),
       PatrolReportColumnSpec(
-        label: 'HSE C',
+        label: 'HSE Comment',
         width: 260,
         align: TextAlign.left,
         valueGetter: (e) => e.hseComment ?? '',
       ),
+
       PatrolReportColumnSpec(
         label: 'Img(H)',
         width: 100,

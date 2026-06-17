@@ -149,16 +149,6 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
     _jumpVerticalToTop();
   }
 
-  // List<PatrolReportModel> get _filteredReports {
-  //   return PatrolReportTableHelper.applyFilters(
-  //     source: _reports,
-  //     query: _viewState.searchQuery,
-  //     fromDate: _viewState.fromDate,
-  //     toDate: _viewState.toDate,
-  //     filterValues: _viewState.filterValues,
-  //     columns: _columns,
-  //   );
-  // }
   List<PatrolReportModel> get _filteredReports {
     final result = PatrolReportTableHelper.applyFilters(
       source: _reports,
@@ -445,22 +435,6 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
 
     _jumpVerticalToTop();
   }
-
-  // Future<void> _editReport(PatrolReportModel report) async {
-  //   setState(() {
-  //     _viewState = _viewState.copyWith(selectedReportId: report.id);
-  //   });
-  //
-  //   final updated = await EditReportDialog.show(context, model: report);
-  //   if (updated == null || !mounted) return;
-  //
-  //   setState(() {
-  //     final index = _reports.indexWhere((e) => e.id == updated.id);
-  //     if (index != -1) {
-  //       _reports[index] = updated;
-  //     }
-  //   });
-  // }
 
   Future<void> _editReport(PatrolReportModel report) async {
     final canEdit =
@@ -1635,20 +1609,26 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
             },
           ),
           _textCell(
+            report.hseUser ?? '-',
+            PatrolReportTableHelper.widthOf(_columns, 'HSE User'),
+            tooltip: true,
+          ),
+          _textCell(
             report.hseJudge ?? '-',
-            PatrolReportTableHelper.widthOf(_columns, 'HSE J'),
+            PatrolReportTableHelper.widthOf(_columns, 'HSE Judge'),
             align: TextAlign.center,
           ),
           _textCell(
             CommonUI.fmtDate(report.hseDate),
-            PatrolReportTableHelper.widthOf(_columns, 'HSE D'),
+            PatrolReportTableHelper.widthOf(_columns, 'HSE Updated'),
             align: TextAlign.center,
           ),
           _textCell(
             report.hseComment ?? '-',
-            PatrolReportTableHelper.widthOf(_columns, 'HSE C'),
+            PatrolReportTableHelper.widthOf(_columns, 'HSE Comment'),
             tooltip: true,
           ),
+
           _imageCell(
             names: report.hseImageNames,
             width: PatrolReportTableHelper.widthOf(_columns, 'Img(H)'),
