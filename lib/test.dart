@@ -514,9 +514,10 @@ class _CameraScreenState extends State<CameraScreen> {
     setState(() {
       _isLoadingMachineInfo = true;
       _loadingMacId = macId;
-      _qrKey = rawQr;
+      // _qrKey = rawQr;
     });
 
+    print("_QR KEY AFTERR DETECTED  ${_qrKey} ");
     try {
       final apiInfo = await _fetchMachineInfoByMacId(macId);
 
@@ -594,12 +595,12 @@ class _CameraScreenState extends State<CameraScreen> {
     ////////////////////////////////////////////////////////////
     /// VALIDATE
     ////////////////////////////////////////////////////////////
-    if (_qrKey.trim().isEmpty && isPatrol) {
+    if (isPatrol && !RegExp(r'^\d{1,5}$').hasMatch(_qrKey.trim())) {
+      // if (_qrKey.trim().isEmpty && isPatrol) {
       CommonUI.showWarning(
         context: context,
-        icon: Icons.qr_code_rounded,
         title: "QR Required",
-        message: "Please scan QR code before sending report.",
+        message: "Please scan a valid 5-digit Patrol QR.",
       );
       return;
     }
