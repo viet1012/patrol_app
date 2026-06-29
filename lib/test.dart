@@ -14,7 +14,7 @@ import 'package:http/http.dart' as http;
 
 import 'ai/ai_analysis_toggle.dart';
 import 'ai/machine_ai_alert_card.dart';
-import 'api/api_config.dart';
+import 'api/api_error_message.dart';
 import 'api/auth_api.dart';
 import 'api/auto_cmp_api.dart';
 import 'api/dio_client.dart';
