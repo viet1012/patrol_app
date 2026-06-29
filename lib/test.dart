@@ -908,91 +908,75 @@ class _CameraScreenState extends State<CameraScreen> {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(4),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
         color: color.withOpacity(.10),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: color.withOpacity(.35)),
+        border: Border.all(color: color.withOpacity(.32)),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          Row(
-            children: [
-              const Icon(
-                Icons.battery_saver_outlined,
-                color: Colors.amber,
-                size: 22,
-              ),
-
-              const SizedBox(width: 8),
-
-              const Expanded(
-                child: Text(
+          Icon(
+            sleeping
+                ? Icons.videocam_off_rounded
+                : Icons.battery_saver_outlined,
+            color: color,
+            size: 22,
+          ),
+          const SizedBox(width: 9),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
                   "Battery Saving",
                   style: TextStyle(
                     color: Colors.white,
-                    fontSize: 14,
+                    fontSize: 13.5,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
-              ),
-
-              InkWell(
-                borderRadius: BorderRadius.circular(20),
-                onTap: () {
-                  setState(() {
-                    _cameraSleeping = !_cameraSleeping;
-                  });
-                },
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 220),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: _cameraSleeping
-                        ? const Color(0xFF22C55E)
-                        : Colors.amber,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        _cameraSleeping
-                            ? Icons.videocam_off_rounded
-                            : Icons.videocam_rounded,
-                        size: 15,
-                        color: _cameraSleeping ? Colors.white : Colors.black,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        _cameraSleeping ? "OFF" : "ON",
-                        style: TextStyle(
-                          color: _cameraSleeping ? Colors.white : Colors.black,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ],
+                const SizedBox(height: 2),
+                Text(
+                  sleeping
+                      ? "Camera paused. Turn it on to scan QR or take photos."
+                      : "Turn off camera preview or lock screen while walking.",
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(.68),
+                    fontSize: 12.5,
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-
-          const SizedBox(height: 8),
-
-          Text(
-            _cameraSleeping
-                ? "Camera preview is paused to save battery. Turn it back on when you need to scan a QR code or take the next photo."
-                : "To reduce battery usage while walking between inspection points, you can turn off the camera preview or simply lock your phone screen until you need to scan or take the next photo.",
-            style: TextStyle(
-              color: Colors.white.withOpacity(.72),
-              fontSize: 12,
-              height: 1.35,
+          const SizedBox(width: 8),
+          InkWell(
+            borderRadius: BorderRadius.circular(999),
+            onTap: () => setState(() => _cameraSleeping = !sleeping),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: color,
+                borderRadius: BorderRadius.circular(999),
+                boxShadow: [
+                  BoxShadow(
+                    color: color.withOpacity(.22),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: Text(
+                sleeping ? "OFF" : "ON",
+                style: TextStyle(
+                  color: sleeping ? Colors.white : Colors.black,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
             ),
           ),
         ],
@@ -1043,35 +1027,6 @@ class _CameraScreenState extends State<CameraScreen> {
             label: const Text("Wake Camera"),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildCameraSleepButton() {
-    return Padding(
-      padding: const EdgeInsets.only(top: 8),
-      child: SizedBox(
-        width: double.infinity,
-        child: OutlinedButton.icon(
-          onPressed: () {
-            setState(() {
-              _cameraSleeping = !_cameraSleeping;
-            });
-          },
-          icon: Icon(
-            _cameraSleeping ? Icons.videocam_rounded : Icons.nightlight_round,
-            size: 18,
-          ),
-          label: Text(
-            _cameraSleeping
-                ? "Wake Camera Preview"
-                : "Sleep Camera Preview to Save Battery",
-          ),
-          style: OutlinedButton.styleFrom(
-            foregroundColor: Colors.amber,
-            side: BorderSide(color: Colors.amber.withOpacity(.45)),
-          ),
-        ),
       ),
     );
   }
