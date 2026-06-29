@@ -2,6 +2,9 @@ import '../../model/patrol_export_query.dart';
 import '../../model/patrol_report_model.dart';
 import 'patrol_report_table_columns.dart';
 
+typedef ComputedValueGetter =
+    String? Function(PatrolReportModel row, String columnLabel);
+
 class PatrolReportTableHelper {
   static String fmtDate(DateTime d) {
     final month = d.month.toString().padLeft(2, '0');
@@ -20,12 +23,20 @@ class PatrolReportTableHelper {
     return columnByLabel(columns, label).width;
   }
 
+  static String _norm(String? v) {
+    return (v ?? '').replaceAll(String.fromCharCode(160), ' ').trim();
+  }
+
   static String cellValue(
     List<PatrolReportColumnSpec> columns,
     PatrolReportModel row,
-    String columnLabel,
-  ) {
-    return columnByLabel(columns, columnLabel).valueGetter(row).trim();
+    String columnLabel, {
+    ComputedValueGetter? computedValueGetter,
+  }) {
+    final computed = computedValueGetter?.call(row, columnLabel);
+    if (computed != null) return _norm(computed);
+
+    return _norm(columnByLabel(columns, columnLabel).valueGetter(row));
   }
 
   static List<PatrolReportModel> applyFilters({
@@ -36,6 +47,7 @@ class PatrolReportTableHelper {
     required Map<String, Set<String>> filterValues,
     required List<PatrolReportColumnSpec> columns,
     String? excludeColumn,
+    ComputedValueGetter? computedValueGetter,
   }) {
     return source.where((row) {
       if (query.isNotEmpty) {
@@ -66,9 +78,7 @@ class PatrolReportTableHelper {
       if (fromDate != null) {
         final created = row.createdAt;
         final startDate = DateTime(fromDate.year, fromDate.month, fromDate.day);
-        if (created == null || created.isBefore(startDate)) {
-          return false;
-        }
+        if (created == null || created.isBefore(startDate)) return false;
       }
 
       if (toDate != null) {
@@ -79,17 +89,24 @@ class PatrolReportTableHelper {
           toDate.day,
         ).add(const Duration(days: 1));
 
-        if (created == null || !created.isBefore(endExclusive)) {
-          return false;
-        }
+        if (created == null || !created.isBefore(endExclusive)) return false;
       }
 
       for (final entry in filterValues.entries) {
-        if (entry.key == excludeColumn) continue;
-        if (entry.value.isEmpty) continue;
+        final columnLabel = entry.key;
+        final selectedValues = entry.value.map(_norm).toSet();
 
-        final value = cellValue(columns, row, entry.key);
-        if (!entry.value.contains(value)) return false;
+        if (columnLabel == excludeColumn) continue;
+        if (selectedValues.isEmpty) continue;
+
+        final value = cellValue(
+          columns,
+          row,
+          columnLabel,
+          computedValueGetter: computedValueGetter,
+        );
+
+        if (!selectedValues.contains(value)) return false;
       }
 
       return true;
@@ -100,14 +117,19 @@ class PatrolReportTableHelper {
     required String columnLabel,
     required List<PatrolReportModel> source,
     required List<PatrolReportColumnSpec> columns,
+    ComputedValueGetter? computedValueGetter,
   }) {
     final values = <String>{};
 
     for (final row in source) {
-      final value = cellValue(columns, row, columnLabel);
-      if (value.isNotEmpty) {
-        values.add(value);
-      }
+      final value = cellValue(
+        columns,
+        row,
+        columnLabel,
+        computedValueGetter: computedValueGetter,
+      );
+
+      if (value.isNotEmpty) values.add(value);
     }
 
     return values.toList()..sort();

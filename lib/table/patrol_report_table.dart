@@ -157,6 +157,7 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
       toDate: _viewState.toDate,
       filterValues: _viewState.filterValues,
       columns: _columns,
+      computedValueGetter: _computedFilterValue,
     );
 
     result.sort((a, b) {
@@ -220,6 +221,7 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
       filterValues: _viewState.filterValues,
       columns: _columns,
       excludeColumn: 'Group',
+      computedValueGetter: _computedFilterValue,
     );
 
     final counts = <String, int>{};
@@ -324,6 +326,14 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
         _viewState = _viewState.copyWith(downloading: false);
       });
     }
+  }
+
+  String? _computedFilterValue(PatrolReportModel row, String columnLabel) {
+    if (columnLabel == 'Due Status') {
+      return _isLate(row) ? 'Late' : 'Still Time';
+    }
+
+    return null;
   }
 
   void _applySummaryFilter(String group, String division) {
@@ -1242,6 +1252,7 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
       columnLabel: column,
       source: base,
       columns: _columns,
+      computedValueGetter: _computedFilterValue,
     );
 
     final selected = _viewState.filterValues[column] ?? <String>{};
