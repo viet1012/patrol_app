@@ -2,13 +2,289 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 class MachineAiSummary {
+  final String cate;
   final String summaryVi;
 
-  const MachineAiSummary({required this.summaryVi});
+  const MachineAiSummary({required this.cate, required this.summaryVi});
 
   factory MachineAiSummary.fromJson(Map<String, dynamic> json) {
     return MachineAiSummary(
+      cate: (json['cate'] ?? '').toString().trim(),
       summaryVi: (json['summaryVi'] ?? '').toString().trim(),
+    );
+  }
+}
+
+class MachineAiRiskHistoryPanel extends StatefulWidget {
+  final String lang;
+  final bool enabled;
+  final bool loading;
+  final bool hasMachine;
+  final String? machine;
+  final String? error;
+  final MachineAiSummary? summary;
+  final String? summaryJp;
+  final bool translatingJp;
+  final VoidCallback onToggle;
+  final VoidCallback onRetry;
+  final VoidCallback onTranslateJp;
+
+  const MachineAiRiskHistoryPanel({
+    super.key,
+    required this.lang,
+    required this.enabled,
+    required this.loading,
+    required this.hasMachine,
+    required this.machine,
+    required this.error,
+    required this.summary,
+    required this.summaryJp,
+    required this.translatingJp,
+    required this.onToggle,
+    required this.onRetry,
+    required this.onTranslateJp,
+  });
+
+  @override
+  State<MachineAiRiskHistoryPanel> createState() =>
+      _MachineAiRiskHistoryPanelState();
+}
+
+class _MachineAiRiskHistoryPanelState extends State<MachineAiRiskHistoryPanel> {
+  bool _collapsed = false;
+
+  bool get _isJp => widget.lang.toUpperCase() == 'JP';
+
+  @override
+  Widget build(BuildContext context) {
+    final active = widget.enabled && widget.hasMachine;
+    final mac = widget.machine?.trim() ?? '';
+    final cate = widget.summary?.cate ?? '';
+    final hasText = _isJp
+        ? (widget.summaryJp?.trim().isNotEmpty ?? false)
+        : (widget.summary?.summaryVi.trim().isNotEmpty ?? false);
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 220),
+      margin: const EdgeInsets.only(top: 10),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(.04),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: active
+              ? const Color(0xFF38BDF8).withOpacity(.35)
+              : Colors.white.withOpacity(.10),
+        ),
+      ),
+      child: Column(
+        children: [
+          InkWell(
+            borderRadius: BorderRadius.circular(14),
+            onTap: active
+                ? () => setState(() => _collapsed = !_collapsed)
+                : null,
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.auto_awesome_rounded,
+                  color: Color(0xFF67E8F9),
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Risk History (AI Gen)',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      if (mac.isNotEmpty)
+                        Text(
+                          cate,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(.55),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+
+                if (active && hasText)
+                  IconButton(
+                    tooltip: 'Copy',
+                    splashRadius: 18,
+                    iconSize: 18,
+                    icon: const Icon(Icons.copy_rounded, color: Colors.white70),
+                    onPressed: () async {
+                      final text = _isJp
+                          ? widget.summaryJp!.trim()
+                          : widget.summary!.summaryVi.trim();
+
+                      await Clipboard.setData(ClipboardData(text: text));
+
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Copied'),
+                            duration: Duration(seconds: 1),
+                          ),
+                        );
+                      }
+                    },
+                  ),
+
+                _AiMiniSwitch(
+                  enabled: active,
+                  loading: widget.loading,
+                  disabled: !widget.hasMachine,
+                  onTap: widget.hasMachine && !widget.loading
+                      ? widget.onToggle
+                      : null,
+                ),
+
+                if (active) ...[
+                  const SizedBox(width: 4),
+                  IconButton(
+                    tooltip: _collapsed ? 'Expand' : 'Collapse',
+                    splashRadius: 18,
+                    iconSize: 22,
+                    onPressed: () {
+                      setState(() => _collapsed = !_collapsed);
+                    },
+                    icon: AnimatedRotation(
+                      turns: _collapsed ? 0 : 0.5,
+                      duration: const Duration(milliseconds: 220),
+                      child: Icon(
+                        Icons.keyboard_arrow_down_rounded,
+                        color: Colors.white.withOpacity(.7),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+
+          AnimatedCrossFade(
+            duration: const Duration(milliseconds: 220),
+            crossFadeState: (!active || _collapsed)
+                ? CrossFadeState.showFirst
+                : CrossFadeState.showSecond,
+            firstChild: active
+                ? const SizedBox.shrink()
+                : Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        widget.hasMachine
+                            ? 'Turn on AI to generate risk history and recommendations.'
+                            : 'Please select a machine to enable AI risk history.',
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(.62),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+            secondChild: Padding(
+              padding: const EdgeInsets.only(top: 10),
+              child: _MachineAiBody(
+                isJp: _isJp,
+                machine: mac,
+                loading: widget.loading,
+                error: widget.error,
+                summary: widget.summary,
+                onRetry: widget.onRetry,
+                summaryJp: widget.summaryJp,
+                translatingJp: widget.translatingJp,
+                onTranslateJp: widget.onTranslateJp,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AiMiniSwitch extends StatelessWidget {
+  final bool enabled;
+  final bool loading;
+  final bool disabled;
+  final VoidCallback? onTap;
+
+  const _AiMiniSwitch({
+    required this.enabled,
+    required this.loading,
+    required this.disabled,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = enabled ? const Color(0xFF22C55E) : Colors.white24;
+
+    return Opacity(
+      opacity: disabled ? .45 : 1,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(99),
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 220),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: color.withOpacity(enabled ? .95 : .45),
+            borderRadius: BorderRadius.circular(99),
+            border: Border.all(
+              color: enabled
+                  ? const Color(0xFF86EFAC).withOpacity(.55)
+                  : Colors.white.withOpacity(.12),
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (loading)
+                const SizedBox(
+                  width: 13,
+                  height: 13,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                )
+              else
+                Icon(
+                  enabled ? Icons.toggle_on_rounded : Icons.toggle_off_rounded,
+                  size: 16,
+                  color: enabled ? Colors.white : Colors.white70,
+                ),
+              const SizedBox(width: 4),
+              Text(
+                enabled ? 'ON' : 'OFF',
+                style: TextStyle(
+                  color: enabled ? Colors.white : Colors.white70,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -71,7 +347,7 @@ class _MachineAiAlertCardState extends State<MachineAiAlertCard> {
             },
             child: _AiHeader(
               isJp: _isJp,
-              machine: mac,
+              cate: widget.summary?.cate ?? '',
               collapsed: _collapsed,
               text: _isJp ? widget.summaryJp : widget.summary?.summaryVi,
               onRetry: widget.onRetry,
@@ -175,7 +451,7 @@ class _MachineAiBody extends StatelessWidget {
 
 class _AiHeader extends StatelessWidget {
   final bool isJp;
-  final String machine;
+  final String cate;
   final bool collapsed;
   final String? text;
   final VoidCallback onRetry;
@@ -183,7 +459,7 @@ class _AiHeader extends StatelessWidget {
 
   const _AiHeader({
     required this.isJp,
-    required this.machine,
+    required this.cate,
     required this.collapsed,
     required this.onRetry,
     required this.onToggleCollapse,
@@ -223,7 +499,7 @@ class _AiHeader extends StatelessWidget {
                 ),
               ),
               Text(
-                machine,
+                'Area: $cate',
                 style: TextStyle(
                   color: Colors.white.withOpacity(.55),
                   fontSize: 11,

@@ -1368,9 +1368,6 @@ class _CameraScreenState extends State<CameraScreen> {
                               }
                             });
 
-                            // if (autoMachine != null) {
-                            //   _loadMachineAiSummary(autoMachine);
-                            // }
                             if (_aiEnabled && autoMachine != null) {
                               _loadMachineAiSummary(autoMachine);
                             }
@@ -1405,11 +1402,55 @@ class _CameraScreenState extends State<CameraScreen> {
               const SizedBox(height: 10),
 
               // _buildAiAnalyzeSwitch(),
-              AiAnalysisToggle(
+              // AiAnalysisToggle(
+              //   enabled: _aiEnabled,
+              //   loading: _isLoadingMachineAi,
+              //   hasMachine: (_selectedMachine?.isNotEmpty ?? false),
+              //   onTap: () {
+              //     final mac = _selectedMachine ?? '';
+              //
+              //     setState(() {
+              //       _aiEnabled = !_aiEnabled;
+              //     });
+              //
+              //     if (_aiEnabled) {
+              //       _loadMachineAiSummary(mac);
+              //     } else {
+              //       setState(() {
+              //         _machineAiSummary = null;
+              //         _machineAiError = null;
+              //         _lastAiMachine = null;
+              //       });
+              //     }
+              //   },
+              // ),
+              // if (_aiEnabled)
+              //   MachineAiAlertCard(
+              //     lang: widget.lang,
+              //     machine: _selectedMachine,
+              //     loading: _isLoadingMachineAi,
+              //     translatingJp: _isTranslatingAi,
+              //     error: _machineAiError,
+              //     summary: _machineAiSummary,
+              //     summaryJp: _summaryJp,
+              //     onTranslateJp: _translateAiSummaryToJp,
+              //     onRetry: () =>
+              //         _loadMachineAiSummary(_selectedMachine, force: true),
+              //   ),
+              MachineAiRiskHistoryPanel(
+                lang: widget.lang,
                 enabled: _aiEnabled,
                 loading: _isLoadingMachineAi,
                 hasMachine: (_selectedMachine?.isNotEmpty ?? false),
-                onTap: () {
+                machine: _selectedMachine,
+                error: _machineAiError,
+                summary: _machineAiSummary,
+                summaryJp: _summaryJp,
+                translatingJp: _isTranslatingAi,
+                onTranslateJp: _translateAiSummaryToJp,
+                onRetry: () =>
+                    _loadMachineAiSummary(_selectedMachine, force: true),
+                onToggle: () {
                   final mac = _selectedMachine ?? '';
 
                   setState(() {
@@ -1427,28 +1468,6 @@ class _CameraScreenState extends State<CameraScreen> {
                   }
                 },
               ),
-              if (_aiEnabled)
-                // MachineAiAlertCard(
-                //   lang: widget.lang,
-                //   machine: _selectedMachine,
-                //   loading: _isLoadingMachineAi,
-                //   error: _machineAiError,
-                //   summary: _machineAiSummary,
-                //   onRetry: () =>
-                //       _loadMachineAiSummary(_selectedMachine, force: true),
-                // ),
-                MachineAiAlertCard(
-                  lang: widget.lang,
-                  machine: _selectedMachine,
-                  loading: _isLoadingMachineAi,
-                  translatingJp: _isTranslatingAi,
-                  error: _machineAiError,
-                  summary: _machineAiSummary,
-                  summaryJp: _summaryJp,
-                  onTranslateJp: _translateAiSummaryToJp,
-                  onRetry: () =>
-                      _loadMachineAiSummary(_selectedMachine, force: true),
-                ),
               const SizedBox(height: 16),
               // CÁC DROPDOWN RISK
               if (widget.patrolGroup != PatrolGroup.AssetUpdate)
