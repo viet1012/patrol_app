@@ -107,7 +107,7 @@ class _MachineAiRiskHistoryPanelState extends State<MachineAiRiskHistoryPanel> {
                       ),
                       if (mac.isNotEmpty)
                         Text(
-                          cate,
+                          'Cate: $cate',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
@@ -499,9 +499,9 @@ class _AiHeader extends StatelessWidget {
                 ),
               ),
               Text(
-                'Area: $cate',
+                cate,
                 style: TextStyle(
-                  color: Colors.white.withOpacity(.55),
+                  color: Colors.white70.withOpacity(.55),
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
                 ),
