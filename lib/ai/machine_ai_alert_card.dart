@@ -61,8 +61,12 @@ class _MachineAiRiskHistoryPanelState extends State<MachineAiRiskHistoryPanel> {
     final mac = widget.machine?.trim() ?? '';
     final cate = widget.summary?.cate ?? '';
     final hasText = _isJp
-        ? (widget.summaryJp?.trim().isNotEmpty ?? false)
-        : (widget.summary?.summaryVi.trim().isNotEmpty ?? false);
+        ? (widget.summaryJp
+        ?.trim()
+        .isNotEmpty ?? false)
+        : (widget.summary?.summaryVi
+        .trim()
+        .isNotEmpty ?? false);
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 220),
@@ -184,21 +188,21 @@ class _MachineAiRiskHistoryPanelState extends State<MachineAiRiskHistoryPanel> {
             firstChild: active
                 ? const SizedBox.shrink()
                 : Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        widget.hasMachine
-                            ? 'Turn on AI to generate risk history and recommendations.'
-                            : 'Please select a machine to enable AI risk history.',
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(.62),
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
+              padding: const EdgeInsets.only(top: 8),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  widget.hasMachine
+                      ? 'Turn on AI to generate risk history and recommendations.'
+                      : 'Please select a machine to enable AI risk history.',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(.62),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
                   ),
+                ),
+              ),
+            ),
             secondChild: Padding(
               padding: const EdgeInsets.only(top: 10),
               child: _MachineAiBody(
@@ -233,52 +237,66 @@ class _AiMiniSwitch extends StatelessWidget {
     required this.onTap,
   });
 
+  // Thumb di chuyển: track 40px, thumb 20px, padding 2px mỗi bên → travel = 16px
+  static const double _trackW = 40;
+  static const double _trackH = 22;
+  static const double _thumbSz = 16;
+  static const double _pad = 3;
+  static const double _travel = _trackW - _thumbSz - _pad * 2;
+
+  static const Color _colorOn = Color(0xFF16A34A);
+  static const Color _colorOff = Color(0xFF4B5563);
+
   @override
   Widget build(BuildContext context) {
-    final color = enabled ? const Color(0xFF22C55E) : Colors.white24;
+    final Color trackColor = enabled ? _colorOn : _colorOff;
 
     return Opacity(
-      opacity: disabled ? .45 : 1,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(99),
-        onTap: onTap,
+      opacity: disabled ? .4 : 1,
+      child: GestureDetector(
+        onTap: disabled ? null : onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 220),
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          curve: Curves.easeInOut,
+          width: _trackW,
+          height: _trackH,
           decoration: BoxDecoration(
-            color: color.withOpacity(enabled ? .95 : .45),
-            borderRadius: BorderRadius.circular(99),
-            border: Border.all(
-              color: enabled
-                  ? const Color(0xFF86EFAC).withOpacity(.55)
-                  : Colors.white.withOpacity(.12),
-            ),
+            color: trackColor,
+            borderRadius: BorderRadius.circular(999),
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
+          padding: const EdgeInsets.all(_pad),
+          child: Stack(
             children: [
-              if (loading)
-                const SizedBox(
-                  width: 13,
-                  height: 13,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
+              // Thumb
+              AnimatedAlign(
+                duration: const Duration(milliseconds: 220),
+                curve: Curves.easeInOut,
+                alignment: enabled
+                    ? Alignment.centerRight
+                    : Alignment.centerLeft,
+                child: Container(
+                  width: _thumbSz,
+                  height: _thumbSz,
+                  decoration: const BoxDecoration(
                     color: Colors.white,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Color(0x40000000),
+                        blurRadius: 4,
+                        offset: Offset(0, 1),
+                      ),
+                    ],
                   ),
-                )
-              else
-                Icon(
-                  enabled ? Icons.toggle_on_rounded : Icons.toggle_off_rounded,
-                  size: 16,
-                  color: enabled ? Colors.white : Colors.white70,
-                ),
-              const SizedBox(width: 4),
-              Text(
-                enabled ? 'ON' : 'OFF',
-                style: TextStyle(
-                  color: enabled ? Colors.white : Colors.white70,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w900,
+                  child: loading
+                      ? Padding(
+                    padding: const EdgeInsets.all(3),
+                    child: CircularProgressIndicator(
+                      strokeWidth: 1.8,
+                      color: trackColor,
+                    ),
+                  )
+                      : null,
                 ),
               ),
             ],
@@ -894,7 +912,9 @@ class _LoadingState extends StatelessWidget {
         const SizedBox(width: 12),
         Expanded(
           child: Text(
-            isJp ? 'AIが $machine を分析中です...' : 'AI is analyzing $machine...',
+            isJp
+                ? 'AIが $machine を分析中です...'
+                : 'AI is analyzing $machine...',
             style: const TextStyle(
               color: Colors.white70,
               fontSize: 14,
