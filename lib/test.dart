@@ -12,10 +12,8 @@ import 'package:dropdown_search/dropdown_search.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
-import 'ai/ai_analysis_toggle.dart';
 import 'ai/machine_ai_alert_card.dart';
 import 'api/api_error_message.dart';
-import 'api/auth_api.dart';
 import 'api/auto_cmp_api.dart';
 import 'api/dio_client.dart';
 import 'api/hse_master_service.dart';
@@ -588,23 +586,31 @@ class _CameraScreenState extends State<CameraScreen> {
 
   Future<void> _sendReport() async {
     final isPatrol = widget.patrolGroup == PatrolGroup.Patrol;
+
     final isQA = widget.patrolGroup == PatrolGroup.QualityPatrol;
 
-    final images = _cameraKey.currentState?.images ?? [];
-    final hasQr = _qrKey.trim().isNotEmpty;
+    final images = _cameraKey.currentState?.images ?? const <Uint8List>[];
 
-    ////////////////////////////////////////////////////////////
-    /// VALIDATE
-    ////////////////////////////////////////////////////////////
-    if (isPatrol && !RegExp(r'^\d{1,5}$').hasMatch(_qrKey.trim())) {
-      // if (_qrKey.trim().isEmpty && isPatrol) {
+    final qrKey = _qrKey.trim();
+    final hasQr = qrKey.isNotEmpty;
+
+    // ============================================================
+    // VALIDATE QR
+    // ============================================================
+
+    if (isPatrol && !RegExp(r'^\d{1,5}$').hasMatch(qrKey)) {
       CommonUI.showWarning(
         context: context,
-        title: "QR Required",
-        message: "Please scan a valid 5-digit Patrol QR.",
+        title: 'QR Required',
+        message: 'Please scan a valid Patrol QR containing 1 to 5 digits.',
       );
+
       return;
     }
+
+    // ============================================================
+    // VALIDATE MACHINE INFORMATION
+    // ============================================================
 
     if (isPatrol &&
         (_isBlank(_selectedPlant) ||
@@ -613,67 +619,100 @@ class _CameraScreenState extends State<CameraScreen> {
             _isBlank(_selectedMachine))) {
       CommonUI.showWarning(
         context: context,
-        title: "Information Required",
-        message: "Please select Plant, Fac, Area and Machine.",
+        title: 'Information Required',
+        message: 'Please select Plant, Fac, Area and Machine.',
       );
+
       return;
     }
+
+    // ============================================================
+    // VALIDATE COMMENT
+    // ============================================================
 
     if (_comment.trim().isEmpty) {
       CommonUI.showWarning(
         context: context,
-        title: "Comment Required",
-        message: "Please enter a comment.",
+        title: 'Comment Required',
+        message: 'Please enter a comment.',
       );
+
       return;
     }
 
-    ////////////////////////////////////////////////////////////
-    /// LOADING
-    ////////////////////////////////////////////////////////////
+    /*
+   * Không dùng dấu ! trực tiếp vì một số loại report
+   * có thể không yêu cầu đủ Plant/Fac/Area/Machine.
+   */
+    final plant = _selectedPlant?.trim() ?? '';
+    final division = _selectedFac?.trim() ?? '';
+    final area = _selectedArea?.trim() ?? '';
+    final machine = _selectedMachine?.trim() ?? '';
+
+    var loadingVisible = false;
+
+    void hideLoading() {
+      if (!loadingVisible || !mounted) {
+        return;
+      }
+
+      loadingVisible = false;
+      LoadingDialog.hide(context);
+    }
+
     LoadingDialog.show(context);
+    loadingVisible = true;
 
     try {
-      ////////////////////////////////////////////////////////////
-      /// IMAGE
-      ////////////////////////////////////////////////////////////
+      // ============================================================
+      // IMAGE FILES
+      // ============================================================
+
       final imageFiles = <MultipartFile>[];
 
-      for (int i = 0; i < images.length; i++) {
+      for (var index = 0; index < images.length; index++) {
         imageFiles.add(
           MultipartFile.fromBytes(
-            images[i],
-            filename: 'photo_${i + 1}.jpg',
+            images[index],
+            filename: 'photo_${index + 1}.jpg',
             contentType: http.MediaType('image', 'jpeg'),
           ),
         );
       }
 
-      ////////////////////////////////////////////////////////////
-      /// REPORT BASE
-      ////////////////////////////////////////////////////////////
+      // ============================================================
+      // REPORT BODY
+      // ============================================================
+
+      final employeeName = _employeeName?.trim() ?? '';
+
+      final userCreate = employeeName.isEmpty
+          ? widget.accountCode.trim()
+          : '${widget.accountCode.trim()}_$employeeName';
+
       final reportMap = <String, dynamic>{
-        'userCreate': '${widget.accountCode}_$_employeeName',
-        'qr_key': _qrKey ?? '',
+        'userCreate': userCreate,
+        'qr_key': qrKey,
         'qr_scan_sts': hasQr ? 'SUCCESS_1st' : '',
         'type': widget.patrolGroup.name,
-        'group': _selectedGroup ?? '',
-        'plant': _selectedPlant!.trim(),
-        'division': _selectedFac!.trim(),
-        'area': _selectedArea!.trim(),
-        'machine': _selectedMachine!.trim(),
-        'comment': _comment,
-        'countermeasure': _counterMeasure,
+        'group': _selectedGroup?.trim() ?? '',
+        'plant': plant,
+        'division': division,
+        'area': area,
+        'machine': machine,
+        'comment': _comment.trim(),
+        'countermeasure': _counterMeasure.trim(),
         'check': _needRecheck
-            ? (_selectedArea != null
+            ? (area.isNotEmpty
                   ? ''.combinedViJa(context, 'needRecheck')
                   : ''.combinedViJa(context, 'needSelectArea'))
             : '',
       };
 
-      ////////////////////////////////////////////////////////////
-      /// REPORT TYPE
-      ////////////////////////////////////////////////////////////
+      // ============================================================
+      // RISK INFORMATION
+      // ============================================================
+
       if (!isQA) {
         reportMap.addAll({
           'riskFreq': ''.combinedViJa(context, _freq ?? ''),
@@ -686,33 +725,65 @@ class _CameraScreenState extends State<CameraScreen> {
           'riskFreq': ''.combinedViJa(context, _qaFreq ?? ''),
           'riskProb': ''.combinedViJa(context, _qa5m ?? ''),
           'riskSev': ''.combinedViJa(context, _qaImpact ?? ''),
+          'riskTotal': '',
         });
       }
 
-      ////////////////////////////////////////////////////////////
-      /// FORM DATA
-      ////////////////////////////////////////////////////////////
+      // ============================================================
+      // MULTIPART DATA
+      // ============================================================
+
       final formData = FormData.fromMap({
         'report': jsonEncode(reportMap),
         'images': imageFiles,
       });
 
-      ////////////////////////////////////////////////////////////
-      /// CALL API
-      ////////////////////////////////////////////////////////////
+      // ============================================================
+      // CALL API
+      // ============================================================
 
       final response = await DioClient.postUpload(
         '/api/report',
         data: formData,
       );
-      ////////////////////////////////////////////////////////////
-      /// SUCCESS
-      ////////////////////////////////////////////////////////////
-      LoadingDialog.hide(context);
 
-      if (response.statusCode != null &&
-          response.statusCode! >= 200 &&
-          response.statusCode! < 300) {
+      hideLoading();
+
+      if (!mounted) return;
+
+      final statusCode = response.statusCode ?? 0;
+      final responseData = response.data;
+
+      String? serverCode;
+      String? serverMessage;
+
+      if (responseData is Map) {
+        serverCode = responseData['code']?.toString().trim();
+        serverMessage = responseData['message']?.toString().trim();
+      } else if (responseData is String && responseData.trim().isNotEmpty) {
+        try {
+          final decoded = jsonDecode(responseData);
+
+          if (decoded is Map) {
+            serverCode = decoded['code']?.toString().trim();
+            serverMessage = decoded['message']?.toString().trim();
+          } else {
+            serverMessage = responseData.trim();
+          }
+        } catch (_) {
+          serverMessage = responseData.trim();
+        }
+      }
+
+      debugPrint('REPORT RESPONSE STATUS: $statusCode');
+      debugPrint('REPORT RESPONSE DATA: $responseData');
+      debugPrint('REPORT RESPONSE CODE: $serverCode');
+      debugPrint('REPORT RESPONSE MESSAGE: $serverMessage');
+
+      if (!mounted) return;
+
+      // Thành công
+      if (statusCode >= 200 && statusCode < 300) {
         CommonUI.showSnackBar(
           context: context,
           message: 'Successfully sent ${images.length} images!',
@@ -720,49 +791,163 @@ class _CameraScreenState extends State<CameraScreen> {
         );
 
         _resetForm();
-      } else {
-        CommonUI.showSnackBar(
-          context: context,
-          message: AppMessage.serverError,
-          color: Colors.red,
-        );
+        return;
       }
-    }
-    ////////////////////////////////////////////////////////////
-    /// DIO ERROR (CHUẨN HỆ THỐNG)
-    ////////////////////////////////////////////////////////////
-    on DioException catch (e) {
-      LoadingDialog.hide(context);
 
-      debugPrint('========== SEND REPORT ERROR ==========');
-      debugPrint('TYPE: ${e.type}');
-      debugPrint('STATUS: ${e.response?.statusCode}');
-      debugPrint('DATA: ${e.response?.data}');
-      debugPrint('MESSAGE: ${e.message}');
+      // QR b? trùng
+      if (statusCode == 409 || serverCode == 'DUPLICATE_QR') {
+        CommonUI.showWarning(
+          context: context,
+          title: 'Duplicate QR Code',
+          message: serverMessage?.isNotEmpty == true
+              ? serverMessage!
+              : 'QR code $qrKey already exists and has not been closed.',
+        );
 
-      final message = ApiErrorMessage.fromDio(e);
+        return;
+      }
 
+      // QR không h?p l?
+      if (statusCode == 400 && serverCode == 'INVALID_QR') {
+        CommonUI.showWarning(
+          context: context,
+          title: 'Invalid QR Code',
+          message: serverMessage?.isNotEmpty == true
+              ? serverMessage!
+              : 'QR code must contain only numbers and have a maximum of 5 digits.',
+        );
+
+        return;
+      }
+
+      // L?i khác
       CommonUI.showSnackBar(
         context: context,
-        message: message,
+        message: serverMessage?.isNotEmpty == true
+            ? serverMessage!
+            : 'Unable to submit the report.',
         color: Colors.red,
       );
     }
-    ////////////////////////////////////////////////////////////
-    /// UNKNOWN ERROR
-    ////////////////////////////////////////////////////////////
-    catch (e, s) {
-      LoadingDialog.hide(context);
+    // ============================================================
+    // DIO ERROR
+    // ============================================================
+    on DioException catch (error, stackTrace) {
+      hideLoading();
 
-      debugPrint('========== FLUTTER ERROR ==========');
-      debugPrint('ERROR: $e');
-      debugPrint('STACK: $s');
+      debugPrint('========== SEND REPORT DIO ERROR ==========');
+      debugPrint('TYPE: ${error.type}');
+      debugPrint('STATUS: ${error.response?.statusCode}');
+      debugPrint('DATA: ${error.response?.data}');
+      debugPrint('MESSAGE: ${error.message}');
+      debugPrintStack(stackTrace: stackTrace);
+
+      if (!mounted) return;
+
+      final statusCode = error.response?.statusCode;
+
+      final responseData = error.response?.data;
+
+      String? serverCode;
+      String? serverMessage;
+
+      if (responseData is Map) {
+        serverCode = responseData['code']?.toString().trim();
+
+        serverMessage = responseData['message']?.toString().trim();
+      } else if (responseData is String && responseData.trim().isNotEmpty) {
+        /*
+       * Trường hợp backend trả JSON dưới dạng String.
+       */
+        try {
+          final decoded = jsonDecode(responseData);
+
+          if (decoded is Map) {
+            serverCode = decoded['code']?.toString().trim();
+
+            serverMessage = decoded['message']?.toString().trim();
+          }
+        } catch (_) {
+          serverMessage = responseData.trim();
+        }
+      }
+
+      final duplicateQr = statusCode == 409 || serverCode == 'DUPLICATE_QR';
+
+      if (duplicateQr) {
+        CommonUI.showWarning(
+          context: context,
+          title: 'Duplicate QR Code',
+          message: serverMessage?.isNotEmpty == true
+              ? serverMessage!
+              : 'QR code $qrKey already exists and has not been closed.',
+        );
+
+        return;
+      }
+
+      final invalidQr = statusCode == 400 && serverCode == 'INVALID_QR';
+
+      if (invalidQr) {
+        CommonUI.showWarning(
+          context: context,
+          title: 'Invalid QR Code',
+          message: serverMessage?.isNotEmpty == true
+              ? serverMessage!
+              : 'QR code must contain only numbers and have a maximum of 5 digits.',
+        );
+
+        return;
+      }
+
+      if (error.type == DioExceptionType.connectionTimeout) {
+        CommonUI.showWarning(
+          context: context,
+          title: 'Connection Timeout',
+          message: 'The server took too long to respond. Please try again.',
+        );
+
+        return;
+      }
+
+      if (error.type == DioExceptionType.receiveTimeout) {
+        CommonUI.showWarning(
+          context: context,
+          title: 'Server Timeout',
+          message:
+              'The server is still processing the report. Please try again later.',
+        );
+
+        return;
+      }
 
       CommonUI.showSnackBar(
         context: context,
-        message: ApiErrorMessage.fromFlutter(e),
+        message: serverMessage?.isNotEmpty == true
+            ? serverMessage!
+            : ApiErrorMessage.fromDio(error),
         color: Colors.red,
       );
+    }
+    // ============================================================
+    // UNKNOWN ERROR
+    // ============================================================
+    catch (error, stackTrace) {
+      hideLoading();
+
+      debugPrint('========== SEND REPORT FLUTTER ERROR ==========');
+      debugPrint('ERROR: $error');
+      debugPrintStack(stackTrace: stackTrace);
+
+      if (!mounted) return;
+
+      CommonUI.showSnackBar(
+        context: context,
+        message: ApiErrorMessage.fromFlutter(error),
+        color: Colors.red,
+      );
+    } finally {
+      hideLoading();
     }
   }
 
