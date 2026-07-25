@@ -16,103 +16,97 @@ import 'forgot_password_bottom_sheet.dart';
 
 class LoadingDialog {
   static bool _isShowing = false;
+  static BuildContext? _dialogContext;
 
-  ////////////////////////////////////////////////////////////
-  /// SHOW
-  ////////////////////////////////////////////////////////////
-  static void show(
+  static bool get isShowing => _isShowing;
+
+  static Future<void> show(
     BuildContext context, {
-    String message = "Connecting to server...",
-  }) {
+    String message = 'Connecting to server...',
+  }) async {
     if (_isShowing) return;
 
     _isShowing = true;
 
-    showDialog(
+    await showDialog<void>(
       context: context,
       barrierDismissible: false,
       barrierColor: Colors.black54,
-      builder: (_) => Dialog(
-        backgroundColor: Colors.transparent,
+      useRootNavigator: true,
+      builder: (dialogContext) {
+        _dialogContext = dialogContext;
 
-        child: Container(
-          padding: const EdgeInsets.all(24),
-
-          decoration: BoxDecoration(
-            color: const Color(0xFF0F172A),
-            borderRadius: BorderRadius.circular(20),
-
-            border: Border.all(color: Colors.white12),
-
-            boxShadow: const [
-              BoxShadow(
-                color: Colors.black54,
-                blurRadius: 20,
-                offset: Offset(0, 10),
-              ),
-            ],
-          ),
-
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ////////////////////////////////////////////////////////////
-              /// LOADING
-              ////////////////////////////////////////////////////////////
-              const SizedBox(
-                width: 42,
-                height: 42,
-                child: CircularProgressIndicator(
-                  strokeWidth: 4,
-                  color: Color(0xFF38BDF8),
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: const Color(0xFF0F172A),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.white12),
+              boxShadow: const [
+                BoxShadow(
+                  color: Colors.black54,
+                  blurRadius: 20,
+                  offset: Offset(0, 10),
                 ),
-              ),
-
-              const SizedBox(height: 20),
-
-              ////////////////////////////////////////////////////////////
-              /// TEXT
-              ////////////////////////////////////////////////////////////
-              Text(
-                message,
-                textAlign: TextAlign.center,
-
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(
+                  width: 42,
+                  height: 42,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 4,
+                    color: Color(0xFF38BDF8),
+                  ),
                 ),
-              ),
-
-              const SizedBox(height: 8),
-
-              const Text(
-                "Please wait a moment...",
-                textAlign: TextAlign.center,
-
-                style: TextStyle(color: Colors.white60, fontSize: 13),
-              ),
-            ],
+                const SizedBox(height: 20),
+                Text(
+                  message,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Please wait a moment...',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.white60, fontSize: 13),
+                ),
+              ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
-  }
-
-  ////////////////////////////////////////////////////////////
-  /// HIDE
-  ////////////////////////////////////////////////////////////
-  static void hide(BuildContext context) {
-    if (!_isShowing) return;
 
     _isShowing = false;
+    _dialogContext = null;
+  }
 
-    Navigator.of(context, rootNavigator: true).pop();
+  static void hide() {
+    if (!_isShowing) return;
+
+    final dialogContext = _dialogContext;
+
+    _isShowing = false;
+    _dialogContext = null;
+
+    if (dialogContext == null) return;
+
+    final navigator = Navigator.of(dialogContext, rootNavigator: true);
+
+    if (navigator.canPop()) {
+      navigator.pop();
+    }
   }
 }
-////////////////////////////////////////////////////////////
-/// LOGIN PAGE
-////////////////////////////////////////////////////////////
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -122,56 +116,39 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> {
-  ////////////////////////////////////////////////////////////
-  /// CONTROLLERS
-  ////////////////////////////////////////////////////////////
+  static const Duration _idleLimit = Duration(minutes: 30);
+  static const Duration _idleCheckInterval = Duration(minutes: 1);
+  static const String _reloadSessionKey = 'LOGIN_RELOADED_ONCE';
 
-  final _codeCtrl = TextEditingController();
-  final _passCtrl = TextEditingController();
-  final _passFocus = FocusNode();
+  final TextEditingController _codeCtrl = TextEditingController();
+  final TextEditingController _passCtrl = TextEditingController();
 
-  ////////////////////////////////////////////////////////////
-  /// STATES
-  ////////////////////////////////////////////////////////////
+  final FocusNode _codeFocus = FocusNode();
+  final FocusNode _passFocus = FocusNode();
+
+  Timer? _idleTimer;
 
   String? _errorMsg;
 
   bool _showPassword = false;
   bool _rememberMe = true;
   bool _isServerError = false;
-
-  ////////////////////////////////////////////////////////////
-  /// IDLE DETECTOR
-  ////////////////////////////////////////////////////////////
-
-  DateTime _lastActivity = DateTime.now();
-
-  Timer? _idleTimer;
-
+  bool _isLoggingIn = false;
+  bool _isAutoLoggingIn = false;
   bool _idleWarningShown = false;
 
-  ////////////////////////////////////////////////////////////
-  /// INIT
-  ////////////////////////////////////////////////////////////
+  DateTime _lastActivity = DateTime.now();
 
   @override
   void initState() {
     super.initState();
 
-    _autoLogin();
+    _startIdleMonitor();
 
-    ////////////////////////////////////////////////////////////
-    /// CHECK IDLE EVERY 1 MINUTE
-    ////////////////////////////////////////////////////////////
-    _idleTimer = Timer.periodic(
-      const Duration(minutes: 1),
-      (_) => _checkIdle(),
-    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _autoLogin();
+    });
   }
-
-  ////////////////////////////////////////////////////////////
-  /// DISPOSE
-  ////////////////////////////////////////////////////////////
 
   @override
   void dispose() {
@@ -179,827 +156,299 @@ class _LoginPageState extends State<LoginPage> {
 
     _codeCtrl.dispose();
     _passCtrl.dispose();
+
+    _codeFocus.dispose();
     _passFocus.dispose();
 
     super.dispose();
   }
 
-  ////////////////////////////////////////////////////////////
-  /// UPDATE ACTIVITY
-  ////////////////////////////////////////////////////////////
+  void _startIdleMonitor() {
+    _idleTimer?.cancel();
+
+    _idleTimer = Timer.periodic(_idleCheckInterval, (_) => _checkIdle());
+  }
 
   void _updateActivity() {
     _lastActivity = DateTime.now();
-
-    ////////////////////////////////////////////////////////////
-    /// RESET WARNING
-    ////////////////////////////////////////////////////////////
     _idleWarningShown = false;
   }
 
-  ////////////////////////////////////////////////////////////
-  /// CHECK IDLE
-  ////////////////////////////////////////////////////////////
+  Duration get _idleDuration => DateTime.now().difference(_lastActivity);
+
+  bool get _isIdleExpired => _idleDuration >= _idleLimit;
 
   Future<void> _checkIdle() async {
-    ////////////////////////////////////////////////////////////
-    /// AVOID MULTIPLE DIALOGS
-    ////////////////////////////////////////////////////////////
-    if (_idleWarningShown) return;
-
-    final idleMinutes = DateTime.now().difference(_lastActivity).inMinutes;
-
-    ////////////////////////////////////////////////////////////
-    /// SHOW AFTER 30 MINUTES
-    ////////////////////////////////////////////////////////////
-    if (idleMinutes < 30) return;
+    if (!mounted || _idleWarningShown || !_isIdleExpired) {
+      return;
+    }
 
     _idleWarningShown = true;
 
+    final shouldRefresh = await _showIdleDialog();
+
     if (!mounted) return;
 
-    ////////////////////////////////////////////////////////////
-    /// SHOW WARNING
-    ////////////////////////////////////////////////////////////
-    final shouldRefresh = await showDialog<bool>(
+    if (shouldRefresh == true) {
+      html.window.location.reload();
+      return;
+    }
+
+    _updateActivity();
+  }
+
+  Future<bool?> _showIdleDialog() {
+    return showDialog<bool>(
       context: context,
       barrierColor: Colors.black87,
       barrierDismissible: false,
-      builder: (_) => Dialog(
-        backgroundColor: Colors.transparent,
-        child: Container(
-          padding: const EdgeInsets.all(20),
-
-          decoration: BoxDecoration(
-            color: const Color(0xFF0F172A),
-            borderRadius: BorderRadius.circular(20),
-
-            border: Border.all(color: Colors.white12),
-
-            boxShadow: const [
-              BoxShadow(
-                color: Colors.black54,
-                blurRadius: 20,
-                offset: Offset(0, 10),
-              ),
-            ],
-          ),
-
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ////////////////////////////////////////////////////////////
-              /// ICON
-              ////////////////////////////////////////////////////////////
-              Container(
-                width: 64,
-                height: 64,
-
-                decoration: BoxDecoration(
-                  color: Colors.orange.withOpacity(0.12),
-                  shape: BoxShape.circle,
-                ),
-
-                child: const Icon(
-                  Icons.access_time_rounded,
-                  color: Colors.orangeAccent,
-                  size: 34,
-                ),
-              ),
-
-              const SizedBox(height: 16),
-
-              ////////////////////////////////////////////////////////////
-              /// TITLE
-              ////////////////////////////////////////////////////////////
-              const Text(
-                "Session Idle",
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              ),
-
-              const SizedBox(height: 16),
-
-              ////////////////////////////////////////////////////////////
-              /// MESSAGE
-              ////////////////////////////////////////////////////////////
-              const ErrorBox(
-                message:
-                    "This page has been idle for a long time.\n\n"
-                    "The connection may become unstable.\n"
-                    "Please refresh the page for the best experience.",
-
-                isServerError: true,
-              ),
-
-              const SizedBox(height: 20),
-
-              ////////////////////////////////////////////////////////////
-              /// BUTTONS
-              ////////////////////////////////////////////////////////////
-              Row(
-                children: [
-                  ////////////////////////////////////////////////////////////
-                  /// CONTINUE
-                  ////////////////////////////////////////////////////////////
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () {
-                        Navigator.pop(context, false);
-                      },
-
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.white70,
-
-                        side: const BorderSide(color: Colors.white24),
-
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                      ),
-
-                      child: const Text("Continue"),
-                    ),
-                  ),
-
-                  const SizedBox(width: 12),
-
-                  ////////////////////////////////////////////////////////////
-                  /// REFRESH
-                  ////////////////////////////////////////////////////////////
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: () {
-                        Navigator.pop(context, true);
-                      },
-
-                      icon: const Icon(Icons.refresh),
-
-                      label: const Text("Refresh"),
-
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF2563EB),
-
-                        foregroundColor: Colors.white,
-
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
+      builder: (dialogContext) {
+        return _StatusDialog(
+          icon: Icons.access_time_rounded,
+          iconColor: Colors.orangeAccent,
+          title: 'Session Idle',
+          message:
+              'This page has been idle for a long time.\n\n'
+              'The connection may become unstable.\n'
+              'Please refresh the page for the best experience.',
+          secondaryText: 'Continue',
+          primaryText: 'Refresh',
+          primaryIcon: Icons.refresh,
+          onSecondary: () {
+            Navigator.pop(dialogContext, false);
+          },
+          onPrimary: () {
+            Navigator.pop(dialogContext, true);
+          },
+        );
+      },
     );
-
-    ////////////////////////////////////////////////////////////
-    /// REFRESH PAGE
-    ////////////////////////////////////////////////////////////
-    if (shouldRefresh == true) {
-      html.window.location.reload();
-    }
   }
-
-  ////////////////////////////////////////////////////////////
-  /// AUTO LOGIN
-  ////////////////////////////////////////////////////////////
 
   Future<void> _autoLogin() async {
-    final creds = await SessionStore.getCreds();
+    if (_isAutoLoggingIn || _isLoggingIn) return;
 
-    if (creds == null) return;
-
-    final (account, password) = creds;
-
-    final result = await AuthApi.login(account: account, password: password);
-
-    if (!mounted) return;
-
-    if (!result.success) {
-      await SessionStore.clear();
-
-      return;
-    }
-
-    context.go('/home', extra: {'accountCode': account});
-  }
-
-  ////////////////////////////////////////////////////////////
-  /// LOGIN
-  ////////////////////////////////////////////////////////////
-  bool _reloadSuggested = false;
-
-  Future<void> _login1() async {
-    final idleMinutes = DateTime.now().difference(_lastActivity).inMinutes;
-
-    if (idleMinutes >= 30) {
-      html.window.location.reload();
-      return;
-    }
-    ////////////////////////////////////////////////////////////
-    /// UPDATE USER ACTIVITY
-    ////////////////////////////////////////////////////////////
-    _updateActivity();
-
-    final code = _codeCtrl.text.trim();
-    final pass = _passCtrl.text.trim();
-
-    ////////////////////////////////////////////////////////////
-    /// CLEAR ERROR
-    ////////////////////////////////////////////////////////////
-    setState(() {
-      _errorMsg = null;
-      _isServerError = false;
-    });
-
-    ////////////////////////////////////////////////////////////
-    /// VALIDATE
-    ////////////////////////////////////////////////////////////
-    if (code.isEmpty || pass.isEmpty) {
-      setState(() {
-        _errorMsg = "Please enter code and password";
-      });
-
-      return;
-    }
-
-    ////////////////////////////////////////////////////////////
-    /// SHOW LOADING
-    ////////////////////////////////////////////////////////////
-    LoadingDialog.show(context);
-
-    AuthResult result;
+    _isAutoLoggingIn = true;
 
     try {
-      ////////////////////////////////////////////////////////////
-      /// LOGIN
-      ////////////////////////////////////////////////////////////
-      result = await AuthApi.login(account: code, password: pass);
+      final creds = await SessionStore.getCreds();
 
-      ////////////////////////////////////////////////////////////
-      /// RETRY ONLY REAL SERVER ERROR
-      ////////////////////////////////////////////////////////////
-      final shouldRetry = !result.success && result.isServerError;
+      if (creds == null || !mounted) return;
 
-      if (shouldRetry) {
-        ////////////////////////////////////////////////////////////
-        /// WAIT
-        ////////////////////////////////////////////////////////////
-        await Future.delayed(const Duration(milliseconds: 500));
+      final (account, password) = creds;
 
-        ////////////////////////////////////////////////////////////
-        /// RETRY
-        ////////////////////////////////////////////////////////////
-        result = await AuthApi.login(account: code, password: pass);
-      }
-    } catch (_) {
-      result = AuthResult(
-        success: false,
-        message: AppMessage.serverError,
-        isServerError: true,
-      );
-    } finally {
-      ////////////////////////////////////////////////////////////
-      /// ALWAYS HIDE LOADING
-      ////////////////////////////////////////////////////////////
-      if (mounted) {
-        LoadingDialog.hide(context);
-      }
-    }
+      final normalizedAccount = account.trim();
+      final normalizedPassword = password.trim();
 
-    ////////////////////////////////////////////////////////////
-    /// LOGIN FAILED
-    ////////////////////////////////////////////////////////////
-    if (!result.success) {
-      ////////////////////////////////////////////////////////////
-      /// SPECIAL MESSAGE FOR LONG IDLE
-      ////////////////////////////////////////////////////////////
-      final idleMinutes = DateTime.now().difference(_lastActivity).inMinutes;
-
-      String message = result.message;
-
-      if (idleMinutes >= 30 && result.isServerError) {
-        message =
-            "${result.message}\n\n"
-            "This page has been idle for a long time.\n"
-            "Please refresh the page and try again.";
-      }
-
-      ////////////////////////////////////////////////////////////
-      /// NETWORK / CONNECTION LOST
-      ////////////////////////////////////////////////////////////
-      if (result.message == AppMessage.cannotConnect ||
-          result.message == AppMessage.timeout ||
-          result.message == AppMessage.networkError) {
-        ////////////////////////////////////////////////////////////
-        /// FIRST TIME -> ASK RELOAD
-        ////////////////////////////////////////////////////////////
-        if (!_reloadSuggested) {
-          _reloadSuggested = true;
-
-          final shouldReload = await showDialog<bool>(
-            context: context,
-            barrierDismissible: false,
-            barrierColor: Colors.black87,
-
-            builder: (_) => Dialog(
-              backgroundColor: Colors.transparent,
-
-              child: Container(
-                padding: const EdgeInsets.all(20),
-
-                decoration: BoxDecoration(
-                  color: const Color(0xFF0F172A),
-                  borderRadius: BorderRadius.circular(20),
-
-                  border: Border.all(color: Colors.white12),
-
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Colors.black54,
-                      blurRadius: 20,
-                      offset: Offset(0, 10),
-                    ),
-                  ],
-                ),
-
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    //////////////////////////////////////////////////////
-                    /// ICON
-                    //////////////////////////////////////////////////////
-                    Container(
-                      width: 64,
-                      height: 64,
-
-                      decoration: BoxDecoration(
-                        color: Colors.red.withOpacity(0.12),
-                        shape: BoxShape.circle,
-                      ),
-
-                      child: const Icon(
-                        Icons.wifi_off_rounded,
-                        color: Colors.redAccent,
-                        size: 34,
-                      ),
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    //////////////////////////////////////////////////////
-                    /// TITLE
-                    //////////////////////////////////////////////////////
-                    const Text(
-                      "Connection Lost",
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    //////////////////////////////////////////////////////
-                    /// ERROR BOX
-                    //////////////////////////////////////////////////////
-                    const ErrorBox(
-                      message:
-                          "Unable to connect to the server.\n\n"
-                          "The page may be outdated or the connection was interrupted.\n\n"
-                          "Please reload the page and try again.",
-
-                      isServerError: true,
-                    ),
-
-                    const SizedBox(height: 20),
-
-                    //////////////////////////////////////////////////////
-                    /// BUTTONS
-                    //////////////////////////////////////////////////////
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: () {
-                              Navigator.pop(context, false);
-                            },
-
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: Colors.white70,
-
-                              side: const BorderSide(color: Colors.white24),
-
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                            ),
-
-                            child: const Text("Cancel"),
-                          ),
-                        ),
-
-                        const SizedBox(width: 12),
-
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: () {
-                              Navigator.pop(context, true);
-                            },
-
-                            icon: const Icon(Icons.refresh),
-
-                            label: const Text("Reload"),
-
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF2563EB),
-
-                              foregroundColor: Colors.white,
-
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          );
-
-          if (shouldReload == true) {
-            html.window.location.reload();
-          }
-
-          return;
-        }
-
-        ////////////////////////////////////////////////////////////
-        /// AFTER RELOAD STILL FAIL
-        ////////////////////////////////////////////////////////////
-        setState(() {
-          _errorMsg =
-              "Unable to connect to the server.\n\n"
-              "Please contact IT Support.";
-
-          _isServerError = true;
-        });
-
+      if (normalizedAccount.isEmpty || normalizedPassword.isEmpty) {
+        await SessionStore.clear();
         return;
       }
 
-      setState(() {
-        _errorMsg = message;
-        _isServerError = result.isServerError;
-      });
+      final result = await AuthApi.login(
+        account: normalizedAccount,
+        password: normalizedPassword,
+      );
 
-      return;
-    }
+      if (!mounted) return;
 
-    ////////////////////////////////////////////////////////////
-    /// REMEMBER ME
-    ////////////////////////////////////////////////////////////
-    if (_rememberMe) {
-      await SessionStore.saveCreds(account: code, password: pass);
-    } else {
+      if (!result.success) {
+        await SessionStore.clear();
+        return;
+      }
+
+      html.window.sessionStorage.remove(_reloadSessionKey);
+
+      context.go('/home', extra: {'accountCode': normalizedAccount});
+    } catch (error, stackTrace) {
+      debugPrint('Auto login error: $error');
+      debugPrintStack(stackTrace: stackTrace);
+
       await SessionStore.clear();
+    } finally {
+      _isAutoLoggingIn = false;
     }
-
-    ////////////////////////////////////////////////////////////
-    /// NAVIGATE
-    ////////////////////////////////////////////////////////////
-    if (!mounted) return;
-
-    context.go('/home', extra: {'accountCode': code});
   }
 
   Future<void> _login() async {
-    ////////////////////////////////////////////////////////////
-    /// CHECK IDLE BEFORE UPDATE ACTIVITY
-    ////////////////////////////////////////////////////////////
-    final idleMinutes = DateTime.now().difference(_lastActivity).inMinutes;
+    if (_isLoggingIn || _isAutoLoggingIn) return;
 
-    if (idleMinutes >= 30) {
+    if (_isIdleExpired) {
       html.window.location.reload();
       return;
     }
 
-    ////////////////////////////////////////////////////////////
-    /// UPDATE USER ACTIVITY
-    ////////////////////////////////////////////////////////////
     _updateActivity();
 
     final code = _codeCtrl.text.trim();
-    final pass = _passCtrl.text.trim();
+    final password = _passCtrl.text.trim();
 
-    ////////////////////////////////////////////////////////////
-    /// CLEAR ERROR
-    ////////////////////////////////////////////////////////////
-    setState(() {
-      _errorMsg = null;
-      _isServerError = false;
-    });
-
-    ////////////////////////////////////////////////////////////
-    /// VALIDATE
-    ////////////////////////////////////////////////////////////
-    if (code.isEmpty || pass.isEmpty) {
+    if (code.isEmpty || password.isEmpty) {
       setState(() {
-        _errorMsg = "Please enter code and password";
+        _errorMsg = 'Please enter code and password';
+        _isServerError = false;
       });
+
+      if (code.isEmpty) {
+        _codeFocus.requestFocus();
+      } else {
+        _passFocus.requestFocus();
+      }
 
       return;
     }
 
-    ////////////////////////////////////////////////////////////
-    /// SHOW LOADING
-    ////////////////////////////////////////////////////////////
-    LoadingDialog.show(context, message: "Signing in...");
+    setState(() {
+      _isLoggingIn = true;
+      _errorMsg = null;
+      _isServerError = false;
+    });
+
+    unawaited(LoadingDialog.show(context, message: 'Signing in...'));
 
     AuthResult result;
 
     try {
-      ////////////////////////////////////////////////////////////
-      /// LOGIN
-      ////////////////////////////////////////////////////////////
-      result = await AuthApi.login(account: code, password: pass);
+      result = await _loginWithRetry(account: code, password: password);
+    } catch (error, stackTrace) {
+      debugPrint('Login error: $error');
+      debugPrintStack(stackTrace: stackTrace);
 
-      ////////////////////////////////////////////////////////////
-      /// RETRY ONLY REAL SERVER / NETWORK ERROR
-      ////////////////////////////////////////////////////////////
-      final shouldRetry = !result.success && result.isServerError;
-
-      if (shouldRetry) {
-        await Future.delayed(const Duration(milliseconds: 800));
-
-        result = await AuthApi.login(account: code, password: pass);
-      }
-    } catch (_) {
       result = AuthResult(
         success: false,
         message: AppMessage.serverError,
         isServerError: true,
       );
     } finally {
-      ////////////////////////////////////////////////////////////
-      /// ALWAYS HIDE LOADING
-      ////////////////////////////////////////////////////////////
+      LoadingDialog.hide();
+
       if (mounted) {
-        LoadingDialog.hide(context);
+        setState(() {
+          _isLoggingIn = false;
+        });
       }
     }
 
     if (!mounted) return;
 
-    ////////////////////////////////////////////////////////////
-    /// LOGIN FAILED
-    ////////////////////////////////////////////////////////////
     if (!result.success) {
-      String message = result.message;
-
-      ////////////////////////////////////////////////////////////
-      /// NETWORK / CONNECTION LOST
-      ////////////////////////////////////////////////////////////
-      final isNetworkError =
-          result.message == AppMessage.cannotConnect ||
-          result.message == AppMessage.timeout ||
-          result.message == AppMessage.networkError;
-
-      if (isNetworkError) {
-        final alreadyReloaded =
-            html.window.sessionStorage['LOGIN_RELOADED_ONCE'] == 'true';
-
-        //////////////////////////////////////////////////////////
-        /// FIRST TIME -> ASK USER TO RELOAD
-        //////////////////////////////////////////////////////////
-        if (!alreadyReloaded) {
-          final shouldReload = await showDialog<bool>(
-            context: context,
-            barrierDismissible: false,
-            barrierColor: Colors.black87,
-
-            builder: (_) => Dialog(
-              backgroundColor: Colors.transparent,
-
-              child: Container(
-                padding: const EdgeInsets.all(20),
-
-                decoration: BoxDecoration(
-                  color: const Color(0xFF0F172A),
-                  borderRadius: BorderRadius.circular(20),
-
-                  border: Border.all(color: Colors.white12),
-
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Colors.black54,
-                      blurRadius: 20,
-                      offset: Offset(0, 10),
-                    ),
-                  ],
-                ),
-
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    //////////////////////////////////////////////////////
-                    /// ICON
-                    //////////////////////////////////////////////////////
-                    Container(
-                      width: 64,
-                      height: 64,
-
-                      decoration: BoxDecoration(
-                        color: Colors.red.withOpacity(0.12),
-                        shape: BoxShape.circle,
-                      ),
-
-                      child: const Icon(
-                        Icons.wifi_off_rounded,
-                        color: Colors.redAccent,
-                        size: 34,
-                      ),
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    //////////////////////////////////////////////////////
-                    /// TITLE
-                    //////////////////////////////////////////////////////
-                    const Text(
-                      "Connection Lost",
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    //////////////////////////////////////////////////////
-                    /// ERROR BOX
-                    //////////////////////////////////////////////////////
-                    const ErrorBox(
-                      message:
-                          "Unable to connect to the server.\n\n"
-                          "The page may be outdated or the connection was interrupted.\n\n"
-                          "Please reload the page and try again.",
-
-                      isServerError: true,
-                      showContact: false,
-                    ),
-
-                    const SizedBox(height: 20),
-
-                    //////////////////////////////////////////////////////
-                    /// BUTTONS hintText: "search_or_add_new".tr(context),
-                    //////////////////////////////////////////////////////
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: () {
-                              Navigator.pop(context, false);
-                            },
-
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: Colors.white70,
-                              side: const BorderSide(color: Colors.white24),
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                            ),
-
-                            child: const Text("Cancel"),
-                          ),
-                        ),
-
-                        const SizedBox(width: 12),
-
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: () {
-                              Navigator.pop(context, true);
-                            },
-
-                            icon: const Icon(Icons.refresh),
-
-                            label: const Text("Reload"),
-
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF2563EB),
-
-                              foregroundColor: Colors.white,
-
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          );
-
-          if (shouldReload == true) {
-            html.window.sessionStorage['LOGIN_RELOADED_ONCE'] = 'true';
-            html.window.location.reload();
-          }
-          return;
-        }
-
-        //////////////////////////////////////////////////////////
-        /// AFTER RELOAD STILL FAIL -> CONTACT IT
-        //////////////////////////////////////////////////////////
-        setState(() {
-          _errorMsg =
-              "Unable to connect to the server.\n\n"
-              "Please contact IT Support.";
-          _isServerError = true;
-        });
-
-        return;
-      }
-
-      ////////////////////////////////////////////////////////////
-      /// LONG IDLE MESSAGE
-      ////////////////////////////////////////////////////////////
-      final idleMinutesAfterLogin = DateTime.now()
-          .difference(_lastActivity)
-          .inMinutes;
-
-      if (idleMinutesAfterLogin >= 30 && result.isServerError) {
-        message =
-            "${result.message}\n\n"
-            "This page has been idle for a long time.\n"
-            "Please refresh the page and try again.";
-      }
-
-      ////////////////////////////////////////////////////////////
-      /// NORMAL ERROR
-      ////////////////////////////////////////////////////////////
-      setState(() {
-        _errorMsg = message;
-        _isServerError = result.isServerError;
-      });
-
+      await _handleLoginFailure(result);
       return;
     }
 
-    ////////////////////////////////////////////////////////////
-    /// LOGIN SUCCESS -> CLEAR RELOAD FLAG
-    ////////////////////////////////////////////////////////////
-    html.window.sessionStorage.remove('LOGIN_RELOADED_ONCE');
+    html.window.sessionStorage.remove(_reloadSessionKey);
 
-    ////////////////////////////////////////////////////////////
-    /// REMEMBER ME
-    ////////////////////////////////////////////////////////////
     if (_rememberMe) {
-      await SessionStore.saveCreds(account: code, password: pass);
+      await SessionStore.saveCreds(account: code, password: password);
     } else {
       await SessionStore.clear();
     }
 
     if (!mounted) return;
 
-    ////////////////////////////////////////////////////////////
-    /// NAVIGATE
-    ////////////////////////////////////////////////////////////
     context.go('/home', extra: {'accountCode': code});
   }
 
-  ////////////////////////////////////////////////////////////
-  /// REGISTER
-  ////////////////////////////////////////////////////////////
+  Future<AuthResult> _loginWithRetry({
+    required String account,
+    required String password,
+  }) async {
+    var result = await AuthApi.login(account: account, password: password);
+
+    if (!result.success && result.isServerError) {
+      await Future<void>.delayed(const Duration(milliseconds: 800));
+
+      result = await AuthApi.login(account: account, password: password);
+    }
+
+    return result;
+  }
+
+  Future<void> _handleLoginFailure(AuthResult result) async {
+    if (!mounted) return;
+
+    if (_isNetworkError(result.message)) {
+      await _handleNetworkFailure();
+      return;
+    }
+
+    var message = result.message;
+
+    if (_isIdleExpired && result.isServerError) {
+      message =
+          '${result.message}\n\n'
+          'This page has been idle for a long time.\n'
+          'Please refresh the page and try again.';
+    }
+
+    setState(() {
+      _errorMsg = message;
+      _isServerError = result.isServerError;
+    });
+  }
+
+  bool _isNetworkError(String message) {
+    return message == AppMessage.cannotConnect ||
+        message == AppMessage.timeout ||
+        message == AppMessage.networkError;
+  }
+
+  Future<void> _handleNetworkFailure() async {
+    final alreadyReloaded =
+        html.window.sessionStorage[_reloadSessionKey] == 'true';
+
+    if (!alreadyReloaded) {
+      final shouldReload = await _showConnectionLostDialog();
+
+      if (!mounted) return;
+
+      if (shouldReload == true) {
+        html.window.sessionStorage[_reloadSessionKey] = 'true';
+        html.window.location.reload();
+      }
+
+      return;
+    }
+
+    setState(() {
+      _errorMsg =
+          'Unable to connect to the server.\n\n'
+          'Please contact IT Support.';
+      _isServerError = true;
+    });
+  }
+
+  Future<bool?> _showConnectionLostDialog() {
+    return showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      barrierColor: Colors.black87,
+      builder: (dialogContext) {
+        return _StatusDialog(
+          icon: Icons.wifi_off_rounded,
+          iconColor: Colors.redAccent,
+          title: 'Connection Lost',
+          message:
+              'Unable to connect to the server.\n\n'
+              'The page may be outdated or the connection was interrupted.\n\n'
+              'Please reload the page and try again.',
+          secondaryText: 'Cancel',
+          primaryText: 'Reload',
+          primaryIcon: Icons.refresh,
+          onSecondary: () {
+            Navigator.pop(dialogContext, false);
+          },
+          onPrimary: () {
+            Navigator.pop(dialogContext, true);
+          },
+        );
+      },
+    );
+  }
 
   Future<void> _showRegister() async {
+    _updateActivity();
+
     final result = await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
@@ -1007,35 +456,38 @@ class _LoginPageState extends State<LoginPage> {
       builder: (_) => const RegisterBottomSheet(),
     );
 
-    if (result != null && result.isNotEmpty) {
-      _codeCtrl.text = result;
-
-      _passCtrl.clear();
-
-      Future.delayed(const Duration(milliseconds: 200), () {
-        _passFocus.requestFocus();
-      });
+    if (!mounted || result == null || result.trim().isEmpty) {
+      return;
     }
+
+    _codeCtrl.text = result.trim();
+    _passCtrl.clear();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _passFocus.requestFocus();
+      }
+    });
   }
 
-  ////////////////////////////////////////////////////////////
-  /// CHANGE PASSWORD
-  ////////////////////////////////////////////////////////////
-
   Future<void> _showChangePassword() async {
+    _updateActivity();
+
     final account = _codeCtrl.text.trim();
 
     if (account.isEmpty) {
       setState(() {
-        _errorMsg = "Please enter Employee ID first";
-
+        _errorMsg = 'Please enter Employee ID first';
         _isServerError = false;
       });
 
+      _codeFocus.requestFocus();
       return;
     }
 
     final result = await AuthApi.checkAccountExists(account);
+
+    if (!mounted) return;
 
     if (!result.success) {
       setState(() {
@@ -1046,119 +498,123 @@ class _LoginPageState extends State<LoginPage> {
       return;
     }
 
-    final exists = result.data == true;
-
-    if (!exists) {
+    if (result.data != true) {
       setState(() {
-        _errorMsg = "Account does not exist";
+        _errorMsg = 'Account does not exist';
         _isServerError = false;
       });
 
       return;
     }
 
-    await showModalBottomSheet(
+    await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => ChangePasswordBottomSheet(account: account),
+      builder: (_) {
+        return ChangePasswordBottomSheet(account: account);
+      },
     );
   }
 
-  ////////////////////////////////////////////////////////////
-  /// FORGOT PASSWORD
-  ////////////////////////////////////////////////////////////
-
   Future<void> _forgotPassword() async {
+    _updateActivity();
+
     final account = _codeCtrl.text.trim();
 
     final result = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) =>
-          ForgotPasswordBottomSheet(account: account.isEmpty ? null : account),
+      builder: (_) {
+        return ForgotPasswordBottomSheet(
+          account: account.isEmpty ? null : account,
+        );
+      },
     );
 
-    if (result == true) {
-      LoadingDialog.show(context);
+    if (!mounted || result != true) return;
 
-      await Future.delayed(const Duration(seconds: 2));
-
-      if (!mounted) return;
-
-      LoadingDialog.hide(context);
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            "Your request has been submitted successfully.\n"
-            "Please check Microsoft Teams.",
-          ),
-          backgroundColor: Colors.green,
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Your request has been submitted successfully.\n'
+          'Please check Microsoft Teams.',
         ),
-      );
-    }
+        backgroundColor: Colors.green,
+      ),
+    );
   }
 
-  ////////////////////////////////////////////////////////////
-  /// BUILD
-  ////////////////////////////////////////////////////////////
+  void _onInputChanged(String _) {
+    _updateActivity();
+
+    if (_errorMsg == null) return;
+
+    setState(() {
+      _errorMsg = null;
+      _isServerError = false;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+
     return Listener(
-      ////////////////////////////////////////////////////////////
-      /// DETECT USER ACTIVITY
-      ////////////////////////////////////////////////////////////
       onPointerDown: (_) => _updateActivity(),
-      onPointerMove: (_) => _updateActivity(),
-
-      child: Scaffold(
-        body: Container(
-          decoration: AppStyles.bg,
-
-          child: Center(
-            child: LoginCard(
-              codeCtrl: _codeCtrl,
-              passCtrl: _passCtrl,
-              passFocus: _passFocus,
-
-              errorMsg: _errorMsg,
-              isServerError: _isServerError,
-
-              showPassword: _showPassword,
-              rememberMe: _rememberMe,
-
-              onToggleRemember: (v) {
-                setState(() {
-                  _rememberMe = v;
-                });
-              },
-
-              onTogglePassword: () {
-                setState(() {
-                  _showPassword = !_showPassword;
-                });
-              },
-
-              onLogin: _login,
-
-              onRegister: _showRegister,
-
-              onChangePassword: _showChangePassword,
-
-              onForgotPassword: _forgotPassword,
-
-              onInputChanged: (_) {
-                _updateActivity();
-
-                if (_errorMsg != null) {
-                  setState(() {
-                    _errorMsg = null;
-                  });
-                }
-              },
+      child: Focus(
+        onKeyEvent: (_, __) {
+          _updateActivity();
+          return KeyEventResult.ignored;
+        },
+        child: Scaffold(
+          resizeToAvoidBottomInset: true,
+          body: Container(
+            decoration: AppStyles.bg,
+            child: SafeArea(
+              child: SingleChildScrollView(
+                keyboardDismissBehavior:
+                    ScrollViewKeyboardDismissBehavior.onDrag,
+                padding: EdgeInsets.fromLTRB(16, 24, 16, bottomInset + 24),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    minHeight:
+                        MediaQuery.sizeOf(context).height -
+                        MediaQuery.paddingOf(context).vertical -
+                        bottomInset -
+                        48,
+                  ),
+                  child: Center(
+                    child: LoginCard(
+                      codeCtrl: _codeCtrl,
+                      passCtrl: _passCtrl,
+                      codeFocus: _codeFocus,
+                      passFocus: _passFocus,
+                      errorMsg: _errorMsg,
+                      isServerError: _isServerError,
+                      showPassword: _showPassword,
+                      rememberMe: _rememberMe,
+                      isLoggingIn: _isLoggingIn || _isAutoLoggingIn,
+                      onToggleRemember: (value) {
+                        setState(() {
+                          _rememberMe = value;
+                        });
+                      },
+                      onTogglePassword: () {
+                        setState(() {
+                          _showPassword = !_showPassword;
+                        });
+                      },
+                      onLogin: _login,
+                      onRegister: _showRegister,
+                      onChangePassword: _showChangePassword,
+                      onForgotPassword: _forgotPassword,
+                      onInputChanged: _onInputChanged,
+                    ),
+                  ),
+                ),
+              ),
             ),
           ),
         ),
@@ -1167,54 +623,58 @@ class _LoginPageState extends State<LoginPage> {
   }
 }
 
-////////////////////////////////////////////////////////////
-/// CARD
-////////////////////////////////////////////////////////////
-
 class LoginCard extends StatelessWidget {
   final TextEditingController codeCtrl;
   final TextEditingController passCtrl;
+
+  final FocusNode codeFocus;
   final FocusNode passFocus;
 
   final String? errorMsg;
+
   final bool isServerError;
   final bool showPassword;
   final bool rememberMe;
+  final bool isLoggingIn;
 
-  final Function(bool) onToggleRemember;
+  final ValueChanged<bool> onToggleRemember;
   final VoidCallback onTogglePassword;
   final VoidCallback onLogin;
   final VoidCallback onRegister;
   final VoidCallback onChangePassword;
-  final ValueChanged<String> onInputChanged;
   final VoidCallback onForgotPassword;
+  final ValueChanged<String> onInputChanged;
 
   const LoginCard({
     super.key,
     required this.codeCtrl,
     required this.passCtrl,
+    required this.codeFocus,
     required this.passFocus,
     required this.errorMsg,
+    required this.isServerError,
     required this.showPassword,
     required this.rememberMe,
+    required this.isLoggingIn,
     required this.onToggleRemember,
     required this.onTogglePassword,
     required this.onLogin,
     required this.onRegister,
     required this.onChangePassword,
-    required this.onInputChanged,
     required this.onForgotPassword,
-    required this.isServerError,
+    required this.onInputChanged,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 380,
-      padding: const EdgeInsets.all(24),
+      width: double.infinity,
+      constraints: const BoxConstraints(maxWidth: 380),
+      padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
         gradient: AppStyles.cardGradient,
         borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withOpacity(.08)),
         boxShadow: const [
           BoxShadow(
             color: Colors.black54,
@@ -1229,110 +689,168 @@ class LoginCard extends StatelessWidget {
           const _Logo(),
           const SizedBox(height: 10),
           const AppVersionText(),
-
           const SizedBox(height: 16),
           const _Title(),
-
           const SizedBox(height: 20),
-
           AppInput(
             controller: codeCtrl,
-            label: "Employee ID",
+            focusNode: codeFocus,
+            label: 'Employee ID',
             icon: Icons.badge_outlined,
             isNumber: true,
+            enabled: !isLoggingIn,
+            textInputAction: TextInputAction.next,
+            onSubmitted: (_) {
+              passFocus.requestFocus();
+            },
             onChanged: onInputChanged,
           ),
-
           const SizedBox(height: 14),
-
           AppInput(
             controller: passCtrl,
-            label: "Password",
+            focusNode: passFocus,
+            label: 'Password',
             icon: Icons.lock_outline,
             obscure: !showPassword,
-            focusNode: passFocus,
+            enabled: !isLoggingIn,
+            textInputAction: TextInputAction.done,
+            onSubmitted: (_) {
+              if (!isLoggingIn) {
+                onLogin();
+              }
+            },
             onChanged: onInputChanged,
             suffix: IconButton(
+              tooltip: showPassword ? 'Hide password' : 'Show password',
+              onPressed: isLoggingIn ? null : onTogglePassword,
               icon: Icon(
                 showPassword ? Icons.visibility_off : Icons.visibility,
                 color: Colors.white60,
               ),
-              onPressed: onTogglePassword,
             ),
           ),
-
           const SizedBox(height: 18),
-
           Row(
             children: [
-              Checkbox(
-                value: rememberMe,
-                onChanged: (v) => onToggleRemember(v ?? true),
+              SizedBox(
+                width: 32,
+                height: 32,
+                child: Checkbox(
+                  value: rememberMe,
+                  onChanged: isLoggingIn
+                      ? null
+                      : (value) {
+                          onToggleRemember(value ?? false);
+                        },
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  visualDensity: VisualDensity.compact,
+                ),
               ),
-              const Text(
-                "Remember me",
-                style: TextStyle(color: Colors.white70),
+
+              const SizedBox(width: 4),
+
+              Expanded(
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: isLoggingIn
+                      ? null
+                      : () => onToggleRemember(!rememberMe),
+                  child: const Text(
+                    'Remember me',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(color: Colors.white70, fontSize: 13),
+                  ),
+                ),
               ),
-              Spacer(),
-              GestureDetector(
-                onTap: onForgotPassword,
+
+              const SizedBox(width: 8),
+
+              TextButton(
+                onPressed: isLoggingIn ? null : onForgotPassword,
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 4,
+                    vertical: 6,
+                  ),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
                 child: const Text(
-                  "Forgot password?",
-                  style: TextStyle(color: Colors.white70),
+                  'Forgot password?',
+                  maxLines: 1,
+                  style: TextStyle(color: Colors.white70, fontSize: 13),
                 ),
               ),
             ],
           ),
-
           const SizedBox(height: 10),
-
           SizedBox(
             width: double.infinity,
             height: 48,
             child: ElevatedButton(
-              onPressed: onLogin,
+              onPressed: isLoggingIn ? null : onLogin,
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF2563EB),
+                disabledBackgroundColor: const Color(
+                  0xFF2563EB,
+                ).withOpacity(.45),
+                foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),
                 ),
               ),
-              child: const Text(
-                "Login",
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.white70,
-                  fontWeight: FontWeight.w700,
-                ),
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 180),
+                child: isLoggingIn
+                    ? const SizedBox(
+                        key: ValueKey('login-loading'),
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.4,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Text(
+                        'Login',
+                        key: ValueKey('login-text'),
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
               ),
             ),
           ),
-
-          // if (errorMsg != null) ...[
-          //   const SizedBox(height: 10),
-          //   Text(errorMsg!, style: const TextStyle(color: Colors.redAccent)),
-          // ],
-          if (errorMsg != null) ...[
-            const SizedBox(height: 10),
-            ErrorBox(message: errorMsg!, isServerError: isServerError),
-          ],
+          AnimatedSize(
+            duration: const Duration(milliseconds: 180),
+            alignment: Alignment.topCenter,
+            child: errorMsg == null
+                ? const SizedBox.shrink()
+                : Padding(
+                    padding: const EdgeInsets.only(top: 10),
+                    child: ErrorBox(
+                      message: errorMsg!,
+                      isServerError: isServerError,
+                    ),
+                  ),
+          ),
           const SizedBox(height: 16),
-
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              GestureDetector(
-                onTap: onChangePassword,
+              TextButton(
+                onPressed: isLoggingIn ? null : onChangePassword,
                 child: const Text(
-                  "Change password",
+                  'Change password',
                   style: TextStyle(color: Colors.white70),
                 ),
               ),
-
-              GestureDetector(
-                onTap: onRegister,
+              TextButton(
+                onPressed: isLoggingIn ? null : onRegister,
                 child: const Text(
-                  "Create account",
+                  'Create account',
                   style: TextStyle(color: Color(0xFF38BDF8)),
                 ),
               ),
@@ -1344,30 +862,36 @@ class LoginCard extends StatelessWidget {
   }
 }
 
-////////////////////////////////////////////////////////////
-/// INPUT
-////////////////////////////////////////////////////////////
-
 class AppInput extends StatelessWidget {
   final TextEditingController controller;
   final String label;
   final IconData icon;
+
   final bool obscure;
   final bool isNumber;
+  final bool enabled;
+
   final FocusNode? focusNode;
   final Widget? suffix;
+
+  final TextInputAction? textInputAction;
+
   final ValueChanged<String> onChanged;
+  final ValueChanged<String>? onSubmitted;
 
   const AppInput({
     super.key,
     required this.controller,
     required this.label,
     required this.icon,
+    required this.onChanged,
     this.obscure = false,
     this.isNumber = false,
+    this.enabled = true,
     this.focusNode,
     this.suffix,
-    required this.onChanged,
+    this.textInputAction,
+    this.onSubmitted,
   });
 
   @override
@@ -1375,21 +899,135 @@ class AppInput extends StatelessWidget {
     return TextField(
       controller: controller,
       focusNode: focusNode,
+      enabled: enabled,
       obscureText: obscure,
       keyboardType: isNumber ? TextInputType.number : TextInputType.text,
       inputFormatters: isNumber
-          ? [FilteringTextInputFormatter.digitsOnly]
+          ? <TextInputFormatter>[FilteringTextInputFormatter.digitsOnly]
           : null,
+      textInputAction: textInputAction,
+      autofillHints: isNumber
+          ? const <String>[AutofillHints.username]
+          : const <String>[AutofillHints.password],
+      enableSuggestions: !obscure,
+      autocorrect: !obscure,
       style: const TextStyle(color: Colors.white),
       decoration: AppStyles.input(label: label, icon: icon, suffix: suffix),
       onChanged: onChanged,
+      onSubmitted: onSubmitted,
     );
   }
 }
 
-////////////////////////////////////////////////////////////
-/// STYLE
-////////////////////////////////////////////////////////////
+class _StatusDialog extends StatelessWidget {
+  final IconData icon;
+  final Color iconColor;
+  final String title;
+  final String message;
+  final String secondaryText;
+  final String primaryText;
+  final IconData primaryIcon;
+  final VoidCallback onSecondary;
+  final VoidCallback onPrimary;
+
+  const _StatusDialog({
+    required this.icon,
+    required this.iconColor,
+    required this.title,
+    required this.message,
+    required this.secondaryText,
+    required this.primaryText,
+    required this.primaryIcon,
+    required this.onSecondary,
+    required this.onPrimary,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.all(20),
+      child: Container(
+        width: double.infinity,
+        constraints: const BoxConstraints(maxWidth: 440),
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: const Color(0xFF0F172A),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.white12),
+          boxShadow: const [
+            BoxShadow(
+              color: Colors.black54,
+              blurRadius: 20,
+              offset: Offset(0, 10),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                color: iconColor.withOpacity(.12),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: iconColor, size: 34),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+            const SizedBox(height: 16),
+            ErrorBox(message: message, isServerError: true, showContact: false),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: onSecondary,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.white70,
+                      side: const BorderSide(color: Colors.white24),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    child: Text(secondaryText),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: onPrimary,
+                    icon: Icon(primaryIcon),
+                    label: Text(primaryText),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF2563EB),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 class AppStyles {
   static const bg = BoxDecoration(
@@ -1416,6 +1054,22 @@ class AppStyles {
       suffixIcon: suffix,
       filled: true,
       fillColor: const Color(0xFF020617),
+      disabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide.none,
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide(color: Colors.white.withOpacity(.08)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: Color(0xFF38BDF8), width: 1.2),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: Colors.redAccent),
+      ),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
         borderSide: BorderSide.none,
@@ -1424,16 +1078,17 @@ class AppStyles {
   }
 }
 
-////////////////////////////////////////////////////////////
-/// SMALL WIDGETS
-////////////////////////////////////////////////////////////
-
 class _Logo extends StatelessWidget {
   const _Logo();
 
   @override
   Widget build(BuildContext context) {
-    return Image.asset('assets/flags/favicon.png', width: 100, height: 100);
+    return Image.asset(
+      'assets/flags/favicon.png',
+      width: 100,
+      height: 100,
+      filterQuality: FilterQuality.medium,
+    );
   }
 }
 
@@ -1445,7 +1100,7 @@ class _Title extends StatelessWidget {
     return const Column(
       children: [
         Text(
-          "Welcome Back",
+          'Welcome Back',
           style: TextStyle(
             color: Colors.white,
             fontSize: 20,
@@ -1453,7 +1108,7 @@ class _Title extends StatelessWidget {
           ),
         ),
         SizedBox(height: 4),
-        Text("Sign in to continue", style: TextStyle(color: Colors.white70)),
+        Text('Sign in to continue', style: TextStyle(color: Colors.white70)),
       ],
     );
   }

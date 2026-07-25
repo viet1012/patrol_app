@@ -27,6 +27,13 @@ import 'model/machine_model.dart';
 import 'model/reason_model.dart';
 import 'model/risk_score_calculator.dart';
 
+class _ReportServerMessage {
+  final String? code;
+  final String? message;
+
+  const _ReportServerMessage({this.code, this.message});
+}
+
 class HseMachineInfo {
   final String plant;
   final String fac;
@@ -46,6 +53,32 @@ class HseMachineInfo {
       fac: (json['fac'] ?? '').toString().trim(),
       area: (json['area'] ?? '').toString().trim(),
       macId: (json['macId'] ?? '').toString().trim(),
+    );
+  }
+}
+
+class QrCheckResult {
+  final String? qrKey;
+  final bool valid;
+  final bool available;
+  final bool duplicate;
+  final String message;
+
+  const QrCheckResult({
+    required this.qrKey,
+    required this.valid,
+    required this.available,
+    required this.duplicate,
+    required this.message,
+  });
+
+  factory QrCheckResult.fromJson(Map<String, dynamic> json) {
+    return QrCheckResult(
+      qrKey: json['qrKey']?.toString().trim(),
+      valid: json['valid'] == true,
+      available: json['available'] == true,
+      duplicate: json['duplicate'] == true,
+      message: json['message']?.toString().trim() ?? '',
     );
   }
 }
@@ -93,10 +126,10 @@ class _CameraScreenState extends State<CameraScreen> {
   String? _prob;
   String? _sev;
 
-  TextEditingController _commentController = TextEditingController();
+  final TextEditingController _commentController = TextEditingController();
   final FocusNode _commentFocusNode = FocusNode();
 
-  TextEditingController _counterController = TextEditingController();
+  final TextEditingController _counterController = TextEditingController();
   final FocusNode _counterFocusNode = FocusNode();
 
   Timer? _commentDebounce;
@@ -105,10 +138,10 @@ class _CameraScreenState extends State<CameraScreen> {
   String? _employeeName;
   bool _isLoadingName = false;
 
-  // ✅ QA states
+  // ? QA states
   String? _qaFreq; // dùng chung key frequency_often...
-  String? _qa5m; // 1 lựa chọn
-  String? _qaImpact; // 1 lựa chọn
+  String? _qa5m; // 1 l?a ch?n
+  String? _qaImpact; // 1 l?a ch?n
 
   bool _isLoadingMachineInfo = false;
   String? _loadingMacId;
@@ -123,26 +156,45 @@ class _CameraScreenState extends State<CameraScreen> {
   bool _isTranslatingAi = false;
   String? _summaryJp;
 
-  // @override
-  // void initState() {
-  //   // _selectedPlant = widget.selectedPlant;
-  //   super.initState();
-  //   final team = widget.autoTeam;
-  //
-  //   // auto select Plant - Fac - Group
-  //   if (team != null) {
-  //     _selectedPlant = team.plant;
-  //     _selectedFac = team.fac;
-  //     _selectedGroup = team.grp;
-  //   } else {
-  //     _selectedPlant = widget.selectedPlant;
-  //   }
-  //   fetchEmployeeName(
-  //     widget.accountCode,
-  //   ).then((name) => debugPrint('EMPLOYEE NAME = $name'));
-  //   _loadInitialDataComment();
-  //   _loadInitialDataCounter();
-  // }
+  String _qrKey = '';
+
+  bool _isCheckingQr = false;
+
+  /// QR dang du?c g?i API ki?m tra.
+  /// Dùng d? tránh scanner g?i cùng QR nhi?u l?n.
+  String? _checkingQrKey;
+
+  // CameraPreviewBoxState là nguồn trạng thái camera thật duy nhất.
+  // Hai biến dưới đây chỉ phục vụ render UI và khóa thao tác.
+  bool _cameraUiSleeping = false;
+  bool _cameraSwitching = false;
+  bool _isSubmitting = false;
+
+  // Chỉ phần AppBar ảnh/nút Send lắng nghe notifier này.
+  // Thay đổi ảnh không còn rebuild toàn bộ CameraScreen.
+  final ValueNotifier<List<Uint8List>> _imagesNotifier =
+      ValueNotifier<List<Uint8List>>(const <Uint8List>[]);
+
+  // Font size của hai ô text được cập nhật cục bộ.
+  final ValueNotifier<double> _commentFontSizeNotifier = ValueNotifier<double>(
+    14,
+  );
+  final ValueNotifier<double> _counterFontSizeNotifier = ValueNotifier<double>(
+    14,
+  );
+
+  // Cache master data để không quét widget.machines trong mỗi build().
+  final Map<String, List<String>> _facByPlantCache = <String, List<String>>{};
+  final Map<String, List<String>> _areaByPlantFacCache =
+      <String, List<String>>{};
+  final Map<String, List<String>> _machineByPlantFacAreaCache =
+      <String, List<String>>{};
+  final Map<String, List<String>> _groupsByPlantCache =
+      <String, List<String>>{};
+  final Set<String> _localMachineKeys = <String>{};
+
+  /// QR g?n nh?t dã ki?m tra thành công.
+  String? _lastValidQrKey;
 
   @override
   void initState() {
@@ -150,7 +202,7 @@ class _CameraScreenState extends State<CameraScreen> {
 
     final team = widget.autoTeam;
 
-    // ✅ Patrol Before ưu tiên nhận Plant / Fac / Group từ _loadTeams
+    // ? Patrol Before uu tiên nh?n Plant / Fac / Group t? _loadTeams
     if (team != null) {
       _selectedPlant = team.plant;
       _selectedFac = team.fac;
@@ -162,6 +214,8 @@ class _CameraScreenState extends State<CameraScreen> {
     debugPrint('Camera selectedPlant = $_selectedPlant');
     debugPrint('Camera selectedFac = $_selectedFac');
     debugPrint('Camera selectedGroup = $_selectedGroup');
+
+    _buildMasterIndexes();
 
     fetchEmployeeName(
       widget.accountCode,
@@ -175,8 +229,13 @@ class _CameraScreenState extends State<CameraScreen> {
   void dispose() {
     _commentDebounce?.cancel();
     _counterDebounce?.cancel();
+    _commentController.dispose();
+    _counterController.dispose();
     _commentFocusNode.dispose();
     _counterFocusNode.dispose();
+    _imagesNotifier.dispose();
+    _commentFontSizeNotifier.dispose();
+    _counterFontSizeNotifier.dispose();
     super.dispose();
   }
 
@@ -244,11 +303,7 @@ class _CameraScreenState extends State<CameraScreen> {
       if (!mounted) return;
 
       if (data is Map) {
-        // setState(() {
-        //   _machineAiSummary = MachineAiSummary.fromJson(
-        //     Map<String, dynamic>.from(data),
-        //   );
-        // });
+        ;
         final summary = MachineAiSummary.fromJson(
           Map<String, dynamic>.from(data),
         );
@@ -332,7 +387,7 @@ class _CameraScreenState extends State<CameraScreen> {
   }
 
   String getScoreSymbol() {
-    // Nếu chưa chọn đủ 3 thì trả về rỗng
+    // N?u chua ch?n d? 3 thì tr? v? r?ng
     if (_freq == null || _prob == null || _sev == null) {
       return "";
     }
@@ -351,57 +406,117 @@ class _CameraScreenState extends State<CameraScreen> {
       GlobalKey<CameraPreviewBoxState>();
 
   List<String> get groupList =>
-      List.generate(numbersGroup, (index) => 'Group ${index + 1}');
+      List<String>.generate(numbersGroup, (index) => 'Group ${index + 1}');
+
+  String _cacheKey2(String first, String second) {
+    return '${_norm(first)}|${_norm(second)}';
+  }
+
+  String _cacheKey3(String first, String second, String third) {
+    return '${_norm(first)}|${_norm(second)}|${_norm(third)}';
+  }
+
+  void _addUnique(Map<String, List<String>> target, String key, String value) {
+    final normalizedValue = value.trim();
+    if (normalizedValue.isEmpty) return;
+
+    final values = target.putIfAbsent(key, () => <String>[]);
+
+    final exists = values.any((item) => _norm(item) == _norm(normalizedValue));
+
+    if (!exists) {
+      values.add(normalizedValue);
+    }
+  }
+
+  void _buildMasterIndexes() {
+    _facByPlantCache.clear();
+    _areaByPlantFacCache.clear();
+    _machineByPlantFacAreaCache.clear();
+    _groupsByPlantCache.clear();
+    _localMachineKeys.clear();
+
+    for (final team in widget.patrolTeams) {
+      final plant = team.plant?.toString().trim() ?? '';
+      final group = team.grp?.toString().trim() ?? '';
+
+      if (plant.isEmpty || group.isEmpty) continue;
+
+      _addUnique(_groupsByPlantCache, _norm(plant), group);
+    }
+
+    for (final item in widget.machines) {
+      final plant = item.plant.toString().trim();
+      final fac = item.fac.toString().trim();
+      final area = item.area.toString().trim();
+      final machine = item.macId.toString().trim();
+
+      if (plant.isEmpty) continue;
+
+      if (fac.isNotEmpty) {
+        _addUnique(_facByPlantCache, _norm(plant), fac);
+      }
+
+      if (fac.isNotEmpty && area.isNotEmpty) {
+        _addUnique(_areaByPlantFacCache, _cacheKey2(plant, fac), area);
+      }
+
+      if (fac.isNotEmpty && area.isNotEmpty && machine.isNotEmpty) {
+        _addUnique(
+          _machineByPlantFacAreaCache,
+          _cacheKey3(plant, fac, area),
+          machine,
+        );
+
+        _localMachineKeys.add(
+          '${_cacheKey3(plant, fac, area)}|${_norm(machine)}',
+        );
+      }
+    }
+
+    for (final values in _facByPlantCache.values) {
+      values.sort();
+    }
+
+    for (final values in _areaByPlantFacCache.values) {
+      values.sort();
+    }
+
+    for (final values in _machineByPlantFacAreaCache.values) {
+      values.sort();
+    }
+
+    for (final values in _groupsByPlantCache.values) {
+      values.sort();
+    }
+  }
 
   List<String> getPlants() {
-    final Set<String> unique = {};
-    return widget.machines
-        .map((m) => m.plant.toString())
-        .where((p) => p.isNotEmpty)
-        .where((p) => unique.add(p))
-        .toList();
+    final plants = _facByPlantCache.keys.toList(growable: false);
+    plants.sort();
+    return plants;
   }
 
   List<String> getGroupsByPlant() {
-    return widget.patrolTeams
-        .where((e) => e.plant == _selectedPlant)
-        .map((e) => e.grp)
-        .whereType<String>()
-        .toSet() // tránh trùng
-        .toList();
+    final plant = _selectedPlant;
+    if (plant == null || plant.trim().isEmpty) {
+      return const <String>[];
+    }
+
+    return _groupsByPlantCache[_norm(plant)] ?? const <String>[];
   }
 
   List<String> getFacByPlant(String plant) {
-    final Set<String> unique = {};
-    return widget.machines
-        .where((m) => m.plant.toString() == plant)
-        .map((m) => m.fac.toString())
-        .where((f) => f.isNotEmpty)
-        .where((f) => unique.add(f))
-        .toList();
+    return _facByPlantCache[_norm(plant)] ?? const <String>[];
   }
 
   List<String> getAreaByFac(String plant, String fac) {
-    final Set<String> unique = {};
-    return widget.machines
-        .where((m) => m.plant.toString() == plant)
-        .where((m) => m.fac.toString() == fac)
-        .map((m) => m.area.toString())
-        .where((a) => a.isNotEmpty)
-        .where((a) => unique.add(a))
-        .toList();
+    return _areaByPlantFacCache[_cacheKey2(plant, fac)] ?? const <String>[];
   }
 
   List<String> getMachineByArea(String plant, String fac, String area) {
-    final Set<String> unique = {};
-    return widget.machines
-        .where((m) => m.plant.toString() == plant)
-        .where((m) => m.fac.toString() == fac)
-        .where((m) => m.area.toString() == area)
-        .map((m) => m.macId.toString())
-        .where((id) => id.isNotEmpty)
-        .where((id) => unique.add(id))
-        .toList();
+    return _machineByPlantFacAreaCache[_cacheKey3(plant, fac, area)] ??
+        const <String>[];
   }
 
   String normalizeGroup(String? group) {
@@ -488,35 +603,186 @@ class _CameraScreenState extends State<CameraScreen> {
   }
 
   bool _existsInLocalMaster(HseMachineInfo info) {
-    return widget.machines.any((m) {
-      return _norm(m.plant.toString()) == _norm(info.plant) &&
-          _norm(m.fac.toString()) == _norm(info.fac) &&
-          _norm(m.area.toString()) == _norm(info.area) &&
-          _norm(m.macId.toString()) == _norm(info.macId);
-    });
+    final key =
+        '${_cacheKey3(info.plant, info.fac, info.area)}|${_norm(info.macId)}';
+
+    return _localMachineKeys.contains(key);
   }
 
-  Future<void> _handleQrDetected(String qr) async {
-    if (_isLoadingMachineInfo) return;
+  Future<void> _handlePatrolQr(String rawQr) async {
+    final qr = rawQr.trim();
 
-    final rawQr = qr.trim();
-    final isQrNumber = RegExp(r'^\d+$').hasMatch(rawQr);
-    final macId = _extractMacIdFromQr(rawQr);
+    if (!RegExp(r'^\d{1,5}$').hasMatch(qr)) {
+      if (!mounted) return;
 
-    if (isQrNumber) {
-      setState(() {
-        _qrKey = rawQr;
-      });
+      CommonUI.showWarning(
+        context: context,
+        title: 'Invalid QR Code',
+        message:
+            'QR code must contain only numbers and have a maximum of 5 digits.',
+      );
+
+      return;
+    }
+
+    // Ðã check thành công QR này r?i thì không g?i API l?i.
+    if (_lastValidQrKey == qr && _qrKey == qr) {
+      return;
+    }
+
+    // Scanner dang gi? camera trên cùng QR.
+    // Không cho t?o thêm request trùng.
+    if (_isCheckingQr && _checkingQrKey == qr) {
+      return;
+    }
+
+    // Có request QR khác dang ch?y thì b? qua lu?t scan này.
+    if (_isCheckingQr) {
       return;
     }
 
     setState(() {
-      _isLoadingMachineInfo = true;
-      _loadingMacId = macId;
-      // _qrKey = rawQr;
+      _isCheckingQr = true;
+      _checkingQrKey = qr;
     });
 
-    print("_QR KEY AFTERR DETECTED  ${_qrKey} ");
+    try {
+      final result = await _checkQrDuplicate(qr);
+
+      if (!mounted) return;
+
+      if (!result.valid) {
+        /*
+       * Không gi? QR không h?p l? trên state cha.
+       * Reset ph?n hi?n th? QR trong CameraPreviewBox.
+       */
+        _cameraKey.currentState?.resetQr();
+
+        CommonUI.showWarning(
+          context: context,
+          title: 'Invalid QR Code',
+          message: result.message.isNotEmpty
+              ? result.message
+              : 'Invalid QR code.',
+        );
+
+        return;
+      }
+
+      if (result.duplicate || !result.available) {
+        /*
+       * QR b? trùng thì không gán vào _qrKey.
+       * UI camera cung xóa QR v?a quét d? ngu?i dùng quét mã khác.
+       */
+        _cameraKey.currentState?.resetQr();
+
+        CommonUI.showWarning(
+          context: context,
+          title: 'Duplicate QR Code',
+          message: result.message.isNotEmpty
+              ? result.message
+              : 'QR code $qr already exists and has not been closed.',
+        );
+
+        return;
+      }
+
+      final acceptedQr = result.qrKey == null || result.qrKey!.isEmpty
+          ? qr
+          : result.qrKey!;
+
+      setState(() {
+        _qrKey = acceptedQr;
+        _lastValidQrKey = acceptedQr;
+      });
+
+      CommonUI.showSnackBar(
+        context: context,
+        message: 'QR code $acceptedQr is available.',
+        color: Colors.green,
+      );
+    } on DioException catch (error) {
+      if (!mounted) return;
+
+      /*
+     * API check l?i thì không nên ch?p nh?n QR,
+     * vì chua xác d?nh du?c QR có trùng hay không.
+     */
+      _cameraKey.currentState?.resetQr();
+
+      CommonUI.showWarning(
+        context: context,
+        title: 'QR Check Failed',
+        message: error.type == DioExceptionType.connectionTimeout
+            ? 'Connection timeout while checking QR code.'
+            : error.type == DioExceptionType.receiveTimeout
+            ? 'The server took too long to check the QR code.'
+            : ApiErrorMessage.fromDio(error),
+      );
+    } catch (error) {
+      if (!mounted) return;
+
+      _cameraKey.currentState?.resetQr();
+
+      CommonUI.showWarning(
+        context: context,
+        title: 'QR Check Failed',
+        message: 'Unable to verify QR code. Please scan again.',
+      );
+    } finally {
+      if (!mounted) return;
+
+      setState(() {
+        _isCheckingQr = false;
+        _checkingQrKey = null;
+      });
+    }
+  }
+
+  Future<void> _handleQrDetected(String qr) async {
+    final rawQr = qr.trim();
+
+    if (rawQr.isEmpty) return;
+
+    final isQrNumber = RegExp(r'^\d+$').hasMatch(rawQr);
+
+    // ============================================================
+    // QR NUMBER
+    // ============================================================
+
+    if (isQrNumber) {
+      // Ch? Patrol m?i ki?m tra QR trùng.
+      if (widget.patrolGroup == PatrolGroup.Patrol) {
+        await _handlePatrolQr(rawQr);
+        return;
+      }
+
+      // Audit / Quality Patrol / Asset Update:
+      // ch? luu QR, không g?i API check trùng.
+      if (!mounted) return;
+
+      setState(() {
+        _qrKey = rawQr;
+      });
+
+      return;
+    }
+
+    // ============================================================
+    // QR MACHINE
+    // ============================================================
+
+    if (_isLoadingMachineInfo) return;
+
+    final macId = _extractMacIdFromQr(rawQr);
+
+    if (macId.trim().isEmpty) return;
+
+    setState(() {
+      _isLoadingMachineInfo = true;
+      _loadingMacId = macId;
+    });
+
     try {
       final apiInfo = await _fetchMachineInfoByMacId(macId);
 
@@ -530,6 +796,7 @@ class _CameraScreenState extends State<CameraScreen> {
       final info = apiInfo ?? fallbackInfo;
 
       final validInMaster = _existsInLocalMaster(info);
+
       final samePlant = _norm(info.plant) == _norm(widget.selectedPlant);
 
       final shouldUseFallback = apiInfo == null || !validInMaster || !samePlant;
@@ -537,66 +804,74 @@ class _CameraScreenState extends State<CameraScreen> {
       final selectedInfo = shouldUseFallback ? fallbackInfo : info;
 
       setState(() {
-        if (shouldUseFallback) {
-          _qrFallbackMachine = fallbackInfo;
-        } else {
-          _qrFallbackMachine = null;
-        }
+        _qrFallbackMachine = shouldUseFallback ? fallbackInfo : null;
 
         _selectedPlant = selectedInfo.plant;
         _selectedFac = selectedInfo.fac;
         _selectedArea = selectedInfo.area;
         _selectedMachine = selectedInfo.macId;
+
+        // Không thay d?i _qrKey.
+        // Quét QR máy không du?c làm m?t QR Patrol.
       });
 
       if (_aiEnabled) {
         _loadMachineAiSummary(selectedInfo.macId);
       }
-      // _loadMachineAiSummary(selectedInfo.macId);
 
-      // setState(() {
-      //   _selectedPlant = selectedInfo.plant;
-      //   _selectedFac = selectedInfo.fac;
-      //   _selectedArea = selectedInfo.area;
-      //   _selectedMachine = selectedInfo.macId;
-      // });
-
-      if (shouldUseFallback) {
-        CommonUI.showSnackBar(
-          context: context,
-          message: 'Machine added from QR: ${selectedInfo.macId}',
-          color: Colors.orange,
-        );
-      } else {
-        CommonUI.showSnackBar(
-          context: context,
-          message: 'Machine detected: ${selectedInfo.macId}',
-          color: Colors.green,
-        );
-      }
+      CommonUI.showSnackBar(
+        context: context,
+        message: shouldUseFallback
+            ? 'Machine added from QR: ${selectedInfo.macId}'
+            : 'Machine detected: ${selectedInfo.macId}',
+        color: shouldUseFallback ? Colors.orange : Colors.green,
+      );
     } finally {
-      if (mounted) {
-        setState(() {
-          _isLoadingMachineInfo = false;
-          _loadingMacId = null;
-        });
-      }
+      if (!mounted) return;
+
+      setState(() {
+        _isLoadingMachineInfo = false;
+        _loadingMacId = null;
+      });
     }
   }
 
+  Future<QrCheckResult> _checkQrDuplicate(String qrKey) async {
+    final normalizedQr = qrKey.trim();
+
+    final response = await DioClient.get(
+      '/api/report/check-qr',
+      queryParameters: {'qrKey': normalizedQr},
+    );
+
+    final data = response.data;
+
+    if (data is! Map) {
+      throw const FormatException('Invalid QR check response.');
+    }
+
+    return QrCheckResult.fromJson(Map<String, dynamic>.from(data));
+  }
+
   Future<void> _sendReport() async {
+    if (_isSubmitting) return;
+
     final isPatrol = widget.patrolGroup == PatrolGroup.Patrol;
-
     final isQA = widget.patrolGroup == PatrolGroup.QualityPatrol;
-
-    final images = _cameraKey.currentState?.images ?? const <Uint8List>[];
-
     final qrKey = _qrKey.trim();
-    final hasQr = qrKey.isNotEmpty;
 
-    // ============================================================
-    // VALIDATE QR
-    // ============================================================
+    final images = List<Uint8List>.from(
+      _cameraKey.currentState?.images ?? const <Uint8List>[],
+    );
+
+    if (images.isEmpty) {
+      CommonUI.showWarning(
+        context: context,
+        title: 'Image Required',
+        message: 'Please take at least one photo.',
+      );
+      return;
+    }
 
     if (isPatrol && !RegExp(r'^\d{1,5}$').hasMatch(qrKey)) {
       CommonUI.showWarning(
@@ -604,13 +879,8 @@ class _CameraScreenState extends State<CameraScreen> {
         title: 'QR Required',
         message: 'Please scan a valid Patrol QR containing 1 to 5 digits.',
       );
-
       return;
     }
-
-    // ============================================================
-    // VALIDATE MACHINE INFORMATION
-    // ============================================================
 
     if (isPatrol &&
         (_isBlank(_selectedPlant) ||
@@ -622,86 +892,94 @@ class _CameraScreenState extends State<CameraScreen> {
         title: 'Information Required',
         message: 'Please select Plant, Fac, Area and Machine.',
       );
-
       return;
     }
 
-    // ============================================================
-    // VALIDATE COMMENT
-    // ============================================================
+    final latestComment = _commentController.text.trim();
+    final latestCounterMeasure = _counterController.text.trim();
 
-    if (_comment.trim().isEmpty) {
+    if (latestComment.isEmpty) {
       CommonUI.showWarning(
         context: context,
         title: 'Comment Required',
         message: 'Please enter a comment.',
       );
-
       return;
     }
 
-    /*
-   * Không dùng dấu ! trực tiếp vì một số loại report
-   * có thể không yêu cầu đủ Plant/Fac/Area/Machine.
-   */
     final plant = _selectedPlant?.trim() ?? '';
     final division = _selectedFac?.trim() ?? '';
     final area = _selectedArea?.trim() ?? '';
     final machine = _selectedMachine?.trim() ?? '';
 
+    final cameraState = _cameraKey.currentState;
+    final cameraWasSleeping = cameraState?.isCameraSleeping ?? true;
+
+    final totalWatch = Stopwatch()..start();
     var loadingVisible = false;
 
     void hideLoading() {
-      if (!loadingVisible || !mounted) {
-        return;
-      }
-
+      if (!loadingVisible) return;
       loadingVisible = false;
-      LoadingDialog.hide(context);
+      LoadingDialog.hide();
     }
 
-    LoadingDialog.show(context);
+    FocusManager.instance.primaryFocus?.unfocus();
+
+    setState(() {
+      _isSubmitting = true;
+    });
+
+    await WidgetsBinding.instance.endOfFrame;
+
+    if (!mounted) return;
+
+    unawaited(LoadingDialog.show(context, message: 'Sending report...'));
     loadingVisible = true;
 
     try {
-      // ============================================================
-      // IMAGE FILES
-      // ============================================================
+      if (!cameraWasSleeping) {
+        final cameraSleepWatch = Stopwatch()..start();
+        await cameraState?.sleepCamera();
+        cameraSleepWatch.stop();
 
-      final imageFiles = <MultipartFile>[];
-
-      for (var index = 0; index < images.length; index++) {
-        imageFiles.add(
-          MultipartFile.fromBytes(
-            images[index],
-            filename: 'photo_${index + 1}.jpg',
-            contentType: http.MediaType('image', 'jpeg'),
-          ),
+        debugPrint(
+          'REPORT CAMERA SLEEP TIME: '
+          '${cameraSleepWatch.elapsedMilliseconds} ms',
         );
       }
 
-      // ============================================================
-      // REPORT BODY
-      // ============================================================
+      final prepareWatch = Stopwatch()..start();
+
+      final imageFiles = List<MultipartFile>.generate(
+        images.length,
+        (index) => MultipartFile.fromBytes(
+          images[index],
+          filename: 'photo_${index + 1}.jpg',
+          contentType: http.MediaType('image', 'jpeg'),
+        ),
+        growable: false,
+      );
 
       final employeeName = _employeeName?.trim() ?? '';
+      final accountCode = widget.accountCode.trim();
 
       final userCreate = employeeName.isEmpty
-          ? widget.accountCode.trim()
-          : '${widget.accountCode.trim()}_$employeeName';
+          ? accountCode
+          : '${accountCode}_$employeeName';
 
       final reportMap = <String, dynamic>{
         'userCreate': userCreate,
         'qr_key': qrKey,
-        'qr_scan_sts': hasQr ? 'SUCCESS_1st' : '',
+        'qr_scan_sts': qrKey.isNotEmpty ? 'SUCCESS_1st' : '',
         'type': widget.patrolGroup.name,
         'group': _selectedGroup?.trim() ?? '',
         'plant': plant,
         'division': division,
         'area': area,
         'machine': machine,
-        'comment': _comment.trim(),
-        'countermeasure': _counterMeasure.trim(),
+        'comment': latestComment,
+        'countermeasure': latestCounterMeasure,
         'check': _needRecheck
             ? (area.isNotEmpty
                   ? ''.combinedViJa(context, 'needRecheck')
@@ -709,80 +987,64 @@ class _CameraScreenState extends State<CameraScreen> {
             : '',
       };
 
-      // ============================================================
-      // RISK INFORMATION
-      // ============================================================
-
-      if (!isQA) {
-        reportMap.addAll({
-          'riskFreq': ''.combinedViJa(context, _freq ?? ''),
-          'riskProb': ''.combinedViJa(context, _prob ?? ''),
-          'riskSev': ''.combinedViJa(context, _sev ?? ''),
-          'riskTotal': getScoreSymbol(),
-        });
-      } else {
+      if (isQA) {
         reportMap.addAll({
           'riskFreq': ''.combinedViJa(context, _qaFreq ?? ''),
           'riskProb': ''.combinedViJa(context, _qa5m ?? ''),
           'riskSev': ''.combinedViJa(context, _qaImpact ?? ''),
           'riskTotal': '',
         });
+      } else {
+        reportMap.addAll({
+          'riskFreq': ''.combinedViJa(context, _freq ?? ''),
+          'riskProb': ''.combinedViJa(context, _prob ?? ''),
+          'riskSev': ''.combinedViJa(context, _sev ?? ''),
+          'riskTotal': getScoreSymbol(),
+        });
       }
-
-      // ============================================================
-      // MULTIPART DATA
-      // ============================================================
 
       final formData = FormData.fromMap({
         'report': jsonEncode(reportMap),
         'images': imageFiles,
       });
 
-      // ============================================================
-      // CALL API
-      // ============================================================
+      prepareWatch.stop();
+
+      final totalImageBytes = images.fold<int>(
+        0,
+        (sum, image) => sum + image.lengthInBytes,
+      );
+
+      debugPrint('REPORT PREPARE TIME: ${prepareWatch.elapsedMilliseconds} ms');
+      debugPrint('REPORT IMAGE COUNT: ${images.length}');
+      debugPrint('REPORT IMAGE BYTES: $totalImageBytes');
+      debugPrint(
+        'REPORT IMAGE SIZE MB: '
+        '${(totalImageBytes / 1024 / 1024).toStringAsFixed(2)} MB',
+      );
+
+      final uploadWatch = Stopwatch()..start();
 
       final response = await DioClient.postUpload(
         '/api/report',
         data: formData,
       );
 
+      uploadWatch.stop();
+
+      debugPrint('REPORT UPLOAD TIME: ${uploadWatch.elapsedMilliseconds} ms');
+
       hideLoading();
 
       if (!mounted) return;
 
       final statusCode = response.statusCode ?? 0;
-      final responseData = response.data;
-
-      String? serverCode;
-      String? serverMessage;
-
-      if (responseData is Map) {
-        serverCode = responseData['code']?.toString().trim();
-        serverMessage = responseData['message']?.toString().trim();
-      } else if (responseData is String && responseData.trim().isNotEmpty) {
-        try {
-          final decoded = jsonDecode(responseData);
-
-          if (decoded is Map) {
-            serverCode = decoded['code']?.toString().trim();
-            serverMessage = decoded['message']?.toString().trim();
-          } else {
-            serverMessage = responseData.trim();
-          }
-        } catch (_) {
-          serverMessage = responseData.trim();
-        }
-      }
+      final serverResult = _parseServerResponse(response.data);
 
       debugPrint('REPORT RESPONSE STATUS: $statusCode');
-      debugPrint('REPORT RESPONSE DATA: $responseData');
-      debugPrint('REPORT RESPONSE CODE: $serverCode');
-      debugPrint('REPORT RESPONSE MESSAGE: $serverMessage');
+      debugPrint('REPORT RESPONSE CODE: ${serverResult.code}');
+      debugPrint('REPORT RESPONSE MESSAGE: ${serverResult.message}');
 
-      if (!mounted) return;
-
-      // Thành công
       if (statusCode >= 200 && statusCode < 300) {
         CommonUI.showSnackBar(
           context: context,
@@ -794,45 +1056,13 @@ class _CameraScreenState extends State<CameraScreen> {
         return;
       }
 
-      // QR b? trùng
-      if (statusCode == 409 || serverCode == 'DUPLICATE_QR') {
-        CommonUI.showWarning(
-          context: context,
-          title: 'Duplicate QR Code',
-          message: serverMessage?.isNotEmpty == true
-              ? serverMessage!
-              : 'QR code $qrKey already exists and has not been closed.',
-        );
-
-        return;
-      }
-
-      // QR không h?p l?
-      if (statusCode == 400 && serverCode == 'INVALID_QR') {
-        CommonUI.showWarning(
-          context: context,
-          title: 'Invalid QR Code',
-          message: serverMessage?.isNotEmpty == true
-              ? serverMessage!
-              : 'QR code must contain only numbers and have a maximum of 5 digits.',
-        );
-
-        return;
-      }
-
-      // L?i khác
-      CommonUI.showSnackBar(
-        context: context,
-        message: serverMessage?.isNotEmpty == true
-            ? serverMessage!
-            : 'Unable to submit the report.',
-        color: Colors.red,
+      _showReportServerError(
+        statusCode: statusCode,
+        serverCode: serverResult.code,
+        serverMessage: serverResult.message,
+        qrKey: qrKey,
       );
-    }
-    // ============================================================
-    // DIO ERROR
-    // ============================================================
-    on DioException catch (error, stackTrace) {
+    } on DioException catch (error, stackTrace) {
       hideLoading();
 
       debugPrint('========== SEND REPORT DIO ERROR ==========');
@@ -844,95 +1074,8 @@ class _CameraScreenState extends State<CameraScreen> {
 
       if (!mounted) return;
 
-      final statusCode = error.response?.statusCode;
-
-      final responseData = error.response?.data;
-
-      String? serverCode;
-      String? serverMessage;
-
-      if (responseData is Map) {
-        serverCode = responseData['code']?.toString().trim();
-
-        serverMessage = responseData['message']?.toString().trim();
-      } else if (responseData is String && responseData.trim().isNotEmpty) {
-        /*
-       * Trường hợp backend trả JSON dưới dạng String.
-       */
-        try {
-          final decoded = jsonDecode(responseData);
-
-          if (decoded is Map) {
-            serverCode = decoded['code']?.toString().trim();
-
-            serverMessage = decoded['message']?.toString().trim();
-          }
-        } catch (_) {
-          serverMessage = responseData.trim();
-        }
-      }
-
-      final duplicateQr = statusCode == 409 || serverCode == 'DUPLICATE_QR';
-
-      if (duplicateQr) {
-        CommonUI.showWarning(
-          context: context,
-          title: 'Duplicate QR Code',
-          message: serverMessage?.isNotEmpty == true
-              ? serverMessage!
-              : 'QR code $qrKey already exists and has not been closed.',
-        );
-
-        return;
-      }
-
-      final invalidQr = statusCode == 400 && serverCode == 'INVALID_QR';
-
-      if (invalidQr) {
-        CommonUI.showWarning(
-          context: context,
-          title: 'Invalid QR Code',
-          message: serverMessage?.isNotEmpty == true
-              ? serverMessage!
-              : 'QR code must contain only numbers and have a maximum of 5 digits.',
-        );
-
-        return;
-      }
-
-      if (error.type == DioExceptionType.connectionTimeout) {
-        CommonUI.showWarning(
-          context: context,
-          title: 'Connection Timeout',
-          message: 'The server took too long to respond. Please try again.',
-        );
-
-        return;
-      }
-
-      if (error.type == DioExceptionType.receiveTimeout) {
-        CommonUI.showWarning(
-          context: context,
-          title: 'Server Timeout',
-          message:
-              'The server is still processing the report. Please try again later.',
-        );
-
-        return;
-      }
-
-      CommonUI.showSnackBar(
-        context: context,
-        message: serverMessage?.isNotEmpty == true
-            ? serverMessage!
-            : ApiErrorMessage.fromDio(error),
-        color: Colors.red,
-      );
-    }
-    // ============================================================
-    // UNKNOWN ERROR
-    // ============================================================
-    catch (error, stackTrace) {
+      _handleReportDioError(error: error, qrKey: qrKey);
+    } catch (error, stackTrace) {
       hideLoading();
 
       debugPrint('========== SEND REPORT FLUTTER ERROR ==========');
@@ -948,42 +1091,221 @@ class _CameraScreenState extends State<CameraScreen> {
       );
     } finally {
       hideLoading();
+
+      totalWatch.stop();
+      debugPrint('REPORT TOTAL TIME: ${totalWatch.elapsedMilliseconds} ms');
+
+      if (!cameraWasSleeping && mounted) {
+        final cameraWakeWatch = Stopwatch()..start();
+        final started = await cameraState?.wakeCamera();
+        cameraWakeWatch.stop();
+
+        debugPrint(
+          'REPORT CAMERA WAKE TIME: '
+          '${cameraWakeWatch.elapsedMilliseconds} ms',
+        );
+        debugPrint('REPORT CAMERA WAKE RESULT: $started');
+      }
+
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+      }
     }
   }
 
-  double _fontSize = 14;
+  _ReportServerMessage _parseServerResponse(dynamic responseData) {
+    if (responseData is Map) {
+      return _ReportServerMessage(
+        code: responseData['code']?.toString().trim(),
+        message: responseData['message']?.toString().trim(),
+      );
+    }
 
-  void _autoFont(String text) {
-    setState(() {
-      if (text.length > 120) {
-        _fontSize = 11;
-      } else if (text.length > 80)
-        _fontSize = 12;
-      else if (text.length > 40)
-        _fontSize = 13;
-      else
-        _fontSize = 14;
-    });
+    if (responseData is String && responseData.trim().isNotEmpty) {
+      final raw = responseData.trim();
+
+      try {
+        final decoded = jsonDecode(raw);
+
+        if (decoded is Map) {
+          return _ReportServerMessage(
+            code: decoded['code']?.toString().trim(),
+            message: decoded['message']?.toString().trim(),
+          );
+        }
+      } catch (_) {
+        return _ReportServerMessage(message: raw);
+      }
+
+      return _ReportServerMessage(message: raw);
+    }
+
+    return const _ReportServerMessage();
+  }
+
+  void _showReportServerError({
+    required int statusCode,
+    required String? serverCode,
+    required String? serverMessage,
+    required String qrKey,
+  }) {
+    if (!mounted) return;
+
+    final message = serverMessage?.trim() ?? '';
+
+    if (statusCode == 409 || serverCode == 'DUPLICATE_QR') {
+      CommonUI.showWarning(
+        context: context,
+        title: 'Duplicate QR Code',
+        message: message.isNotEmpty
+            ? message
+            : 'QR code $qrKey already exists and has not been closed.',
+      );
+      return;
+    }
+
+    if (statusCode == 400 && serverCode == 'INVALID_QR') {
+      CommonUI.showWarning(
+        context: context,
+        title: 'Invalid QR Code',
+        message: message.isNotEmpty
+            ? message
+            : 'QR code must contain only numbers and have a maximum of 5 digits.',
+      );
+      return;
+    }
+
+    CommonUI.showSnackBar(
+      context: context,
+      message: message.isNotEmpty ? message : 'Unable to submit the report.',
+      color: Colors.red,
+    );
+  }
+
+  void _handleReportDioError({
+    required DioException error,
+    required String qrKey,
+  }) {
+    if (!mounted) return;
+
+    final statusCode = error.response?.statusCode ?? 0;
+    final serverResult = _parseServerResponse(error.response?.data);
+    final serverCode = serverResult.code;
+    final serverMessage = serverResult.message?.trim() ?? '';
+
+    if (statusCode == 409 || serverCode == 'DUPLICATE_QR') {
+      CommonUI.showWarning(
+        context: context,
+        title: 'Duplicate QR Code',
+        message: serverMessage.isNotEmpty
+            ? serverMessage
+            : 'QR code $qrKey already exists and has not been closed.',
+      );
+      return;
+    }
+
+    if (statusCode == 400 && serverCode == 'INVALID_QR') {
+      CommonUI.showWarning(
+        context: context,
+        title: 'Invalid QR Code',
+        message: serverMessage.isNotEmpty
+            ? serverMessage
+            : 'QR code must contain only numbers and have a maximum of 5 digits.',
+      );
+      return;
+    }
+
+    switch (error.type) {
+      case DioExceptionType.connectionTimeout:
+        CommonUI.showWarning(
+          context: context,
+          title: 'Connection Timeout',
+          message: 'The server took too long to connect. Please try again.',
+        );
+        return;
+
+      case DioExceptionType.sendTimeout:
+        CommonUI.showWarning(
+          context: context,
+          title: 'Upload Timeout',
+          message:
+              'The images took too long to upload. Please check the network and try again.',
+        );
+        return;
+
+      case DioExceptionType.receiveTimeout:
+        CommonUI.showWarning(
+          context: context,
+          title: 'Server Timeout',
+          message:
+              'The server is still processing the report. Please check the report before sending again.',
+        );
+        return;
+
+      case DioExceptionType.connectionError:
+        CommonUI.showWarning(
+          context: context,
+          title: 'Connection Error',
+          message:
+              'Unable to connect to the server. Please check the network connection.',
+        );
+        return;
+
+      default:
+        CommonUI.showSnackBar(
+          context: context,
+          message: serverMessage.isNotEmpty
+              ? serverMessage
+              : ApiErrorMessage.fromDio(error),
+          color: Colors.red,
+        );
+    }
+  }
+
+  double _resolveFontSize(String text) {
+    final length = text.length;
+
+    if (length > 120) return 11;
+    if (length > 80) return 12;
+    if (length > 40) return 13;
+
+    return 14;
   }
 
   void _resetForm() {
     setState(() {
       _selectedMachine = null;
+
       _comment = '';
       _counterMeasure = '';
+
       _commentController.clear();
       _counterController.clear();
+      _commentFontSizeNotifier.value = 14;
+      _counterFontSizeNotifier.value = 14;
+
       _freq = null;
       _prob = null;
       _sev = null;
-      _needRecheck = false;
-      _qrKey = '';
-    });
-    _cameraKey.currentState?.clearAll(); // xóa hết ảnh
-    _cameraKey.currentState?.resetQr(); // xóa hết ảnh
-  }
 
-  String _qrKey = '';
+      _qaFreq = null;
+      _qa5m = null;
+      _qaImpact = null;
+
+      _needRecheck = false;
+
+      _qrKey = '';
+      _lastValidQrKey = null;
+      _checkingQrKey = null;
+      _isCheckingQr = false;
+    });
+
+    _cameraKey.currentState?.clearAll();
+    _cameraKey.currentState?.resetQr();
+    _imagesNotifier.value = const <Uint8List>[];
+  }
 
   bool _aiEnabled = false;
 
@@ -1002,93 +1324,70 @@ class _CameraScreenState extends State<CameraScreen> {
     }
   }
 
-  Widget _buildMachineInfoLoadingCard() {
-    return Center(
-      child: TweenAnimationBuilder<double>(
-        tween: Tween(begin: .94, end: 1),
-        duration: const Duration(milliseconds: 450),
-        curve: Curves.easeOutCubic,
-        builder: (context, scale, child) {
-          return Transform.scale(scale: scale, child: child);
-        },
+  Future<void> _toggleCameraPower() async {
+    if (_cameraSwitching) return;
 
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+    final camera = _cameraKey.currentState;
+    if (camera == null) {
+      if (!mounted) return;
+      CommonUI.showWarning(
+        context: context,
+        title: 'Camera Error',
+        message: 'Camera is not ready.',
+      );
+      return;
+    }
 
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(22),
-            color: Colors.black.withOpacity(.58),
+    setState(() => _cameraSwitching = true);
 
-            border: Border.all(color: Colors.white.withOpacity(.08)),
+    try {
+      final success = camera.isCameraSleeping
+          ? await camera.wakeCamera()
+          : await _sleepCamera(camera);
 
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(.28),
-                blurRadius: 24,
-                offset: const Offset(0, 10),
-              ),
-            ],
-          ),
+      if (!mounted) return;
 
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ////////////////////////////////////////////////////////////
-              /// LOADING DOT
-              ////////////////////////////////////////////////////////////
-              SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: Colors.cyanAccent.withOpacity(.9),
-                ),
-              ),
+      _cameraUiSleeping = camera.isCameraSleeping;
 
-              const SizedBox(width: 12),
+      if (!success && !camera.isCameraSleeping) {
+        CommonUI.showWarning(
+          context: context,
+          title: 'Camera Error',
+          message: 'Unable to start camera. Please check camera permission.',
+        );
+      }
+    } catch (error, stackTrace) {
+      debugPrint('Toggle camera error: $error');
+      debugPrintStack(stackTrace: stackTrace);
 
-              ////////////////////////////////////////////////////////////
-              /// TEXT
-              ////////////////////////////////////////////////////////////
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text(
-                    'Scanning QR Machine',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: .2,
-                    ),
-                  ),
-
-                  if ((_loadingMacId ?? '').isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 2),
-                      child: Text(
-                        _loadingMacId!,
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(.6),
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+      if (!mounted) return;
+      CommonUI.showWarning(
+        context: context,
+        title: 'Camera Error',
+        message: 'Unable to change camera state.',
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _cameraSwitching = false;
+          _cameraUiSleeping = _cameraKey.currentState?.isCameraSleeping ?? true;
+        });
+      }
+    }
   }
 
-  bool _cameraSleeping = false;
+  Future<bool> _sleepCamera(CameraPreviewBoxState camera) async {
+    await camera.sleepCamera();
+    return camera.isCameraSleeping;
+  }
+
+  void _onCameraSleepingChanged(bool sleeping) {
+    if (!mounted || _cameraUiSleeping == sleeping) return;
+    setState(() => _cameraUiSleeping = sleeping);
+  }
 
   Widget _buildBatterySavingTip() {
-    final sleeping = _cameraSleeping;
+    final sleeping = _cameraUiSleeping;
     final color = sleeping ? const Color(0xFF22C55E) : Colors.amber;
 
     return Container(
@@ -1114,7 +1413,7 @@ class _CameraScreenState extends State<CameraScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  "Battery Saving",
+                  'Battery Saving',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 13.5,
@@ -1124,8 +1423,8 @@ class _CameraScreenState extends State<CameraScreen> {
                 const SizedBox(height: 2),
                 Text(
                   sleeping
-                      ? "Camera paused. Turn it on to scan QR or take photos."
-                      : "Turn off camera preview or lock screen while walking.",
+                      ? 'Camera and QR scanner are off.'
+                      : 'Turn off camera while walking to save battery.',
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
@@ -1139,9 +1438,11 @@ class _CameraScreenState extends State<CameraScreen> {
           const SizedBox(width: 8),
           InkWell(
             borderRadius: BorderRadius.circular(999),
-            onTap: () => setState(() => _cameraSleeping = !sleeping),
+            onTap: _cameraSwitching ? null : _toggleCameraPower,
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 200),
+              constraints: const BoxConstraints(minWidth: 58, minHeight: 30),
+              alignment: Alignment.center,
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
                 color: color,
@@ -1154,14 +1455,23 @@ class _CameraScreenState extends State<CameraScreen> {
                   ),
                 ],
               ),
-              child: Text(
-                sleeping ? "OFF" : "ON",
-                style: TextStyle(
-                  color: sleeping ? Colors.white : Colors.black,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
+              child: _cameraSwitching
+                  ? const SizedBox(
+                      width: 15,
+                      height: 15,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : Text(
+                      sleeping ? 'WAKE' : 'OFF',
+                      style: TextStyle(
+                        color: sleeping ? Colors.white : Colors.black,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
             ),
           ),
         ],
@@ -1169,70 +1479,91 @@ class _CameraScreenState extends State<CameraScreen> {
     );
   }
 
-  Widget _buildCameraSleepOverlay() {
-    return Container(
+  Widget _buildCameraSection() {
+    return SizedBox(
       width: 340,
       height: 340,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: Colors.black.withOpacity(.72),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.white.withOpacity(.12)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
+      child: Stack(
+        fit: StackFit.expand,
         children: [
-          const Icon(Icons.nightlight_round, color: Colors.amber, size: 38),
-          const SizedBox(height: 10),
-          const Text(
-            "Camera Preview Sleeping",
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 15,
-              fontWeight: FontWeight.w800,
+          RepaintBoundary(
+            child: CameraPreviewBox(
+              key: _cameraKey,
+              size: 340,
+              plant: _selectedPlant,
+              type: widget.patrolGroup.name,
+              group: _selectedGroup,
+              patrolGroup: widget.patrolGroup,
+              onImagesChanged: (images) {
+                _imagesNotifier.value = List<Uint8List>.unmodifiable(images);
+              },
+              onQrDetected: _handleQrDetected,
+              onCameraSleepingChanged: _onCameraSleepingChanged,
             ),
           ),
-          const SizedBox(height: 6),
-          Text(
-            "Tap wake camera when you need to take more photos.",
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Colors.white.withOpacity(.65),
-              fontSize: 12,
-            ),
-          ),
-          const SizedBox(height: 14),
-          ElevatedButton.icon(
-            onPressed: () {
-              setState(() {
-                _cameraSleeping = false;
-              });
-            },
-            icon: const Icon(Icons.videocam_rounded),
-            label: const Text("Wake Camera"),
-          ),
+          if (_isCheckingQr && !_cameraUiSleeping)
+            Positioned.fill(child: _buildCheckingQrOverlay()),
         ],
+      ),
+    );
+  }
+
+  Widget _buildCheckingQrOverlay() {
+    return Container(
+      alignment: Alignment.center,
+      color: Colors.black.withOpacity(.20),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+        decoration: BoxDecoration(
+          color: Colors.black.withOpacity(.72),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: const Color(0xFF22C55E).withOpacity(.45)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: Color(0xFF22C55E),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Checking QR Code',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                if ((_checkingQrKey ?? '').isNotEmpty)
+                  Text(
+                    _checkingQrKey!,
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(.65),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final plantList = getPlants();
     final groupList = getGroupsByPlant();
 
-    // final facList = _selectedPlant == null
-    //     ? []
-    //     : getFacByPlant(_selectedPlant!);
-
-    // final areaList = _selectedPlant == null || _selectedFac == null
-    //     ? []
-    //     : getAreaByFac(_selectedPlant!, _selectedFac!);
-
-    // final machineList =
-    //     _selectedPlant == null || _selectedFac == null || _selectedArea == null
-    //     ? []
-    //     : getMachineByArea(_selectedPlant!, _selectedFac!, _selectedArea!);
     final facList = <String>[
       if (_selectedPlant != null) ...getFacByPlant(_selectedPlant!),
 
@@ -1267,15 +1598,10 @@ class _CameraScreenState extends State<CameraScreen> {
         _qrFallbackMachine!.macId,
     ].toSet().toList();
 
-    final imageCount = _cameraKey.currentState?.images.length ?? 0;
-    final hasImages = imageCount > 0;
-    final images = _cameraKey.currentState?.images ?? [];
-
-    final symbol = getScoreSymbol();
     final minLength = (widget.lang == 'JP') ? 1 : 2;
 
     return Scaffold(
-      // ✅ QUAN TRỌNG: Giúp giao diện tự co lên khi bàn phím hiện
+      // ? QUAN TR?NG: Giúp giao di?n t? co lên khi bàn phím hi?n
       resizeToAvoidBottomInset: true,
       appBar: AppBar(
         backgroundColor: Color(0xFF121826),
@@ -1316,59 +1642,85 @@ class _CameraScreenState extends State<CameraScreen> {
           ),
         ),
         actions: [
-          // HIỂN THỊ ẢNH THUMBNAIL TRÊN APPBAR
-          if (images.isNotEmpty)
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: images.asMap().entries.map((entry) {
-                  int idx = entry.key;
-                  Uint8List img = entry.value;
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 4),
-                    child: Stack(
-                      children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: Image.memory(
-                            img,
-                            width: 50,
-                            height: 50,
-                            fit: BoxFit.cover,
-                          ),
-                        ),
-                        Positioned(
-                          top: -4,
-                          right: -4,
-                          child: GestureDetector(
-                            onTap: () =>
-                                _cameraKey.currentState?.removeImage(idx),
-                            child: Container(
-                              padding: const EdgeInsets.all(2),
-                              decoration: const BoxDecoration(
-                                color: Colors.red,
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(
-                                Icons.close,
-                                size: 14,
-                                color: Colors.white,
-                              ),
+          ValueListenableBuilder<List<Uint8List>>(
+            valueListenable: _imagesNotifier,
+            builder: (context, images, _) {
+              final hasImages = images.isNotEmpty;
+              final canSubmit = hasImages && !_isSubmitting;
+
+              return Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (hasImages)
+                    SizedBox(
+                      width: 168,
+                      height: 52,
+                      child: ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: images.length,
+                        itemBuilder: (context, index) {
+                          final image = images[index];
+
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 4),
+                            child: Stack(
+                              clipBehavior: Clip.none,
+                              children: [
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Image.memory(
+                                    image,
+                                    width: 50,
+                                    height: 50,
+                                    cacheWidth: 100,
+                                    cacheHeight: 100,
+                                    fit: BoxFit.cover,
+                                    gaplessPlayback: true,
+                                    filterQuality: FilterQuality.low,
+                                  ),
+                                ),
+                                Positioned(
+                                  top: -2,
+                                  right: -2,
+                                  child: GestureDetector(
+                                    onTap: _isSubmitting
+                                        ? null
+                                        : () {
+                                            _cameraKey.currentState
+                                                ?.removeImage(index);
+                                          },
+                                    child: Container(
+                                      padding: const EdgeInsets.all(2),
+                                      decoration: const BoxDecoration(
+                                        color: Colors.red,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(
+                                        Icons.close,
+                                        size: 14,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
-                          ),
-                        ),
-                      ],
+                          );
+                        },
+                      ),
                     ),
-                  );
-                }).toList(),
-              ),
-            ),
-          GlassActionButton(
-            icon: Icons.send_rounded,
-            enabled: hasImages,
-            onTap: hasImages ? _sendReport : null,
-            backgroundColor: hasImages ? const Color(0xFF22C55E) : null,
-            iconColor: hasImages ? Colors.black : Colors.white,
+                  GlassActionButton(
+                    icon: _isSubmitting
+                        ? Icons.hourglass_top_rounded
+                        : Icons.send_rounded,
+                    enabled: canSubmit,
+                    onTap: canSubmit ? _sendReport : null,
+                    backgroundColor: canSubmit ? const Color(0xFF22C55E) : null,
+                    iconColor: canSubmit ? Colors.black : Colors.white54,
+                  ),
+                ],
+              );
+            },
           ),
         ],
       ),
@@ -1390,35 +1742,8 @@ class _CameraScreenState extends State<CameraScreen> {
           padding: const EdgeInsets.all(8),
           child: Column(
             children: [
-              // CAMERA + GRID ẢNH
-              Stack(
-                children: [
-                  if (!_cameraSleeping)
-                    CameraPreviewBox(
-                      key: _cameraKey,
-                      size: 340,
-                      plant: _selectedPlant,
-                      type: widget.patrolGroup.name,
-                      group: _selectedGroup,
-                      onImagesChanged: (_) => setState(() {}),
-                      patrolGroup: widget.patrolGroup,
-                      onQrDetected: (qr) async {
-                        await _handleQrDetected(qr);
-                      },
-                    )
-                  else
-                    _buildCameraSleepOverlay(),
-
-                  if (_isLoadingMachineInfo && !_cameraSleeping)
-                    Positioned.fill(
-                      child: Container(
-                        alignment: Alignment.center,
-                        color: Colors.black.withOpacity(.18),
-                        child: _buildMachineInfoLoadingCard(),
-                      ),
-                    ),
-                ],
-              ),
+              // CAMERA + QR CHECK OVERLAY
+              _buildCameraSection(),
               const SizedBox(height: 8),
 
               _buildBatterySavingTip(),
@@ -1661,7 +1986,7 @@ class _CameraScreenState extends State<CameraScreen> {
               const SizedBox(height: 8),
 
               // ---------------------------------------------------------
-              // PHẦN AUTO COMPLETE ĐÃ TỐI ƯU CHO MOBILE
+              // PH?N AUTO COMPLETE ÐÃ T?I UU CHO MOBILE
               // ---------------------------------------------------------
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1671,49 +1996,60 @@ class _CameraScreenState extends State<CameraScreen> {
                   Expanded(
                     child: LayoutBuilder(
                       builder: (context, constraints) {
-                        return Autocomplete<AutoCmp>(
+                        return RawAutocomplete<AutoCmp>(
+                          textEditingController: _commentController,
+                          focusNode: _commentFocusNode,
                           optionsViewOpenDirection: OptionsViewOpenDirection.up,
+                          displayStringForOption: (option) => option.inputText,
+
                           optionsBuilder: (TextEditingValue value) {
-                            if (value.text.length < minLength || isLoading) {
+                            final keyword = value.text.trim().toLowerCase();
+
+                            if (keyword.length < minLength || isLoading) {
                               return const Iterable<AutoCmp>.empty();
                             }
 
-                            // FILTER TRỰC TIẾP TẠI ĐÂY
                             return allOptionsComment
-                                .where((AutoCmp option) {
-                                  return option.inputText
+                                .where(
+                                  (option) => option.inputText
                                       .toLowerCase()
-                                      .contains(
-                                        value.text.toLowerCase(),
-                                      ); // Tìm kiếm không phân biệt hoa thường
-                                })
-                                .take(
-                                  5,
-                                ); // Chỉ lấy 5 kết quả đầu tiên giống như logic cũ của BE
+                                      .contains(keyword),
+                                )
+                                .take(5);
                           },
-                          displayStringForOption: (option) => option.inputText,
+
                           onSelected: (AutoCmp selection) {
-                            // Khi CHỌN gợi ý → điền vào comment
+                            final comment = selection.inputText.trim();
 
-                            _commentController.text = selection.inputText;
-                            _commentController
-                                .selection = TextSelection.fromPosition(
-                              TextPosition(offset: selection.inputText.length),
-                            ); // Đưa con trỏ ra cuối
-                            _comment = selection.inputText;
-                            _autoFont(_comment);
+                            _commentController.value = TextEditingValue(
+                              text: comment,
+                              selection: TextSelection.collapsed(
+                                offset: comment.length,
+                              ),
+                            );
 
-                            // === TỰ ĐỘNG ĐIỀN COUNTERMEASURE NẾU CÓ ===
-                            if (selection.countermeasure.isNotEmpty) {
-                              _counterController.text =
-                                  selection.countermeasure;
-                              _counterMeasure = selection.countermeasure;
-                            } else {
-                              // Nếu không có countermeasure → để trống (tùy yêu cầu)
-                              _counterController.clear();
-                              _counterMeasure = '';
-                            }
+                            final countermeasure = selection.countermeasure
+                                .trim();
+
+                            _counterController.value = TextEditingValue(
+                              text: countermeasure,
+                              selection: TextSelection.collapsed(
+                                offset: countermeasure.length,
+                              ),
+                            );
+
+                            setState(() {
+                              _comment = comment;
+                              _counterMeasure = countermeasure;
+                              _commentFontSizeNotifier.value = _resolveFontSize(
+                                comment,
+                              );
+                              _counterFontSizeNotifier.value = _resolveFontSize(
+                                countermeasure,
+                              );
+                            });
                           },
+
                           fieldViewBuilder:
                               (
                                 context,
@@ -1721,89 +2057,113 @@ class _CameraScreenState extends State<CameraScreen> {
                                 focusNode,
                                 onFieldSubmitted,
                               ) {
-                                _commentController = controller;
-                                return TextField(
-                                  controller: controller,
-                                  focusNode: focusNode,
-                                  maxLines: 3,
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: _fontSize,
-                                  ),
-
-                                  decoration: InputDecoration(
-                                    // hintText: '${"commentHint".tr(context)}*',
-                                    filled: true,
-                                    hint: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Text(
-                                          "commentHint".tr(context),
-                                          style: TextStyle(
-                                            color: Colors.red.withOpacity(.6),
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.bold,
+                                // Không gán lại _commentController = controller.
+                                // RawAutocomplete đang dùng chính _commentController.
+                                return ValueListenableBuilder<double>(
+                                  valueListenable: _commentFontSizeNotifier,
+                                  builder: (context, fontSize, _) {
+                                    return TextField(
+                                      controller: controller,
+                                      focusNode: focusNode,
+                                      enabled: !_isSubmitting,
+                                      maxLines: 3,
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: fontSize,
+                                      ),
+                                      decoration: InputDecoration(
+                                        filled: true,
+                                        hint: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Text(
+                                              'commentHint'.tr(context),
+                                              style: TextStyle(
+                                                color: Colors.red.withOpacity(
+                                                  .6,
+                                                ),
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 4),
+                                            Icon(
+                                              Icons.star_rounded,
+                                              size: 14,
+                                              color: Colors.red.withOpacity(.6),
+                                            ),
+                                          ],
+                                        ),
+                                        fillColor: Colors.green.withOpacity(
+                                          .08,
+                                        ),
+                                        border: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            14,
+                                          ),
+                                          borderSide: BorderSide(
+                                            color: Colors.white.withOpacity(
+                                              .35,
+                                            ),
                                           ),
                                         ),
-                                        const SizedBox(width: 4),
-                                        Icon(
-                                          Icons.star_rounded,
-                                          size: 14,
-                                          color: Colors.red.withOpacity(.6),
+                                        enabledBorder: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            14,
+                                          ),
+                                          borderSide: BorderSide(
+                                            color: const Color(
+                                              0xFF90E14D,
+                                            ).withOpacity(.25),
+                                          ),
                                         ),
-                                      ],
-                                    ),
-                                    fillColor: Colors.green.withOpacity(0.08),
-
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(14),
-                                      borderSide: BorderSide(
-                                        color: Colors.white.withOpacity(0.35),
+                                        focusedBorder: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            14,
+                                          ),
+                                          borderSide: BorderSide(
+                                            color: const Color(
+                                              0xFF90E14D,
+                                            ).withOpacity(.45),
+                                          ),
+                                        ),
+                                        contentPadding: const EdgeInsets.all(
+                                          12,
+                                        ),
                                       ),
-                                    ),
-                                    enabledBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(14),
-                                      borderSide: BorderSide(
-                                        color: Color(
-                                          0xFF90E14D,
-                                        ).withOpacity(0.25),
-                                      ),
-                                    ),
-                                    focusedBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(14),
-                                      borderSide: BorderSide(
-                                        color: Color(
-                                          0xFF90E14D,
-                                        ).withOpacity(.45), // cyan
-                                      ),
-                                    ),
-                                    contentPadding: const EdgeInsets.all(12),
-                                  ),
+                                      onChanged: (value) {
+                                        _commentFontSizeNotifier.value =
+                                            _resolveFontSize(value);
 
-                                  onChanged: (v) {
-                                    _comment = v;
-                                    _autoFont(v);
+                                        if (value.trim().isEmpty) {
+                                          _counterController.clear();
+                                          _counterFontSizeNotifier.value = 14;
+                                        }
 
-                                    // Debounce search
-                                    if (_commentDebounce?.isActive ?? false) {
-                                      _commentDebounce!.cancel();
-                                    }
+                                        _commentDebounce?.cancel();
+                                        _commentDebounce = Timer(
+                                          const Duration(milliseconds: 250),
+                                          () {
+                                            _comment = value;
 
-                                    // === KHI XÓA HẾT COMMENT → XÓA LUÔN COUNTERMEASURE ===
-                                    if (v.trim().isEmpty) {
-                                      _counterController.clear();
-                                      _counterMeasure = '';
-                                    }
+                                            if (value.trim().isEmpty) {
+                                              _counterMeasure = '';
+                                            }
+                                          },
+                                        );
+                                      },
+                                    );
                                   },
                                 );
                               },
+
                           optionsViewBuilder: (context, onSelected, options) {
+                            final optionList = options.toList(growable: false);
+
                             return Align(
                               alignment: Alignment.topLeft,
                               child: Transform.translate(
-                                offset: const Offset(0, 8), // Sát ô, đẹp đều
+                                offset: const Offset(0, 8),
                                 child: Material(
                                   elevation: 8,
                                   borderRadius: BorderRadius.circular(12),
@@ -1816,14 +2176,15 @@ class _CameraScreenState extends State<CameraScreen> {
                                     child: ListView.separated(
                                       padding: EdgeInsets.zero,
                                       shrinkWrap: true,
-                                      itemCount: options.length,
+                                      itemCount: optionList.length,
                                       separatorBuilder: (_, __) =>
                                           const Divider(
                                             height: 1,
-                                            thickness: 0.5,
+                                            thickness: .5,
                                           ),
                                       itemBuilder: (context, index) {
-                                        final option = options.elementAt(index);
+                                        final option = optionList[index];
+
                                         return InkWell(
                                           onTap: () => onSelected(option),
                                           child: Padding(
@@ -1833,13 +2194,13 @@ class _CameraScreenState extends State<CameraScreen> {
                                             ),
                                             child: Text(
                                               option.inputText,
-                                              style: const TextStyle(
-                                                fontSize: 14,
-                                                fontWeight: FontWeight.w600,
-                                                color: Colors.white,
-                                              ),
                                               maxLines: 3,
                                               overflow: TextOverflow.ellipsis,
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w600,
+                                              ),
                                             ),
                                           ),
                                         );
@@ -1857,44 +2218,51 @@ class _CameraScreenState extends State<CameraScreen> {
 
                   if (widget.patrolGroup != PatrolGroup.AssetUpdate) ...[
                     const SizedBox(width: 8),
-                    // Ô 2: COUNTERMEASURE (giữ nguyên, không cần linking ngược)
+                    // Ô 2: COUNTERMEASURE (gi? nguyên, không c?n linking ngu?c)
                     Expanded(
                       child: LayoutBuilder(
                         builder: (context, constraints) {
-                          return Autocomplete<AutoCmp>(
+                          return RawAutocomplete<AutoCmp>(
+                            textEditingController: _counterController,
+                            focusNode: _counterFocusNode,
                             optionsViewOpenDirection:
                                 OptionsViewOpenDirection.up,
+                            displayStringForOption: (option) =>
+                                option.inputText,
+
                             optionsBuilder: (TextEditingValue value) {
-                              if (value.text.length < minLength || isLoading) {
+                              final keyword = value.text.trim().toLowerCase();
+
+                              if (keyword.length < minLength || isLoading) {
                                 return const Iterable<AutoCmp>.empty();
                               }
 
                               return allOptionsCounter
-                                  .where((AutoCmp option) {
-                                    return option.inputText
+                                  .where(
+                                    (option) => option.inputText
                                         .toLowerCase()
-                                        .contains(
-                                          value.text.toLowerCase(),
-                                        ); // Tìm kiếm không phân biệt hoa thường
-                                  })
-                                  .take(
-                                    5,
-                                  ); // Chỉ lấy 5 kết quả đầu tiên giống như logic cũ của BE
+                                        .contains(keyword),
+                                  )
+                                  .take(5);
                             },
-                            displayStringForOption: (option) =>
-                                option.inputText,
-                            onSelected: (AutoCmp selection) {
-                              _counterController.text = selection.inputText;
 
-                              _counterController.selection =
-                                  TextSelection.fromPosition(
-                                    TextPosition(
-                                      offset: selection.inputText.length,
-                                    ),
-                                  );
-                              _counterMeasure = selection.inputText;
-                              _autoFont(_counterMeasure);
+                            onSelected: (AutoCmp selection) {
+                              final countermeasure = selection.inputText.trim();
+
+                              _counterController.value = TextEditingValue(
+                                text: countermeasure,
+                                selection: TextSelection.collapsed(
+                                  offset: countermeasure.length,
+                                ),
+                              );
+
+                              setState(() {
+                                _counterMeasure = countermeasure;
+                                _counterFontSizeNotifier.value =
+                                    _resolveFontSize(countermeasure);
+                              });
                             },
+
                             fieldViewBuilder:
                                 (
                                   context,
@@ -1902,62 +2270,88 @@ class _CameraScreenState extends State<CameraScreen> {
                                   focusNode,
                                   onFieldSubmitted,
                                 ) {
-                                  _counterController = controller;
-                                  return TextField(
-                                    controller: controller,
-                                    focusNode: focusNode,
-                                    maxLines: 3,
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: _fontSize,
-                                    ),
-                                    decoration: InputDecoration(
-                                      hintText: "counterMeasureHint".tr(
-                                        context,
-                                      ),
-                                      filled: true,
-                                      fillColor: Colors.green.withOpacity(0.08),
-                                      hintStyle: TextStyle(
-                                        color: Colors.white.withOpacity(.6),
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                      border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(14),
-                                        borderSide: BorderSide(
-                                          color: Colors.white.withOpacity(0.35),
+                                  // Không gán lại _counterController = controller.
+                                  return ValueListenableBuilder<double>(
+                                    valueListenable: _counterFontSizeNotifier,
+                                    builder: (context, fontSize, _) {
+                                      return TextField(
+                                        controller: controller,
+                                        focusNode: focusNode,
+                                        enabled: !_isSubmitting,
+                                        maxLines: 3,
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: fontSize,
                                         ),
-                                      ),
-                                      enabledBorder: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(14),
-                                        borderSide: BorderSide(
-                                          color: Color(
-                                            0xFF90E14D,
-                                          ).withOpacity(0.25),
+                                        decoration: InputDecoration(
+                                          hintText: 'counterMeasureHint'.tr(
+                                            context,
+                                          ),
+                                          filled: true,
+                                          fillColor: Colors.green.withOpacity(
+                                            .08,
+                                          ),
+                                          hintStyle: TextStyle(
+                                            color: Colors.white.withOpacity(.6),
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                          border: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              14,
+                                            ),
+                                            borderSide: BorderSide(
+                                              color: Colors.white.withOpacity(
+                                                .35,
+                                              ),
+                                            ),
+                                          ),
+                                          enabledBorder: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              14,
+                                            ),
+                                            borderSide: BorderSide(
+                                              color: const Color(
+                                                0xFF90E14D,
+                                              ).withOpacity(.25),
+                                            ),
+                                          ),
+                                          focusedBorder: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              14,
+                                            ),
+                                            borderSide: BorderSide(
+                                              color: const Color(
+                                                0xFF90E14D,
+                                              ).withOpacity(.45),
+                                            ),
+                                          ),
+                                          contentPadding: const EdgeInsets.all(
+                                            12,
+                                          ),
                                         ),
-                                      ),
-                                      focusedBorder: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(14),
-                                        borderSide: BorderSide(
-                                          color: Color(
-                                            0xFF90E14D,
-                                          ).withOpacity(.45), // cyan
-                                        ),
-                                      ),
+                                        onChanged: (value) {
+                                          _counterFontSizeNotifier.value =
+                                              _resolveFontSize(value);
 
-                                      contentPadding: const EdgeInsets.all(12),
-                                    ),
-                                    onChanged: (v) {
-                                      _counterMeasure = v;
-                                      _autoFont(v);
-
-                                      if (_counterDebounce?.isActive ?? false) {
-                                        _counterDebounce!.cancel();
-                                      }
+                                          _counterDebounce?.cancel();
+                                          _counterDebounce = Timer(
+                                            const Duration(milliseconds: 250),
+                                            () {
+                                              _counterMeasure = value;
+                                            },
+                                          );
+                                        },
+                                      );
                                     },
                                   );
                                 },
+
                             optionsViewBuilder: (context, onSelected, options) {
+                              final optionList = options.toList(
+                                growable: false,
+                              );
+
                               return Align(
                                 alignment: Alignment.topLeft,
                                 child: Transform.translate(
@@ -1966,7 +2360,6 @@ class _CameraScreenState extends State<CameraScreen> {
                                     elevation: 8,
                                     borderRadius: BorderRadius.circular(12),
                                     color: Colors.black.withOpacity(.5),
-
                                     child: ConstrainedBox(
                                       constraints: BoxConstraints(
                                         maxWidth: constraints.maxWidth,
@@ -1975,16 +2368,15 @@ class _CameraScreenState extends State<CameraScreen> {
                                       child: ListView.separated(
                                         padding: EdgeInsets.zero,
                                         shrinkWrap: true,
-                                        itemCount: options.length,
+                                        itemCount: optionList.length,
                                         separatorBuilder: (_, __) =>
                                             const Divider(
                                               height: 1,
-                                              thickness: 0.5,
+                                              thickness: .5,
                                             ),
                                         itemBuilder: (context, index) {
-                                          final option = options.elementAt(
-                                            index,
-                                          );
+                                          final option = optionList[index];
+
                                           return InkWell(
                                             onTap: () => onSelected(option),
                                             child: Padding(
@@ -1995,13 +2387,13 @@ class _CameraScreenState extends State<CameraScreen> {
                                                   ),
                                               child: Text(
                                                 option.inputText,
-                                                style: const TextStyle(
-                                                  fontSize: 14,
-                                                  fontWeight: FontWeight.w600,
-                                                  color: Colors.white,
-                                                ),
                                                 maxLines: 3,
                                                 overflow: TextOverflow.ellipsis,
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 14,
+                                                  fontWeight: FontWeight.w600,
+                                                ),
                                               ),
                                             ),
                                           );
@@ -2020,7 +2412,7 @@ class _CameraScreenState extends State<CameraScreen> {
                 ],
               ),
 
-              // Checkbox và phần cuối
+              // Checkbox và ph?n cu?i
               if (widget.patrolGroup != PatrolGroup.AssetUpdate)
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 12),
@@ -2031,8 +2423,10 @@ class _CameraScreenState extends State<CameraScreen> {
                         height: 28,
                         child: Checkbox(
                           value: _needRecheck,
-                          onChanged: (v) =>
-                              setState(() => _needRecheck = v ?? false),
+                          onChanged: _isSubmitting
+                              ? null
+                              : (v) =>
+                                    setState(() => _needRecheck = v ?? false),
                           activeColor: Colors.orange.shade700,
                           materialTapTargetSize:
                               MaterialTapTargetSize.shrinkWrap,
@@ -2071,7 +2465,7 @@ class _CameraScreenState extends State<CameraScreen> {
                         backgroundColor: const Color(
                           0xFF22C55E,
                         ).withOpacity(.4),
-                        iconColor: hasImages ? Colors.black : Colors.white,
+                        iconColor: Colors.white,
                       ),
                     ],
                   ),
