@@ -15,8 +15,14 @@ class PatrolReportModel {
   final String riskSev;
   final String riskTotal;
 
+  /// Giá trị đã ghép Việt + Nhật để tương thích code cũ
   final String comment;
   final String countermeasure;
+
+  /// Giá trị tiếng Nhật riêng từ API
+  final String? commentJapanese;
+  final String? countermeasureJp;
+
   final String checkInfo;
 
   final DateTime? createdAt;
@@ -61,8 +67,13 @@ class PatrolReportModel {
     required this.riskProb,
     required this.riskSev,
     required this.riskTotal,
+
     required this.comment,
     required this.countermeasure,
+
+    this.commentJapanese,
+    this.countermeasureJp,
+
     required this.checkInfo,
     this.createdAt,
     this.pic,
@@ -90,20 +101,67 @@ class PatrolReportModel {
     this.loadStatus,
   });
 
+  /// Ghép nội dung gốc và tiếng Nhật.
+  ///
+  /// Ví dụ:
+  /// source: "Sửa chữa lại"
+  /// japanese: "再修理する"
+  ///
+  /// Kết quả:
+  /// Sửa chữa lại
+  /// 再修理する
+  static String combineTranslation(dynamic source, dynamic translated) {
+    final sourceText = source?.toString().trim() ?? '';
+    final translatedText = translated?.toString().trim() ?? '';
+
+    if (sourceText.isEmpty) {
+      return translatedText;
+    }
+
+    if (translatedText.isEmpty) {
+      return sourceText;
+    }
+
+    // Tránh ghép trùng nếu dữ liệu giống nhau
+    if (sourceText.toLowerCase() == translatedText.toLowerCase()) {
+      return sourceText;
+    }
+
+    // Hỗ trợ dữ liệu cũ đã chứa sẵn bản dịch tiếng Nhật
+    if (sourceText.contains(translatedText)) {
+      return sourceText;
+    }
+
+    return '$sourceText\n$translatedText';
+  }
+
   factory PatrolReportModel.fromJson(Map<String, dynamic> json) {
     List<String> parseImageList(dynamic value) {
       if (value == null) return [];
-      if (value is List) return List<String>.from(value);
-      if (value is String && value.isNotEmpty) {
-        return value.split(',').map((e) => e.trim()).toList();
+
+      if (value is List) {
+        return value.map((e) => e.toString()).toList();
       }
+
+      if (value is String && value.trim().isNotEmpty) {
+        return value
+            .split(',')
+            .map((e) => e.trim())
+            .where((e) => e.isNotEmpty)
+            .toList();
+      }
+
       return [];
     }
 
     DateTime? parseDate(dynamic value) {
       if (value == null) return null;
       if (value is DateTime) return value;
-      if (value is String) return DateTime.tryParse(value);
+
+      if (value is String && value.trim().isNotEmpty) {
+        return DateTime.tryParse(value);
+      }
+
       return null;
     }
 
@@ -111,13 +169,39 @@ class PatrolReportModel {
       if (value == null) return 0;
       if (value is int) return value;
       if (value is num) return value.toInt();
+
       return int.tryParse(value.toString()) ?? 0;
     }
 
+    /*
+     * Hỗ trợ cả hai kiểu JSON:
+     *
+     * Java field:
+     * commentJapanese
+     * countermeasureJp
+     *
+     * Hoặc tên database:
+     * comment_japanese
+     * countermeasure_jp
+     */
+    final rawCommentJapanese = json['comment_jp'];
+
+    final rawCountermeasureJp = json['countermeasure_jp'];
+
+    final combinedComment = combineTranslation(
+      json['comment'],
+      rawCommentJapanese,
+    );
+
+    final combinedCountermeasure = combineTranslation(
+      json['countermeasure'],
+      rawCountermeasureJp,
+    );
+
     return PatrolReportModel(
-      id: parseInt(json['id']),
+      id: json['id'] == null ? null : parseInt(json['id']),
       stt: parseInt(json['stt']),
-      type: json['type'],
+      type: json['type']?.toString(),
       qr_key: json['qr_key']?.toString(),
 
       grp: json['grp']?.toString() ?? '',
@@ -131,8 +215,14 @@ class PatrolReportModel {
       riskSev: json['riskSev']?.toString() ?? '',
       riskTotal: json['riskTotal']?.toString() ?? '',
 
-      comment: json['comment']?.toString() ?? '',
-      countermeasure: json['countermeasure']?.toString() ?? '',
+      // Giữ tương thích với toàn bộ code cũ
+      comment: combinedComment,
+      countermeasure: combinedCountermeasure,
+
+      // Vẫn giữ riêng để dùng về sau
+      commentJapanese: rawCommentJapanese?.toString(),
+      countermeasureJp: rawCountermeasureJp?.toString(),
+
       checkInfo: json['checkInfo']?.toString() ?? '',
 
       createdAt: parseDate(json['createdAt']),
@@ -157,6 +247,7 @@ class PatrolReportModel {
       hseComment: json['hse_comment']?.toString(),
       hseDate: parseDate(json['hse_date']),
       hseUser: json['hse_user']?.toString(),
+
       loadStatus: json['load_status']?.toString(),
     );
   }
@@ -175,8 +266,12 @@ class PatrolReportModel {
     String? riskProb,
     String? riskSev,
     String? riskTotal,
+
     String? comment,
     String? countermeasure,
+    String? commentJapanese,
+    String? countermeasureJp,
+
     String? checkInfo,
     DateTime? createdAt,
     String? pic,
@@ -199,6 +294,7 @@ class PatrolReportModel {
     List<String>? hseImageNames,
     String? hseComment,
     DateTime? hseDate,
+    String? hseUser,
 
     String? loadStatus,
   }) {
@@ -207,18 +303,25 @@ class PatrolReportModel {
       stt: stt ?? this.stt,
       qr_key: qr_key ?? this.qr_key,
       type: type ?? this.type,
+
       grp: grp ?? this.grp,
       plant: plant ?? this.plant,
       division: division ?? this.division,
       area: area ?? this.area,
       machine: machine ?? this.machine,
+
       riskFreq: riskFreq ?? this.riskFreq,
       riskProb: riskProb ?? this.riskProb,
       riskSev: riskSev ?? this.riskSev,
       riskTotal: riskTotal ?? this.riskTotal,
+
       comment: comment ?? this.comment,
       countermeasure: countermeasure ?? this.countermeasure,
+      commentJapanese: commentJapanese ?? this.commentJapanese,
+      countermeasureJp: countermeasureJp ?? this.countermeasureJp,
+
       checkInfo: checkInfo ?? this.checkInfo,
+
       createdAt: createdAt ?? this.createdAt,
       pic: pic ?? this.pic,
       dueDate: dueDate ?? this.dueDate,
@@ -240,6 +343,7 @@ class PatrolReportModel {
       hseImageNames: hseImageNames ?? this.hseImageNames,
       hseComment: hseComment ?? this.hseComment,
       hseDate: hseDate ?? this.hseDate,
+      hseUser: hseUser ?? this.hseUser,
 
       loadStatus: loadStatus ?? this.loadStatus,
     );

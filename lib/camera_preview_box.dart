@@ -3562,6 +3562,7 @@
 //   bool shouldRepaint(covariant _QrGuidePainter oldDelegate) => false;
 // }
 import 'dart:async';
+import 'dart:convert';
 import 'dart:html' as html;
 import 'dart:math' as math;
 import 'dart:typed_data';
@@ -3765,16 +3766,31 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
 
   @override
   void dispose() {
-    _patrolQrNotifier.dispose();
-    _showQrGuideNotifier.dispose();
+    /*
+   * Vô hiệu hóa session camera trước.
+   */
+    _cameraSession++;
 
-    _stopQrScan();
-    _flashController.dispose();
+    try {
+      stopQrLoop();
+    } catch (_) {}
+
+    try {
+      _qrSub?.cancel();
+    } catch (_) {}
+
+    _qrSub = null;
+    _qrScanning = false;
+
     _stopCamera();
 
     try {
       sttSocket?.dispose();
     } catch (_) {}
+
+    _flashController.dispose();
+    _patrolQrNotifier.dispose();
+    _showQrGuideNotifier.dispose();
 
     super.dispose();
   }
@@ -3890,10 +3906,26 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
     if (!mounted) return;
 
     final qr = rawQr.trim();
+
     if (qr.isEmpty) return;
 
+    /*
+   * Chặn dữ liệu bất thường.
+   */
+    if (qr.length > 2048) {
+      debugPrint(
+        'QR rejected because content is too long: '
+        '${qr.length}',
+      );
+
+      return;
+    }
+
     final now = DateTime.now();
-    if (_isDuplicateQr(qr, now)) return;
+
+    if (_isDuplicateQr(qr, now)) {
+      return;
+    }
 
     _lastDetectedQr = qr;
     _lastDetectedQrAt = now;
@@ -3902,16 +3934,27 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
       _showQrGuideNotifier.value = false;
     }
 
-    // QR máy không được xóa QR Patrol cũ trên UI.
+    /*
+   * Chỉ QR Patrol dạng số mới hiện trên badge.
+   * QR máy không xóa QR Patrol trước đó.
+   */
     if (_isQrNumber(qr) && _patrolQrNotifier.value != qr) {
       _patrolQrNotifier.value = qr;
     }
 
     if (haptic) {
-      HapticFeedback.mediumImpact();
+      try {
+        HapticFeedback.mediumImpact();
+      } catch (_) {}
     }
 
-    widget.onQrDetected?.call(qr);
+    try {
+      widget.onQrDetected?.call(qr);
+    } catch (error, stackTrace) {
+      debugPrint('onQrDetected callback error: $error');
+
+      debugPrintStack(stackTrace: stackTrace);
+    }
   }
 
   // =========================
@@ -4062,7 +4105,7 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
         return;
       }
 
-      await Future.delayed(const Duration(milliseconds: 350));
+      await Future.delayed(const Duration(milliseconds: 180));
 
       if (!mounted ||
           _cameraSleeping ||
@@ -4141,10 +4184,6 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
     }
   }
 
-  void _stopCameraTracks() {
-    _stopStream(_stream);
-  }
-
   void _stopCamera() {
     _cameraSession++;
 
@@ -4171,36 +4210,56 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
   // QR (ZXing JS) start/stop
   // =========================
   Future<void> _startAutoQrScan() async {
-    if (_qrScanning || _cameraSleeping || _stream == null || _video == null) {
-      return;
-    }
+    if (_qrScanning) return;
+    if (_cameraSleeping) return;
+    if (_stream == null) return;
+    if (_video == null) return;
 
     final video = _video!;
+
     if (video.videoWidth <= 0 || video.videoHeight <= 0) {
       debugPrint('QR scan not started: video is not ready.');
+
       return;
-    }
-
-    await _qrSub?.cancel();
-    _qrSub = html.window.on['qr-from-image'].listen(_onQrEvent);
-
-    if (mounted) {
-      setState(() {
-        _qrScanning = true;
-        _qrLoading = true;
-      });
     }
 
     try {
+      await _qrSub?.cancel();
+    } catch (_) {}
+
+    _qrSub = html.window.on['qr-from-image'].listen(_onQrEvent);
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _qrScanning = true;
+      _qrLoading = true;
+    });
+
+    try {
+      /*
+     * JS chỉ đọc video hiện có.
+     * JS không được gọi getUserMedia.
+     */
       startQrLoop();
+
       debugPrint(
-        'QR loop started: id=${video.id}, ${video.videoWidth}x${video.videoHeight}',
+        'QR loop started: '
+        '${video.videoWidth}x${video.videoHeight}',
       );
+
+      await Future.delayed(const Duration(milliseconds: 150));
     } catch (error, stackTrace) {
       debugPrint('startQrLoop error: $error');
+
       debugPrintStack(stackTrace: stackTrace);
 
-      await _qrSub?.cancel();
+      try {
+        await _qrSub?.cancel();
+      } catch (_) {}
+
       _qrSub = null;
       _qrScanning = false;
     } finally {
@@ -4213,13 +4272,24 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
   }
 
   Future<void> _stopQrScan({bool updateUi = true}) async {
+    /*
+   * Đặt false trước để event đang bay về
+   * không còn được xử lý.
+   */
+    _qrScanning = false;
+
     try {
       stopQrLoop();
-    } catch (_) {}
+    } catch (error) {
+      debugPrint('stopQrLoop warning: $error');
+    }
 
     try {
       await _qrSub?.cancel();
-    } catch (_) {}
+    } catch (error) {
+      debugPrint('Cancel QR subscription warning: $error');
+    }
+
     _qrSub = null;
 
     if (mounted && updateUi) {
@@ -4228,25 +4298,91 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
         _qrLoading = false;
       });
     } else {
-      _qrScanning = false;
       _qrLoading = false;
     }
   }
 
+  Map<String, dynamic>? _parseJsEventDetail(html.CustomEvent event) {
+    try {
+      final rawDetail = event.detail;
+
+      if (rawDetail == null) {
+        return null;
+      }
+
+      /*
+     * Bản JS mới luôn gửi JSON string.
+     */
+      if (rawDetail is String) {
+        final decoded = jsonDecode(rawDetail);
+
+        if (decoded is Map<String, dynamic>) {
+          return decoded;
+        }
+
+        if (decoded is Map) {
+          return Map<String, dynamic>.from(decoded);
+        }
+
+        return null;
+      }
+
+      /*
+     * Fallback tạm thời nếu browser đang cache JS cũ.
+     */
+      if (rawDetail is Map) {
+        return Map<String, dynamic>.from(rawDetail);
+      }
+
+      debugPrint(
+        'Unsupported JS event detail type: '
+        '${rawDetail.runtimeType}',
+      );
+
+      return null;
+    } catch (error, stackTrace) {
+      debugPrint('Cannot parse JS event detail: $error');
+
+      debugPrintStack(stackTrace: stackTrace);
+
+      return null;
+    }
+  }
+
   void _onQrEvent(dynamic event) {
-    if (!mounted || _cameraSleeping || !_qrScanning) return;
+    if (!mounted) return;
+    if (_cameraSleeping) return;
+    if (!_qrScanning) return;
     if (event is! html.CustomEvent) return;
 
-    final detail = event.detail;
-    if (detail == null) return;
+    final detail = _parseJsEventDetail(event);
+
+    if (detail == null) {
+      return;
+    }
 
     final error = detail['error']?.toString().trim() ?? '';
-    if (error.isNotEmpty) return;
+
+    if (error.isNotEmpty) {
+      /*
+     * Not found trong một frame là bình thường,
+     * không nên hiển thị lỗi cho người dùng.
+     */
+      if (!error.toLowerCase().contains('not found')) {
+        debugPrint('QR scanner event error: $error');
+      }
+
+      return;
+    }
 
     final text = detail['text']?.toString().trim() ?? '';
-    if (text.isEmpty) return;
+
+    if (text.isEmpty) {
+      return;
+    }
 
     debugPrint('QR detected from camera: $text');
+
     _acceptDetectedQr(text);
   }
 
@@ -4294,58 +4430,77 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
   // Capture / Upload
   // =========================
   Future<String?> _decodeQrFromBytes(Uint8List bytes) async {
-    String? url;
-    StreamSubscription<html.Event>? sub;
+    if (bytes.isEmpty) {
+      return null;
+    }
+
+    String? objectUrl;
+    StreamSubscription<html.Event>? subscription;
+
     final completer = Completer<String?>();
 
     try {
-      debugPrint('[DECODE] start, bytes = ${bytes.length}');
+      debugPrint('[QR-UPLOAD] start: ${bytes.length} bytes');
 
-      final blob = html.Blob([bytes], 'image/*');
-      url = html.Url.createObjectUrlFromBlob(blob);
-      debugPrint('[DECODE] objectUrl created = $url');
+      final blob = html.Blob(<dynamic>[bytes], 'image/jpeg');
 
-      sub = html.window.on['qr-from-uploaded-image'].listen((event) {
-        debugPrint('[DECODE] event qr-from-uploaded-image received');
+      objectUrl = html.Url.createObjectUrlFromBlob(blob);
 
-        final e = event as html.CustomEvent;
-        final detail = e.detail;
+      subscription = html.window.on['qr-from-uploaded-image'].listen((event) {
+        if (event is! html.CustomEvent) {
+          return;
+        }
 
-        final text = detail['text']?.toString().trim();
-        final err = detail['error']?.toString() ?? '';
+        final detail = _parseJsEventDetail(event);
 
-        debugPrint('[DECODE] text = $text');
-        debugPrint('[DECODE] error = $err');
+        if (detail == null) {
+          if (!completer.isCompleted) {
+            completer.complete(null);
+          }
+
+          return;
+        }
+
+        final text = detail['text']?.toString().trim() ?? '';
+
+        final error = detail['error']?.toString().trim() ?? '';
+
+        if (error.isNotEmpty) {
+          debugPrint('[QR-UPLOAD] error: $error');
+        }
 
         if (!completer.isCompleted) {
-          completer.complete((text == null || text.isEmpty) ? null : text);
+          completer.complete(text.isEmpty ? null : text);
         }
       });
 
-      debugPrint('[DECODE] call JS decodeQrFromImageBytes');
-      _decodeQrFromImageBytesJs(url);
+      _decodeQrFromImageBytesJs(objectUrl);
 
       final result = await completer.future.timeout(
-        const Duration(seconds: 5),
+        const Duration(seconds: 8),
         onTimeout: () {
-          debugPrint('[DECODE] timeout after 5s');
+          debugPrint('[QR-UPLOAD] timeout after 8 seconds');
+
           return null;
         },
       );
 
-      debugPrint('[DECODE] final result = $result');
+      debugPrint('[QR-UPLOAD] result: $result');
+
       return result;
-    } catch (e, st) {
-      debugPrint('[DECODE] ERROR = $e');
-      debugPrint('[DECODE] STACK = $st');
+    } catch (error, stackTrace) {
+      debugPrint('[QR-UPLOAD] exception: $error');
+
+      debugPrintStack(stackTrace: stackTrace);
+
       return null;
     } finally {
-      await sub?.cancel();
-      debugPrint('[DECODE] listener cancelled');
+      try {
+        await subscription?.cancel();
+      } catch (_) {}
 
-      if (url != null) {
-        html.Url.revokeObjectUrl(url);
-        debugPrint('[DECODE] objectUrl revoked');
+      if (objectUrl != null) {
+        html.Url.revokeObjectUrl(objectUrl);
       }
     }
   }

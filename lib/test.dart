@@ -968,6 +968,21 @@ class _CameraScreenState extends State<CameraScreen> {
           ? accountCode
           : '${accountCode}_$employeeName';
 
+      final latestComment = _commentController.text.trim();
+
+      final latestCounterMeasure = _counterController.text.trim();
+
+      if (latestComment.isEmpty) {
+        CommonUI.showWarning(
+          context: context,
+          title: 'Comment Required',
+          message: 'Please enter a comment.',
+        );
+        return;
+      }
+
+      final bool isJapaneseUser = widget.lang.trim().toUpperCase() == 'JP';
+
       final reportMap = <String, dynamic>{
         'userCreate': userCreate,
         'qr_key': qrKey,
@@ -978,14 +993,34 @@ class _CameraScreenState extends State<CameraScreen> {
         'division': division,
         'area': area,
         'machine': machine,
-        'comment': latestComment,
-        'countermeasure': latestCounterMeasure,
         'check': _needRecheck
             ? (area.isNotEmpty
                   ? ''.combinedViJa(context, 'needRecheck')
                   : ''.combinedViJa(context, 'needSelectArea'))
             : '',
       };
+
+      if (isJapaneseUser) {
+        reportMap.addAll({
+          // Không lưu tiếng Nhật nhầm vào cột tiếng Việt
+          'comment': '',
+          'countermeasure': '',
+
+          // Nội dung do người Nhật nhập
+          'comment_jp': latestComment,
+          'countermeasure_jp': latestCounterMeasure,
+        });
+      } else {
+        reportMap.addAll({
+          // Nội dung do người Việt nhập
+          'comment': latestComment,
+          'countermeasure': latestCounterMeasure,
+
+          // Python daemon sẽ dịch và cập nhật sau
+          'comment_jp': '',
+          'countermeasure_jp': '',
+        });
+      }
 
       if (isQA) {
         reportMap.addAll({
