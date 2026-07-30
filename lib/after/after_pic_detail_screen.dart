@@ -50,6 +50,7 @@ class _AfterPicDetailScreenState extends State<AfterPicDetailScreen> {
 
   void _fetchReport() {
     final picFilter = widget.pic == _unknownPicLabel ? '' : widget.pic.trim();
+    print("PIC: ${widget.pic}");
 
     setState(() {
       _futureReport = PatrolReportApi.fetchReports(

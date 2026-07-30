@@ -15,11 +15,11 @@ class PatrolReportModel {
   final String riskSev;
   final String riskTotal;
 
-  /// Giá trị đã ghép Việt + Nhật để tương thích code cũ
+  /// N?i dung Vi?t + Nh?t dã ghép d? tuong thích code cu.
   final String comment;
   final String countermeasure;
 
-  /// Giá trị tiếng Nhật riêng từ API
+  /// N?i dung ti?ng Nh?t riêng.
   final String? commentJapanese;
   final String? countermeasureJp;
 
@@ -38,7 +38,13 @@ class PatrolReportModel {
 
   // PATROL_AFTER fields
   final List<String> atImageNames;
+
+  /// N?i dung at_comment Vi?t + Nh?t dã ghép.
   final String? atComment;
+
+  /// N?i dung ti?ng Nh?t riêng c?a at_comment.
+  final String? atCommentJp;
+
   final DateTime? atDate;
   final String? atPic;
   final String? atStatus;
@@ -47,7 +53,13 @@ class PatrolReportModel {
   // HSE_CHECK fields
   final String? hseJudge;
   final List<String> hseImageNames;
+
+  /// N?i dung hse_comment Vi?t + Nh?t dã ghép.
   final String? hseComment;
+
+  /// N?i dung ti?ng Nh?t riêng c?a hse_comment.
+  final String? hseCommentJp;
+
   final DateTime? hseDate;
   final String? hseUser;
 
@@ -87,6 +99,7 @@ class PatrolReportModel {
 
     required this.atImageNames,
     this.atComment,
+    this.atCommentJp,
     this.atDate,
     this.atPic,
     this.atStatus,
@@ -95,21 +108,27 @@ class PatrolReportModel {
     this.hseJudge,
     required this.hseImageNames,
     this.hseComment,
+    this.hseCommentJp,
     this.hseDate,
     this.hseUser,
 
     this.loadStatus,
   });
 
-  /// Ghép nội dung gốc và tiếng Nhật.
+  /// Ghép n?i dung g?c và b?n d?ch.
   ///
-  /// Ví dụ:
-  /// source: "Sửa chữa lại"
-  /// japanese: "再修理する"
+  /// Ví d?:
   ///
-  /// Kết quả:
-  /// Sửa chữa lại
-  /// 再修理する
+  /// source:
+  /// S?a ch?a l?i
+  ///
+  /// translated:
+  /// ?????
+  ///
+  /// K?t qu?:
+  ///
+  /// S?a ch?a l?i
+  /// ?????
   static String combineTranslation(dynamic source, dynamic translated) {
     final sourceText = source?.toString().trim() ?? '';
     final translatedText = translated?.toString().trim() ?? '';
@@ -122,12 +141,12 @@ class PatrolReportModel {
       return sourceText;
     }
 
-    // Tránh ghép trùng nếu dữ liệu giống nhau
+    // Tránh ghép trùng n?u hai n?i dung gi?ng nhau.
     if (sourceText.toLowerCase() == translatedText.toLowerCase()) {
       return sourceText;
     }
 
-    // Hỗ trợ dữ liệu cũ đã chứa sẵn bản dịch tiếng Nhật
+    // H? tr? d? li?u cu dã ch?a s?n b?n d?ch.
     if (sourceText.contains(translatedText)) {
       return sourceText;
     }
@@ -135,19 +154,40 @@ class PatrolReportModel {
     return '$sourceText\n$translatedText';
   }
 
+  /// L?y giá tr? d?u tiên t?n t?i trong danh sách key.
+  ///
+  /// Giúp h? tr? d?ng th?i:
+  /// - snake_case t? database/API cu
+  /// - camelCase t? DTO Java
+  static dynamic getJsonValue(Map<String, dynamic> json, List<String> keys) {
+    for (final key in keys) {
+      if (json.containsKey(key) && json[key] != null) {
+        return json[key];
+      }
+    }
+
+    return null;
+  }
+
   factory PatrolReportModel.fromJson(Map<String, dynamic> json) {
     List<String> parseImageList(dynamic value) {
-      if (value == null) return [];
+      if (value == null) {
+        return [];
+      }
 
       if (value is List) {
-        return value.map((e) => e.toString()).toList();
+        return value
+            .where((item) => item != null)
+            .map((item) => item.toString().trim())
+            .where((item) => item.isNotEmpty)
+            .toList();
       }
 
       if (value is String && value.trim().isNotEmpty) {
         return value
             .split(',')
-            .map((e) => e.trim())
-            .where((e) => e.isNotEmpty)
+            .map((item) => item.trim())
+            .where((item) => item.isNotEmpty)
             .toList();
       }
 
@@ -155,54 +195,122 @@ class PatrolReportModel {
     }
 
     DateTime? parseDate(dynamic value) {
-      if (value == null) return null;
-      if (value is DateTime) return value;
+      if (value == null) {
+        return null;
+      }
+
+      if (value is DateTime) {
+        return value;
+      }
 
       if (value is String && value.trim().isNotEmpty) {
-        return DateTime.tryParse(value);
+        return DateTime.tryParse(value.trim());
       }
 
       return null;
     }
 
     int parseInt(dynamic value) {
-      if (value == null) return 0;
-      if (value is int) return value;
-      if (value is num) return value.toInt();
+      if (value == null) {
+        return 0;
+      }
+
+      if (value is int) {
+        return value;
+      }
+
+      if (value is num) {
+        return value.toInt();
+      }
 
       return int.tryParse(value.toString()) ?? 0;
     }
 
-    /*
-     * Hỗ trợ cả hai kiểu JSON:
-     *
-     * Java field:
-     * commentJapanese
-     * countermeasureJp
-     *
-     * Hoặc tên database:
-     * comment_japanese
-     * countermeasure_jp
-     */
-    final rawCommentJapanese = json['comment_jp'];
+    String? parseNullableString(dynamic value) {
+      if (value == null) {
+        return null;
+      }
 
-    final rawCountermeasureJp = json['countermeasure_jp'];
+      final text = value.toString().trim();
+      return text.isEmpty ? null : text;
+    }
 
-    final combinedComment = combineTranslation(
-      json['comment'],
-      rawCommentJapanese,
-    );
+    // =========================================================
+    // COMMENT
+    // =========================================================
+
+    final rawComment = getJsonValue(json, const ['comment']);
+
+    final rawCommentJp = getJsonValue(json, const [
+      'comment_jp',
+      'commentJp',
+      'commentJapanese',
+      'comment_japanese',
+    ]);
+
+    final combinedComment = combineTranslation(rawComment, rawCommentJp);
+
+    // =========================================================
+    // COUNTERMEASURE
+    // =========================================================
+
+    final rawCountermeasure = getJsonValue(json, const ['countermeasure']);
+
+    final rawCountermeasureJp = getJsonValue(json, const [
+      'countermeasure_jp',
+      'countermeasureJp',
+      'countermeasureJapanese',
+      'countermeasure_japanese',
+    ]);
 
     final combinedCountermeasure = combineTranslation(
-      json['countermeasure'],
+      rawCountermeasure,
       rawCountermeasureJp,
+    );
+
+    // =========================================================
+    // AT COMMENT
+    // =========================================================
+
+    final rawAtComment = getJsonValue(json, const ['at_comment', 'atComment']);
+
+    final rawAtCommentJp = getJsonValue(json, const [
+      'at_comment_jp',
+      'atCommentJp',
+      'atCommentJapanese',
+      'at_comment_japanese',
+    ]);
+
+    final combinedAtComment = combineTranslation(rawAtComment, rawAtCommentJp);
+
+    // =========================================================
+    // HSE COMMENT
+    // =========================================================
+
+    final rawHseComment = getJsonValue(json, const [
+      'hse_comment',
+      'hseComment',
+    ]);
+
+    final rawHseCommentJp = getJsonValue(json, const [
+      'hse_comment_jp',
+      'hseCommentJp',
+      'hseCommentJapanese',
+      'hse_comment_japanese',
+    ]);
+
+    final combinedHseComment = combineTranslation(
+      rawHseComment,
+      rawHseCommentJp,
     );
 
     return PatrolReportModel(
       id: json['id'] == null ? null : parseInt(json['id']),
       stt: parseInt(json['stt']),
-      type: json['type']?.toString(),
-      qr_key: json['qr_key']?.toString(),
+      type: parseNullableString(json['type']),
+      qr_key: parseNullableString(
+        getJsonValue(json, const ['qr_key', 'qrKey']),
+      ),
 
       grp: json['grp']?.toString() ?? '',
       plant: json['plant']?.toString() ?? '',
@@ -210,45 +318,103 @@ class PatrolReportModel {
       area: json['area']?.toString() ?? '',
       machine: json['machine']?.toString() ?? '',
 
-      riskFreq: json['riskFreq']?.toString() ?? '',
-      riskProb: json['riskProb']?.toString() ?? '',
-      riskSev: json['riskSev']?.toString() ?? '',
-      riskTotal: json['riskTotal']?.toString() ?? '',
+      riskFreq:
+          getJsonValue(json, const ['riskFreq', 'risk_freq'])?.toString() ?? '',
+      riskProb:
+          getJsonValue(json, const ['riskProb', 'risk_prob'])?.toString() ?? '',
+      riskSev:
+          getJsonValue(json, const ['riskSev', 'risk_sev'])?.toString() ?? '',
+      riskTotal:
+          getJsonValue(json, const ['riskTotal', 'risk_total'])?.toString() ??
+          '',
 
-      // Giữ tương thích với toàn bộ code cũ
+      // Comment dã ghép Vi?t + Nh?t.
       comment: combinedComment,
       countermeasure: combinedCountermeasure,
 
-      // Vẫn giữ riêng để dùng về sau
-      commentJapanese: rawCommentJapanese?.toString(),
-      countermeasureJp: rawCountermeasureJp?.toString(),
+      // B?n ti?ng Nh?t riêng.
+      commentJapanese: parseNullableString(rawCommentJp),
+      countermeasureJp: parseNullableString(rawCountermeasureJp),
 
-      checkInfo: json['checkInfo']?.toString() ?? '',
+      checkInfo:
+          getJsonValue(json, const ['checkInfo', 'check_info'])?.toString() ??
+          '',
 
-      createdAt: parseDate(json['createdAt']),
-      pic: json['pic']?.toString(),
-      dueDate: parseDate(json['dueDate']),
-      imageNames: parseImageList(json['imageNames']),
-      patrol_user: json['patrol_user']?.toString(),
+      createdAt: parseDate(
+        getJsonValue(json, const ['createdAt', 'created_at']),
+      ),
+      pic: parseNullableString(json['pic']),
+      dueDate: parseDate(getJsonValue(json, const ['dueDate', 'due_date'])),
+      imageNames: parseImageList(
+        getJsonValue(json, const ['imageNames', 'image_names']),
+      ),
+      patrol_user: parseNullableString(
+        getJsonValue(json, const ['patrol_user', 'patrolUser']),
+      ),
 
-      dueDateUpdateCount: parseInt(json['dueDateUpdateCount']),
-      dueDateUpdatedBy: json['dueDateUpdatedBy']?.toString(),
-      dueDateUpdatedAt: parseDate(json['dueDateUpdatedAt']),
+      dueDateUpdateCount: parseInt(
+        getJsonValue(json, const [
+          'dueDateUpdateCount',
+          'due_date_update_count',
+        ]),
+      ),
+      dueDateUpdatedBy: parseNullableString(
+        getJsonValue(json, const ['dueDateUpdatedBy', 'due_date_updated_by']),
+      ),
+      dueDateUpdatedAt: parseDate(
+        getJsonValue(json, const ['dueDateUpdatedAt', 'due_date_updated_at']),
+      ),
 
-      atImageNames: parseImageList(json['at_imageNames']),
-      atComment: json['at_comment']?.toString(),
-      atDate: parseDate(json['at_date']),
-      atPic: json['at_pic']?.toString(),
-      atStatus: json['at_status']?.toString(),
-      atAssign: json['at_assign']?.toString(),
+      atImageNames: parseImageList(
+        getJsonValue(json, const [
+          'at_imageNames',
+          'atImageNames',
+          'at_image_names',
+        ]),
+      ),
 
-      hseJudge: json['hse_judge']?.toString(),
-      hseImageNames: parseImageList(json['hse_imageNames']),
-      hseComment: json['hse_comment']?.toString(),
-      hseDate: parseDate(json['hse_date']),
-      hseUser: json['hse_user']?.toString(),
+      // atComment dã ghép Vi?t + Nh?t gi?ng comment.
+      atComment: combinedAtComment,
 
-      loadStatus: json['load_status']?.toString(),
+      // Gi? riêng ti?ng Nh?t.
+      atCommentJp: parseNullableString(rawAtCommentJp),
+
+      atDate: parseDate(getJsonValue(json, const ['at_date', 'atDate'])),
+      atPic: parseNullableString(
+        getJsonValue(json, const ['at_pic', 'atPic', 'at_user', 'atUser']),
+      ),
+      atStatus: parseNullableString(
+        getJsonValue(json, const ['at_status', 'atStatus']),
+      ),
+      atAssign: parseNullableString(
+        getJsonValue(json, const ['at_assign', 'atAssign']),
+      ),
+
+      hseJudge: parseNullableString(
+        getJsonValue(json, const ['hse_judge', 'hseJudge']),
+      ),
+      hseImageNames: parseImageList(
+        getJsonValue(json, const [
+          'hse_imageNames',
+          'hseImageNames',
+          'hse_image_names',
+        ]),
+      ),
+
+      // hseComment dã ghép Vi?t + Nh?t gi?ng comment.
+      hseComment: combinedHseComment,
+
+      // Gi? riêng ti?ng Nh?t.
+      hseCommentJp: parseNullableString(rawHseCommentJp),
+
+      hseDate: parseDate(getJsonValue(json, const ['hse_date', 'hseDate'])),
+      hseUser: parseNullableString(
+        getJsonValue(json, const ['hse_user', 'hseUser']),
+      ),
+
+      loadStatus: parseNullableString(
+        getJsonValue(json, const ['load_status', 'loadStatus']),
+      ),
     );
   }
 
@@ -285,6 +451,7 @@ class PatrolReportModel {
 
     List<String>? atImageNames,
     String? atComment,
+    String? atCommentJp,
     DateTime? atDate,
     String? atPic,
     String? atStatus,
@@ -293,6 +460,7 @@ class PatrolReportModel {
     String? hseJudge,
     List<String>? hseImageNames,
     String? hseComment,
+    String? hseCommentJp,
     DateTime? hseDate,
     String? hseUser,
 
@@ -334,6 +502,7 @@ class PatrolReportModel {
 
       atImageNames: atImageNames ?? this.atImageNames,
       atComment: atComment ?? this.atComment,
+      atCommentJp: atCommentJp ?? this.atCommentJp,
       atDate: atDate ?? this.atDate,
       atPic: atPic ?? this.atPic,
       atStatus: atStatus ?? this.atStatus,
@@ -342,6 +511,7 @@ class PatrolReportModel {
       hseJudge: hseJudge ?? this.hseJudge,
       hseImageNames: hseImageNames ?? this.hseImageNames,
       hseComment: hseComment ?? this.hseComment,
+      hseCommentJp: hseCommentJp ?? this.hseCommentJp,
       hseDate: hseDate ?? this.hseDate,
       hseUser: hseUser ?? this.hseUser,
 

@@ -392,7 +392,6 @@ class _AfterDetailScreenState extends State<AfterDetailScreen> {
                     final detailStatus = (_atStatus == 'Doing')
                         ? 'Doing,Redo'
                         : _atStatus;
-
                     final result = await Navigator.push(
                       context,
                       MaterialPageRoute(
