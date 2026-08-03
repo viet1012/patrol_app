@@ -48,7 +48,7 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
   final OverlayPortalController _overlayCtrl = OverlayPortalController();
   final Map<String, LayerLink> _filterLinks = {};
 
-  late final Future<List<PatrolReportModel>> _futureReports;
+  Future<List<PatrolReportModel>>? _futureReports;
   late final List<PatrolReportColumnSpec> _columns =
       PatrolReportTableColumns.build();
 
@@ -75,7 +75,8 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
       fromDate: DateTime(now.year, now.month - 1, 1),
     );
 
-    _futureReports = _loadReports();
+    // _futureReports = _loadReports();
+    _reload();
 
     _loadPatrolUser();
 
@@ -84,6 +85,14 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
     }
 
     _searchCtrl.addListener(_onSearchChanged);
+  }
+
+  Future<void> _reload() async {
+    setState(() {
+      _futureReports = _loadReports();
+    });
+
+    await _futureReports;
   }
 
   Future<void> _loadPatrolUser() async {
@@ -510,7 +519,7 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
       backgroundColor: pageBg,
       body: SafeArea(
         child: FutureBuilder<List<PatrolReportModel>>(
-          future: _futureReports,
+          future: _futureReports!,
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(child: CircularProgressIndicator());
@@ -758,35 +767,23 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
 
                 const Spacer(),
 
-                TextButton.icon(
-                  onPressed: () {
+                GlassActionButton(
+                  icon: _viewState.showSummary
+                      ? Icons.expand_less_rounded
+                      : Icons.expand_more_rounded,
+                  label: _viewState.showSummary ? "Hide" : "Show",
+                  onTap: () {
                     setState(() {
                       _viewState = _viewState.copyWith(
                         showSummary: !_viewState.showSummary,
                       );
                     });
                   },
-                  icon: Icon(
-                    _viewState.showSummary
-                        ? Icons.expand_less_rounded
-                        : Icons.expand_more_rounded,
-                    color: Colors.white,
-                  ),
-                  label: Text(
-                    _viewState.showSummary ? 'Hide' : 'Show',
-                    style: const TextStyle(color: Colors.white70),
-                  ),
                 ),
-                TextButton.icon(
-                  onPressed: _openBeforeAfterSummary,
-                  icon: const Icon(
-                    Icons.analytics_outlined,
-                    color: Colors.white,
-                  ),
-                  label: const Text(
-                    'Report',
-                    style: TextStyle(color: Colors.white70),
-                  ),
+                GlassActionButton(
+                  icon: Icons.analytics_outlined,
+                  label: "Report",
+                  onTap: _openBeforeAfterSummary,
                 ),
               ],
             ),
@@ -808,32 +805,23 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
 
           const SizedBox(width: 8),
 
-          TextButton.icon(
-            onPressed: () {
+          GlassActionButton(
+            icon: _viewState.showSummary
+                ? Icons.expand_less_rounded
+                : Icons.expand_more_rounded,
+            label: _viewState.showSummary ? "Hide" : "Show",
+            onTap: () {
               setState(() {
                 _viewState = _viewState.copyWith(
                   showSummary: !_viewState.showSummary,
                 );
               });
             },
-            icon: Icon(
-              _viewState.showSummary
-                  ? Icons.expand_less_rounded
-                  : Icons.expand_more_rounded,
-              color: Colors.white,
-            ),
-            label: Text(
-              _viewState.showSummary ? 'Hide' : 'Show',
-              style: const TextStyle(color: Colors.white70),
-            ),
           ),
-          TextButton.icon(
-            onPressed: _openBeforeAfterSummary,
-            icon: const Icon(Icons.analytics_outlined, color: Colors.white),
-            label: const Text(
-              'Report',
-              style: TextStyle(color: Colors.white70),
-            ),
+          GlassActionButton(
+            icon: Icons.analytics_outlined,
+            label: "Report",
+            onTap: _openBeforeAfterSummary,
           ),
         ],
       ),
@@ -921,6 +909,7 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
           icon: Icons.arrow_back_rounded,
           onTap: () => context.go('/home'),
         ),
+        GlassActionButton(icon: Icons.refresh, onTap: _reload),
         IconButton(
           icon: const Icon(Icons.download_rounded, color: Colors.greenAccent),
           onPressed: _downloadExcel,
