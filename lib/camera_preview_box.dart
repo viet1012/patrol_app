@@ -3587,6 +3587,8 @@ import 'homeScreen/patrol_home_screen.dart';
 // import 'api/stt_api.dart';
 // import 'homeScreen/patrol_home_screen.dart';
 
+enum _QrWarningState { hidden, reading, unreadable, error }
+
 @JS('startQrLoop')
 external void startQrLoop();
 
@@ -3684,6 +3686,7 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
   // QR scanning (JS ZXing)
   // =========================
   StreamSubscription? _qrSub;
+  StreamSubscription? _qrStatusSub;
   bool _qrScanning = false;
   bool _qrLoading = false;
 
@@ -3694,6 +3697,15 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
   /// true: hiện khung hướng dẫn căn QR.
   /// false: đã đọc được QR bất kỳ nên ẩn khung.
   final ValueNotifier<bool> _showQrGuideNotifier = ValueNotifier<bool>(true);
+
+  /// Chỉ hiện khi JS xác định có hình giống QR nhưng chưa đọc được,
+  /// hoặc scanner/camera gặp lỗi thật.
+  final ValueNotifier<_QrWarningState> _qrWarningStateNotifier =
+      ValueNotifier<_QrWarningState>(_QrWarningState.hidden);
+
+  final ValueNotifier<String> _qrWarningMessageNotifier = ValueNotifier<String>(
+    '',
+  );
 
   /// QR raw gần nhất, dùng chống callback lặp liên tục.
   String? _lastDetectedQr;
@@ -3724,6 +3736,22 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
   int stt = 0;
   bool _sttLoading = true;
   SttWebSocket? sttSocket;
+
+  void _setQrWarning(_QrWarningState state, [String message = '']) {
+    if (!mounted) return;
+
+    if (_qrWarningStateNotifier.value != state) {
+      _qrWarningStateNotifier.value = state;
+    }
+
+    if (_qrWarningMessageNotifier.value != message) {
+      _qrWarningMessageNotifier.value = message;
+    }
+  }
+
+  void _hideQrWarning() {
+    _setQrWarning(_QrWarningState.hidden);
+  }
 
   // =========================
   // Lifecycle
@@ -3779,7 +3807,12 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
       _qrSub?.cancel();
     } catch (_) {}
 
+    try {
+      _qrStatusSub?.cancel();
+    } catch (_) {}
+
     _qrSub = null;
+    _qrStatusSub = null;
     _qrScanning = false;
 
     _stopCamera();
@@ -3791,6 +3824,8 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
     _flashController.dispose();
     _patrolQrNotifier.dispose();
     _showQrGuideNotifier.dispose();
+    _qrWarningStateNotifier.dispose();
+    _qrWarningMessageNotifier.dispose();
 
     super.dispose();
   }
@@ -3817,6 +3852,7 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
 
     try {
       await _stopQrScan(updateUi: false);
+      _hideQrWarning();
 
       final oldStream = _stream;
       final oldVideo = _video;
@@ -3930,6 +3966,8 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
     _lastDetectedQr = qr;
     _lastDetectedQrAt = now;
 
+    _hideQrWarning();
+
     if (_showQrGuideNotifier.value) {
       _showQrGuideNotifier.value = false;
     }
@@ -4015,6 +4053,8 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
 
     _cameraStarting = true;
     final session = ++_cameraSession;
+
+    _hideQrWarning();
 
     if (mounted) setState(() {});
 
@@ -4133,6 +4173,11 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
       });
 
       _setCameraSleeping(true);
+
+      _setQrWarning(
+        _QrWarningState.error,
+        'Cannot start camera. Check camera permission and HTTPS.',
+      );
     } finally {
       if (session == _cameraSession) {
         _cameraStarting = false;
@@ -4228,6 +4273,7 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
     } catch (_) {}
 
     _qrSub = html.window.on['qr-from-image'].listen(_onQrEvent);
+    _qrStatusSub = html.window.on['qr-scan-status'].listen(_onQrStatusEvent);
 
     if (!mounted) {
       return;
@@ -4237,6 +4283,8 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
       _qrScanning = true;
       _qrLoading = true;
     });
+
+    _hideQrWarning();
 
     try {
       /*
@@ -4260,8 +4308,14 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
         await _qrSub?.cancel();
       } catch (_) {}
 
+      try {
+        await _qrStatusSub?.cancel();
+      } catch (_) {}
+
       _qrSub = null;
+      _qrStatusSub = null;
       _qrScanning = false;
+      _setQrWarning(_QrWarningState.error, 'QR scanner could not start.');
     } finally {
       if (mounted) {
         setState(() {
@@ -4277,7 +4331,6 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
    * không còn được xử lý.
    */
     _qrScanning = false;
-
     try {
       stopQrLoop();
     } catch (error) {
@@ -4290,7 +4343,16 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
       debugPrint('Cancel QR subscription warning: $error');
     }
 
+    try {
+      await _qrStatusSub?.cancel();
+    } catch (error) {
+      debugPrint('Cancel QR status subscription warning: $error');
+    }
+
     _qrSub = null;
+    _qrStatusSub = null;
+
+    _hideQrWarning();
 
     if (mounted && updateUi) {
       setState(() {
@@ -4349,6 +4411,40 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
     }
   }
 
+  void _onQrStatusEvent(dynamic event) {
+    if (!mounted || _cameraSleeping || !_qrScanning) return;
+    if (event is! html.CustomEvent) return;
+
+    final detail = _parseJsEventDetail(event);
+    if (detail == null) return;
+
+    final status = detail['status']?.toString().trim().toLowerCase() ?? '';
+    final message = detail['message']?.toString().trim() ?? '';
+
+    switch (status) {
+      case 'reading':
+        /*
+         * Có hình giống QR nhưng chưa đủ lâu để coi là lỗi.
+         * Không hiện banner, giữ UI sạch.
+         */
+        _hideQrWarning();
+        break;
+
+      case 'unreadable':
+        _setQrWarning(
+          _QrWarningState.unreadable,
+          message.isEmpty
+              ? 'Cannot read QR. Move closer or hold steady.'
+              : message,
+        );
+        break;
+
+      case 'clear':
+        _hideQrWarning();
+        break;
+    }
+  }
+
   void _onQrEvent(dynamic event) {
     if (!mounted) return;
     if (_cameraSleeping) return;
@@ -4370,6 +4466,11 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
      */
       if (!error.toLowerCase().contains('not found')) {
         debugPrint('QR scanner event error: $error');
+
+        _setQrWarning(
+          _QrWarningState.error,
+          'QR scanner error. Please restart the camera.',
+        );
       }
 
       return;
@@ -4748,6 +4849,10 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
 
     _patrolQrNotifier.value = null;
     _showQrGuideNotifier.value = true;
+
+    if (_qrScanning && !_cameraSleeping) {
+      _hideQrWarning();
+    }
   }
 
   Future<void> _takePhoto() async {
@@ -5025,6 +5130,30 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
               ),
             ),
 
+            Positioned(
+              left: 12,
+              right: 12,
+              bottom: 78,
+              child: IgnorePointer(
+                child: RepaintBoundary(
+                  child: ValueListenableBuilder<_QrWarningState>(
+                    valueListenable: _qrWarningStateNotifier,
+                    builder: (context, state, _) {
+                      return ValueListenableBuilder<String>(
+                        valueListenable: _qrWarningMessageNotifier,
+                        builder: (context, message, __) {
+                          return _QrWarningBanner(
+                            state: state,
+                            message: message,
+                          );
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ),
+            ),
+
             if (_qrLoading)
               const Positioned(
                 top: 12,
@@ -5038,6 +5167,65 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
           ],
         ),
       ],
+    );
+  }
+}
+
+class _QrWarningBanner extends StatelessWidget {
+  final _QrWarningState state;
+  final String message;
+
+  const _QrWarningBanner({required this.state, required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    if (state == _QrWarningState.hidden) {
+      return const SizedBox.shrink();
+    }
+
+    final isError = state == _QrWarningState.error;
+    final color = isError ? const Color(0xFFEF4444) : const Color(0xFFF59E0B);
+    final icon = isError
+        ? Icons.error_outline_rounded
+        : Icons.qr_code_scanner_rounded;
+
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 180),
+      child: Container(
+        key: ValueKey('${state.name}-$message'),
+        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
+        decoration: BoxDecoration(
+          color: const Color(0xE6111827),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: color.withOpacity(0.82)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.22),
+              blurRadius: 9,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: color, size: 19),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                message,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  height: 1.25,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
