@@ -75,6 +75,11 @@ class _EditReportDialogState extends State<EditReportDialog> {
   String? _selectedPIC; // UI selected
   String? _oldPIC;
 
+  late String _oldRiskTotal;
+  late String? _oldRiskFreq;
+  late String? _oldRiskProb;
+  late String? _oldRiskSev;
+
   // ✅ AT Status dropdown
   static const List<String> atStatusOptions = ['Doing', 'Pro_Done', 'Closed'];
   String? _selectedAtStatus;
@@ -109,6 +114,11 @@ class _EditReportDialogState extends State<EditReportDialog> {
     _riskFreq = widget.report.riskFreq;
     _riskProb = widget.report.riskProb;
     _riskSev = widget.report.riskSev;
+
+    _oldRiskTotal = widget.report.riskTotal.trim();
+    _oldRiskFreq = widget.report.riskFreq;
+    _oldRiskProb = widget.report.riskProb;
+    _oldRiskSev = widget.report.riskSev;
 
     final rawMachine = _norm(widget.report.machine);
 
@@ -910,6 +920,13 @@ class _EditReportDialogState extends State<EditReportDialog> {
       debugPrint('COMMENT SEND = $commentToSend');
       debugPrint('COUNTER SEND = $counterToSend');
       debugPrint('AT COMMENT SEND = $atCommentToSend');
+      final currentRiskTotal = _riskScoreSymbol.trim();
+
+      final riskChanged =
+          currentRiskTotal != _oldRiskTotal ||
+          !_eq(freqBi, _oldRiskFreq) ||
+          !_eq(probBi, _oldRiskProb) ||
+          !_eq(sevBi, _oldRiskSev);
       ////////////////////////////////////////////////////////////
       /// 1. UPDATE REPORT
       ////////////////////////////////////////////////////////////
@@ -922,10 +939,10 @@ class _EditReportDialogState extends State<EditReportDialog> {
         division: _selectedDivision,
         area: _selectedArea,
         machine: machineToSave,
-        riskFreq: freqBi,
-        riskProb: probBi,
-        riskSev: sevBi,
-        riskTotal: _riskScoreSymbol,
+        riskFreq: riskChanged ? freqBi : null,
+        riskProb: riskChanged ? probBi : null,
+        riskSev: riskChanged ? sevBi : null,
+        riskTotal: riskChanged ? currentRiskTotal : null,
         atStatus: atStatusToSend,
         pic: picToSend,
         editUser: "${widget.me.empId}_$_employeeName",
