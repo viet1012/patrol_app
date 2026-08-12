@@ -404,7 +404,7 @@ class _RecheckDetailScreenState extends State<RecheckDetailScreen> {
             onTap: isTotal
                 ? null
                 : () async {
-                    final result = await Navigator.push(
+                    final result = await Navigator.push<bool>(
                       context,
                       MaterialPageRoute(
                         builder: (_) => RecheckPicDetailScreen(
@@ -416,6 +416,12 @@ class _RecheckDetailScreenState extends State<RecheckDetailScreen> {
                         ),
                       ),
                     );
+
+                    if (!mounted) return;
+
+                    if (result == true) {
+                      _loadPivot();
+                    }
 
                     // ✅ nếu màn detail update gì đó, quay lại reload pivot
                     if (result == true) {

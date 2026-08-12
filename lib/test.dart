@@ -1599,16 +1599,16 @@ class _CameraScreenState extends State<CameraScreen> {
   Widget build(BuildContext context) {
     final groupList = getGroupsByPlant();
 
-    final facList = <String>[
+    final facList = <String>{
       if (_selectedPlant != null) ...getFacByPlant(_selectedPlant!),
 
       if (_qrFallbackMachine != null &&
           _norm(_qrFallbackMachine!.plant) == _norm(_selectedPlant) &&
           _qrFallbackMachine!.fac.isNotEmpty)
         _qrFallbackMachine!.fac,
-    ].toSet().toList();
+    }.toList();
 
-    final areaList = <String>[
+    final areaList = <String>{
       if (_selectedPlant != null && _selectedFac != null)
         ...getAreaByFac(_selectedPlant!, _selectedFac!),
 
@@ -1617,9 +1617,9 @@ class _CameraScreenState extends State<CameraScreen> {
           _norm(_qrFallbackMachine!.fac) == _norm(_selectedFac) &&
           _qrFallbackMachine!.area.isNotEmpty)
         _qrFallbackMachine!.area,
-    ].toSet().toList();
+    }.toList();
 
-    final machineList = <String>[
+    final machineList = <String>{
       if (_selectedPlant != null &&
           _selectedFac != null &&
           _selectedArea != null)
@@ -1631,7 +1631,7 @@ class _CameraScreenState extends State<CameraScreen> {
           _norm(_qrFallbackMachine!.area) == _norm(_selectedArea) &&
           _qrFallbackMachine!.macId.isNotEmpty)
         _qrFallbackMachine!.macId,
-    ].toSet().toList();
+    }.toList();
 
     final minLength = (widget.lang == 'JP') ? 1 : 2;
 
@@ -1931,12 +1931,6 @@ class _CameraScreenState extends State<CameraScreen> {
                                 _selectedArea == null)
                             ? <String>[]
                             : machineList.cast<String>(),
-
-                        // onChanged: (v) {
-                        //   setState(() => _selectedMachine = v);
-                        //
-                        //   // _loadMachineAiSummary(v);
-                        // },
                         onChanged: _onMachineChanged,
                         isRequired: true,
                       ),
@@ -1946,42 +1940,6 @@ class _CameraScreenState extends State<CameraScreen> {
               ],
               const SizedBox(height: 10),
 
-              // _buildAiAnalyzeSwitch(),
-              // AiAnalysisToggle(
-              //   enabled: _aiEnabled,
-              //   loading: _isLoadingMachineAi,
-              //   hasMachine: (_selectedMachine?.isNotEmpty ?? false),
-              //   onTap: () {
-              //     final mac = _selectedMachine ?? '';
-              //
-              //     setState(() {
-              //       _aiEnabled = !_aiEnabled;
-              //     });
-              //
-              //     if (_aiEnabled) {
-              //       _loadMachineAiSummary(mac);
-              //     } else {
-              //       setState(() {
-              //         _machineAiSummary = null;
-              //         _machineAiError = null;
-              //         _lastAiMachine = null;
-              //       });
-              //     }
-              //   },
-              // ),
-              // if (_aiEnabled)
-              //   MachineAiAlertCard(
-              //     lang: widget.lang,
-              //     machine: _selectedMachine,
-              //     loading: _isLoadingMachineAi,
-              //     translatingJp: _isTranslatingAi,
-              //     error: _machineAiError,
-              //     summary: _machineAiSummary,
-              //     summaryJp: _summaryJp,
-              //     onTranslateJp: _translateAiSummaryToJp,
-              //     onRetry: () =>
-              //         _loadMachineAiSummary(_selectedMachine, force: true),
-              //   ),
               MachineAiRiskHistoryPanel(
                 lang: widget.lang,
                 enabled: _aiEnabled,

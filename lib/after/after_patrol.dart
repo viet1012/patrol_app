@@ -43,17 +43,15 @@ class AfterPatrol extends StatefulWidget {
   State<AfterPatrol> createState() => _AfterPatrolState();
 }
 
-class _AfterPatrolState extends State<AfterPatrol> {
+class _AfterPatrolState extends State<AfterPatrol>
+    with SingleTickerProviderStateMixin {
   final GlobalKey<CameraAfterBoxState> _cameraKey =
       GlobalKey<CameraAfterBoxState>();
 
-  bool _enableCamera = false;
   final TextEditingController _commentAfStatusCtrl = TextEditingController();
-  final TextEditingController _commentCtrl = TextEditingController();
   final TextEditingController _msnvCtrl = TextEditingController();
   String? _employeeName;
   bool _isLoadingName = false;
-  Timer? _debounce;
 
   // ✅ PIC dropdown
   String? _currentPIC; // readonly
@@ -66,6 +64,9 @@ class _AfterPatrolState extends State<AfterPatrol> {
 
   PatrolReportModel? _report;
   bool _loading = true;
+  bool _submitting = false;
+  late final AnimationController _sendGlowController;
+
   String? _error;
 
   String? patrolUser;
@@ -89,9 +90,30 @@ class _AfterPatrolState extends State<AfterPatrol> {
     return loginUser == currentPic;
   }
 
+  String? get _employeeUser {
+    final code = _msnvCtrl.text.trim();
+    final name = _employeeName?.trim();
+
+    if (code.isEmpty) {
+      return null;
+    }
+
+    if (name == null || name.isEmpty || name.toLowerCase() == 'null') {
+      return null;
+    }
+
+    return '${code}_$name';
+  }
+
+  List<Uint8List> get _cameraImages {
+    return _cameraKey.currentState?.images ?? const <Uint8List>[];
+  }
+
   DateTime? _selectedDueDate;
 
   Future<void> _loadReport() async {
+    if (!mounted) return;
+
     setState(() {
       _loading = true;
       _error = null;
@@ -99,65 +121,68 @@ class _AfterPatrolState extends State<AfterPatrol> {
 
     try {
       final q = widget.qrCode?.trim();
+
       final list = await PatrolReportApi.fetchReports(
-        qrKey: (q != null && q.isNotEmpty) ? q : null,
-        id: (q == null || q.isEmpty) ? widget.id : null,
+        qrKey: q != null && q.isNotEmpty ? q : null,
+        id: q == null || q.isEmpty ? widget.id : null,
       );
+
+      if (!mounted) return;
 
       if (list.isEmpty) {
         setState(() {
           _error = 'Không tìm thấy report cho key=$_lookupKey';
           _loading = false;
         });
+
         return;
       }
 
-      // nếu API trả nhiều cái, lấy cái đúng nhất
-      final picked = (widget.id != null)
+      final picked = widget.id != null
           ? list.firstWhere((e) => e.id == widget.id, orElse: () => list.first)
           : list.first;
 
       final rawPic = picked.pic?.trim();
+
       final assignUser = picked.atAssign?.trim();
 
-      ////////////////////////////////////////////////////////////
-      /// CURRENT PIC
-      ////////////////////////////////////////////////////////////
-      final currentPic = (rawPic == null || rawPic.isEmpty)
-          ? emptyLabel
-          : rawPic;
+      final currentPic = rawPic == null || rawPic.isEmpty ? emptyLabel : rawPic;
 
-      ////////////////////////////////////////////////////////////
-      /// ASSIGN PIC
-      ////////////////////////////////////////////////////////////
-      final assignPic = (assignUser == null || assignUser.isEmpty)
+      final assignPic = assignUser == null || assignUser.isEmpty
           ? emptyLabel
           : assignUser;
+
+      _commentAfStatusCtrl.text = picked.atComment ?? '';
+
+      patrolUser = picked.atPic;
+
+      if (!mounted) return;
 
       setState(() {
         _report = picked;
 
         _currentPIC = currentPic;
-
         _selectedPIC = currentPic;
-
         _selectedAssignPIC = assignPic;
 
         _oldPIC = currentPic;
 
-        _selectedDueDate = picked.dueDateUpdatedAt;
+        // Nên fallback về dueDate nếu chưa từng revise.
+        _selectedDueDate = picked.dueDateUpdatedAt ?? picked.dueDate;
 
         _futurePics = findPicsByPlantFromApi(picked.plant);
 
         _loading = false;
-        _enableCamera = true;
       });
 
-      _commentAfStatusCtrl.text = _report?.atComment ?? '';
-      patrolUser = _report?.atPic;
-      // ✅ redirect theo status
       _routeByAfStatus(picked);
-    } catch (e) {
+    } catch (e, stackTrace) {
+      debugPrint('[LOAD REPORT ERROR] $e');
+
+      debugPrintStack(stackTrace: stackTrace);
+
+      if (!mounted) return;
+
       setState(() {
         _error = e.toString();
         _loading = false;
@@ -165,27 +190,123 @@ class _AfterPatrolState extends State<AfterPatrol> {
     }
   }
 
+  Future<void> _submitAfterReport(PatrolReportModel report) async {
+    if (_submitting) {
+      return;
+    }
+
+    final reportId = report.id;
+
+    if (reportId == null) {
+      _showSnackBar('Report ID không hợp lệ.', Colors.redAccent);
+      return;
+    }
+
+    final comment = _commentAfStatusCtrl.text.trim();
+
+    if (comment.isEmpty) {
+      _showSnackBar('Please enter comment before saving.', Colors.orange);
+      return;
+    }
+
+    final employeeUser = _employeeUser;
+
+    if (employeeUser == null) {
+      _showSnackBar('Không tìm thấy thông tin nhân viên.', Colors.orange);
+      return;
+    }
+
+    final images = List<Uint8List>.from(_cameraImages);
+
+    if (images.isEmpty) {
+      _showSnackBar('Please take or upload at least one image.', Colors.orange);
+      return;
+    }
+
+    setState(() {
+      _submitting = true;
+    });
+
+    bool loadingVisible = false;
+    bool success = false;
+
+    try {
+      showLoading(context);
+      loadingVisible = true;
+
+      await updateAtReport(
+        userAfter: widget.accountCode,
+        reportId: reportId,
+        atPic: employeeUser,
+        comment: comment,
+        images: images,
+      );
+
+      if (!mounted) return;
+
+      if (loadingVisible) {
+        hideLoading(context);
+        loadingVisible = false;
+      }
+
+      if (!mounted) return;
+
+      success = true;
+
+      // API OK -> BACK NGAY
+      Navigator.of(context).pop(true);
+    } catch (e, stackTrace) {
+      debugPrint('[UPDATE AFTER ERROR] $e');
+      debugPrintStack(stackTrace: stackTrace);
+
+      if (!mounted) return;
+
+      if (loadingVisible) {
+        hideLoading(context);
+        loadingVisible = false;
+      }
+
+      if (!mounted) return;
+
+      _showSnackBar('Server error: $e', Colors.redAccent);
+    } finally {
+      // Chỉ unlock nếu submit thất bại.
+      // Thành công thì page đã pop rồi.
+      if (!success && mounted) {
+        setState(() {
+          _submitting = false;
+        });
+      }
+    }
+  }
+
   @override
   void initState() {
     super.initState();
 
+    _sendGlowController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    )..repeat();
+
     _msnvCtrl.text = widget.accountCode;
-    fetchEmployeeName(
-      widget.accountCode,
-    ).then((name) => debugPrint('EMPLOYEE NAME = $name'));
+
+    fetchEmployeeName(widget.accountCode);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadReport(); // ✅ gọi sau khi build frame đầu
+      if (!mounted) return;
+
+      _loadReport();
     });
   }
 
   @override
   void dispose() {
-    _debounce?.cancel();
-    _commentAfStatusCtrl.dispose();
+    _sendGlowController.dispose();
 
-    _commentCtrl.dispose();
+    _commentAfStatusCtrl.dispose();
     _msnvCtrl.dispose();
+
     super.dispose();
   }
 
@@ -840,13 +961,6 @@ class _AfterPatrolState extends State<AfterPatrol> {
                   child: GestureDetector(
                     onTap: () {
                       _cameraKey.currentState?.removeImage(idx);
-
-                      // setState(() {
-                      //   _retakeImages.removeAt(idx);
-                      //   if (_retakeImages.isEmpty) {
-                      //     _enableCamera = true;
-                      //   }
-                      // });
                     },
                     child: Container(
                       padding: const EdgeInsets.all(2),
@@ -1139,43 +1253,38 @@ class _AfterPatrolState extends State<AfterPatrol> {
   }
 
   Future<void> _onSaveUpdateAfStatus() async {
+    final employeeUser = _employeeUser;
+
+    if (employeeUser == null) {
+      _showSnackBar('Không tìm thấy thông tin nhân viên.', Colors.orange);
+
+      return;
+    }
+
     try {
       await updateReportApi(
         id: _report!.id!,
         atComment: _commentAfStatusCtrl.text.trim(),
-        atUser: '${_msnvCtrl.text.trim()}_$_employeeName',
+        atUser: employeeUser,
         atStatus: 'Doing',
       );
 
       if (!mounted) return;
 
-      /// ✅ THÀNH CÔNG → dialog glass
-      CommonUI.showGlassDialog(
-        context: context,
-        icon: Icons.check_circle_rounded,
-        iconColor: Colors.greenAccent,
-        title: 'Update Successful',
-        message: 'The report has been updated successfully.',
-        buttonText: 'OK',
-      );
+      Navigator.of(context).pop(true);
+    } catch (e, stackTrace) {
+      debugPrint('[UPDATE AF STATUS ERROR] $e');
 
-      /// ⏳ đợi dialog đóng rồi pop
-      await Future.delayed(const Duration(milliseconds: 500));
-
-      if (!mounted) return;
-      Navigator.pop(context, true); // báo màn trước reload API
-    } catch (e, s) {
-      debugPrint('❌ UPDATE FAILED: $e');
-      debugPrintStack(stackTrace: s);
+      debugPrintStack(stackTrace: stackTrace);
 
       if (!mounted) return;
 
-      /// ❌ THẤT BẠI → warning dialog
       CommonUI.showWarning(
         context: context,
         title: 'Update Failed',
         message:
-            'Unable to update the report.\nPlease check your connection or try again.',
+            'Unable to update the report.\n'
+            'Please check your connection or try again.',
       );
     }
   }
@@ -1235,242 +1344,174 @@ class _AfterPatrolState extends State<AfterPatrol> {
       color: const Color(0xFF121826).withOpacity(.4),
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
-        padding: const EdgeInsets.all(8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            /// ===== THUMBNAIL PREVIEW =====
-            _buildThumbPreview(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          /// ===== THUMBNAIL PREVIEW =====
+          _buildThumbPreview(),
 
-            const SizedBox(height: 12),
+          const SizedBox(height: 12),
 
-            /// ===== CAMERA =====
-            // if (_enableCamera)
-            CameraAfterBox(
-              key: _cameraKey,
-              size: 320,
-              plant: report.plant,
-              patrolGroup: widget.patrolGroup,
-              type: "RETAKE",
-              onImagesChanged: (_) => setState(() {}),
-            ),
+          /// ===== CAMERA =====
+          // if (_enableCamera)
+          CameraAfterBox(
+            key: _cameraKey,
+            size: 320,
+            plant: report.plant,
+            patrolGroup: widget.patrolGroup,
+            type: "RETAKE",
+            onImagesChanged: (_) => setState(() {}),
+          ),
 
-            /// ===== COMMENT =====
-            if (_cameraKey.currentState != null &&
-                _cameraKey.currentState!.images.isNotEmpty) ...[
-              //   const SizedBox(height: 16),
-              //   TextField(
-              //     controller: _commentCtrl,
-              //     maxLines: 3,
-              //     decoration: InputDecoration(
-              //       labelText: 'Comment',
-              //       labelStyle: const TextStyle(color: Colors.white70),
-              //       enabledBorder: OutlineInputBorder(
-              //         borderSide: BorderSide(color: Colors.white54),
-              //         borderRadius: BorderRadius.circular(8),
-              //       ),
-              //       focusedBorder: OutlineInputBorder(
-              //         borderSide: BorderSide(color: Colors.blueAccent.shade200),
-              //         borderRadius: BorderRadius.circular(8),
-              //       ),
-              //       filled: true,
-              //       fillColor: Colors.white.withOpacity(0.12),
-              //     ),
-              //     style: const TextStyle(color: Colors.white),
-              //     onChanged: (value) {
-              //       setState(
-              //         () {},
-              //       ); // Bắt buộc gọi setState để UI rebuild và nút lưu hiện/ẩn đúng
-              //     },
-              //   ),
-              const SizedBox(height: 20),
+          /// ===== COMMENT =====
+          if (_cameraKey.currentState != null &&
+              _cameraKey.currentState!.images.isNotEmpty) ...[
+            //   const SizedBox(height: 16),
+            //   TextField(
+            //     controller: _commentCtrl,
+            //     maxLines: 3,
+            //     decoration: InputDecoration(
+            //       labelText: 'Comment',
+            //       labelStyle: const TextStyle(color: Colors.white70),
+            //       enabledBorder: OutlineInputBorder(
+            //         borderSide: BorderSide(color: Colors.white54),
+            //         borderRadius: BorderRadius.circular(8),
+            //       ),
+            //       focusedBorder: OutlineInputBorder(
+            //         borderSide: BorderSide(color: Colors.blueAccent.shade200),
+            //         borderRadius: BorderRadius.circular(8),
+            //       ),
+            //       filled: true,
+            //       fillColor: Colors.white.withOpacity(0.12),
+            //     ),
+            //     style: const TextStyle(color: Colors.white),
+            //     onChanged: (value) {
+            //       setState(
+            //         () {},
+            //       ); // Bắt buộc gọi setState để UI rebuild và nút lưu hiện/ẩn đúng
+            //     },
+            //   ),
+            const SizedBox(height: 20),
 
-              /// ===== SAVE =====
-              // if (_commentAfStatusCtrl.text.trim().isNotEmpty)
-              SizedBox(
-                height: 58,
-                child: Builder(
-                  builder: (context) {
-                    final canSend =
-                        _cameraKey.currentState != null &&
-                        _cameraKey.currentState!.images.isNotEmpty &&
-                        _msnvCtrl.text.trim().isNotEmpty;
+            /// ===== SAVE =====
+            // if (_commentAfStatusCtrl.text.trim().isNotEmpty)
+            SizedBox(
+              height: 58,
+              child: Builder(
+                builder: (context) {
+                  final canSend =
+                      !_submitting &&
+                      _cameraImages.isNotEmpty &&
+                      _employeeUser != null;
 
-                    return AnimatedContainer(
-                      duration: const Duration(milliseconds: 180),
-                      curve: Curves.easeOut,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(16),
-                        gradient: canSend
-                            ? const LinearGradient(
-                                colors: [Color(0xFF606F8F), Color(0xFF08265C)],
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                              )
-                            : LinearGradient(
-                                colors: [
-                                  Colors.grey.shade700,
-                                  Colors.grey.shade800,
-                                ],
+                  return AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    curve: Curves.easeOut,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(16),
+                      gradient: canSend
+                          ? const LinearGradient(
+                              colors: [Color(0xFF606F8F), Color(0xFF08265C)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            )
+                          : LinearGradient(
+                              colors: [
+                                Colors.grey.shade700,
+                                Colors.grey.shade800,
+                              ],
+                            ),
+                      boxShadow: canSend
+                          ? [
+                              BoxShadow(
+                                color: const Color(0xFF1647A3).withOpacity(.38),
+                                blurRadius: 18,
+                                offset: const Offset(0, 8),
                               ),
-                        boxShadow: canSend
-                            ? [
-                                BoxShadow(
-                                  color: const Color(
-                                    0xFF1647A3,
-                                  ).withOpacity(.38),
-                                  blurRadius: 18,
-                                  offset: const Offset(0, 8),
-                                ),
-                              ]
-                            : [],
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(16),
-                        child: Stack(
-                          children: [
-                            if (canSend)
-                              Positioned.fill(
-                                child: TweenAnimationBuilder<double>(
-                                  key: ValueKey(
-                                    DateTime.now().millisecondsSinceEpoch,
-                                  ),
-                                  tween: Tween(begin: -1.2, end: 1.8),
-                                  duration: const Duration(seconds: 2),
-                                  curve: Curves.linear,
-                                  onEnd: () {
-                                    if (mounted) setState(() {});
-                                  },
-                                  builder: (context, value, child) {
-                                    return Transform.translate(
-                                      offset: Offset(value * 220, 0),
-                                      child: Transform.rotate(
-                                        angle: -0.35,
-                                        child: Container(
-                                          width: 56,
-                                          decoration: BoxDecoration(
-                                            gradient: LinearGradient(
-                                              colors: [
-                                                Colors.white.withOpacity(0),
-                                                Colors.white.withOpacity(.10),
-                                                Colors.white.withOpacity(.24),
-                                                Colors.white.withOpacity(.10),
-                                                Colors.white.withOpacity(0),
-                                              ],
-                                            ),
+                            ]
+                          : [],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(16),
+                      child: Stack(
+                        children: [
+                          if (canSend)
+                            Positioned.fill(
+                              child: AnimatedBuilder(
+                                animation: _sendGlowController,
+
+                                builder: (context, child) {
+                                  final value =
+                                      -1.2 + (_sendGlowController.value * 3.0);
+
+                                  return Transform.translate(
+                                    offset: Offset(value * 220, 0),
+
+                                    child: Transform.rotate(
+                                      angle: -0.35,
+
+                                      child: Container(
+                                        width: 56,
+
+                                        decoration: BoxDecoration(
+                                          gradient: LinearGradient(
+                                            colors: [
+                                              Colors.white.withOpacity(0),
+                                              Colors.white.withOpacity(.10),
+                                              Colors.white.withOpacity(.24),
+                                              Colors.white.withOpacity(.10),
+                                              Colors.white.withOpacity(0),
+                                            ],
                                           ),
                                         ),
                                       ),
-                                    );
-                                  },
-                                ),
+                                    ),
+                                  );
+                                },
                               ),
+                            ),
 
-                            Material(
-                              color: Colors.transparent,
-                              child: InkWell(
-                                borderRadius: BorderRadius.circular(16),
-                                onTap: canSend
-                                    ? () async {
-                                        if (_commentAfStatusCtrl.text
-                                            .trim()
-                                            .isEmpty) {
-                                          _showSnackBar(
-                                            'Please enter comment before saving.',
-                                            Colors.orange,
-                                          );
-                                          return;
-                                        }
-
-                                        try {
-                                          showLoading(context);
-
-                                          await updateAtReport(
-                                            userAfter: widget.accountCode,
-                                            reportId: report.id!,
-                                            atPic:
-                                                '${_msnvCtrl.text.trim()}_$_employeeName',
-                                            comment: _commentAfStatusCtrl.text
-                                                .trim(),
-                                            images:
-                                                _cameraKey.currentState!.images,
-                                          );
-
-                                          hideLoading(context);
-
-                                          setState(() {
-                                            _commentCtrl.clear();
-                                            _enableCamera = false;
-                                          });
-
-                                          _cameraKey.currentState?.clearAll();
-
-                                          await Future.delayed(
-                                            const Duration(milliseconds: 200),
-                                          );
-
-                                          setState(() => _enableCamera = true);
-
-                                          _showSnackBar(
-                                            'Update AF successful!',
-                                            Colors.green,
-                                          );
-
-                                          await Future.delayed(
-                                            const Duration(milliseconds: 500),
-                                          );
-
-                                          if (!mounted) return;
-
-                                          Navigator.pop(context, true);
-                                        } catch (e) {
-                                          hideLoading(context);
-
-                                          debugPrint('Update AT error: $e');
-
-                                          _showSnackBar(
-                                            'Server error: $e',
-                                            Colors.red,
-                                          );
-                                        }
-                                      }
-                                    : null,
-                                child: const Center(
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        Icons.send_rounded,
+                          Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(16),
+                              onTap: canSend && !_submitting
+                                  ? () => _submitAfterReport(report)
+                                  : null,
+                              child: const Center(
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.send_rounded,
+                                      color: Colors.white,
+                                      size: 20,
+                                    ),
+                                    SizedBox(width: 8),
+                                    Text(
+                                      'SEND',
+                                      style: TextStyle(
                                         color: Colors.white,
-                                        size: 20,
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w800,
+                                        letterSpacing: .5,
                                       ),
-                                      SizedBox(width: 8),
-                                      Text(
-                                        'SEND',
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w800,
-                                          letterSpacing: .5,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
-                    );
-                  },
-                ),
+                    ),
+                  );
+                },
               ),
-            ],
+            ),
           ],
-        ),
+        ],
       ),
     );
   }
@@ -1550,14 +1591,18 @@ class _AfterPatrolState extends State<AfterPatrol> {
     if (_report == null) return;
 
     try {
-      final name = await fetchEmployeeName(widget.accountCode);
-      final editUser = "${widget.accountCode}_${name ?? ''}".trim();
+      final editUser = _employeeUser;
 
-      debugPrint("SAVE DUE DATE editUser = [$editUser]");
+      if (editUser == null) {
+        _showSnackBar('Không tìm thấy thông tin nhân viên.', Colors.orange);
+
+        return;
+      }
+
       await updateReportApi(
         id: _report!.id!,
         dueDate: newDueDate,
-        editUser: "${widget.accountCode}_$name",
+        editUser: editUser,
       );
 
       if (!mounted) return;
@@ -1591,13 +1636,19 @@ class _AfterPatrolState extends State<AfterPatrol> {
   }
 
   Future<void> _onSavePic() async {
-    try {
-      final name = await fetchEmployeeName(widget.accountCode);
+    final editUser = _employeeUser;
 
+    if (editUser == null) {
+      _showSnackBar('Không tìm thấy thông tin nhân viên.', Colors.orange);
+
+      return;
+    }
+
+    try {
       await updateReportApi(
         id: _report!.id!,
         pic: _selectedPIC,
-        editUser: "${widget.accountCode}_$name",
+        editUser: editUser,
       );
 
       if (!mounted) return;
@@ -1619,13 +1670,19 @@ class _AfterPatrolState extends State<AfterPatrol> {
   }
 
   Future<void> _onSaveAssign() async {
-    try {
-      final name = await fetchEmployeeName(widget.accountCode);
+    final editUser = _employeeUser;
 
+    if (editUser == null) {
+      _showSnackBar('Không tìm thấy thông tin nhân viên.', Colors.orange);
+
+      return;
+    }
+
+    try {
       await updateReportApi(
         id: _report!.id!,
         atAssign: _selectedAssignPIC,
-        editUser: "${widget.accountCode}_$name",
+        editUser: editUser,
       );
 
       if (!mounted) return;
@@ -1648,26 +1705,64 @@ class _AfterPatrolState extends State<AfterPatrol> {
 
   Future<String?> fetchEmployeeName(String code) async {
     final empCode = code.trim();
-    if (empCode.isEmpty) return null;
 
-    if (!mounted) return null;
-    setState(() => _isLoadingName = true);
+    if (empCode.isEmpty) {
+      return null;
+    }
+
+    if (!mounted) {
+      return null;
+    }
+
+    setState(() {
+      _isLoadingName = true;
+    });
 
     try {
-      final name = await HseMasterService.fetchEmployeeName(empCode);
+      final result = await HseMasterService.fetchEmployeeName(empCode);
 
-      if (!mounted) return null;
-      setState(() => _employeeName = name);
+      final rawName = result?.trim();
+
+      final name =
+          rawName == null || rawName.isEmpty || rawName.toLowerCase() == 'null'
+          ? null
+          : rawName;
+
+      if (!mounted) {
+        return name;
+      }
+
+      setState(() {
+        _employeeName = name;
+      });
+
+      debugPrint(
+        '[EMPLOYEE] '
+        '$empCode -> $name',
+      );
+
       return name;
     } catch (e) {
-      debugPrint('Error fetching employee name: $e');
+      debugPrint(
+        '[EMPLOYEE ERROR] '
+        '$empCode -> $e',
+      );
 
-      if (!mounted) return null;
-      setState(() => _employeeName = null);
+      if (!mounted) {
+        return null;
+      }
+
+      setState(() {
+        _employeeName = null;
+      });
+
       return null;
     } finally {
-      if (!mounted) return null;
-      setState(() => _isLoadingName = false);
+      if (mounted) {
+        setState(() {
+          _isLoadingName = false;
+        });
+      }
     }
   }
 

@@ -42,13 +42,22 @@ class _RecheckDetailPageState extends State<RecheckDetailPage> {
   final GlobalKey<CameraAfterBoxState> _cameraKey =
       GlobalKey<CameraAfterBoxState>();
 
-  bool _enableCamera = false;
-
   final TextEditingController _commentCtrl = TextEditingController();
+
   final TextEditingController _msnvCtrl = TextEditingController();
+
+  Timer? _employeeDebounce;
+
   String? _employeeName;
-  bool _isLoadingName = false;
-  Timer? _debounce;
+
+  String? _employeeError;
+
+  bool _employeeLoading = false;
+
+  bool _employeeResolved = false;
+
+  /// Chống request cũ trả về sau request mới.
+  int _employeeRequestToken = 0;
 
   // ✅ PIC dropdown
   static const String emptyLabel = 'UNKNOWN';
@@ -61,30 +70,47 @@ class _RecheckDetailPageState extends State<RecheckDetailPage> {
   @override
   void initState() {
     super.initState();
-    _msnvCtrl.text = widget.accountCode;
-    fetchEmployeeName(
-      widget.accountCode,
-    ).then((name) => debugPrint('EMPLOYEE NAME = $name'));
 
-    // ✅ init PIC
+    // ============================================================
+    // EMPLOYEE
+    // ============================================================
+
+    final initialCode = _normalizeEmployeeCode(widget.accountCode);
+
+    _msnvCtrl.text = initialCode;
+
+    if (initialCode.isNotEmpty) {
+      unawaited(_resolveEmployee(initialCode));
+    }
+
+    // ============================================================
+    // PIC
+    // ============================================================
+
     final rawPic = widget.report.pic?.trim();
-    _selectedPIC = (rawPic == null || rawPic.isEmpty) ? emptyLabel : rawPic;
+
+    _selectedPIC = rawPic == null || rawPic.isEmpty ? emptyLabel : rawPic;
+
     _oldPIC = _selectedPIC;
 
     final assignUser = widget.report.atAssign?.trim();
-    _selectedAssignPIC = (assignUser == null || assignUser.isEmpty)
+
+    _selectedAssignPIC = assignUser == null || assignUser.isEmpty
         ? emptyLabel
         : assignUser;
 
-    // ✅ cache list PIC theo plant
     _futurePics = findPicsByPlantFromApi(widget.report.plant);
   }
 
   @override
   void dispose() {
-    _debounce?.cancel();
+    _employeeRequestToken++;
+
+    _employeeDebounce?.cancel();
+
     _commentCtrl.dispose();
     _msnvCtrl.dispose();
+
     super.dispose();
   }
 
@@ -866,7 +892,7 @@ class _RecheckDetailPageState extends State<RecheckDetailPage> {
           children: [
             /// ===== THUMBNAIL PREVIEW =====
             _buildThumbPreview(),
-
+            _buildEmployeeField(),
             const SizedBox(height: 12),
 
             /// ===== CAMERA =====
@@ -945,39 +971,62 @@ class _RecheckDetailPageState extends State<RecheckDetailPage> {
     required String value,
     required Color color,
   }) {
-    final bool selected = _hseJudge == value;
+    final selected = _hseJudge == value;
 
-    return InkWell(
-      borderRadius: BorderRadius.circular(16),
-      onTap: () => _submitHseJudge(value), // ✅ SAVE NGAY
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        decoration: BoxDecoration(
-          color: selected ? color.withOpacity(0.9) : color.withOpacity(0.2),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: selected ? color : Colors.white.withOpacity(0.25),
-            width: 2,
-          ),
-          boxShadow: selected
-              ? [
-                  BoxShadow(
-                    color: color.withOpacity(0.4),
-                    blurRadius: 16,
-                    offset: const Offset(0, 8),
-                  ),
-                ]
-              : [],
-        ),
-        child: Center(
-          child: Text(
-            label,
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w800,
-              color: selected ? Colors.black : Colors.white,
+    final enabled = _canSubmitHse;
+
+    return AnimatedOpacity(
+      duration: const Duration(milliseconds: 180),
+
+      opacity: enabled ? 1 : .42,
+
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+
+        onTap: enabled ? () => _submitHseJudge(value) : null,
+
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+
+          padding: const EdgeInsets.symmetric(vertical: 14),
+
+          decoration: BoxDecoration(
+            color: selected ? color.withOpacity(.9) : color.withOpacity(.15),
+
+            borderRadius: BorderRadius.circular(16),
+
+            border: Border.all(
+              color: selected ? color : Colors.white.withOpacity(.15),
             ),
+          ),
+
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+
+            children: [
+              Icon(
+                value == 'OK'
+                    ? Icons.check_circle_rounded
+                    : Icons.cancel_rounded,
+
+                color: enabled ? Colors.white : Colors.white38,
+
+                size: 20,
+              ),
+
+              const SizedBox(width: 6),
+
+              Text(
+                label,
+                style: TextStyle(
+                  color: enabled ? Colors.white : Colors.white38,
+
+                  fontSize: 16,
+
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -1041,28 +1090,219 @@ class _RecheckDetailPageState extends State<RecheckDetailPage> {
     }
   }
 
-  Future<String?> fetchEmployeeName(String code) async {
-    final empCode = code.trim();
-    if (empCode.isEmpty) return null;
+  Widget _buildEmployeeField() {
+    final code = _msnvCtrl.text.trim();
 
-    if (!mounted) return null;
-    setState(() => _isLoadingName = true);
+    final Color statusColor;
+    final IconData statusIcon;
+
+    if (_employeeLoading) {
+      statusColor = Colors.orangeAccent;
+      statusIcon = Icons.sync_rounded;
+    } else if (_employeeResolved) {
+      statusColor = Colors.greenAccent;
+      statusIcon = Icons.verified_user_rounded;
+    } else if (_employeeError != null) {
+      statusColor = Colors.redAccent;
+      statusIcon = Icons.error_outline_rounded;
+    } else {
+      statusColor = Colors.white54;
+      statusIcon = Icons.badge_outlined;
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(.07),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: statusColor.withOpacity(.30)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // =====================================================
+          // TITLE
+          // =====================================================
+          const Text(
+            'HSE USER',
+            style: TextStyle(
+              color: Colors.white70,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              letterSpacing: .8,
+            ),
+          ),
+
+          const SizedBox(height: 10),
+
+          // =====================================================
+          // USER INFO
+          // =====================================================
+          Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: statusColor.withOpacity(.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(statusIcon, color: statusColor, size: 26),
+              ),
+
+              const SizedBox(width: 12),
+
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // =========================
+                    // TÊN NHÂN VIÊN
+                    // =========================
+                    if (_employeeLoading)
+                      const Text(
+                        'Đang tìm nhân viên...',
+                        style: TextStyle(
+                          color: Colors.orangeAccent,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      )
+                    else if (_employeeResolved &&
+                        _employeeName != null &&
+                        _employeeName!.trim().isNotEmpty)
+                      Text(
+                        _employeeName!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      )
+                    else if (_employeeError != null)
+                      Text(
+                        _employeeError!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.redAccent,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      )
+                    else
+                      const Text(
+                        'Chưa xác định nhân viên',
+                        style: TextStyle(color: Colors.white54, fontSize: 13),
+                      ),
+
+                    const SizedBox(height: 4),
+
+                    // =========================
+                    // MSNV
+                    // =========================
+                    Text(
+                      code.isEmpty ? 'MSNV: --' : 'MSNV: $code',
+                      style: const TextStyle(
+                        color: Colors.white54,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              if (_employeeLoading)
+                const SizedBox.square(
+                  dimension: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.orangeAccent,
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _normalizeEmployeeCode(String? value) {
+    if (value == null) {
+      return '';
+    }
+
+    return value.trim().replaceAll(' ', '').toUpperCase();
+  }
+
+  Future<void> _resolveEmployee(String rawCode) async {
+    final code = _normalizeEmployeeCode(rawCode);
+
+    if (code.isEmpty || !mounted) {
+      return;
+    }
+
+    final token = ++_employeeRequestToken;
+
+    setState(() {
+      _employeeLoading = true;
+      _employeeResolved = false;
+      _employeeName = null;
+      _employeeError = null;
+    });
 
     try {
-      final name = await HseMasterService.fetchEmployeeName(empCode);
+      final result = await HseMasterService.fetchEmployeeName(code);
 
-      if (!mounted) return null;
-      setState(() => _employeeName = name);
-      return name;
-    } catch (e) {
-      debugPrint('Error fetching employee name: $e');
+      debugPrint('[EMPLOYEE LOOKUP] code=$code | result=$result');
 
-      if (!mounted) return null;
-      setState(() => _employeeName = null);
-      return null;
+      if (!mounted || token != _employeeRequestToken) {
+        return;
+      }
+
+      final name = result?.trim();
+
+      if (name == null || name.isEmpty || name.toLowerCase() == 'null') {
+        setState(() {
+          _employeeName = null;
+          _employeeResolved = false;
+          _employeeError = 'Không tìm thấy nhân viên';
+        });
+
+        return;
+      }
+
+      setState(() {
+        _employeeName = name;
+        _employeeResolved = true;
+        _employeeError = null;
+      });
+    } catch (e, stackTrace) {
+      debugPrint(
+        '[EMPLOYEE LOOKUP ERROR] '
+        'code=$code | error=$e',
+      );
+
+      debugPrintStack(stackTrace: stackTrace);
+
+      if (!mounted || token != _employeeRequestToken) {
+        return;
+      }
+
+      setState(() {
+        _employeeName = null;
+        _employeeResolved = false;
+        _employeeError = 'Không thể kiểm tra MSNV';
+      });
     } finally {
-      if (!mounted) return null;
-      setState(() => _isLoadingName = false);
+      if (mounted && token == _employeeRequestToken) {
+        setState(() {
+          _employeeLoading = false;
+        });
+      }
     }
   }
 
@@ -1076,6 +1316,26 @@ class _RecheckDetailPageState extends State<RecheckDetailPage> {
 
   void hideLoading(BuildContext context) {
     Navigator.of(context, rootNavigator: true).pop();
+  }
+
+  bool get _canSubmitHse {
+    if (_employeeLoading) {
+      return false;
+    }
+
+    if (!_employeeResolved) {
+      return false;
+    }
+
+    if (_employeeName == null || _employeeName!.trim().isEmpty) {
+      return false;
+    }
+
+    if (_msnvCtrl.text.trim().isEmpty) {
+      return false;
+    }
+
+    return true;
   }
 
   Future<void> updateHseReport({
@@ -1141,51 +1401,75 @@ class _RecheckDetailPageState extends State<RecheckDetailPage> {
   }
 
   Future<void> _submitHseJudge(String value) async {
-    // if (_cameraKey.currentState == null ||
-    //     _cameraKey.currentState!.images.isEmpty) {
-    //   _showSnackBar('Please take at least one photo', Colors.orange);
-    //   return;
-    // }
-    //
-    // if (_commentCtrl.text.trim().isEmpty) {
-    //   _showSnackBar('Please enter comment', Colors.orange);
-    //   return;
-    // }
-    //
-    // if (_msnvCtrl.text.trim().isEmpty) {
-    //   _showSnackBar('Please enter MSNV', Colors.orange);
-    //   return;
-    // }
+    if (_employeeLoading) {
+      _showSnackBar(
+        'Đang kiểm tra MSNV, vui lòng chờ.',
+        Colors.orange,
+        duration: const Duration(seconds: 3),
+      );
+      return;
+    }
+
+    if (!_employeeResolved ||
+        _employeeName == null ||
+        _employeeName!.trim().isEmpty) {
+      _showSnackBar(
+        'MSNV không hợp lệ hoặc chưa tìm thấy tên nhân viên.',
+        Colors.orange,
+        duration: const Duration(seconds: 4),
+      );
+      return;
+    }
+
+    final reportId = widget.report.id;
+
+    if (reportId == null) {
+      _showSnackBar('Report ID không hợp lệ.', Colors.redAccent);
+      return;
+    }
+
+    final employeeCode = _normalizeEmployeeCode(_msnvCtrl.text);
+
+    final employeeName = _employeeName!.trim();
+
+    final hseUser = '${employeeCode}_$employeeName';
 
     try {
-      setState(() => _hseJudge = value);
+      setState(() {
+        _hseJudge = value;
+      });
+
       showLoading(context);
 
       await updateHseReport(
+        reportId: reportId,
+        hseUser: hseUser,
         hseJudge: value,
-        reportId: widget.report.id!,
-        hseUser: '${_msnvCtrl.text.trim()}_$_employeeName',
         comment: _commentCtrl.text.trim(),
-        images: _cameraKey.currentState!.images,
+        images: _cameraKey.currentState?.images ?? const <Uint8List>[],
       );
+
+      if (!mounted) return;
 
       hideLoading(context);
 
-      /// RESET UI
-      _commentCtrl.clear();
-      _cameraKey.currentState?.clearAll();
+      if (!mounted) return;
 
-      await Future.delayed(const Duration(milliseconds: 200));
-      setState(() {});
+      // ⭐ Báo màn trước rằng data đã thay đổi
+      Navigator.of(context).pop(true);
+    } catch (e, stackTrace) {
+      debugPrint('[HSE UPDATE ERROR] $e');
+      debugPrintStack(stackTrace: stackTrace);
 
-      _showSnackBar(
-        'Update ${value == 'OK' ? 'OK' : 'NG'} successful!',
-        Colors.green,
-      );
-    } catch (e) {
+      if (!mounted) return;
+
       hideLoading(context);
-      debugPrint('Update HSE error: $e');
-      _showSnackBar('Server error: $e', Colors.red);
+
+      setState(() {
+        _hseJudge = null;
+      });
+
+      _showSnackBar('Server error: $e', Colors.redAccent);
     }
   }
 }
