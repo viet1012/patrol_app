@@ -253,7 +253,13 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
   }
 
   bool get isHse {
-    return widget.auth.role == "HSE";
+    final roles = (widget.auth.role ?? '')
+        .split(',')
+        .map((e) => e.trim().toUpperCase())
+        .where((e) => e.isNotEmpty)
+        .toSet();
+
+    return roles.contains('HSE');
   }
 
   void _onTapGroup(String group) {
@@ -464,6 +470,7 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
       "COMPARE => "
       "report.patrol_user = [${report.patrol_user?.trim()}] | "
       "_patrolUser = [${_patrolUser?.trim()}] | "
+      "Role = [${widget.auth.role}] | "
       "RESULT = $canEdit",
     );
     if (!canEdit && !isHse) {
