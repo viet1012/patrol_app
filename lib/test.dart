@@ -173,7 +173,7 @@ class _CameraScreenState extends State<CameraScreen> {
   // Chỉ phần AppBar ảnh/nút Send lắng nghe notifier này.
   // Thay đổi ảnh không còn rebuild toàn bộ CameraScreen.
   final ValueNotifier<List<Uint8List>> _imagesNotifier =
-  ValueNotifier<List<Uint8List>>(const <Uint8List>[]);
+      ValueNotifier<List<Uint8List>>(const <Uint8List>[]);
 
   // Font size của hai ô text được cập nhật cục bộ.
   final ValueNotifier<double> _commentFontSizeNotifier = ValueNotifier<double>(
@@ -186,11 +186,11 @@ class _CameraScreenState extends State<CameraScreen> {
   // Cache master data để không quét widget.machines trong mỗi build().
   final Map<String, List<String>> _facByPlantCache = <String, List<String>>{};
   final Map<String, List<String>> _areaByPlantFacCache =
-  <String, List<String>>{};
+      <String, List<String>>{};
   final Map<String, List<String>> _machineByPlantFacAreaCache =
-  <String, List<String>>{};
+      <String, List<String>>{};
   final Map<String, List<String>> _groupsByPlantCache =
-  <String, List<String>>{};
+      <String, List<String>>{};
   final Set<String> _localMachineKeys = <String>{};
 
   /// QR g?n nh?t dã ki?m tra thành công.
@@ -273,7 +273,8 @@ class _CameraScreenState extends State<CameraScreen> {
     }
   }
 
-  Future<void> _loadMachineAiSummary(String? machine, {
+  Future<void> _loadMachineAiSummary(
+    String? machine, {
     bool force = false,
   }) async {
     final mac = machine?.trim();
@@ -364,22 +365,22 @@ class _CameraScreenState extends State<CameraScreen> {
     int f = frequencyOptions
         .firstWhere(
           (e) => e.labelKey == _freq,
-      orElse: () => const RiskOption(labelKey: "", score: 0),
-    )
+          orElse: () => const RiskOption(labelKey: "", score: 0),
+        )
         .score;
 
     int p = probabilityOptions
         .firstWhere(
           (e) => e.labelKey == _prob,
-      orElse: () => const RiskOption(labelKey: "", score: 0),
-    )
+          orElse: () => const RiskOption(labelKey: "", score: 0),
+        )
         .score;
 
     int s = severityOptions
         .firstWhere(
           (e) => e.labelKey == _sev,
-      orElse: () => const RiskOption(labelKey: "", score: 0),
-    )
+          orElse: () => const RiskOption(labelKey: "", score: 0),
+        )
         .score;
 
     return f + p + s;
@@ -401,19 +402,8 @@ class _CameraScreenState extends State<CameraScreen> {
     return "-";
   }
 
-  bool get _hasValidPatrolRisk {
-    if (widget.patrolGroup != PatrolGroup.Patrol) {
-      return true;
-    }
-
-    return !_isBlank(_freq) &&
-        !_isBlank(_prob) &&
-        !_isBlank(_sev) &&
-        const {'I', 'II', 'III', 'IV', 'V'}.contains(getScoreSymbol());
-  }
-
   final GlobalKey<CameraPreviewBoxState> _cameraKey =
-  GlobalKey<CameraPreviewBoxState>();
+      GlobalKey<CameraPreviewBoxState>();
 
   List<String> get groupList =>
       List<String>.generate(numbersGroup, (index) => 'Group ${index + 1}');
@@ -509,9 +499,7 @@ class _CameraScreenState extends State<CameraScreen> {
 
   List<String> getGroupsByPlant() {
     final plant = _selectedPlant;
-    if (plant == null || plant
-        .trim()
-        .isEmpty) {
+    if (plant == null || plant.trim().isEmpty) {
       return const <String>[];
     }
 
@@ -604,9 +592,7 @@ class _CameraScreenState extends State<CameraScreen> {
   }
 
   bool _isBlank(String? value) {
-    return value == null || value
-        .trim()
-        .isEmpty;
+    return value == null || value.trim().isEmpty;
   }
 
   String _norm(String? v) {
@@ -633,7 +619,7 @@ class _CameraScreenState extends State<CameraScreen> {
         context: context,
         title: 'Invalid QR Code',
         message:
-        'QR code must contain only numbers and have a maximum of 5 digits.',
+            'QR code must contain only numbers and have a maximum of 5 digits.',
       );
 
       return;
@@ -790,9 +776,7 @@ class _CameraScreenState extends State<CameraScreen> {
 
     final macId = _extractMacIdFromQr(rawQr);
 
-    if (macId
-        .trim()
-        .isEmpty) return;
+    if (macId.trim().isEmpty) return;
 
     setState(() {
       _isLoadingMachineInfo = true;
@@ -872,20 +856,15 @@ class _CameraScreenState extends State<CameraScreen> {
   Future<void> _sendReport() async {
     if (_isSubmitting) return;
 
-    final isPatrol =
-        widget.patrolGroup == PatrolGroup.Patrol;
+    final isPatrol = widget.patrolGroup == PatrolGroup.Patrol;
 
-    final isQA =
-        widget.patrolGroup == PatrolGroup.QualityPatrol;
-
+    final isQA = widget.patrolGroup == PatrolGroup.QualityPatrol;
+    final isAssetUpdate = widget.patrolGroup == PatrolGroup.AssetUpdate;
     final qrKey = _qrKey.trim();
 
-    final images =
-    List<Uint8List>.from(
-      _cameraKey.currentState?.images
-          ?? const <Uint8List>[],
+    final images = List<Uint8List>.from(
+      _cameraKey.currentState?.images ?? const <Uint8List>[],
     );
-
 
     // ============================================================
     // IMAGE REQUIRED
@@ -901,49 +880,47 @@ class _CameraScreenState extends State<CameraScreen> {
       return;
     }
 
-
     // ============================================================
     // PATROL QR REQUIRED
     // ============================================================
-
-    if (
-    isPatrol
-        && !RegExp(r'^\d{1,5}$').hasMatch(qrKey)
-    ) {
+    // AssetUpdate: chỉ cần không rỗng
+    if (isAssetUpdate && qrKey.isEmpty) {
       CommonUI.showWarning(
         context: context,
         title: 'QR Required',
-        message:
-        'Please scan a valid Patrol QR containing 1 to 5 digits.',
+        message: 'Please scan QR code before sending.',
       );
 
       return;
     }
 
+    if (isPatrol && !RegExp(r'^\d{1,5}$').hasMatch(qrKey)) {
+      CommonUI.showWarning(
+        context: context,
+        title: 'QR Required',
+        message: 'Please scan a valid Patrol QR containing 1 to 5 digits.',
+      );
+
+      return;
+    }
 
     // ============================================================
     // PATROL MASTER DATA REQUIRED
     // ============================================================
 
-    if (
-    isPatrol
-        && (
-        _isBlank(_selectedPlant)
-            || _isBlank(_selectedFac)
-            || _isBlank(_selectedArea)
-            || _isBlank(_selectedMachine)
-    )
-    ) {
+    if (isPatrol &&
+        (_isBlank(_selectedPlant) ||
+            _isBlank(_selectedFac) ||
+            _isBlank(_selectedArea) ||
+            _isBlank(_selectedMachine))) {
       CommonUI.showWarning(
         context: context,
         title: 'Information Required',
-        message:
-        'Please select Plant, Fac, Area and Machine.',
+        message: 'Please select Plant, Fac, Area and Machine.',
       );
 
       return;
     }
-
 
     // ============================================================
     // PATROL RISK REQUIRED
@@ -955,23 +932,17 @@ class _CameraScreenState extends State<CameraScreen> {
       riskTotal = getScoreSymbol();
 
       final hasValidRisk =
-          !_isBlank(_freq)
-              && !_isBlank(_prob)
-              && !_isBlank(_sev)
-              && const {
-            'I',
-            'II',
-            'III',
-            'IV',
-            'V',
-          }.contains(riskTotal);
+          !_isBlank(_freq) &&
+          !_isBlank(_prob) &&
+          !_isBlank(_sev) &&
+          const {'I', 'II', 'III', 'IV', 'V'}.contains(riskTotal);
 
       if (!hasValidRisk) {
         CommonUI.showWarning(
           context: context,
           title: 'Risk Assessment Required',
           message:
-          'Please select Frequency, Probability and Severity '
+              'Please select Frequency, Probability and Severity '
               'before sending the Patrol report.',
         );
 
@@ -979,16 +950,13 @@ class _CameraScreenState extends State<CameraScreen> {
       }
     }
 
-
     // ============================================================
     // COMMENT REQUIRED
     // ============================================================
 
-    final latestComment =
-    _commentController.text.trim();
+    final latestComment = _commentController.text.trim();
 
-    final latestCounterMeasure =
-    _counterController.text.trim();
+    final latestCounterMeasure = _counterController.text.trim();
 
     if (latestComment.isEmpty) {
       CommonUI.showWarning(
@@ -1000,37 +968,25 @@ class _CameraScreenState extends State<CameraScreen> {
       return;
     }
 
-
     // ============================================================
     // BASIC DATA
     // ============================================================
 
-    final plant =
-        _selectedPlant?.trim() ?? '';
+    final plant = _selectedPlant?.trim() ?? '';
 
-    final division =
-        _selectedFac?.trim() ?? '';
+    final division = _selectedFac?.trim() ?? '';
 
-    final area =
-        _selectedArea?.trim() ?? '';
+    final area = _selectedArea?.trim() ?? '';
 
-    final machine =
-        _selectedMachine?.trim() ?? '';
+    final machine = _selectedMachine?.trim() ?? '';
 
+    final cameraState = _cameraKey.currentState;
 
-    final cameraState =
-        _cameraKey.currentState;
+    final cameraWasSleeping = cameraState?.isCameraSleeping ?? true;
 
-    final cameraWasSleeping =
-        cameraState?.isCameraSleeping ?? true;
-
-
-    final totalWatch =
-    Stopwatch()
-      ..start();
+    final totalWatch = Stopwatch()..start();
 
     var loadingVisible = false;
-
 
     void hideLoading() {
       if (!loadingVisible) return;
@@ -1039,7 +995,6 @@ class _CameraScreenState extends State<CameraScreen> {
 
       LoadingDialog.hide();
     }
-
 
     FocusManager.instance.primaryFocus?.unfocus();
 
@@ -1051,15 +1006,9 @@ class _CameraScreenState extends State<CameraScreen> {
 
     if (!mounted) return;
 
-    unawaited(
-      LoadingDialog.show(
-        context,
-        message: 'Sending report...',
-      ),
-    );
+    unawaited(LoadingDialog.show(context, message: 'Sending report...'));
 
     loadingVisible = true;
-
 
     try {
       // ==========================================================
@@ -1067,9 +1016,7 @@ class _CameraScreenState extends State<CameraScreen> {
       // ==========================================================
 
       if (!cameraWasSleeping) {
-        final cameraSleepWatch =
-        Stopwatch()
-          ..start();
+        final cameraSleepWatch = Stopwatch()..start();
 
         await cameraState?.sleepCamera();
 
@@ -1077,110 +1024,65 @@ class _CameraScreenState extends State<CameraScreen> {
 
         debugPrint(
           'REPORT CAMERA SLEEP TIME: '
-              '${cameraSleepWatch.elapsedMilliseconds} ms',
+          '${cameraSleepWatch.elapsedMilliseconds} ms',
         );
       }
-
 
       // ==========================================================
       // PREPARE
       // ==========================================================
 
-      final prepareWatch =
-      Stopwatch()
-        ..start();
+      final prepareWatch = Stopwatch()..start();
 
-
-      final imageFiles =
-      List<MultipartFile>.generate(
+      final imageFiles = List<MultipartFile>.generate(
         images.length,
-            (index) =>
-            MultipartFile.fromBytes(
-              images[index],
-              filename:
-              'photo_${index + 1}.jpg',
-              contentType:
-              http.MediaType(
-                'image',
-                'jpeg',
-              ),
-            ),
+        (index) => MultipartFile.fromBytes(
+          images[index],
+          filename: 'photo_${index + 1}.jpg',
+          contentType: http.MediaType('image', 'jpeg'),
+        ),
         growable: false,
       );
 
+      final employeeName = _employeeName?.trim() ?? '';
 
-      final employeeName =
-          _employeeName?.trim() ?? '';
+      final accountCode = widget.accountCode.trim();
 
-      final accountCode =
-      widget.accountCode.trim();
-
-
-      final userCreate =
-      employeeName.isEmpty
+      final userCreate = employeeName.isEmpty
           ? accountCode
           : '${accountCode}_$employeeName';
 
-
-      final bool isJapaneseUser =
-          widget.lang
-              .trim()
-              .toUpperCase()
-              == 'JP';
-
+      final bool isJapaneseUser = widget.lang.trim().toUpperCase() == 'JP';
 
       // ==========================================================
       // REPORT MAP
       // ==========================================================
 
-      final reportMap =
-      <String, dynamic>{
-        'userCreate':
-        userCreate,
+      final reportMap = <String, dynamic>{
+        'userCreate': userCreate,
 
-        'qr_key':
-        qrKey,
+        'qr_key': qrKey,
 
-        'qr_scan_sts':
-        qrKey.isNotEmpty
-            ? 'SUCCESS_1st'
-            : '',
+        'qr_scan_sts': qrKey.isNotEmpty ? 'SUCCESS_1st' : '',
 
-        'type':
-        widget.patrolGroup.name,
+        'type': widget.patrolGroup.name,
 
-        'group':
-        _selectedGroup?.trim()
-            ?? '',
+        'group': _selectedGroup?.trim() ?? '',
 
-        'plant':
-        plant,
+        'plant': plant,
 
-        'division':
-        division,
+        'division': division,
 
-        'area':
-        area,
+        'area': area,
 
-        'machine':
-        machine,
+        'machine': machine,
 
-        'check':
-        _needRecheck
-            ? (
-            area.isNotEmpty
-                ? ''.combinedViJa(
-              context,
-              'needRecheck',
-            )
-                : ''.combinedViJa(
-              context,
-              'needSelectArea',
-            )
-        )
+        'check': _needRecheck
+            ? (area.isNotEmpty
+                  ? ''.combinedViJa(context, 'needRecheck')
+                  : ''.combinedViJa(context, 'needSelectArea'))
             : '',
       };
-
 
       // ==========================================================
       // COMMENT LANGUAGE
@@ -1188,34 +1090,25 @@ class _CameraScreenState extends State<CameraScreen> {
 
       if (isJapaneseUser) {
         reportMap.addAll({
-          'comment':
-          '',
+          'comment': '',
 
-          'countermeasure':
-          '',
+          'countermeasure': '',
 
-          'comment_jp':
-          latestComment,
+          'comment_jp': latestComment,
 
-          'countermeasure_jp':
-          latestCounterMeasure,
+          'countermeasure_jp': latestCounterMeasure,
         });
       } else {
         reportMap.addAll({
-          'comment':
-          latestComment,
+          'comment': latestComment,
 
-          'countermeasure':
-          latestCounterMeasure,
+          'countermeasure': latestCounterMeasure,
 
-          'comment_jp':
-          '',
+          'comment_jp': '',
 
-          'countermeasure_jp':
-          '',
+          'countermeasure_jp': '',
         });
       }
-
 
       // ==========================================================
       // RISK DATA
@@ -1223,338 +1116,175 @@ class _CameraScreenState extends State<CameraScreen> {
 
       if (isQA) {
         reportMap.addAll({
-          'riskFreq':
-          ''.combinedViJa(
-            context,
-            _qaFreq ?? '',
-          ),
+          'riskFreq': ''.combinedViJa(context, _qaFreq ?? ''),
 
-          'riskProb':
-          ''.combinedViJa(
-            context,
-            _qa5m ?? '',
-          ),
+          'riskProb': ''.combinedViJa(context, _qa5m ?? ''),
 
-          'riskSev':
-          ''.combinedViJa(
-            context,
-            _qaImpact ?? '',
-          ),
+          'riskSev': ''.combinedViJa(context, _qaImpact ?? ''),
 
-          'riskTotal':
-          '',
+          'riskTotal': '',
         });
       } else if (isPatrol) {
         reportMap.addAll({
-          'riskFreq':
-          ''.combinedViJa(
-            context,
-            _freq!,
-          ),
+          'riskFreq': ''.combinedViJa(context, _freq!),
 
-          'riskProb':
-          ''.combinedViJa(
-            context,
-            _prob!,
-          ),
+          'riskProb': ''.combinedViJa(context, _prob!),
 
-          'riskSev':
-          ''.combinedViJa(
-            context,
-            _sev!,
-          ),
+          'riskSev': ''.combinedViJa(context, _sev!),
 
-          'riskTotal':
-          riskTotal,
+          'riskTotal': riskTotal,
         });
       } else {
         reportMap.addAll({
-          'riskFreq':
-          ''.combinedViJa(
-            context,
-            _freq ?? '',
-          ),
+          'riskFreq': ''.combinedViJa(context, _freq ?? ''),
 
-          'riskProb':
-          ''.combinedViJa(
-            context,
-            _prob ?? '',
-          ),
+          'riskProb': ''.combinedViJa(context, _prob ?? ''),
 
-          'riskSev':
-          ''.combinedViJa(
-            context,
-            _sev ?? '',
-          ),
+          'riskSev': ''.combinedViJa(context, _sev ?? ''),
 
-          'riskTotal':
-          getScoreSymbol(),
+          'riskTotal': getScoreSymbol(),
         });
       }
-
 
       // ==========================================================
       // FORM DATA
       // ==========================================================
 
-      final formData =
-      FormData.fromMap({
-        'report':
-        jsonEncode(reportMap),
+      final formData = FormData.fromMap({
+        'report': jsonEncode(reportMap),
 
-        'images':
-        imageFiles,
+        'images': imageFiles,
       });
-
 
       prepareWatch.stop();
 
-
-      final totalImageBytes =
-      images.fold<int>(
+      final totalImageBytes = images.fold<int>(
         0,
-            (sum, image) =>
-        sum + image.lengthInBytes,
+        (sum, image) => sum + image.lengthInBytes,
       );
-
 
       debugPrint(
         'REPORT PREPARE TIME: '
-            '${prepareWatch.elapsedMilliseconds} ms',
+        '${prepareWatch.elapsedMilliseconds} ms',
       );
 
       debugPrint(
         'REPORT IMAGE COUNT: '
-            '${images.length}',
+        '${images.length}',
       );
 
       debugPrint(
         'REPORT IMAGE BYTES: '
-            '$totalImageBytes',
+        '$totalImageBytes',
       );
 
       debugPrint(
         'REPORT IMAGE SIZE MB: '
-            '${(totalImageBytes / 1024 / 1024).toStringAsFixed(2)} MB',
+        '${(totalImageBytes / 1024 / 1024).toStringAsFixed(2)} MB',
       );
-
 
       // ==========================================================
       // UPLOAD
       // ==========================================================
 
-      final uploadWatch =
-      Stopwatch()
-        ..start();
+      final uploadWatch = Stopwatch()..start();
 
-
-      final response =
-      await DioClient.postUpload(
+      final response = await DioClient.postUpload(
         '/api/report',
         data: formData,
       );
 
-
       uploadWatch.stop();
-
 
       debugPrint(
         'REPORT UPLOAD TIME: '
-            '${uploadWatch.elapsedMilliseconds} ms',
+        '${uploadWatch.elapsedMilliseconds} ms',
       );
-
 
       hideLoading();
 
-
       if (!mounted) return;
 
+      final statusCode = response.statusCode ?? 0;
 
-      final statusCode =
-          response.statusCode ?? 0;
-
-
-      final serverResult =
-      _parseServerResponse(
-        response.data,
-      );
-
+      final serverResult = _parseServerResponse(response.data);
 
       debugPrint(
         'REPORT RESPONSE STATUS: '
-            '$statusCode',
+        '$statusCode',
       );
 
       debugPrint(
         'REPORT RESPONSE CODE: '
-            '${serverResult.code}',
+        '${serverResult.code}',
       );
 
       debugPrint(
         'REPORT RESPONSE MESSAGE: '
-            '${serverResult.message}',
+        '${serverResult.message}',
       );
-
 
       // ==========================================================
       // SUCCESS
       // ==========================================================
 
-      if (
-      statusCode >= 200
-          && statusCode < 300
-      ) {
+      if (statusCode >= 200 && statusCode < 300) {
         CommonUI.showSnackBar(
           context: context,
-          message:
-          'Successfully sent ${images.length} images!',
-          color:
-          Colors.green,
+          message: 'Successfully sent ${images.length} images!',
+          color: Colors.green,
         );
-
 
         _resetForm();
 
         return;
       }
 
-
       // ==========================================================
       // SERVER ERROR
       // ==========================================================
 
       _showReportServerError(
-        statusCode:
-        statusCode,
+        statusCode: statusCode,
 
-        serverCode:
-        serverResult.code,
+        serverCode: serverResult.code,
 
-        serverMessage:
-        serverResult.message,
+        serverMessage: serverResult.message,
 
-        qrKey:
-        qrKey,
+        qrKey: qrKey,
       );
-    } on DioException catch (
-    error,
-    stackTrace
-    ) {
+    } on DioException catch (error, stackTrace) {
       hideLoading();
-
-      debugPrint(
-        '========== SEND REPORT DIO ERROR ==========',
-      );
-
-      debugPrint(
-        'TYPE: ${error.type}',
-      );
-
-      debugPrint(
-        'STATUS: ${error.response?.statusCode}',
-      );
-
-      debugPrint(
-        'DATA: ${error.response?.data}',
-      );
-
-      debugPrint(
-        'MESSAGE: ${error.message}',
-      );
-
-      debugPrintStack(
-        stackTrace:
-        stackTrace,
-      );
-
 
       if (!mounted) return;
 
-
-      _handleReportDioError(
-        error:
-        error,
-
-        qrKey:
-        qrKey,
-      );
-    } catch (
-    error,
-    stackTrace
-    ) {
+      _handleReportDioError(error: error, qrKey: qrKey);
+    } catch (error, stackTrace) {
       hideLoading();
 
-
-      debugPrint(
-        '========== SEND REPORT FLUTTER ERROR ==========',
-      );
-
-      debugPrint(
-        'ERROR: $error',
-      );
-
-      debugPrintStack(
-        stackTrace:
-        stackTrace,
-      );
-
+      debugPrintStack(stackTrace: stackTrace);
 
       if (!mounted) return;
-
 
       CommonUI.showSnackBar(
         context: context,
-        message:
-        ApiErrorMessage.fromFlutter(
-          error,
-        ),
-        color:
-        Colors.red,
+        message: ApiErrorMessage.fromFlutter(error),
+        color: Colors.red,
       );
     } finally {
       hideLoading();
 
-
       totalWatch.stop();
-
-
-      debugPrint(
-        'REPORT TOTAL TIME: '
-            '${totalWatch.elapsedMilliseconds} ms',
-      );
-
 
       // ==========================================================
       // CAMERA WAKE
       // ==========================================================
 
-      if (
-      !cameraWasSleeping
-          && mounted
-      ) {
-        final cameraWakeWatch =
-        Stopwatch()
-          ..start();
-
-
-        final started =
-        await cameraState?.wakeCamera();
-
+      if (!cameraWasSleeping && mounted) {
+        final cameraWakeWatch = Stopwatch()..start();
 
         cameraWakeWatch.stop();
-
-
-        debugPrint(
-          'REPORT CAMERA WAKE TIME: '
-              '${cameraWakeWatch.elapsedMilliseconds} ms',
-        );
-
-        debugPrint(
-          'REPORT CAMERA WAKE RESULT: '
-              '$started',
-        );
       }
-
 
       if (mounted) {
         setState(() {
@@ -1572,9 +1302,7 @@ class _CameraScreenState extends State<CameraScreen> {
       );
     }
 
-    if (responseData is String && responseData
-        .trim()
-        .isNotEmpty) {
+    if (responseData is String && responseData.trim().isNotEmpty) {
       final raw = responseData.trim();
 
       try {
@@ -1682,7 +1410,7 @@ class _CameraScreenState extends State<CameraScreen> {
           context: context,
           title: 'Upload Timeout',
           message:
-          'The images took too long to upload. Please check the network and try again.',
+              'The images took too long to upload. Please check the network and try again.',
         );
         return;
 
@@ -1691,7 +1419,7 @@ class _CameraScreenState extends State<CameraScreen> {
           context: context,
           title: 'Server Timeout',
           message:
-          'The server is still processing the report. Please check the report before sending again.',
+              'The server is still processing the report. Please check the report before sending again.',
         );
         return;
 
@@ -1700,7 +1428,7 @@ class _CameraScreenState extends State<CameraScreen> {
           context: context,
           title: 'Connection Error',
           message:
-          'Unable to connect to the server. Please check the network connection.',
+              'Unable to connect to the server. Please check the network connection.',
         );
         return;
 
@@ -1908,21 +1636,21 @@ class _CameraScreenState extends State<CameraScreen> {
               ),
               child: _cameraSwitching
                   ? const SizedBox(
-                width: 15,
-                height: 15,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: Colors.white,
-                ),
-              )
+                      width: 15,
+                      height: 15,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
                   : Text(
-                sleeping ? 'WAKE' : 'OFF',
-                style: TextStyle(
-                  color: sleeping ? Colors.white : Colors.black,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
+                      sleeping ? 'WAKE' : 'OFF',
+                      style: TextStyle(
+                        color: sleeping ? Colors.white : Colors.black,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
             ),
           ),
         ],
@@ -2137,9 +1865,9 @@ class _CameraScreenState extends State<CameraScreen> {
                                     onTap: _isSubmitting
                                         ? null
                                         : () {
-                                      _cameraKey.currentState
-                                          ?.removeImage(index);
-                                    },
+                                            _cameraKey.currentState
+                                                ?.removeImage(index);
+                                          },
                                     child: Container(
                                       padding: const EdgeInsets.all(2),
                                       decoration: const BoxDecoration(
@@ -2176,10 +1904,7 @@ class _CameraScreenState extends State<CameraScreen> {
         ],
       ),
       body: Container(
-        height: MediaQuery
-            .of(context)
-            .size
-            .height,
+        height: MediaQuery.of(context).size.height,
 
         decoration: BoxDecoration(
           gradient: const LinearGradient(
@@ -2236,8 +1961,8 @@ class _CameraScreenState extends State<CameraScreen> {
 
                             final isFallbackMachine =
                                 _qrFallbackMachine != null &&
-                                    _norm(_qrFallbackMachine!.macId) ==
-                                        _norm(_selectedMachine);
+                                _norm(_qrFallbackMachine!.macId) ==
+                                    _norm(_selectedMachine);
 
                             if (!isFallbackMachine) {
                               _selectedMachine = null;
@@ -2246,13 +1971,13 @@ class _CameraScreenState extends State<CameraScreen> {
                             if (isFallbackMachine) {
                               _qrFallbackMachine = HseMachineInfo(
                                 plant:
-                                _selectedPlant ??
+                                    _selectedPlant ??
                                     widget.selectedPlant ??
                                     '',
                                 fac: v ?? '',
                                 area: _selectedArea ?? '',
                                 macId:
-                                _selectedMachine ??
+                                    _selectedMachine ??
                                     _qrFallbackMachine!.macId,
                               );
                             }
@@ -2288,7 +2013,7 @@ class _CameraScreenState extends State<CameraScreen> {
                           label: "area".tr(context),
                           selectedValue: _selectedArea,
                           items:
-                          (_selectedPlant == null || _selectedFac == null)
+                              (_selectedPlant == null || _selectedFac == null)
                               ? <String>[]
                               : areaList.cast<String>(),
                           onChanged: (v) {
@@ -2299,8 +2024,8 @@ class _CameraScreenState extends State<CameraScreen> {
 
                               final isFallbackMachine =
                                   _qrFallbackMachine != null &&
-                                      _norm(_qrFallbackMachine!.macId) ==
-                                          _norm(_selectedMachine);
+                                  _norm(_qrFallbackMachine!.macId) ==
+                                      _norm(_selectedMachine);
 
                               if (!isFallbackMachine) {
                                 _selectedMachine = null;
@@ -2309,13 +2034,13 @@ class _CameraScreenState extends State<CameraScreen> {
                               if (isFallbackMachine) {
                                 _qrFallbackMachine = HseMachineInfo(
                                   plant:
-                                  _selectedPlant ??
+                                      _selectedPlant ??
                                       widget.selectedPlant ??
                                       '',
                                   fac: _selectedFac ?? '',
                                   area: v ?? '',
                                   macId:
-                                  _selectedMachine ??
+                                      _selectedMachine ??
                                       _qrFallbackMachine!.macId,
                                 );
                               }
@@ -2345,9 +2070,9 @@ class _CameraScreenState extends State<CameraScreen> {
                         label: "machine".tr(context),
                         selectedValue: _selectedMachine,
                         items:
-                        (_selectedPlant == null ||
-                            _selectedFac == null ||
-                            _selectedArea == null)
+                            (_selectedPlant == null ||
+                                _selectedFac == null ||
+                                _selectedArea == null)
                             ? <String>[]
                             : machineList.cast<String>(),
                         onChanged: _onMachineChanged,
@@ -2423,11 +2148,10 @@ class _CameraScreenState extends State<CameraScreen> {
 
                             return allOptionsComment
                                 .where(
-                                  (option) =>
-                                  option.inputText
+                                  (option) => option.inputText
                                       .toLowerCase()
                                       .contains(keyword),
-                            )
+                                )
                                 .take(5);
                           },
 
@@ -2464,113 +2188,111 @@ class _CameraScreenState extends State<CameraScreen> {
                           },
 
                           fieldViewBuilder:
-                              (context,
-                              controller,
-                              focusNode,
-                              onFieldSubmitted,) {
-                            // Không gán lại _commentController = controller.
-                            // RawAutocomplete đang dùng chính _commentController.
-                            return ValueListenableBuilder<double>(
-                              valueListenable: _commentFontSizeNotifier,
-                              builder: (context, fontSize, _) {
-                                return TextField(
-                                  controller: controller,
-                                  focusNode: focusNode,
-                                  enabled: !_isSubmitting,
-                                  maxLines: 3,
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: fontSize,
-                                  ),
-                                  decoration: InputDecoration(
-                                    filled: true,
-                                    hint: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Text(
-                                          'commentHint'.tr(context),
-                                          style: TextStyle(
-                                            color: Colors.red.withOpacity(
-                                              .6,
+                              (
+                                context,
+                                controller,
+                                focusNode,
+                                onFieldSubmitted,
+                              ) {
+                                // Không gán lại _commentController = controller.
+                                // RawAutocomplete đang dùng chính _commentController.
+                                return ValueListenableBuilder<double>(
+                                  valueListenable: _commentFontSizeNotifier,
+                                  builder: (context, fontSize, _) {
+                                    return TextField(
+                                      controller: controller,
+                                      focusNode: focusNode,
+                                      enabled: !_isSubmitting,
+                                      maxLines: 3,
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: fontSize,
+                                      ),
+                                      decoration: InputDecoration(
+                                        filled: true,
+                                        hint: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Text(
+                                              'commentHint'.tr(context),
+                                              style: TextStyle(
+                                                color: Colors.red.withOpacity(
+                                                  .6,
+                                                ),
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.bold,
+                                              ),
                                             ),
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.bold,
+                                            const SizedBox(width: 4),
+                                            Icon(
+                                              Icons.star_rounded,
+                                              size: 14,
+                                              color: Colors.red.withOpacity(.6),
+                                            ),
+                                          ],
+                                        ),
+                                        fillColor: Colors.green.withOpacity(
+                                          .08,
+                                        ),
+                                        border: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            14,
+                                          ),
+                                          borderSide: BorderSide(
+                                            color: Colors.white.withOpacity(
+                                              .35,
+                                            ),
                                           ),
                                         ),
-                                        const SizedBox(width: 4),
-                                        Icon(
-                                          Icons.star_rounded,
-                                          size: 14,
-                                          color: Colors.red.withOpacity(.6),
+                                        enabledBorder: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            14,
+                                          ),
+                                          borderSide: BorderSide(
+                                            color: const Color(
+                                              0xFF90E14D,
+                                            ).withOpacity(.25),
+                                          ),
                                         ),
-                                      ],
-                                    ),
-                                    fillColor: Colors.green.withOpacity(
-                                      .08,
-                                    ),
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(
-                                        14,
-                                      ),
-                                      borderSide: BorderSide(
-                                        color: Colors.white.withOpacity(
-                                          .35,
+                                        focusedBorder: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            14,
+                                          ),
+                                          borderSide: BorderSide(
+                                            color: const Color(
+                                              0xFF90E14D,
+                                            ).withOpacity(.45),
+                                          ),
+                                        ),
+                                        contentPadding: const EdgeInsets.all(
+                                          12,
                                         ),
                                       ),
-                                    ),
-                                    enabledBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(
-                                        14,
-                                      ),
-                                      borderSide: BorderSide(
-                                        color: const Color(
-                                          0xFF90E14D,
-                                        ).withOpacity(.25),
-                                      ),
-                                    ),
-                                    focusedBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(
-                                        14,
-                                      ),
-                                      borderSide: BorderSide(
-                                        color: const Color(
-                                          0xFF90E14D,
-                                        ).withOpacity(.45),
-                                      ),
-                                    ),
-                                    contentPadding: const EdgeInsets.all(
-                                      12,
-                                    ),
-                                  ),
-                                  onChanged: (value) {
-                                    _commentFontSizeNotifier.value =
-                                        _resolveFontSize(value);
+                                      onChanged: (value) {
+                                        _commentFontSizeNotifier.value =
+                                            _resolveFontSize(value);
 
-                                    if (value
-                                        .trim()
-                                        .isEmpty) {
-                                      _counterController.clear();
-                                      _counterFontSizeNotifier.value = 14;
-                                    }
-
-                                    _commentDebounce?.cancel();
-                                    _commentDebounce = Timer(
-                                      const Duration(milliseconds: 250),
-                                          () {
-                                        _comment = value;
-
-                                        if (value
-                                            .trim()
-                                            .isEmpty) {
-                                          _counterMeasure = '';
+                                        if (value.trim().isEmpty) {
+                                          _counterController.clear();
+                                          _counterFontSizeNotifier.value = 14;
                                         }
+
+                                        _commentDebounce?.cancel();
+                                        _commentDebounce = Timer(
+                                          const Duration(milliseconds: 250),
+                                          () {
+                                            _comment = value;
+
+                                            if (value.trim().isEmpty) {
+                                              _counterMeasure = '';
+                                            }
+                                          },
+                                        );
                                       },
                                     );
                                   },
                                 );
                               },
-                            );
-                          },
 
                           optionsViewBuilder: (context, onSelected, options) {
                             final optionList = options.toList(growable: false);
@@ -2593,10 +2315,10 @@ class _CameraScreenState extends State<CameraScreen> {
                                       shrinkWrap: true,
                                       itemCount: optionList.length,
                                       separatorBuilder: (_, __) =>
-                                      const Divider(
-                                        height: 1,
-                                        thickness: .5,
-                                      ),
+                                          const Divider(
+                                            height: 1,
+                                            thickness: .5,
+                                          ),
                                       itemBuilder: (context, index) {
                                         final option = optionList[index];
 
@@ -2641,9 +2363,9 @@ class _CameraScreenState extends State<CameraScreen> {
                             textEditingController: _counterController,
                             focusNode: _counterFocusNode,
                             optionsViewOpenDirection:
-                            OptionsViewOpenDirection.up,
+                                OptionsViewOpenDirection.up,
                             displayStringForOption: (option) =>
-                            option.inputText,
+                                option.inputText,
 
                             optionsBuilder: (TextEditingValue value) {
                               final keyword = value.text.trim().toLowerCase();
@@ -2654,11 +2376,10 @@ class _CameraScreenState extends State<CameraScreen> {
 
                               return allOptionsCounter
                                   .where(
-                                    (option) =>
-                                    option.inputText
+                                    (option) => option.inputText
                                         .toLowerCase()
                                         .contains(keyword),
-                              )
+                                  )
                                   .take(5);
                             },
 
@@ -2680,86 +2401,88 @@ class _CameraScreenState extends State<CameraScreen> {
                             },
 
                             fieldViewBuilder:
-                                (context,
-                                controller,
-                                focusNode,
-                                onFieldSubmitted,) {
-                              // Không gán lại _counterController = controller.
-                              return ValueListenableBuilder<double>(
-                                valueListenable: _counterFontSizeNotifier,
-                                builder: (context, fontSize, _) {
-                                  return TextField(
-                                    controller: controller,
-                                    focusNode: focusNode,
-                                    enabled: !_isSubmitting,
-                                    maxLines: 3,
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: fontSize,
-                                    ),
-                                    decoration: InputDecoration(
-                                      hintText: 'counterMeasureHint'.tr(
-                                        context,
-                                      ),
-                                      filled: true,
-                                      fillColor: Colors.green.withOpacity(
-                                        .08,
-                                      ),
-                                      hintStyle: TextStyle(
-                                        color: Colors.white.withOpacity(.6),
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                      border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(
-                                          14,
+                                (
+                                  context,
+                                  controller,
+                                  focusNode,
+                                  onFieldSubmitted,
+                                ) {
+                                  // Không gán lại _counterController = controller.
+                                  return ValueListenableBuilder<double>(
+                                    valueListenable: _counterFontSizeNotifier,
+                                    builder: (context, fontSize, _) {
+                                      return TextField(
+                                        controller: controller,
+                                        focusNode: focusNode,
+                                        enabled: !_isSubmitting,
+                                        maxLines: 3,
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: fontSize,
                                         ),
-                                        borderSide: BorderSide(
-                                          color: Colors.white.withOpacity(
-                                            .35,
+                                        decoration: InputDecoration(
+                                          hintText: 'counterMeasureHint'.tr(
+                                            context,
+                                          ),
+                                          filled: true,
+                                          fillColor: Colors.green.withOpacity(
+                                            .08,
+                                          ),
+                                          hintStyle: TextStyle(
+                                            color: Colors.white.withOpacity(.6),
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                          border: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              14,
+                                            ),
+                                            borderSide: BorderSide(
+                                              color: Colors.white.withOpacity(
+                                                .35,
+                                              ),
+                                            ),
+                                          ),
+                                          enabledBorder: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              14,
+                                            ),
+                                            borderSide: BorderSide(
+                                              color: const Color(
+                                                0xFF90E14D,
+                                              ).withOpacity(.25),
+                                            ),
+                                          ),
+                                          focusedBorder: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              14,
+                                            ),
+                                            borderSide: BorderSide(
+                                              color: const Color(
+                                                0xFF90E14D,
+                                              ).withOpacity(.45),
+                                            ),
+                                          ),
+                                          contentPadding: const EdgeInsets.all(
+                                            12,
                                           ),
                                         ),
-                                      ),
-                                      enabledBorder: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(
-                                          14,
-                                        ),
-                                        borderSide: BorderSide(
-                                          color: const Color(
-                                            0xFF90E14D,
-                                          ).withOpacity(.25),
-                                        ),
-                                      ),
-                                      focusedBorder: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(
-                                          14,
-                                        ),
-                                        borderSide: BorderSide(
-                                          color: const Color(
-                                            0xFF90E14D,
-                                          ).withOpacity(.45),
-                                        ),
-                                      ),
-                                      contentPadding: const EdgeInsets.all(
-                                        12,
-                                      ),
-                                    ),
-                                    onChanged: (value) {
-                                      _counterFontSizeNotifier.value =
-                                          _resolveFontSize(value);
+                                        onChanged: (value) {
+                                          _counterFontSizeNotifier.value =
+                                              _resolveFontSize(value);
 
-                                      _counterDebounce?.cancel();
-                                      _counterDebounce = Timer(
-                                        const Duration(milliseconds: 250),
+                                          _counterDebounce?.cancel();
+                                          _counterDebounce = Timer(
+                                            const Duration(milliseconds: 250),
                                             () {
-                                          _counterMeasure = value;
+                                              _counterMeasure = value;
+                                            },
+                                          );
                                         },
                                       );
                                     },
                                   );
                                 },
-                              );
-                            },
 
                             optionsViewBuilder: (context, onSelected, options) {
                               final optionList = options.toList(
@@ -2784,10 +2507,10 @@ class _CameraScreenState extends State<CameraScreen> {
                                         shrinkWrap: true,
                                         itemCount: optionList.length,
                                         separatorBuilder: (_, __) =>
-                                        const Divider(
-                                          height: 1,
-                                          thickness: .5,
-                                        ),
+                                            const Divider(
+                                              height: 1,
+                                              thickness: .5,
+                                            ),
                                         itemBuilder: (context, index) {
                                           final option = optionList[index];
 
@@ -2795,10 +2518,10 @@ class _CameraScreenState extends State<CameraScreen> {
                                             onTap: () => onSelected(option),
                                             child: Padding(
                                               padding:
-                                              const EdgeInsets.symmetric(
-                                                horizontal: 16,
-                                                vertical: 14,
-                                              ),
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 16,
+                                                    vertical: 14,
+                                                  ),
                                               child: Text(
                                                 option.inputText,
                                                 maxLines: 3,
@@ -2840,10 +2563,10 @@ class _CameraScreenState extends State<CameraScreen> {
                           onChanged: _isSubmitting
                               ? null
                               : (v) =>
-                              setState(() => _needRecheck = v ?? false),
+                                    setState(() => _needRecheck = v ?? false),
                           activeColor: Colors.orange.shade700,
                           materialTapTargetSize:
-                          MaterialTapTargetSize.shrinkWrap,
+                              MaterialTapTargetSize.shrinkWrap,
                           visualDensity: VisualDensity.compact,
                         ),
                       ),
@@ -2864,16 +2587,15 @@ class _CameraScreenState extends State<CameraScreen> {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) =>
-                                  EditBeforeScreen(
-                                    machines: widget.machines,
-                                    accountCode: widget.accountCode,
-                                    selectedFac: _selectedFac,
-                                    selectedPlant: _selectedPlant,
-                                    selectedGrp: widget.autoTeam?.grp ?? '',
-                                    titleScreen: widget.titleScreen,
-                                    patrolGroup: widget.patrolGroup,
-                                  ),
+                              builder: (_) => EditBeforeScreen(
+                                machines: widget.machines,
+                                accountCode: widget.accountCode,
+                                selectedFac: _selectedFac,
+                                selectedPlant: _selectedPlant,
+                                selectedGrp: widget.autoTeam?.grp ?? '',
+                                titleScreen: widget.titleScreen,
+                                patrolGroup: widget.patrolGroup,
+                              ),
                             ),
                           );
                         },
@@ -3179,7 +2901,7 @@ class _CameraScreenState extends State<CameraScreen> {
               return result;
             },
             compareFn: (item, selectedItem) =>
-            item.trim() == selectedItem.trim(),
+                item.trim() == selectedItem.trim(),
 
             selectedItem: selectedValue ?? '',
 
@@ -3243,7 +2965,6 @@ class _CameraScreenState extends State<CameraScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-
                   /// 📝 TEXT
                   Expanded(
                     child: AutoSizeText(
@@ -3406,91 +3127,89 @@ class _CameraScreenState extends State<CameraScreen> {
     showDialog(
       context: context,
       barrierColor: Colors.black54,
-      builder: (_) =>
-          Dialog(
-            backgroundColor: Colors.transparent,
-            insetPadding: const EdgeInsets.symmetric(horizontal: 24),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(20),
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-                child: Container(
-                  padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.55),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: Colors.white.withOpacity(0.15)),
+      builder: (_) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 24),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+            child: Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.55),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: Colors.white.withOpacity(0.15)),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  /// ICON
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: iconColor.withOpacity(0.15),
+                    ),
+                    child: Icon(icon, color: iconColor, size: 42),
                   ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
 
-                      /// ICON
-                      Container(
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: iconColor.withOpacity(0.15),
-                        ),
-                        child: Icon(icon, color: iconColor, size: 42),
+                  const SizedBox(height: 16),
+
+                  /// TITLE
+                  if (title.isNotEmpty)
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
                       ),
+                    ),
 
-                      const SizedBox(height: 16),
+                  if (message.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      message,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Colors.white70,
+                      ),
+                    ),
+                  ],
 
-                      /// TITLE
-                      if (title.isNotEmpty)
-                        Text(
-                          title,
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white,
-                          ),
-                        ),
+                  const SizedBox(height: 22),
 
-                      if (message.isNotEmpty) ...[
-                        const SizedBox(height: 8),
-                        Text(
-                          message,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            color: Colors.white70,
-                          ),
-                        ),
-                      ],
-
-                      const SizedBox(height: 22),
-
-                      /// BUTTON
-                      SizedBox(
-                        width: 150,
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.white.withOpacity(0.9),
-                            foregroundColor: Colors.black,
-                            elevation: 0,
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                          ),
-                          onPressed: () {
-                            Navigator.pop(context);
-                            onPressed?.call();
-                          },
-                          child: Text(
-                            buttonText,
-                            style: const TextStyle(fontWeight: FontWeight.w600),
-                          ),
+                  /// BUTTON
+                  SizedBox(
+                    width: 150,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.white.withOpacity(0.9),
+                        foregroundColor: Colors.black,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
                         ),
                       ),
-                    ],
+                      onPressed: () {
+                        Navigator.pop(context);
+                        onPressed?.call();
+                      },
+                      child: Text(
+                        buttonText,
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                    ),
                   ),
-                ),
+                ],
               ),
             ),
           ),
+        ),
+      ),
     );
   }
 }

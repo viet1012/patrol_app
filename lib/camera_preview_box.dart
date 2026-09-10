@@ -3637,7 +3637,13 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
   // =========================
   // Config
   // =========================
-  static const int _maxImages = 3;
+  int get _maxImages {
+    if (widget.patrolGroup == PatrolGroup.AssetUpdate) {
+      return 10;
+    }
+
+    return 3;
+  }
 
   static const int _maxCaptureEdge = 2048;
   static const int _maxImportedEdge = 1600;
