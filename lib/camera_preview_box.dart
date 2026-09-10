@@ -3982,8 +3982,21 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
    * Chỉ QR Patrol dạng số mới hiện trên badge.
    * QR máy không xóa QR Patrol trước đó.
    */
-    if (_isQrNumber(qr) && _patrolQrNotifier.value != qr) {
-      _patrolQrNotifier.value = qr;
+    // if (_isQrNumber(qr) && _patrolQrNotifier.value != qr) {
+    //   _patrolQrNotifier.value = qr;
+    // }
+
+    if (widget.patrolGroup == PatrolGroup.Patrol) {
+      // Patrol chỉ hiện QR dạng số
+      if (_isQrNumber(qr) && _patrolQrNotifier.value != qr) {
+        _patrolQrNotifier.value = qr;
+      }
+    } else {
+      // Asset / các loại khác:
+      // hiện nguyên nội dung QR
+      if (_patrolQrNotifier.value != qr) {
+        _patrolQrNotifier.value = qr;
+      }
     }
 
     if (haptic) {
@@ -4022,10 +4035,23 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
               controller: controller,
               autofocus: true,
               style: const TextStyle(color: Colors.white),
+
+              keyboardType: widget.patrolGroup == PatrolGroup.Patrol
+                  ? TextInputType.number
+                  : TextInputType.text,
+
+              inputFormatters: widget.patrolGroup == PatrolGroup.Patrol
+                  ? [
+                      FilteringTextInputFormatter.digitsOnly,
+                      LengthLimitingTextInputFormatter(5),
+                    ]
+                  : null,
+
               decoration: const InputDecoration(
                 hintText: 'Input QR code manually',
                 hintStyle: TextStyle(color: Colors.white54),
               ),
+
               onSubmitted: (text) {
                 Navigator.pop(dialogContext, text.trim());
               },

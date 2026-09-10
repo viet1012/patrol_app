@@ -739,10 +739,127 @@ class _CameraScreenState extends State<CameraScreen> {
     }
   }
 
+  // Future<void> _handleQrDetected(String qr) async {
+  //   final rawQr = qr.trim();
+  //
+  //   if (rawQr.isEmpty) return;
+  //
+  //   final isQrNumber = RegExp(r'^\d+$').hasMatch(rawQr);
+  //
+  //   // ============================================================
+  //   // QR NUMBER
+  //   // ============================================================
+  //
+  //   if (isQrNumber) {
+  //     // Ch? Patrol m?i ki?m tra QR trùng.
+  //     if (widget.patrolGroup == PatrolGroup.Patrol) {
+  //       await _handlePatrolQr(rawQr);
+  //       return;
+  //     }
+  //
+  //     // Audit / Quality Patrol / Asset Update:
+  //     // ch? luu QR, không g?i API check trùng.
+  //     if (!mounted) return;
+  //
+  //     setState(() {
+  //       _qrKey = rawQr;
+  //     });
+  //
+  //     return;
+  //   }
+  //
+  //   // ============================================================
+  //   // QR MACHINE
+  //   // ============================================================
+  //
+  //   if (_isLoadingMachineInfo) return;
+  //
+  //   final macId = _extractMacIdFromQr(rawQr);
+  //
+  //   if (macId.trim().isEmpty) return;
+  //
+  //   setState(() {
+  //     _isLoadingMachineInfo = true;
+  //     _loadingMacId = macId;
+  //   });
+  //
+  //   try {
+  //     final apiInfo = await _fetchMachineInfoByMacId(macId);
+  //
+  //     if (!mounted) return;
+  //
+  //     final fallbackInfo = _buildFallbackMachineInfoFromQr(
+  //       rawQr: rawQr,
+  //       macId: macId,
+  //     );
+  //
+  //     final info = apiInfo ?? fallbackInfo;
+  //
+  //     final validInMaster = _existsInLocalMaster(info);
+  //
+  //     final samePlant = _norm(info.plant) == _norm(widget.selectedPlant);
+  //
+  //     final shouldUseFallback = apiInfo == null || !validInMaster || !samePlant;
+  //
+  //     final selectedInfo = shouldUseFallback ? fallbackInfo : info;
+  //
+  //     setState(() {
+  //       _qrFallbackMachine = shouldUseFallback ? fallbackInfo : null;
+  //
+  //       _selectedPlant = selectedInfo.plant;
+  //       _selectedFac = selectedInfo.fac;
+  //       _selectedArea = selectedInfo.area;
+  //       _selectedMachine = selectedInfo.macId;
+  //
+  //       // Không thay d?i _qrKey.
+  //       // Quét QR máy không du?c làm m?t QR Patrol.
+  //     });
+  //
+  //     if (_aiEnabled) {
+  //       _loadMachineAiSummary(selectedInfo.macId);
+  //     }
+  //
+  //     CommonUI.showSnackBar(
+  //       context: context,
+  //       message: shouldUseFallback
+  //           ? 'Machine added from QR: ${selectedInfo.macId}'
+  //           : 'Machine detected: ${selectedInfo.macId}',
+  //       color: shouldUseFallback ? Colors.orange : Colors.green,
+  //     );
+  //   } finally {
+  //     if (!mounted) return;
+  //
+  //     setState(() {
+  //       _isLoadingMachineInfo = false;
+  //       _loadingMacId = null;
+  //     });
+  //   }
+  // }
   Future<void> _handleQrDetected(String qr) async {
     final rawQr = qr.trim();
 
-    if (rawQr.isEmpty) return;
+    if (rawQr.isEmpty) {
+      return;
+    }
+
+    // ============================================================
+    // ASSET UPDATE
+    // QR bất kỳ đều chính là qr_key của report.
+    // Không check duplicate.
+    // Không parse thành machine QR.
+    // ============================================================
+
+    if (widget.patrolGroup == PatrolGroup.AssetUpdate) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _qrKey = rawQr;
+      });
+
+      return;
+    }
 
     final isQrNumber = RegExp(r'^\d+$').hasMatch(rawQr);
 
@@ -751,15 +868,18 @@ class _CameraScreenState extends State<CameraScreen> {
     // ============================================================
 
     if (isQrNumber) {
-      // Ch? Patrol m?i ki?m tra QR trùng.
+      // Chỉ Patrol mới check QR trùng.
       if (widget.patrolGroup == PatrolGroup.Patrol) {
         await _handlePatrolQr(rawQr);
+
         return;
       }
 
-      // Audit / Quality Patrol / Asset Update:
-      // ch? luu QR, không g?i API check trùng.
-      if (!mounted) return;
+      // Audit / Quality Patrol / các loại khác:
+      // chỉ lưu QR, không check duplicate.
+      if (!mounted) {
+        return;
+      }
 
       setState(() {
         _qrKey = rawQr;
@@ -770,13 +890,21 @@ class _CameraScreenState extends State<CameraScreen> {
 
     // ============================================================
     // QR MACHINE
+    //
+    // AssetUpdate đã return phía trên,
+    // nên phần này chỉ còn áp dụng cho Patrol /
+    // Quality Patrol / Audit... theo flow hiện tại.
     // ============================================================
 
-    if (_isLoadingMachineInfo) return;
+    if (_isLoadingMachineInfo) {
+      return;
+    }
 
     final macId = _extractMacIdFromQr(rawQr);
 
-    if (macId.trim().isEmpty) return;
+    if (macId.trim().isEmpty) {
+      return;
+    }
 
     setState(() {
       _isLoadingMachineInfo = true;
@@ -786,7 +914,9 @@ class _CameraScreenState extends State<CameraScreen> {
     try {
       final apiInfo = await _fetchMachineInfoByMacId(macId);
 
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
 
       final fallbackInfo = _buildFallbackMachineInfoFromQr(
         rawQr: rawQr,
@@ -807,12 +937,15 @@ class _CameraScreenState extends State<CameraScreen> {
         _qrFallbackMachine = shouldUseFallback ? fallbackInfo : null;
 
         _selectedPlant = selectedInfo.plant;
+
         _selectedFac = selectedInfo.fac;
+
         _selectedArea = selectedInfo.area;
+
         _selectedMachine = selectedInfo.macId;
 
-        // Không thay d?i _qrKey.
-        // Quét QR máy không du?c làm m?t QR Patrol.
+        // Không thay đổi _qrKey.
+        // QR machine không được làm mất QR Patrol.
       });
 
       if (_aiEnabled) {
@@ -827,7 +960,9 @@ class _CameraScreenState extends State<CameraScreen> {
         color: shouldUseFallback ? Colors.orange : Colors.green,
       );
     } finally {
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
 
       setState(() {
         _isLoadingMachineInfo = false;
