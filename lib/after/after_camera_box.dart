@@ -4,14 +4,13 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui_web' as ui_web;
 
-import 'package:chuphinh/socket/SttWebSocket.dart';
 import 'package:chuphinh/widget/glass_circle_button.dart';
 import 'package:chuphinh/widget/glass_zoom_control.dart';
 import 'package:flutter/material.dart';
 
 import '../homeScreen/patrol_home_screen.dart';
 
-class CameraAfterBox extends StatefulWidget {
+class AfterCameraBox extends StatefulWidget {
   final double size;
 
   final ValueChanged<List<Uint8List>>? onImagesChanged;
@@ -26,7 +25,7 @@ class CameraAfterBox extends StatefulWidget {
 
   final PatrolGroup patrolGroup;
 
-  const CameraAfterBox({
+  const AfterCameraBox({
     super.key,
     this.size = 320,
     this.onImagesChanged,
@@ -38,10 +37,10 @@ class CameraAfterBox extends StatefulWidget {
   });
 
   @override
-  State<CameraAfterBox> createState() => CameraAfterBoxState();
+  State<AfterCameraBox> createState() => AfterCameraBoxState();
 }
 
-class CameraAfterBoxState extends State<CameraAfterBox>
+class AfterCameraBoxState extends State<AfterCameraBox>
     with SingleTickerProviderStateMixin {
   // ============================================================
   // CONSTANTS
@@ -69,6 +68,8 @@ class CameraAfterBoxState extends State<CameraAfterBox>
 
   bool _cameraReady = false;
 
+  int _cameraSession = 0;
+
   // ============================================================
   // CAPTURE
   // ============================================================
@@ -84,18 +85,6 @@ class CameraAfterBoxState extends State<CameraAfterBox>
   // ============================================================
 
   late final AnimationController _flashController;
-
-  // ============================================================
-  // META
-  // ============================================================
-
-  late String _fac;
-
-  late String _group;
-
-  int stt = 0;
-
-  SttWebSocket? sttSocket;
 
   // ============================================================
   // GETTERS
@@ -115,10 +104,6 @@ class CameraAfterBoxState extends State<CameraAfterBox>
   void initState() {
     super.initState();
 
-    _fac = _normalize(widget.plant);
-
-    _group = _normalize(widget.group);
-
     _viewType = _newViewType();
 
     _flashController = AnimationController(
@@ -130,39 +115,15 @@ class CameraAfterBoxState extends State<CameraAfterBox>
   }
 
   // ============================================================
-  // UPDATE
-  // ============================================================
-
-  @override
-  void didUpdateWidget(covariant CameraAfterBox oldWidget) {
-    super.didUpdateWidget(oldWidget);
-
-    final newFac = _normalize(widget.plant);
-
-    final newGroup = _normalize(widget.group);
-
-    if (_fac == newFac && _group == newGroup) {
-      return;
-    }
-
-    _fac = newFac;
-
-    _group = newGroup;
-
-    debugPrint('CameraAfterBox updated: fac=$_fac, group=$_group');
-  }
-
-  // ============================================================
   // DISPOSE
   // ============================================================
 
   @override
   void dispose() {
+    _cameraSession++;
     _flashController.dispose();
 
-    _disposeCamera();
-
-    sttSocket?.dispose();
+    _disposeCamera(invalidateSession: false);
 
     super.dispose();
   }
@@ -176,11 +137,14 @@ class CameraAfterBoxState extends State<CameraAfterBox>
       return;
     }
 
+    _disposeCamera();
+    final session = ++_cameraSession;
     _cameraStarting = true;
 
-    try {
-      _disposeCamera();
+    html.MediaStream? createdStream;
+    html.VideoElement? createdVideo;
 
+    try {
       final viewType = _newViewType();
 
       final mediaDevices = html.window.navigator.mediaDevices;
@@ -189,21 +153,22 @@ class CameraAfterBoxState extends State<CameraAfterBox>
         throw StateError('MediaDevices is unavailable.');
       }
 
-      final stream = await mediaDevices.getUserMedia({
+      createdStream = await mediaDevices.getUserMedia({
         'video': {
           'facingMode': {'ideal': 'environment'},
-          'width': {'ideal': 1280},
-          'height': {'ideal': 720},
+          'width': {'ideal': 1920},
+          'height': {'ideal': 1080},
+          'frameRate': {'ideal': 20, 'max': 24},
         },
         'audio': false,
       });
 
-      if (!mounted) {
-        _stopStream(stream);
+      if (!mounted || session != _cameraSession) {
+        _stopStream(createdStream);
         return;
       }
 
-      final video = html.VideoElement()
+      createdVideo = html.VideoElement()
         ..autoplay = true
         ..muted = true
         ..setAttribute('playsinline', 'true')
@@ -226,24 +191,29 @@ class CameraAfterBoxState extends State<CameraAfterBox>
         // QUAN TRỌNG
         ..style.backgroundColor = 'transparent'
         ..style.pointerEvents = 'none'
-        ..srcObject = stream;
+        ..srcObject = createdStream;
 
-      ui_web.platformViewRegistry.registerViewFactory(viewType, (_) => video);
+      ui_web.platformViewRegistry.registerViewFactory(
+        viewType,
+        (_) => createdVideo!,
+      );
 
-      await video.onLoadedMetadata.first;
+      await createdVideo.onLoadedMetadata.first.timeout(
+        const Duration(seconds: 5),
+      );
 
-      await video.play();
+      await createdVideo.play();
 
-      if (!mounted) {
-        video.pause();
-        _stopStream(stream);
+      if (!mounted || session != _cameraSession) {
+        _disposeVideo(createdVideo);
+        _stopStream(createdStream);
         return;
       }
 
       setState(() {
-        _stream = stream;
+        _stream = createdStream;
 
-        _videoElement = video;
+        _videoElement = createdVideo;
 
         _viewType = viewType;
 
@@ -254,7 +224,12 @@ class CameraAfterBoxState extends State<CameraAfterBox>
 
       debugPrintStack(stackTrace: stackTrace);
 
-      if (!mounted) {
+      _disposeVideo(createdVideo);
+      if (createdStream != null) {
+        _stopStream(createdStream);
+      }
+
+      if (!mounted || session != _cameraSession) {
         return;
       }
 
@@ -262,16 +237,18 @@ class CameraAfterBoxState extends State<CameraAfterBox>
         _cameraReady = false;
       });
     } finally {
-      _cameraStarting = false;
+      if (session == _cameraSession) {
+        _cameraStarting = false;
+      }
     }
   }
 
-  void _disposeCamera() {
-    try {
-      _videoElement?.pause();
+  void _disposeCamera({bool invalidateSession = true}) {
+    if (invalidateSession) {
+      _cameraSession++;
+    }
 
-      _videoElement?.srcObject = null;
-    } catch (_) {}
+    _disposeVideo(_videoElement);
 
     _videoElement = null;
 
@@ -286,9 +263,22 @@ class CameraAfterBoxState extends State<CameraAfterBox>
     _cameraReady = false;
   }
 
+  void _disposeVideo(html.VideoElement? video) {
+    if (video == null) return;
+
+    try {
+      video.pause();
+      video.srcObject = null;
+      video.removeAttribute('src');
+      video.load();
+      video.remove();
+    } catch (_) {}
+  }
+
   void _stopStream(html.MediaStream stream) {
     try {
       for (final track in stream.getTracks()) {
+        track.enabled = false;
         track.stop();
       }
     } catch (_) {}
@@ -387,13 +377,7 @@ class CameraAfterBoxState extends State<CameraAfterBox>
 
     await reader.onLoadEnd.first;
 
-    final result = reader.result;
-
-    if (result is Uint8List) {
-      return result;
-    }
-
-    return null;
+    return _toBytes(reader.result);
   }
 
   // ============================================================
@@ -467,13 +451,7 @@ class CameraAfterBoxState extends State<CameraAfterBox>
 
     await reader.onLoadEnd.first;
 
-    final result = reader.result;
-
-    if (result is Uint8List) {
-      return result;
-    }
-
-    return null;
+    return _toBytes(reader.result);
   }
 
   // ============================================================
@@ -646,8 +624,11 @@ class CameraAfterBoxState extends State<CameraAfterBox>
   // HELPERS
   // ============================================================
 
-  String _normalize(String? value) {
-    return value?.trim() ?? '';
+  Uint8List? _toBytes(Object? value) {
+    if (value is Uint8List) return value;
+    if (value is ByteBuffer) return Uint8List.view(value);
+    if (value is List<int>) return Uint8List.fromList(value);
+    return null;
   }
 
   String _newViewType() {

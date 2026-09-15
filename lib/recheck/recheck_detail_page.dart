@@ -7,7 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' hide MultipartFile;
 
-import '../after/camera_after_box.dart';
+import '../after/after_camera_box.dart';
 import '../after/replaceable_image_item.dart';
 import '../api/dio_client.dart';
 import '../api/hse_master_service.dart';
@@ -39,8 +39,8 @@ class RecheckDetailPage extends StatefulWidget {
 }
 
 class _RecheckDetailPageState extends State<RecheckDetailPage> {
-  final GlobalKey<CameraAfterBoxState> _cameraKey =
-      GlobalKey<CameraAfterBoxState>();
+  final GlobalKey<AfterCameraBoxState> _cameraKey =
+      GlobalKey<AfterCameraBoxState>();
 
   final TextEditingController _commentCtrl = TextEditingController();
 
@@ -897,7 +897,7 @@ class _RecheckDetailPageState extends State<RecheckDetailPage> {
 
             /// ===== CAMERA =====
             // if (_enableCamera)
-            CameraAfterBox(
+            AfterCameraBox(
               key: _cameraKey,
               size: 320,
               patrolGroup: widget.patrolGroup,

@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 import '../api/replace_image_api.dart';
 import '../homeScreen/patrol_home_screen.dart';
 import '../model/patrol_report_model.dart';
-import 'camera_after_box.dart';
+import 'after_camera_box.dart';
 
 class ReplaceableImageItem extends StatefulWidget {
   final String imageName;
@@ -15,25 +15,17 @@ class ReplaceableImageItem extends StatefulWidget {
   final String? plant;
   final void Function(String newImage) onReplaced;
 
-  const ReplaceableImageItem({
-    super.key,
-    required this.imageName,
-    required this.report,
-    required this.patrolGroup,
-    this.plant,
-    required this.onReplaced,
-  });
+  const ReplaceableImageItem({super.key, required this.imageName, required this.report, required this.patrolGroup, this.plant, required this.onReplaced});
 
   @override
   State<ReplaceableImageItem> createState() => _ReplaceableImageItemState();
 }
 
 class _ReplaceableImageItemState extends State<ReplaceableImageItem> {
-  bool _loading = false;
-  Uint8List? _newImage;
-
   late String _currentImageName;
-  Key _cameraKey = UniqueKey();
+  int _imageVersion = 0;
+
+  String get imageUrl => '${ApiConfig.baseUrl}/images/$_currentImageName?v=$_imageVersion';
 
   @override
   void initState() {
@@ -41,263 +33,192 @@ class _ReplaceableImageItemState extends State<ReplaceableImageItem> {
     _currentImageName = widget.imageName;
   }
 
-  void _retake(StateSetter setModalState) {
-    setModalState(() {
-      _newImage = null;
-      _cameraKey = UniqueKey(); // 🔥 ép CameraUpdateBox reset
-    });
-  }
-
-  String get imageUrl => '${ApiConfig.baseUrl}/images/$_currentImageName';
-
-  // ================= CAMERA OVERLAY =================
-  Future<void> _openCameraOverlay() async {
-    await showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.black,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (_) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            return Padding(
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.of(context).viewInsets.bottom,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const SizedBox(height: 12),
-                  Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: Colors.white54,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-
-                  /// 🔥 PREVIEW
-                  if (_newImage != null)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
-                      ),
-                      child: AspectRatio(
-                        aspectRatio: 1, // 👈 1:1 = vuông
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: Image.memory(_newImage!, fit: BoxFit.cover),
-                        ),
-                      ),
-                    ),
-
-                  /// 📷 CAMERA
-                  CameraAfterBox(
-                    key: _cameraKey,
-                    size: 300,
-                    plant: widget.plant,
-                    patrolGroup: widget.patrolGroup,
-                    type: "REPLACE",
-                    onImagesChanged: (images) {
-                      if (images.isNotEmpty) {
-                        setModalState(() {
-                          _newImage = images.last;
-                        });
-                      }
-                    },
-                  ),
-
-                  /// 🔘 BUTTONS
-                  if (_newImage != null)
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              onPressed: () => _retake(setModalState),
-                              icon: const Icon(Icons.refresh),
-                              label: const Text("Chụp lại"),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: ElevatedButton.icon(
-                              onPressed: () async {
-                                Navigator.pop(context);
-                                await _submitReplace();
-                              },
-                              icon: const Icon(Icons.check),
-                              label: const Text("Replace"),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  // ================= SUBMIT =================
-  Future<void> _submitReplace() async {
-    if (_newImage == null) return;
-
-    setState(() => _loading = true);
-
-    try {
-      final newImageName = await replaceImageApi(
-        id: widget.report.id!,
-        oldImage: _currentImageName,
-        newImageBytes: _newImage!,
-      );
-
-      setState(() {
-        _currentImageName = newImageName;
-        _newImage = null;
-      });
-
-      widget.onReplaced(newImageName);
-    } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Replace failed: $e')));
-    } finally {
-      setState(() => _loading = false);
+  @override
+  void didUpdateWidget(covariant ReplaceableImageItem oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.imageName != oldWidget.imageName && widget.imageName != _currentImageName) {
+      _currentImageName = widget.imageName;
+      _imageVersion++;
     }
   }
 
-  // ================= UI =================
+  Future<void> _openReplaceSheet() async {
+    final reportId = widget.report.id;
+    if (reportId == null) return;
+
+    final newImageName = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.black,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (_) => ReplaceImageSheet(
+        reportId: reportId,
+        oldImageName: _currentImageName,
+        plant: widget.plant,
+        patrolGroup: widget.patrolGroup,
+      ),
+    );
+
+    if (!mounted || newImageName == null || newImageName.isEmpty) return;
+    setState(() {
+      _currentImageName = newImageName;
+      _imageVersion = DateTime.now().millisecondsSinceEpoch;
+    });
+    widget.onReplaced(newImageName);
+  }
+
   @override
   Widget build(BuildContext context) {
-    print('imgURL: $imageUrl');
     return AspectRatio(
       aspectRatio: 280 / 320,
-      child: Stack(
-        children: [
-          // ClipRRect(
-          //   borderRadius: BorderRadius.circular(14),
-          //   child: Image.network(
-          //     imageUrl,
-          //     width: double.infinity,
-          //     height: double.infinity,
-          //     fit: BoxFit.cover,
-          //     key: ValueKey(imageUrl),
-          //     headers: {'ngrok-skip-browser-warning': 'true'},
-          //     // ?? FIX QUAN TR?NG
-          //     // webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
-          //     //
-          //     // errorBuilder: (context, error, stack) {
-          //     //   print('error: ${error}');
-          //     //
-          //     //   return Center(
-          //     //     child: Icon(Icons.broken_image, color: Colors.red),
-          //     //   );
-          //     // },
-          //   ),
-          // ),
-          GestureDetector(
+      child: Stack(children: [
+        Positioned.fill(
+          child: GestureDetector(
             onTap: _openImageViewer,
             child: Hero(
-              tag: imageUrl, // 👈 tag phải unique
+              tag: imageUrl,
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(14),
-                child: Image.network(
-                  imageUrl,
-                  width: double.infinity,
-                  height: double.infinity,
-                  fit: BoxFit.cover,
-                  key: ValueKey(imageUrl),
-                  // headers: {'ngrok-skip-browser-warning': 'true'},
-                ),
+                child: Image.network(imageUrl, width: double.infinity, height: double.infinity, fit: BoxFit.cover, key: ValueKey(imageUrl)),
               ),
             ),
           ),
-
-          /// CAMERA BUTTON
-          // Positioned(
-          //   top: 6,
-          //   right: 6,
-          //   child: InkWell(
-          //     onTap: _openCameraOverlay,
-          //     child: Container(
-          //       padding: const EdgeInsets.all(6),
-          //       decoration: const BoxDecoration(
-          //         color: Colors.black54,
-          //         shape: BoxShape.circle,
-          //       ),
-          //       child: const Icon(
-          //         Icons.delete_forever,
-          //         size: 18,
-          //         color: Colors.white,
-          //       ),
-          //     ),
-          //   ),
-          // ),
-          if (_loading)
-            const Positioned.fill(
-              child: ColoredBox(
-                color: Colors.black38,
-                child: Center(child: CircularProgressIndicator()),
-              ),
+        ),
+        Positioned(
+          top: 6,
+          right: 6,
+          child: Material(
+            color: Colors.black54,
+            shape: const CircleBorder(),
+            child: IconButton(
+              tooltip: 'Replace image',
+              onPressed: _openReplaceSheet,
+              icon: const Icon(Icons.camera_alt_rounded, color: Colors.white),
             ),
-        ],
-      ),
+          ),
+        ),
+      ]),
     );
   }
 
   void _openImageViewer() {
-    showDialog(
+    showDialog<void>(
       context: context,
       barrierColor: Colors.black,
-      builder: (_) {
-        return GestureDetector(
-          onTap: () => Navigator.pop(context),
-          child: Scaffold(
-            backgroundColor: Colors.black,
-            body: SafeArea(
-              child: Stack(
-                children: [
-                  Positioned.fill(
-                    child: InteractiveViewer(
-                      minScale: 1,
-                      maxScale: 5,
-                      child: SizedBox.expand(
-                        child: FittedBox(
-                          fit: BoxFit.contain,
-                          child: Image.network(
-                            imageUrl,
-                            // headers: {'ngrok-skip-browser-warning': 'true'},
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  /// ❌ Close button
-                  Positioned(
-                    top: 12,
-                    right: 12,
-                    child: IconButton(
-                      icon: const Icon(Icons.close, color: Colors.white),
-                      onPressed: () => Navigator.pop(context),
-                    ),
-                  ),
-                ],
+      builder: (dialogContext) => GestureDetector(
+        onTap: () => Navigator.pop(dialogContext),
+        child: Scaffold(
+          backgroundColor: Colors.black,
+          body: SafeArea(
+            child: Stack(children: [
+              Positioned.fill(
+                child: InteractiveViewer(
+                  minScale: 1,
+                  maxScale: 5,
+                  child: SizedBox.expand(child: FittedBox(fit: BoxFit.contain, child: Image.network(imageUrl))),
+                ),
               ),
-            ),
+              Positioned(
+                top: 12,
+                right: 12,
+                child: IconButton(icon: const Icon(Icons.close, color: Colors.white), onPressed: () => Navigator.pop(dialogContext)),
+              ),
+            ]),
           ),
-        );
-      },
+        ),
+      ),
+    );
+  }
+}
+
+class ReplaceImageSheet extends StatefulWidget {
+  final int reportId;
+  final String oldImageName;
+  final String? plant;
+  final PatrolGroup patrolGroup;
+
+  const ReplaceImageSheet({super.key, required this.reportId, required this.oldImageName, this.plant, required this.patrolGroup});
+
+  @override
+  State<ReplaceImageSheet> createState() => _ReplaceImageSheetState();
+}
+
+class _ReplaceImageSheetState extends State<ReplaceImageSheet> {
+  Uint8List? _image;
+  bool _submitting = false;
+  Key _cameraKey = UniqueKey();
+
+  void _selectImage(List<Uint8List> images) {
+    if (images.isEmpty || _image != null) return;
+    setState(() => _image = images.last);
+  }
+
+  void _retake() {
+    if (_submitting) return;
+    setState(() {
+      _image = null;
+      _cameraKey = UniqueKey();
+    });
+  }
+
+  Future<void> _replace() async {
+    final image = _image;
+    if (image == null || _submitting) return;
+    setState(() => _submitting = true);
+
+    try {
+      final name = await replaceImageApi(id: widget.reportId, oldImage: widget.oldImageName, newImageBytes: image);
+      if (!mounted) return;
+      Navigator.pop(context, name);
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text('Replace failed: $error')));
+      setState(() => _submitting = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(16, 12, 16, 16 + MediaQuery.of(context).viewInsets.bottom),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.white54, borderRadius: BorderRadius.circular(4))),
+          const SizedBox(height: 16),
+          if (_image == null)
+            AfterCameraBox(
+              key: _cameraKey,
+              size: 300,
+              plant: widget.plant,
+              patrolGroup: widget.patrolGroup,
+              type: 'REPLACE',
+              onImagesChanged: _selectImage,
+            )
+          else
+            AspectRatio(
+              aspectRatio: 1,
+              child: ClipRRect(borderRadius: BorderRadius.circular(12), child: Image.memory(_image!, fit: BoxFit.cover)),
+            ),
+          if (_image != null) ...[
+            const SizedBox(height: 16),
+            Row(children: [
+              Expanded(child: OutlinedButton.icon(onPressed: _submitting ? null : _retake, icon: const Icon(Icons.refresh), label: const Text('Retake'))),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: _submitting ? null : _replace,
+                  icon: _submitting
+                      ? const SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Icon(Icons.check),
+                  label: const Text('Replace'),
+                ),
+              ),
+            ]),
+          ],
+        ]),
+      ),
     );
   }
 }

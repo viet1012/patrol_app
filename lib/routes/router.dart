@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../after/after_patrol.dart';
+import '../after/after_report_screen.dart';
 import '../app_idle_detector.dart';
-import '../common/common_ui_helper.dart';
 import '../homeScreen/patrol_home_screen.dart';
 import '../login/login_page.dart';
 import '../model/auth_me.dart';
@@ -13,43 +12,52 @@ import '../table/patrol_report_table.dart';
 final router = GoRouter(
   navigatorKey: appNavigatorKey,
 
+  // ============================================================
+  // GLOBAL AUTH GUARD
+  // ============================================================
+  redirect: (context, state) {
+    final authenticatedAccount = SessionStore.authenticatedAccount;
+
+    final isAuthenticated =
+        authenticatedAccount != null &&
+        authenticatedAccount.trim().isNotEmpty;
+
+    final isLoginPage = state.matchedLocation == '/';
+
+    // Chưa login -> chỉ được ở Login
+    if (!isAuthenticated) {
+      return isLoginPage ? null : '/';
+    }
+
+    // Đã login mà đang ở Login:
+    // KHÔNG tự redirect sang Home.
+    // LoginPage sẽ tự xử lý auto-login/manual-login.
+    return null;
+  },
+
   routes: [
     GoRoute(
       path: '/',
-      pageBuilder: (context, state) =>
-          NoTransitionPage(key: state.pageKey, child: const LoginPage()),
+      pageBuilder: (context, state) => NoTransitionPage(
+        key: state.pageKey,
+        child: const LoginPage(),
+      ),
     ),
 
     GoRoute(
       path: '/home',
       builder: (context, state) {
-        final extra = state.extra;
-        String? accountCode;
+        final accountCode = SessionStore.authenticatedAccount;
+        debugPrint('HOME BUILDER: authenticated=$accountCode');
 
-        if (extra is Map<String, dynamic>) {
-          accountCode = extra['accountCode']?.toString();
+        // Defensive guard.
+        // Không bao giờ tạo Home nếu chưa authenticated.
+        if (accountCode == null || accountCode.trim().isEmpty) {
+          return const LoginPage();
         }
 
-        return FutureBuilder<(String, String)?>(
-          future: SessionStore.getCreds(),
-          builder: (context, snap) {
-            final creds = snap.data;
-            final fromStore = creds?.$1;
-
-            final finalAcc = (accountCode?.trim().isNotEmpty == true)
-                ? accountCode!.trim()
-                : (fromStore ?? '');
-
-            if (finalAcc.isEmpty) {
-              return CommonUI.warningPage(
-                context: context,
-                title: 'Session expired',
-                message: 'Please login again.',
-              );
-            }
-
-            return PatrolHomeScreen(accountCode: finalAcc);
-          },
+        return PatrolHomeScreen(
+          accountCode: accountCode.trim(),
         );
       },
     ),
@@ -57,32 +65,44 @@ final router = GoRouter(
     GoRoute(
       path: '/home/summary',
       builder: (context, state) {
-        final extra = state.extra;
-        final group = state.uri.queryParameters['group'] ?? '';
-        final plant = state.uri.queryParameters['plant'] ?? '';
+        final authenticatedAccount =
+            SessionStore.authenticatedAccount;
 
-        String? accountCode;
+        if (authenticatedAccount == null ||
+            authenticatedAccount.trim().isEmpty) {
+          return const LoginPage();
+        }
+
+        final extra = state.extra;
+        final group =
+            state.uri.queryParameters['group'] ?? '';
+        final plant =
+            state.uri.queryParameters['plant'] ?? '';
+
         AuthMe? me;
 
         if (extra is Map<String, dynamic>) {
-          accountCode = extra['accountCode']?.toString();
           me = extra['me'] as AuthMe?;
         }
 
         if (me == null) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            context.go('/home');
+            if (context.mounted) {
+              context.go('/home');
+            }
           });
 
           return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
+            body: Center(
+              child: CircularProgressIndicator(),
+            ),
           );
         }
 
         return PatrolReportTable(
           patrolGroup: group,
           plant: plant,
-          accountCode: accountCode ?? '',
+          accountCode: authenticatedAccount.trim(),
           auth: me,
         );
       },
@@ -91,22 +111,29 @@ final router = GoRouter(
     GoRoute(
       path: '/after/:qr',
       builder: (context, state) {
+        final authenticatedAccount =
+            SessionStore.authenticatedAccount;
+
+        if (authenticatedAccount == null ||
+            authenticatedAccount.trim().isEmpty) {
+          return const LoginPage();
+        }
+
         final qr = state.pathParameters['qr'] ?? '';
         final extra = state.extra;
 
         if (extra is Map<String, dynamic>) {
-          final accountCode = extra['accountCode']?.toString();
-          final qrCode = extra['qrCode']?.toString() ?? qr;
+          final qrCode =
+              extra['qrCode']?.toString() ?? qr;
           final pg = extra['patrolGroup'];
 
-          if (accountCode == null ||
-              accountCode.isEmpty ||
-              pg is! PatrolGroup) {
+          if (pg is! PatrolGroup) {
             return const _MissingExtraPage();
           }
 
-          return AfterPatrol(
-            accountCode: accountCode,
+          return AfterReportScreen(
+            // Không tin accountCode từ extra nữa.
+            accountCode: authenticatedAccount.trim(),
             qrCode: qrCode,
             patrolGroup: pg,
           );
@@ -124,10 +151,13 @@ class _MissingExtraPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Invalid link')),
+      appBar: AppBar(
+        title: const Text('Invalid link'),
+      ),
       body: const Center(
         child: Text(
-          'Thiếu dữ liệu điều hướng (extra).\nVui lòng mở từ trong app.',
+          'Thiếu dữ liệu điều hướng (extra).\n'
+          'Vui lòng mở từ trong app.',
           textAlign: TextAlign.center,
         ),
       ),

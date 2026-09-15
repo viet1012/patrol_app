@@ -1406,45 +1406,44 @@
        * 130 ms ~= 7–8 lần decode/giây.
        * Nhanh đủ cho trải nghiệm thực tế nhưng không quá nóng máy.
        */
-      const FAST_INTERVAL_MS = 150;
+      const FAST_INTERVAL_MS = 90;
 
       /*
        * Hard mode mở rộng ROI và tăng kích thước decode.
        */
-      const HARD_INTERVAL_MS = 240;
+      const HARD_INTERVAL_MS = 135;
 
       /*
        * Sau khoảng thời gian này không tìm thấy QR thì chuyển hard mode.
        */
-      const SWITCH_TO_HARD_AFTER_MS = 800;
+      const SWITCH_TO_HARD_AFTER_MS = 1350;
 
       /*
        * Sau khi bắt được QR, giữ hard một khoảng ngắn rồi về fast.
        */
-      const HARD_SUCCESS_HOLD_MS = 450;
 
       /*
        * Không gửi lại cùng QR quá nhanh.
        */
-      const DUPLICATE_COOLDOWN_MS = 1200;
+      const DUPLICATE_COOLDOWN_MS = 900;
 
       /*
        * Cùng một text phải xuất hiện liên tục N frame.
        * 2 là mức cân bằng tốt giữa tốc độ và độ chính xác.
        */
-      const REQUIRED_STABLE_COUNT = 2;
+      const REQUIRED_STABLE_COUNT = 1;
 
       /*
        * ROI ở giữa camera.
        */
-      const FAST_ROI_SCALE = 0.78;
-      const HARD_ROI_SCALE = 0.98;
+      const FAST_ROI_SCALE = 0.76;
+      const HARD_ROI_SCALE = 0.96;
 
       /*
        * Giới hạn kích thước frame decode.
        */
-      const FAST_MAX_SCAN_EDGE = 800;
-      const HARD_MAX_SCAN_EDGE = 1100;
+      const FAST_MAX_SCAN_EDGE = 768;
+      const HARD_MAX_SCAN_EDGE = 1024;
 
       /*
        * Ảnh upload tối đa.
@@ -1473,6 +1472,8 @@
       let loopRunning = false;
       let loopTimer = null;
       let decoding = false;
+      let scannerGeneration = 0;
+      let emissionLocked = false;
 
       let mode = "fast";
       let scanStartedAt = 0;
@@ -1492,9 +1493,13 @@
 
       let canvas = null;
       let context = null;
+      let candidateCanvas = null;
+      let candidateContext = null;
 
       let qrReader = null;
       let browserQrReader = null;
+      let barcodeDetector = null;
+      let barcodeDetectorUnavailable = false;
 
       // ============================================================
       // EVENT BRIDGE
@@ -1680,6 +1685,28 @@
         console.debug("[QR] mode =", mode);
       }
 
+      async function decodeCanvasWithNative(targetCanvas) {
+        if (barcodeDetectorUnavailable || typeof window.BarcodeDetector !== "function") {
+          barcodeDetectorUnavailable = true;
+          return "";
+        }
+
+        try {
+          barcodeDetector ??= new window.BarcodeDetector({ formats: ["qr_code"] });
+          const barcodes = await barcodeDetector.detect(targetCanvas);
+
+          for (const barcode of barcodes || []) {
+            const text = normalizeQr(barcode?.rawValue);
+            if (isValidQrText(text)) return text;
+          }
+        } catch (_) {
+          barcodeDetectorUnavailable = true;
+          barcodeDetector = null;
+        }
+
+        return "";
+      }
+
       // ============================================================
       // ZXING
       // ============================================================
@@ -1781,7 +1808,8 @@
 
       async function decodeCanvasWithZxing(
         targetCanvas,
-        tryHarder
+        tryHarder,
+        allowBrowserFallback = true
       ) {
         const ZXingLib = getZxingLibrary();
 
@@ -1844,7 +1872,7 @@
         /*
          * Fallback BrowserQRCodeReader.
          */
-        if (browserQrReader) {
+        if (allowBrowserFallback && browserQrReader) {
           try {
             const result =
               await browserQrReader.decodeFromCanvas(
@@ -1936,23 +1964,21 @@
        */
       function looksLikeQrCandidate(sourceCanvas) {
         try {
-          const sample =
-            document.createElement("canvas");
-
-          sample.width = CANDIDATE_SAMPLE_SIZE;
-          sample.height = CANDIDATE_SAMPLE_SIZE;
-
-          const ctx =
-            sample.getContext("2d", {
+          if (!candidateCanvas) {
+            candidateCanvas = document.createElement("canvas");
+            candidateCanvas.width = CANDIDATE_SAMPLE_SIZE;
+            candidateCanvas.height = CANDIDATE_SAMPLE_SIZE;
+            candidateContext = candidateCanvas.getContext("2d", {
               alpha: false,
               willReadFrequently: true
             });
+          }
 
-          if (!ctx) {
+          if (!candidateContext) {
             return false;
           }
 
-          ctx.drawImage(
+          candidateContext.drawImage(
             sourceCanvas,
             0,
             0,
@@ -1960,21 +1986,21 @@
             sourceCanvas.height,
             0,
             0,
-            sample.width,
-            sample.height
+            candidateCanvas.width,
+            candidateCanvas.height
           );
 
           const imageData =
-            ctx.getImageData(
+            candidateContext.getImageData(
               0,
               0,
-              sample.width,
-              sample.height
+              candidateCanvas.width,
+              candidateCanvas.height
             );
 
           const pixels = imageData.data;
-          const width = sample.width;
-          const height = sample.height;
+          const width = candidateCanvas.width;
+          const height = candidateCanvas.height;
 
           let dark = 0;
           let light = 0;
@@ -2197,39 +2223,47 @@
           context.restore();
         }
 
+        const nativeText = await decodeCanvasWithNative(targetCanvas);
+
+        if (nativeText) {
+          return {
+            text: nativeText,
+            engine: "native",
+            candidate: true
+          };
+        }
+
         const zxingText =
           await decodeCanvasWithZxing(
             targetCanvas,
-            mode === "hard"
+            mode === "hard",
+            false
           );
 
         if (zxingText) {
           return {
             text: zxingText,
+            engine: "zxing",
             candidate: true
           };
         }
 
-        if (mode === "hard") {
-          const jsQrText =
-            decodeCanvasWithJsQr(
-              targetCanvas,
-              "attemptBoth"
-            );
+        const jsQrText = mode === "hard"
+          ? decodeCanvasWithJsQr(targetCanvas, "attemptBoth")
+          : "";
 
-          if (jsQrText) {
-            return {
-              text: jsQrText,
-              candidate: true
-            };
-          }
+        if (jsQrText) {
+          return {
+            text: jsQrText,
+            engine: "jsqr",
+            candidate: true
+          };
         }
 
         return {
           text: "",
-          candidate:
-            mode === "hard" &&
-            looksLikeQrCandidate(targetCanvas)
+          engine: "",
+          candidate: looksLikeQrCandidate(targetCanvas)
         };
       }
 
@@ -2272,7 +2306,11 @@
         return true;
       }
 
-      function emitDetectedQr(text) {
+      function emitDetectedQr(text, engine, detectedMode) {
+        if (emissionLocked) {
+          return;
+        }
+
         const normalized = normalizeQr(text);
 
         if (!isValidQrText(normalized)) {
@@ -2300,19 +2338,22 @@
          * Thành công chỉ gửi QR về Flutter.
          * Không gửi banner "detected".
          */
-        dispatchCameraResult(normalized, "");
+        emissionLocked = true;
+        try {
+          dispatchCameraResult(normalized, "");
+        } finally {
+          emissionLocked = false;
+        }
+
+        console.info(
+          `[QR-SUCCESS] ${normalized} | engine=${engine || "unknown"} | mode=${detectedMode}`
+        );
 
         /*
          * Sau khi thành công, quay về fast mode.
          */
-        if (mode === "hard") {
-          window.setTimeout(() => {
-            if (loopRunning) {
-              switchMode("fast");
-              scanStartedAt = now();
-            }
-          }, HARD_SUCCESS_HOLD_MS);
-        }
+        switchMode("fast");
+        scanStartedAt = timestamp;
       }
 
       // ============================================================
@@ -2340,8 +2381,8 @@
       // LOOP
       // ============================================================
 
-      function scheduleNext(video, delayMs = null) {
-        if (!loopRunning) {
+      function scheduleNext(video, generation, delayMs = null) {
+        if (!loopRunning || generation !== scannerGeneration) {
           return;
         }
 
@@ -2350,13 +2391,18 @@
         }
 
         loopTimer = window.setTimeout(
-          () => loopTick(video),
+          () => loopTick(video, generation),
           delayMs ?? currentInterval()
         );
       }
 
-      async function loopTick(video) {
-        if (!loopRunning || decoding) {
+      async function loopTick(video, generation) {
+        if (!loopRunning || generation !== scannerGeneration || decoding) {
+          return;
+        }
+
+        if (document.hidden) {
+          scheduleNext(video, generation, 250);
           return;
         }
 
@@ -2377,7 +2423,7 @@
           activeVideo.videoWidth <= 0 ||
           activeVideo.videoHeight <= 0
         ) {
-          scheduleNext(activeVideo, 250);
+          scheduleNext(activeVideo, generation, 250);
           return;
         }
 
@@ -2385,12 +2431,17 @@
 
         try {
           updateAdaptiveMode();
+          const detectedMode = mode;
 
           const result =
             await decodeCameraFrame(activeVideo);
 
+          if (!loopRunning || generation !== scannerGeneration) {
+            return;
+          }
+
           if (result.text) {
-            emitDetectedQr(result.text);
+            emitDetectedQr(result.text, result.engine, detectedMode);
           } else {
             updateCandidateState(
               Boolean(result.candidate)
@@ -2411,7 +2462,7 @@
           console.warn("[QR] loop decode error:", error);
         } finally {
           decoding = false;
-          scheduleNext(activeVideo);
+          scheduleNext(activeVideo, generation);
         }
       }
 
@@ -2420,17 +2471,19 @@
       // ============================================================
 
       window.startQrLoop = function () {
-        try {
-          if (loopRunning) {
-            return;
-          }
+        const generation = ++scannerGeneration;
 
-          ensureReaders();
+        try {
+          if (loopTimer !== null) {
+            clearTimeout(loopTimer);
+            loopTimer = null;
+          }
 
           const video = getVideoElement();
 
           loopRunning = true;
           decoding = false;
+          emissionLocked = false;
 
           mode = "fast";
           scanStartedAt = now();
@@ -2450,7 +2503,7 @@
             video.videoHeight
           );
 
-          scheduleNext(video, 0);
+          scheduleNext(video, generation, 0);
         } catch (error) {
           loopRunning = false;
 
@@ -2468,7 +2521,9 @@
 
       window.stopQrLoop = function () {
         loopRunning = false;
+        scannerGeneration += 1;
         decoding = false;
+        emissionLocked = true;
 
         if (loopTimer !== null) {
           clearTimeout(loopTimer);
@@ -2481,6 +2536,20 @@
 
         console.info("[QR] scanner stopped");
       };
+
+      document.addEventListener("visibilitychange", () => {
+        if (document.hidden || !loopRunning) return;
+
+        switchMode("fast");
+        scanStartedAt = now();
+        lastSuccessAt = 0;
+        resetCandidateState(true);
+
+        const video = document.getElementById("qr-video");
+        if (video instanceof HTMLVideoElement && !decoding) {
+          scheduleNext(video, scannerGeneration, 0);
+        }
+      });
 
       // ============================================================
       // IMAGE HELPERS
@@ -2768,123 +2837,22 @@
       async function decodeUploadedCanvas(
         targetCanvas
       ) {
-        let text = "";
+        const variants = [
+          targetCanvas,
+          createCenterCropCanvas(targetCanvas, 0.84),
+          createGrayscaleCanvas(targetCanvas),
+          createHighContrastCanvas(targetCanvas)
+        ].filter(Boolean);
 
-        /*
-         * Pass 1: ZXing original.
-         */
-        text =
-          await decodeCanvasWithZxing(
-            targetCanvas,
-            true
-          );
+        for (const variant of variants) {
+          let text = await decodeCanvasWithNative(variant);
+          if (text) return text;
 
-        if (text) {
-          return text;
-        }
+          text = await decodeCanvasWithZxing(variant, true);
+          if (text) return text;
 
-        /*
-         * Pass 2: jsQR original.
-         */
-        text =
-          decodeCanvasWithJsQr(
-            targetCanvas,
-            "attemptBoth"
-          );
-
-        if (text) {
-          return text;
-        }
-
-        /*
-         * Pass 3: center crop.
-         */
-        const centerCanvas =
-          createCenterCropCanvas(
-            targetCanvas,
-            0.84
-          );
-
-        if (centerCanvas) {
-          text =
-            await decodeCanvasWithZxing(
-              centerCanvas,
-              true
-            );
-
-          if (text) {
-            return text;
-          }
-
-          text =
-            decodeCanvasWithJsQr(
-              centerCanvas,
-              "attemptBoth"
-            );
-
-          if (text) {
-            return text;
-          }
-        }
-
-        /*
-         * Pass 4: grayscale.
-         */
-        const grayCanvas =
-          createGrayscaleCanvas(
-            targetCanvas
-          );
-
-        if (grayCanvas) {
-          text =
-            await decodeCanvasWithZxing(
-              grayCanvas,
-              true
-            );
-
-          if (text) {
-            return text;
-          }
-
-          text =
-            decodeCanvasWithJsQr(
-              grayCanvas,
-              "attemptBoth"
-            );
-
-          if (text) {
-            return text;
-          }
-        }
-
-        /*
-         * Pass 5: high contrast.
-         */
-        const contrastCanvas =
-          createHighContrastCanvas(
-            targetCanvas
-          );
-
-        if (contrastCanvas) {
-          text =
-            await decodeCanvasWithZxing(
-              contrastCanvas,
-              true
-            );
-
-          if (text) {
-            return text;
-          }
-
-          text =
-            decodeCanvasWithJsQr(
-              contrastCanvas,
-              "attemptBoth"
-            );
-
-          if (text) {
-            return text;
-          }
+          text = decodeCanvasWithJsQr(variant, "attemptBoth");
+          if (text) return text;
         }
 
         return "";
@@ -2902,8 +2870,6 @@
                 "Image URL is empty."
               );
             }
-
-            ensureReaders();
 
             const image =
               await loadImage(objectUrl);

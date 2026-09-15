@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+
 import '../api/auth_api.dart';
+import 'error_box.dart';
+import 'styles/auth_styles.dart';
+import 'widgets/auth_bottom_sheet_shell.dart';
+import 'widgets/auth_password_input.dart';
+import 'widgets/auth_submit_button.dart';
 
 class ChangePasswordBottomSheet extends StatefulWidget {
   final String account;
-
   const ChangePasswordBottomSheet({super.key, required this.account});
 
   @override
@@ -16,12 +20,9 @@ class _ChangePasswordBottomSheetState extends State<ChangePasswordBottomSheet> {
   final _oldCtrl = TextEditingController();
   final _newCtrl = TextEditingController();
   final _confirmCtrl = TextEditingController();
-
-  bool _showOld = false;
-  bool _showNew = false;
-  bool _showConfirm = false;
-
   String? _error;
+  bool _isServerError = false;
+  bool _isSubmitting = false;
 
   @override
   void dispose() {
@@ -31,171 +32,115 @@ class _ChangePasswordBottomSheetState extends State<ChangePasswordBottomSheet> {
     super.dispose();
   }
 
+  void _clearError(String _) {
+    if (_error == null) return;
+    setState(() {
+      _error = null;
+      _isServerError = false;
+    });
+  }
+
   Future<void> _changePassword() async {
-    final oldP = _oldCtrl.text.trim();
-    final newP = _newCtrl.text.trim();
-    final confirm = _confirmCtrl.text.trim();
-
-    setState(() => _error = null);
-
-    if (oldP.isEmpty || newP.isEmpty || confirm.isEmpty) {
+    if (_isSubmitting) return;
+    final oldPassword = _oldCtrl.text.trim();
+    final newPassword = _newCtrl.text.trim();
+    final confirmation = _confirmCtrl.text.trim();
+    setState(() {
+      _error = null;
+      _isServerError = false;
+    });
+    if (oldPassword.isEmpty || newPassword.isEmpty || confirmation.isEmpty) {
       setState(() => _error = 'Please fill all fields');
       return;
     }
-
-    if (newP != confirm) {
+    if (newPassword != confirmation) {
       setState(() => _error = 'New passwords do not match');
       return;
     }
-
+    setState(() => _isSubmitting = true);
     final result = await AuthApi.changePassword(
       account: widget.account,
-      oldPassword: oldP,
-      newPassword: newP,
+      oldPassword: oldPassword,
+      newPassword: newPassword,
     );
-
+    if (!mounted) return;
     if (!result.success) {
-      setState(() => _error = result.message);
+      setState(() {
+        _isSubmitting = false;
+        _error = result.message;
+        _isServerError = result.isServerError;
+      });
       return;
     }
-
-    if (!mounted) return;
     Navigator.pop(context, 'success');
   }
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
-      ),
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(24, 14, 24, 28),
-        decoration: const BoxDecoration(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-          gradient: LinearGradient(
-            colors: [Color(0xFF1E293B), Color(0xFF020617)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
+    return AuthBottomSheetShell(
+      padding: const EdgeInsets.fromLTRB(24, 14, 24, 28),
+      borderRadius: 28,
+      gradient: AuthStyles.sheetGradient,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text(
+            'Change Password',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+            ),
           ),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 42,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.white24,
-                borderRadius: BorderRadius.circular(10),
-              ),
-            ),
-
-            const SizedBox(height: 18),
-
-            const Text(
-              "Change Password",
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-
-            const SizedBox(height: 6),
-            const Text(
-              "Update your password",
-              style: TextStyle(color: Colors.white70),
-            ),
-
-            const SizedBox(height: 24),
-
-            _passwordInput(
-              ctrl: _oldCtrl,
-              label: "Old Password",
-              show: _showOld,
-              onToggle: () => setState(() => _showOld = !_showOld),
-            ),
-
-            const SizedBox(height: 16),
-
-            _passwordInput(
-              ctrl: _newCtrl,
-              label: "New Password",
-              show: _showNew,
-              onToggle: () => setState(() => _showNew = !_showNew),
-            ),
-
-            const SizedBox(height: 16),
-
-            _passwordInput(
-              ctrl: _confirmCtrl,
-              label: "Confirm New Password",
-              show: _showConfirm,
-              onToggle: () => setState(() => _showConfirm = !_showConfirm),
-            ),
-
-            const SizedBox(height: 24),
-
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: ElevatedButton(
-                onPressed: _changePassword,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF2563EB),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                ),
-                child: const Text(
-                  "Update Password",
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.white70,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ),
-
-            if (_error != null) ...[
-              const SizedBox(height: 12),
-              Text(_error!, style: const TextStyle(color: Colors.redAccent)),
-            ],
+          const SizedBox(height: 6),
+          const Text(
+            'Update your password',
+            style: TextStyle(color: Colors.white70),
+          ),
+          const SizedBox(height: 24),
+          AuthPasswordInput(
+            controller: _oldCtrl,
+            label: 'Old Password',
+            enabled: !_isSubmitting,
+            borderRadius: 16,
+            showOutlineBorder: false,
+            outlinedVisibilityIcons: true,
+            onChanged: _clearError,
+          ),
+          const SizedBox(height: 16),
+          AuthPasswordInput(
+            controller: _newCtrl,
+            label: 'New Password',
+            enabled: !_isSubmitting,
+            borderRadius: 16,
+            showOutlineBorder: false,
+            outlinedVisibilityIcons: true,
+            onChanged: _clearError,
+          ),
+          const SizedBox(height: 16),
+          AuthPasswordInput(
+            controller: _confirmCtrl,
+            label: 'Confirm New Password',
+            enabled: !_isSubmitting,
+            borderRadius: 16,
+            showOutlineBorder: false,
+            outlinedVisibilityIcons: true,
+            onChanged: _clearError,
+          ),
+          const SizedBox(height: 24),
+          AuthSubmitButton(
+            label: 'Update Password',
+            isLoading: _isSubmitting,
+            onPressed: _changePassword,
+            height: 48,
+            borderRadius: 16,
+            fontWeight: FontWeight.w600,
+          ),
+          if (_error != null) ...[
+            const SizedBox(height: 12),
+            ErrorBox(message: _error!, isServerError: _isServerError),
           ],
-        ),
-      ),
-    );
-  }
-
-  Widget _passwordInput({
-    required TextEditingController ctrl,
-    required String label,
-    required bool show,
-    required VoidCallback onToggle,
-  }) {
-    return TextField(
-      controller: ctrl,
-      obscureText: !show,
-      style: const TextStyle(color: Colors.white),
-      decoration: InputDecoration(
-        labelText: label,
-        labelStyle: const TextStyle(color: Colors.white70),
-        prefixIcon: const Icon(Icons.lock_outline, color: Colors.white70),
-        suffixIcon: IconButton(
-          icon: Icon(
-            show ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-            color: Colors.white60,
-          ),
-          onPressed: onToggle,
-        ),
-        filled: true,
-        fillColor: const Color(0xFF020617),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide.none,
-        ),
+        ],
       ),
     );
   }

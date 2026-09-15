@@ -10,16 +10,16 @@ import '../model/patrol_report_model.dart';
 import '../redo/redo_detail_page.dart';
 import '../widget/error_display.dart';
 import '../widget/glass_action_button.dart';
-import 'after_patrol.dart';
+import 'after_report_screen.dart';
 
-class AfterPicDetailScreen extends StatefulWidget {
+class AfterReportListScreen extends StatefulWidget {
   final String accountCode;
   final String plant;
   final String atStatus;
   final String pic;
   final PatrolGroup patrolGroup;
 
-  const AfterPicDetailScreen({
+  const AfterReportListScreen({
     super.key,
     required this.accountCode,
     required this.plant,
@@ -29,10 +29,10 @@ class AfterPicDetailScreen extends StatefulWidget {
   });
 
   @override
-  State<AfterPicDetailScreen> createState() => _AfterPicDetailScreenState();
+  State<AfterReportListScreen> createState() => _AfterReportListScreenState();
 }
 
-class _AfterPicDetailScreenState extends State<AfterPicDetailScreen> {
+class _AfterReportListScreenState extends State<AfterReportListScreen> {
   static const String _unknownPicLabel = 'UNKNOWN';
 
   static const List<String> _riskOptions = ['V', 'IV', 'III', 'II', 'I'];
@@ -42,6 +42,7 @@ class _AfterPicDetailScreenState extends State<AfterPicDetailScreen> {
   String? _selectedArea;
   String? _selectedRisk;
   String? _selectedRowKey;
+  bool _openingDetail = false;
 
   // ============================================================
   // INIT
@@ -232,18 +233,28 @@ class _AfterPicDetailScreenState extends State<AfterPicDetailScreen> {
   // ============================================================
 
   Future<void> _openDetail(PatrolReportModel report) async {
+    if (_openingDetail) return;
+
     final rowKey = _rowKey(report);
 
     if (mounted) {
       setState(() {
+        _openingDetail = true;
         _selectedRowKey = rowKey;
       });
     }
 
-    final result = await Navigator.push<bool>(
-      context,
-      MaterialPageRoute(builder: (_) => _buildTargetPage(report)),
-    );
+    bool? result;
+    try {
+      result = await Navigator.push<bool>(
+        context,
+        MaterialPageRoute(builder: (_) => _buildTargetPage(report)),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _openingDetail = false);
+      }
+    }
 
     if (!mounted) {
       return;
@@ -269,7 +280,7 @@ class _AfterPicDetailScreenState extends State<AfterPicDetailScreen> {
       return const Scaffold(body: Center(child: Text('Invalid report ID')));
     }
 
-    return AfterPatrol(
+    return AfterReportScreen(
       accountCode: widget.accountCode,
       id: reportId,
       patrolGroup: widget.patrolGroup,

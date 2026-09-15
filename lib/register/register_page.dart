@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../api/auth_api.dart';
 import '../common/common_ui_helper.dart';
 import '../login/error_box.dart';
+import '../login/styles/auth_styles.dart';
+import '../login/widgets/auth_bottom_sheet_shell.dart';
+import '../login/widgets/auth_input.dart';
+import '../login/widgets/auth_password_input.dart';
+import '../login/widgets/auth_submit_button.dart';
 
 class RegisterBottomSheet extends StatefulWidget {
   const RegisterBottomSheet({super.key});
@@ -13,15 +17,13 @@ class RegisterBottomSheet extends StatefulWidget {
 }
 
 class _RegisterBottomSheetState extends State<RegisterBottomSheet> {
-  final TextEditingController _codeCtrl = TextEditingController();
-  final TextEditingController _passCtrl = TextEditingController();
-  final TextEditingController _confirmPassCtrl = TextEditingController();
-
-  bool _showPassword = false;
-  bool _showConfirmPassword = false;
+  final _codeCtrl = TextEditingController();
+  final _passCtrl = TextEditingController();
+  final _confirmPassCtrl = TextEditingController();
 
   String? _errorMsg;
-  bool _isServerError = false; // ?? QUAN TR?NG
+  bool _isServerError = false;
+  bool _isSubmitting = false;
 
   @override
   void dispose() {
@@ -31,40 +33,50 @@ class _RegisterBottomSheetState extends State<RegisterBottomSheet> {
     super.dispose();
   }
 
-  ////////////////////////////////////////////////////////////
-  /// REGISTER
-  ////////////////////////////////////////////////////////////
+  void _clearError(String _) {
+    if (_errorMsg == null) return;
+    setState(() {
+      _errorMsg = null;
+      _isServerError = false;
+    });
+  }
+
   Future<void> _register() async {
+    if (_isSubmitting) return;
+
     final code = _codeCtrl.text.trim();
-    final pass = _passCtrl.text.trim();
-    final confirm = _confirmPassCtrl.text.trim();
+    final password = _passCtrl.text.trim();
+    final confirmation = _confirmPassCtrl.text.trim();
 
     setState(() {
       _errorMsg = null;
       _isServerError = false;
     });
 
-    if (code.isEmpty || pass.isEmpty || confirm.isEmpty) {
-      setState(() => _errorMsg = "Please fill all fields");
+    if (code.isEmpty || password.isEmpty || confirmation.isEmpty) {
+      setState(() => _errorMsg = 'Please fill all fields');
       return;
     }
 
-    if (pass != confirm) {
-      setState(() => _errorMsg = "Passwords do not match");
+    if (password != confirmation) {
+      setState(() => _errorMsg = 'Passwords do not match');
       return;
     }
 
-    final result = await AuthApi.register(account: code, password: pass);
+    setState(() => _isSubmitting = true);
+
+    final result = await AuthApi.register(account: code, password: password);
+
+    if (!mounted) return;
 
     if (!result.success) {
       setState(() {
+        _isSubmitting = false;
         _errorMsg = result.message;
-        _isServerError = result.isServerError; // ?? KEY
+        _isServerError = result.isServerError;
       });
       return;
     }
-
-    if (!mounted) return;
 
     CommonUI.showSnackBar(
       context: context,
@@ -72,189 +84,82 @@ class _RegisterBottomSheetState extends State<RegisterBottomSheet> {
       color: Colors.green,
     );
 
-    await Future.delayed(const Duration(milliseconds: 600));
+    await Future<void>.delayed(const Duration(milliseconds: 600));
+    if (!mounted) return;
     Navigator.pop(context, code);
   }
 
-  ////////////////////////////////////////////////////////////
-  /// UI
-  ////////////////////////////////////////////////////////////
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
-      ),
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(24, 14, 24, 28),
-        decoration: const BoxDecoration(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-          gradient: LinearGradient(
-            colors: [Color(0xFF1E293B), Color(0xFF020617)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
+    return AuthBottomSheetShell(
+      padding: const EdgeInsets.fromLTRB(24, 14, 24, 28),
+      borderRadius: 28,
+      gradient: AuthStyles.sheetGradient,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Image.asset('assets/flags/favicon.png', width: 120, height: 120),
+          const SizedBox(height: 14),
+          const Text(
+            'Create Account',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+            ),
           ),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            /// drag handle
-            Container(
-              width: 42,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.white24,
-                borderRadius: BorderRadius.circular(10),
-              ),
-            ),
-
-            const SizedBox(height: 18),
-
-            Image.asset('assets/flags/favicon.png', width: 120, height: 120),
-
-            const SizedBox(height: 14),
-
-            const Text(
-              "Create Account",
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-
-            const SizedBox(height: 6),
-
-            const Text(
-              "Register to get started",
-              style: TextStyle(color: Colors.white70),
-            ),
-
-            const SizedBox(height: 24),
-
-            _input(
-              controller: _codeCtrl,
-              label: "Employee ID",
-              icon: Icons.badge_outlined,
-              isNumber: true,
-            ),
-
-            const SizedBox(height: 16),
-
-            _input(
-              controller: _passCtrl,
-              label: "Password",
-              icon: Icons.lock_outline,
-              obscure: true,
-            ),
-
-            const SizedBox(height: 16),
-
-            _input(
-              controller: _confirmPassCtrl,
-              label: "Confirm Password",
-              icon: Icons.lock_reset_outlined,
-              obscure: true,
-              isConfirm: true,
-            ),
-
-            const SizedBox(height: 16),
-
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: ElevatedButton(
-                onPressed: _register,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF2563EB),
-                  elevation: 6,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                ),
-                child: const Text(
-                  "Register",
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.white70,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ),
-
-            ////////////////////////////////////////////////////////////
-            /// ERROR BOX (GI?NG LOGIN)
-            ////////////////////////////////////////////////////////////
-            if (_errorMsg != null) ...[
-              const SizedBox(height: 12),
-              ErrorBox(message: _errorMsg!, isServerError: _isServerError),
-            ],
+          const SizedBox(height: 6),
+          const Text(
+            'Register to get started',
+            style: TextStyle(color: Colors.white70),
+          ),
+          const SizedBox(height: 24),
+          AppInput(
+            controller: _codeCtrl,
+            label: 'Employee ID',
+            icon: Icons.badge_outlined,
+            isNumber: true,
+            enabled: !_isSubmitting,
+            borderRadius: 16,
+            showOutlineBorder: false,
+            onChanged: _clearError,
+          ),
+          const SizedBox(height: 16),
+          AuthPasswordInput(
+            controller: _passCtrl,
+            label: 'Password',
+            enabled: !_isSubmitting,
+            borderRadius: 16,
+            showOutlineBorder: false,
+            outlinedVisibilityIcons: true,
+            onChanged: _clearError,
+          ),
+          const SizedBox(height: 16),
+          AuthPasswordInput(
+            controller: _confirmPassCtrl,
+            label: 'Confirm Password',
+            icon: Icons.lock_reset_outlined,
+            enabled: !_isSubmitting,
+            borderRadius: 16,
+            showOutlineBorder: false,
+            outlinedVisibilityIcons: true,
+            onChanged: _clearError,
+          ),
+          const SizedBox(height: 16),
+          AuthSubmitButton(
+            label: 'Register',
+            isLoading: _isSubmitting,
+            onPressed: _register,
+            height: 48,
+            borderRadius: 16,
+            elevation: 6,
+            fontWeight: FontWeight.w600,
+          ),
+          if (_errorMsg != null) ...[
+            const SizedBox(height: 12),
+            ErrorBox(message: _errorMsg!, isServerError: _isServerError),
           ],
-        ),
-      ),
-    );
-  }
-
-  ////////////////////////////////////////////////////////////
-  /// INPUT
-  ////////////////////////////////////////////////////////////
-  Widget _input({
-    required TextEditingController controller,
-    required String label,
-    required IconData icon,
-    bool obscure = false,
-    bool isNumber = false,
-    bool isConfirm = false,
-  }) {
-    final isPasswordField = obscure;
-    bool showPassword = isConfirm ? _showConfirmPassword : _showPassword;
-
-    return TextField(
-      controller: controller,
-      obscureText: isPasswordField ? !showPassword : false,
-      keyboardType: isNumber ? TextInputType.number : TextInputType.text,
-      inputFormatters: isNumber
-          ? [FilteringTextInputFormatter.digitsOnly]
-          : null,
-      style: const TextStyle(color: Colors.white),
-      onChanged: (_) {
-        if (_errorMsg != null) {
-          setState(() {
-            _errorMsg = null;
-            _isServerError = false;
-          });
-        }
-      },
-      decoration: InputDecoration(
-        labelText: label,
-        labelStyle: const TextStyle(color: Colors.white70),
-        prefixIcon: Icon(icon, color: Colors.white70),
-        suffixIcon: isPasswordField
-            ? IconButton(
-                icon: Icon(
-                  showPassword
-                      ? Icons.visibility_off_outlined
-                      : Icons.visibility_outlined,
-                  color: Colors.white60,
-                ),
-                onPressed: () {
-                  setState(() {
-                    if (isConfirm) {
-                      _showConfirmPassword = !_showConfirmPassword;
-                    } else {
-                      _showPassword = !_showPassword;
-                    }
-                  });
-                },
-              )
-            : null,
-        filled: true,
-        fillColor: const Color(0xFF020617),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide.none,
-        ),
+        ],
       ),
     );
   }

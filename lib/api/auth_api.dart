@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 
 import '../model/auth_result.dart';
 import 'dio_client.dart';
@@ -68,6 +69,34 @@ class AuthApi {
     );
   }
 
+  static AuthResult? _httpFailure(Response response) {
+    final status = response.statusCode;
+
+    if (status != null && status >= 200 && status < 300) {
+      return null;
+    }
+
+    final data = response.data;
+    String? code;
+    String? message;
+
+    if (data is Map) {
+      code = data['code']?.toString();
+      message = data['message']?.toString();
+    }
+
+    final isServerError = status == null || status >= 500;
+
+    return AuthResult(
+      success: false,
+      code: code,
+      isServerError: isServerError,
+      message: isServerError
+          ? AppMessage.serverError
+          : _mapErrorCode(code, message),
+    );
+  }
+
   static Future<AuthResult> login({
     required String account,
     required String password,
@@ -81,6 +110,15 @@ class AuthApi {
           receiveTimeout: const Duration(seconds: 15),
         ),
       );
+
+      debugPrint(
+        'AUTH HTTP RESPONSE: '
+        'status=${response.statusCode}, '
+        'data=${response.data}',
+      );
+
+      final failure = _httpFailure(response);
+      if (failure != null) return failure;
 
       return AuthResult(
         success: true,
@@ -107,6 +145,9 @@ class AuthApi {
         '$_basePath/register',
         data: {'account': account, 'password': password},
       );
+
+      final failure = _httpFailure(response);
+      if (failure != null) return failure;
 
       return AuthResult(
         success: true,
@@ -139,6 +180,9 @@ class AuthApi {
         },
       );
 
+      final failure = _httpFailure(response);
+      if (failure != null) return failure;
+
       return AuthResult(
         success: true,
         message: AppMessage.changePasswordSuccess,
@@ -165,6 +209,9 @@ class AuthApi {
         queryParameters: {'account': account, 'email': email},
       );
 
+      final failure = _httpFailure(response);
+      if (failure != null) return failure;
+
       return AuthResult(
         success: true,
         message: response.data?.toString() ?? "Request sent",
@@ -186,6 +233,9 @@ class AuthApi {
         '$_basePath/check-account-exists',
         queryParameters: {'account': account},
       );
+
+      final failure = _httpFailure(response);
+      if (failure != null) return failure;
 
       return AuthResult(
         success: true,

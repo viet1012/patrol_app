@@ -1,13 +1,8 @@
-import 'dart:async';
-import 'dart:convert';
 import 'dart:typed_data';
 
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:http/http.dart' hide MultipartFile;
 
-import '../api/dio_client.dart';
 import '../api/hse_master_service.dart';
 import '../api/patrol_report_api.dart';
 import '../api/replace_image_api.dart';
@@ -19,39 +14,36 @@ import '../recheck/recheck_detail_page.dart';
 import '../redo/redo_detail_page.dart';
 import '../translator.dart';
 import '../widget/glass_action_button.dart';
-import 'camera_after_box.dart';
+import 'after_camera_box.dart';
 import 'replaceable_image_item.dart';
 
-class AfterPatrol extends StatefulWidget {
+class AfterReportScreen extends StatefulWidget {
   final String accountCode;
 
-  // final String plant;
   final int? id; // bắt buộc
   final String? qrCode; // có thể null
   final PatrolGroup patrolGroup;
 
-  const AfterPatrol({
+  const AfterReportScreen({
     super.key,
     required this.accountCode,
-    // required this.plant,
     this.id,
     this.qrCode,
     required this.patrolGroup,
   });
 
   @override
-  State<AfterPatrol> createState() => _AfterPatrolState();
+  State<AfterReportScreen> createState() => _AfterReportScreenState();
 }
 
-class _AfterPatrolState extends State<AfterPatrol>
+class _AfterReportScreenState extends State<AfterReportScreen>
     with SingleTickerProviderStateMixin {
-  final GlobalKey<CameraAfterBoxState> _cameraKey =
-      GlobalKey<CameraAfterBoxState>();
+  final GlobalKey<AfterCameraBoxState> _cameraKey =
+      GlobalKey<AfterCameraBoxState>();
 
   final TextEditingController _commentAfStatusCtrl = TextEditingController();
   final TextEditingController _msnvCtrl = TextEditingController();
   String? _employeeName;
-  bool _isLoadingName = false;
 
   // ✅ PIC dropdown
   String? _currentPIC; // readonly
@@ -65,6 +57,8 @@ class _AfterPatrolState extends State<AfterPatrol>
   PatrolReportModel? _report;
   bool _loading = true;
   bool _submitting = false;
+  bool _errorDialogScheduled = false;
+  int _loadGeneration = 0;
   late final AnimationController _sendGlowController;
 
   String? _error;
@@ -114,9 +108,12 @@ class _AfterPatrolState extends State<AfterPatrol>
   Future<void> _loadReport() async {
     if (!mounted) return;
 
+    final generation = ++_loadGeneration;
+
     setState(() {
       _loading = true;
       _error = null;
+      _errorDialogScheduled = false;
     });
 
     try {
@@ -127,7 +124,7 @@ class _AfterPatrolState extends State<AfterPatrol>
         id: q == null || q.isEmpty ? widget.id : null,
       );
 
-      if (!mounted) return;
+      if (!mounted || generation != _loadGeneration) return;
 
       if (list.isEmpty) {
         setState(() {
@@ -156,7 +153,7 @@ class _AfterPatrolState extends State<AfterPatrol>
 
       patrolUser = picked.atPic;
 
-      if (!mounted) return;
+      if (!mounted || generation != _loadGeneration) return;
 
       setState(() {
         _report = picked;
@@ -181,7 +178,7 @@ class _AfterPatrolState extends State<AfterPatrol>
 
       debugPrintStack(stackTrace: stackTrace);
 
-      if (!mounted) return;
+      if (!mounted || generation != _loadGeneration) return;
 
       setState(() {
         _error = e.toString();
@@ -234,8 +231,7 @@ class _AfterPatrolState extends State<AfterPatrol>
       showLoading(context);
       loadingVisible = true;
 
-      await updateAtReport(
-        userAfter: widget.accountCode,
+      await updateAfterReportApi(
         reportId: reportId,
         atPic: employeeUser,
         comment: comment,
@@ -302,6 +298,7 @@ class _AfterPatrolState extends State<AfterPatrol>
 
   @override
   void dispose() {
+    _loadGeneration++;
     _sendGlowController.dispose();
 
     _commentAfStatusCtrl.dispose();
@@ -317,6 +314,8 @@ class _AfterPatrolState extends State<AfterPatrol>
 
     final st = (r.atStatus ?? '').trim();
     if (st.isEmpty || st == 'Doing') return;
+
+    if (st != 'Pro_Done' && st != 'Redo') return;
 
     _redirected = true;
 
@@ -383,9 +382,13 @@ class _AfterPatrolState extends State<AfterPatrol>
       );
     }
     if (_error != null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        CommonUI.showGoHomeDialog(context: context, message: 'No value');
-      });
+      if (!_errorDialogScheduled) {
+        _errorDialogScheduled = true;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          CommonUI.showGoHomeDialog(context: context, message: 'No value');
+        });
+      }
 
       return const Center(child: CircularProgressIndicator());
     }
@@ -449,7 +452,6 @@ class _AfterPatrolState extends State<AfterPatrol>
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(8),
           child: Column(
-            // crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               // ===== THÔNG TIN CHÍNH (Group, Area, Fac, Machine) =====
@@ -529,61 +531,6 @@ class _AfterPatrolState extends State<AfterPatrol>
 
               const SizedBox(height: 14),
 
-              // IntrinsicHeight(
-              //   child: Row(
-              //     crossAxisAlignment: CrossAxisAlignment.stretch,
-              //     children: [
-              //       Expanded(
-              //         child: Column(
-              //           crossAxisAlignment: CrossAxisAlignment.start,
-              //           children: [
-              //             _buildInfoCard(
-              //               icon: Icons.groups_rounded,
-              //               label: "Patrol at",
-              //               color: Colors.white70,
-              //               value: formatDateTime(report.createdAt),
-              //             ),
-              //             const SizedBox(height: 8),
-              //             _buildRiskCard(
-              //               icon: Icons.groups_rounded,
-              //               label: "Review Similar Cases",
-              //               value: report.checkInfo,
-              //               color: Colors.white70,
-              //             ),
-              //           ],
-              //         ),
-              //       ),
-              //       const SizedBox(width: 12),
-              //       Expanded(
-              //         child: Column(
-              //           crossAxisAlignment: CrossAxisAlignment.start,
-              //           children: [
-              //             _buildInfoCard(
-              //               icon: Icons.groups_rounded,
-              //               label: "Deadline",
-              //               value: formatDateTime(report.dueDate),
-              //               color: Colors.white70,
-              //             ),
-              //             const SizedBox(height: 8),
-              //
-              //             _buildRiskCard(
-              //               icon: Icons.groups_rounded,
-              //               label: "label_risk".tr(context),
-              //               value: report.riskTotal,
-              //               color:
-              //                   (report.riskTotal == "V" ||
-              //                       report.riskTotal == "IV")
-              //                   ? Colors.red
-              //                   : Colors.white70,
-              //               riskTotal: true,
-              //             ),
-              //           ],
-              //         ),
-              //       ),
-              //       const SizedBox(height: 4),
-              //     ],
-              //   ),
-              // ),
               const SizedBox(height: 8),
               IntrinsicHeight(
                 child: Column(
@@ -1354,8 +1301,7 @@ class _AfterPatrolState extends State<AfterPatrol>
           const SizedBox(height: 12),
 
           /// ===== CAMERA =====
-          // if (_enableCamera)
-          CameraAfterBox(
+          AfterCameraBox(
             key: _cameraKey,
             size: 320,
             plant: report.plant,
@@ -1367,35 +1313,9 @@ class _AfterPatrolState extends State<AfterPatrol>
           /// ===== COMMENT =====
           if (_cameraKey.currentState != null &&
               _cameraKey.currentState!.images.isNotEmpty) ...[
-            //   const SizedBox(height: 16),
-            //   TextField(
-            //     controller: _commentCtrl,
-            //     maxLines: 3,
-            //     decoration: InputDecoration(
-            //       labelText: 'Comment',
-            //       labelStyle: const TextStyle(color: Colors.white70),
-            //       enabledBorder: OutlineInputBorder(
-            //         borderSide: BorderSide(color: Colors.white54),
-            //         borderRadius: BorderRadius.circular(8),
-            //       ),
-            //       focusedBorder: OutlineInputBorder(
-            //         borderSide: BorderSide(color: Colors.blueAccent.shade200),
-            //         borderRadius: BorderRadius.circular(8),
-            //       ),
-            //       filled: true,
-            //       fillColor: Colors.white.withOpacity(0.12),
-            //     ),
-            //     style: const TextStyle(color: Colors.white),
-            //     onChanged: (value) {
-            //       setState(
-            //         () {},
-            //       ); // Bắt buộc gọi setState để UI rebuild và nút lưu hiện/ẩn đúng
-            //     },
-            //   ),
             const SizedBox(height: 20),
 
             /// ===== SAVE =====
-            // if (_commentAfStatusCtrl.text.trim().isNotEmpty)
             SizedBox(
               height: 58,
               child: Builder(
@@ -1714,10 +1634,6 @@ class _AfterPatrolState extends State<AfterPatrol>
       return null;
     }
 
-    setState(() {
-      _isLoadingName = true;
-    });
-
     try {
       final result = await HseMasterService.fetchEmployeeName(empCode);
 
@@ -1757,12 +1673,6 @@ class _AfterPatrolState extends State<AfterPatrol>
       });
 
       return null;
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoadingName = false;
-        });
-      }
     }
   }
 
@@ -1778,50 +1688,4 @@ class _AfterPatrolState extends State<AfterPatrol>
     Navigator.of(context, rootNavigator: true).pop();
   }
 
-  Future<void> updateAtReport({
-    required String userAfter,
-    required int reportId,
-    required String atPic,
-    required String comment,
-    required List<Uint8List> images,
-  }) async {
-    final dio = DioClient.dio;
-
-    final dataJson = {"atComment": comment, "atPic": atPic};
-
-    final formData = FormData();
-
-    // data (JSON STRING)
-    formData.fields.add(MapEntry('data', jsonEncode(dataJson)));
-
-    // images (BYTES)
-    for (int i = 0; i < images.length; i++) {
-      formData.files.add(
-        MapEntry(
-          'images',
-          MultipartFile.fromBytes(
-            images[i],
-            filename: 'retake_${i + 1}.jpg',
-            contentType: MediaType('image', 'jpeg'),
-          ),
-        ),
-      );
-    }
-
-    final url = '/api/patrol_report/$reportId/update_at';
-
-    debugPrint('Calling PUT $url');
-    debugPrint('Base URL: ${dio.options.baseUrl}');
-    debugPrint('Full URL: ${dio.options.baseUrl}$url');
-
-    try {
-      final response = await DioClient.putUpload(url, data: formData);
-
-      debugPrint('Response status: ${response.statusCode}');
-      debugPrint('Response data: ${response.data}');
-    } catch (e) {
-      debugPrint('Error during PUT request: $e');
-      rethrow;
-    }
-  }
 }

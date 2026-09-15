@@ -67,13 +67,9 @@ class _EditReportDialogState extends State<EditReportDialog> {
 
   // ✅ PIC dropdown
   List<String> _picItems = [];
-  bool _loadingPic = false;
-  String? _picError;
 
   static const String emptyLabel = 'UNKNOWN';
-  Future<List<String>>? _futurePics;
   String? _selectedPIC; // UI selected
-  String? _oldPIC;
 
   late String _oldRiskTotal;
   late String? _oldRiskFreq;
@@ -84,10 +80,10 @@ class _EditReportDialogState extends State<EditReportDialog> {
   static const List<String> atStatusOptions = ['Doing', 'Pro_Done', 'Closed'];
 
   String? _selectedAtStatus;
-  String? _oldAtStatus;
 
   String? _employeeName;
-  bool _isLoadingName = false;
+  int _employeeLoadGeneration = 0;
+  int _masterLoadGeneration = 0;
 
   static const String nullLabel = '<NULL>';
   bool _saving = false;
@@ -212,32 +208,28 @@ class _EditReportDialogState extends State<EditReportDialog> {
     if (empCode.isEmpty) return null;
 
     if (!mounted) return null;
-    setState(() => _isLoadingName = true);
+    final generation = ++_employeeLoadGeneration;
 
     try {
       final name = await HseMasterService.fetchEmployeeName(empCode);
 
-      if (!mounted) return null;
+      if (!mounted || generation != _employeeLoadGeneration) return null;
       setState(() => _employeeName = name);
       return name;
     } catch (e) {
       debugPrint('Error fetching employee name: $e');
 
-      if (!mounted) return null;
+      if (!mounted || generation != _employeeLoadGeneration) return null;
       setState(() => _employeeName = null);
       return null;
-    } finally {
-      if (!mounted) return null;
-      setState(() => _isLoadingName = false);
     }
   }
 
   Future<void> _loadHseMaster() async {
+    final generation = ++_masterLoadGeneration;
     setState(() {
       _loadingMaster = true;
-      _loadingPic = true;
       _masterError = null;
-      _picError = null;
     });
 
     try {
@@ -249,7 +241,7 @@ class _EditReportDialogState extends State<EditReportDialog> {
         findPicsByPlantFromApi(plant), // returns List<String>
       ]);
 
-      if (!mounted) return;
+      if (!mounted || generation != _masterLoadGeneration) return;
 
       final master = results[0] as List<MachineModel>;
       final pics = results[1] as List<String>;
@@ -261,20 +253,14 @@ class _EditReportDialogState extends State<EditReportDialog> {
         _picItems = {emptyLabel, ...pics}.toList();
 
         _loadingMaster = false;
-        _loadingPic = false;
 
-        // nếu bạn muốn auto-fix selection sau khi có master:
-        // _autoFixInvalidSelections();
       });
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || generation != _masterLoadGeneration) return;
       setState(() {
         _loadingMaster = false;
-        _loadingPic = false;
 
-        // tùy bạn: tách error ra 2 cái hay gộp
         _masterError = e.toString();
-        _picError = e.toString();
       });
     }
   }
@@ -708,13 +694,14 @@ class _EditReportDialogState extends State<EditReportDialog> {
           confirmColor: const Color(0xFF22C55E),
         );
 
+        if (!mounted) return;
+
         if (!ok) {
           setState(() => _selectedPIC = prev);
           return;
         }
 
         await _onSave();
-        _oldPIC = _selectedPIC;
       },
     );
   }
@@ -742,13 +729,14 @@ class _EditReportDialogState extends State<EditReportDialog> {
           confirmColor: const Color(0xFF22C55E),
         );
 
+        if (!mounted) return;
+
         if (!ok) {
           setState(() => _selectedAtStatus = prev);
           return;
         }
 
         await _onSave();
-        _oldAtStatus = _selectedAtStatus;
       },
     );
   }
@@ -959,6 +947,8 @@ class _EditReportDialogState extends State<EditReportDialog> {
         plant: widget.report.plant,
       );
 
+      if (!mounted) return;
+
       final savedReport = reports.firstWhere(
         (e) => e.id == widget.report.id,
         orElse: () {
@@ -1049,6 +1039,8 @@ class _EditReportDialogState extends State<EditReportDialog> {
 
   @override
   void dispose() {
+    _employeeLoadGeneration++;
+    _masterLoadGeneration++;
     _commentCtrl.removeListener(_markDirty);
     _counterCtrl.removeListener(_markDirty);
     _commentCtrl.dispose();

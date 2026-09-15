@@ -187,3 +187,39 @@ Future<void> updateReportApi({
     throw Exception('Update failed: ${response.statusCode}');
   }
 }
+
+Future<void> updateAfterReportApi({
+  required int reportId,
+  required String atPic,
+  required String comment,
+  required List<Uint8List> images,
+}) async {
+  final formData = FormData();
+  formData.fields.add(
+    MapEntry('data', jsonEncode({'atComment': comment, 'atPic': atPic})),
+  );
+
+  for (var index = 0; index < images.length; index++) {
+    formData.files.add(
+      MapEntry(
+        'images',
+        MultipartFile.fromBytes(
+          images[index],
+          filename: 'retake_${index + 1}.jpg',
+          contentType: DioMediaType('image', 'jpeg'),
+        ),
+      ),
+    );
+  }
+
+  final response = await DioClient.putUpload(
+    '/api/patrol_report/$reportId/update_at',
+    data: formData,
+  );
+
+  if (response.statusCode != 200 && response.statusCode != 201) {
+    throw Exception(
+      'Update AT failed | status=${response.statusCode} | data=${response.data}',
+    );
+  }
+}

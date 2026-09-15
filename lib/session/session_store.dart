@@ -1,11 +1,26 @@
 // ignore: avoid_web_libraries_in_flutter
 import 'dart:html' as html;
 
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class SessionStore {
   static const FlutterSecureStorage _secureStorage = FlutterSecureStorage();
+
+  static String? _authenticatedAccountCode;
+
+  static String? get authenticatedAccount => _authenticatedAccountCode;
+
+  static void clearAuthenticatedAccount() {
+    debugPrint('AUTH CLEAR: old=$_authenticatedAccountCode');
+    _authenticatedAccountCode = null;
+  }
+
+  static void markAuthenticated(String accountCode) {
+    final normalized = accountCode.trim();
+    debugPrint('AUTH MARK: $normalized');
+    _authenticatedAccountCode = normalized.isEmpty ? null : normalized;
+  }
 
   static const _kAccount = 'account_code';
   static const _kPassword = 'account_password';
@@ -72,6 +87,8 @@ class SessionStore {
 
   // ================= CLEAR =================
   static Future<void> clear() async {
+    clearAuthenticatedAccount();
+
     if (kIsWeb) {
       html.window.localStorage.remove(_kAccount);
       html.window.localStorage.remove(_kPassword);
