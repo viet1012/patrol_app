@@ -2,10 +2,10 @@ import 'package:chuphinh/common/common_ui_helper.dart';
 import 'package:chuphinh/model/patrol_report_model.dart';
 import 'package:flutter/material.dart';
 
-import 'patrol_report_cells.dart';
-import 'patrol_report_table_columns.dart';
-import 'patrol_report_table_helpers.dart';
-import 'patrol_report_table_widgets.dart';
+import '../../core/patrol_report_table_columns.dart';
+import '../../core/patrol_report_table_query.dart';
+import '../cells/patrol_report_cells.dart';
+import 'patrol_report_hoverable_row.dart';
 
 class PatrolReportRow extends StatelessWidget {
   final PatrolReportModel report;
@@ -29,8 +29,7 @@ class PatrolReportRow extends StatelessWidget {
     required this.onShowHseImages,
   });
 
-  double _width(String label) =>
-      PatrolReportTableHelper.widthOf(columns, label);
+  double _width(String label) => PatrolReportTableQuery.widthOf(columns, label);
 
   @override
   Widget build(BuildContext context) {
@@ -106,7 +105,11 @@ class PatrolReportRow extends StatelessWidget {
             tooltip: true,
           ),
           PatrolReportCells.dueStatus(report, _width('Due Status')),
-          PatrolReportCells.text(report.pic ?? '-', _width('PIC'), tooltip: true),
+          PatrolReportCells.text(
+            report.pic ?? '-',
+            _width('PIC'),
+            tooltip: true,
+          ),
           PatrolReportCells.text(
             report.checkInfo,
             _width('Check Info'),

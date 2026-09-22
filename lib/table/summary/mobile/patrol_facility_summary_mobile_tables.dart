@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../patrol_summary_table.dart';
+import '../tables/patrol_facility_summary_table.dart';
 
 class PatrolMobileSummaryTables extends StatelessWidget {
   final List<PatrolPicRowDto> rows;
@@ -179,10 +179,7 @@ class MobileRiskTable extends StatelessWidget {
 class MobileDeadlineTable extends StatelessWidget {
   final List<PatrolPicRowDto> rows;
 
-  const MobileDeadlineTable({
-    super.key,
-    required this.rows,
-  });
+  const MobileDeadlineTable({super.key, required this.rows});
 
   @override
   Widget build(BuildContext context) {
@@ -202,12 +199,7 @@ class MobileDeadlineTable extends StatelessWidget {
       rows: rows.map((row) {
         return TableRowData(
           isTotal: row.pic.toUpperCase() == 'TOTAL',
-          cells: [
-            row.pic,
-            row.stillTimeTtl,
-            row.threeDaysTtl,
-            row.lateTtl,
-          ],
+          cells: [row.pic, row.stillTimeTtl, row.threeDaysTtl, row.lateTtl],
         );
       }).toList(),
     );

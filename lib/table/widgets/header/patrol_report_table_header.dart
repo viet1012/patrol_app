@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
-import 'patrol_report_filter_popup.dart';
-import 'patrol_report_table_columns.dart';
-import 'patrol_report_table_widgets.dart';
+import '../../core/patrol_report_table_columns.dart';
+import '../filters/patrol_report_filter_popup.dart';
+import 'patrol_report_header_filter_cell.dart';
 
 class PatrolReportTableHeader extends StatelessWidget {
   final List<PatrolReportColumnSpec> columns;

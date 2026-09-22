@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 
-import '../api/summary_api.dart';
-import '../model/division_summary.dart';
-import '../test_1/patrol_summary_table.dart';
-import '../widget/glass_action_button.dart';
+import '../../../api/summary_api.dart';
+import '../../../model/division_summary.dart';
+import '../../../widget/glass_action_button.dart';
+import '../tables/patrol_facility_summary_table.dart';
 
 class BeforeAfterSummaryDialog extends StatefulWidget {
   final String fromD;
@@ -237,7 +237,7 @@ class _BeforeAfterSummaryDialogState extends State<BeforeAfterSummaryDialog> {
 
                       const SizedBox(height: 8),
                       // ✅ 2) PATROL SUMMARY (fac blocks like image)
-                      PatrolSummaryScreen(
+                      PatrolFacilitySummaryTable(
                         fromD: widget.fromD,
                         toD: widget.toD,
                         plant: widget.fac, // nếu fac đang là Fac_2

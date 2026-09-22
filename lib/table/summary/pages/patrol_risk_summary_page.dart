@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
 
-import '../api/patrol_risk_summary_api.dart';
-import '../common/common_ui_helper.dart';
-import '../model/risk_summary.dart';
+import '../../../api/patrol_risk_summary_api.dart';
+import '../../../common/common_ui_helper.dart';
+import '../../../model/risk_summary.dart';
 
-class PatrolRiskSummarySfPage extends StatefulWidget {
+class PatrolRiskSummaryPage extends StatefulWidget {
   final String plant;
   final String patrolGroup;
 
@@ -18,7 +18,7 @@ class PatrolRiskSummarySfPage extends StatefulWidget {
   /// ✅ báo ngược lên parent khi user đổi ngày trong Summary
   final void Function(DateTime from, DateTime to)? onDateChanged;
 
-  const PatrolRiskSummarySfPage({
+  const PatrolRiskSummaryPage({
     super.key,
     this.onSelect,
     this.onDateChanged,
@@ -29,11 +29,10 @@ class PatrolRiskSummarySfPage extends StatefulWidget {
   });
 
   @override
-  State<PatrolRiskSummarySfPage> createState() =>
-      _PatrolRiskSummarySfPageState();
+  State<PatrolRiskSummaryPage> createState() => _PatrolRiskSummaryPageState();
 }
 
-class _PatrolRiskSummarySfPageState extends State<PatrolRiskSummarySfPage> {
+class _PatrolRiskSummaryPageState extends State<PatrolRiskSummaryPage> {
   late final PatrolRiskSummaryApi api;
 
   late TextEditingController _fromCtrl;
@@ -93,7 +92,7 @@ class _PatrolRiskSummarySfPageState extends State<PatrolRiskSummarySfPage> {
 
   /// ✅ 2) parent đổi from/to => child sync lại + gọi API
   @override
-  void didUpdateWidget(covariant PatrolRiskSummarySfPage oldWidget) {
+  void didUpdateWidget(covariant PatrolRiskSummaryPage oldWidget) {
     super.didUpdateWidget(oldWidget);
 
     final newFrom = _normalize(widget.fromD);

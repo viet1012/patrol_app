@@ -1,13 +1,17 @@
 import 'package:chuphinh/common/common_ui_helper.dart';
-import 'package:chuphinh/table/patrol_images_dialog.dart';
-import 'package:chuphinh/table/patrol_summary_chart_page.dart';
-import 'package:chuphinh/table/widgets/patrol_report_group_bar.dart';
-import 'package:chuphinh/table/widgets/patrol_report_row.dart';
-import 'package:chuphinh/table/widgets/patrol_report_table_columns.dart';
-import 'package:chuphinh/table/widgets/patrol_report_table_header.dart';
-import 'package:chuphinh/table/widgets/patrol_report_table_helpers.dart';
-import 'package:chuphinh/table/widgets/patrol_report_table_state.dart';
-import 'package:chuphinh/table/widgets/patrol_report_table_widgets.dart';
+import 'package:chuphinh/table/core/patrol_report_table_columns.dart';
+import 'package:chuphinh/table/core/patrol_report_table_query.dart';
+import 'package:chuphinh/table/core/patrol_report_table_state.dart';
+import 'package:chuphinh/table/dialogs/edit_report_dialog.dart';
+import 'package:chuphinh/table/dialogs/patrol_images_dialog.dart';
+import 'package:chuphinh/table/summary/pages/before_after_summary_page.dart';
+import 'package:chuphinh/table/summary/pages/patrol_risk_summary_page.dart';
+import 'package:chuphinh/table/widgets/group/patrol_report_group_bar.dart';
+import 'package:chuphinh/table/widgets/header/patrol_report_table_header.dart';
+import 'package:chuphinh/table/widgets/row/patrol_report_row.dart';
+import 'package:chuphinh/table/widgets/shared/patrol_report_pagination.dart';
+import 'package:chuphinh/table/widgets/shared/patrol_report_table_toolbar.dart';
+import 'package:chuphinh/table/widgets/shared/patrol_report_table_viewport.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -18,8 +22,6 @@ import '../api/patrol_report_api.dart';
 import '../api/patrol_report_download_api.dart';
 import '../model/auth_me.dart';
 import '../model/patrol_report_model.dart';
-import 'before_after_summary_page.dart';
-import 'edit_report_dialog.dart';
 
 class PatrolReportTable extends StatefulWidget {
   final String patrolGroup;
@@ -160,7 +162,7 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
   }
 
   List<PatrolReportModel> get _filteredReports {
-    final result = PatrolReportTableHelper.applyFilters(
+    final result = PatrolReportTableQuery.applyFilters(
       source: _reports,
       query: _viewState.searchQuery,
       fromDate: _viewState.fromDate,
@@ -223,7 +225,7 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
   }
 
   Map<String, int> get _groupCaseCounts {
-    final base = PatrolReportTableHelper.applyFilters(
+    final base = PatrolReportTableQuery.applyFilters(
       source: _reports,
       query: _viewState.searchQuery,
       fromDate: _viewState.fromDate,
@@ -313,7 +315,7 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
       );
 
       await downloader.downloadExportExcel(
-        query: PatrolReportTableHelper.buildExportQuery(
+        query: PatrolReportTableQuery.buildExportQuery(
           filterValues: _viewState.filterValues,
           columns: _columns,
           fromDate: _viewState.fromDate,
@@ -399,8 +401,8 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
 
     await BeforeAfterSummaryDialog.show(
       context,
-      fromD: PatrolReportTableHelper.fmtDate(from),
-      toD: PatrolReportTableHelper.fmtDate(to),
+      fromD: PatrolReportTableQuery.fmtDate(from),
+      toD: PatrolReportTableQuery.fmtDate(to),
       fac: widget.plant,
       type: widget.patrolGroup,
     );
@@ -598,7 +600,7 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
                                         padding: const EdgeInsets.only(
                                           bottom: 8,
                                         ),
-                                        child: PatrolRiskSummarySfPage(
+                                        child: PatrolRiskSummaryPage(
                                           onSelect: _applySummaryFilter,
                                           onDateChanged: _applySummaryDates,
                                           fromD: _viewState.fromDate,
@@ -718,7 +720,7 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
                                           padding: const EdgeInsets.only(
                                             bottom: 8,
                                           ),
-                                          child: PatrolRiskSummarySfPage(
+                                          child: PatrolRiskSummaryPage(
                                             onSelect: _applySummaryFilter,
                                             onDateChanged: _applySummaryDates,
                                             fromD: _viewState.fromDate,
@@ -888,7 +890,7 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
     final column = _viewState.activeFilterColumn;
     var popupValues = const <String>[];
     if (column != null) {
-      final base = PatrolReportTableHelper.applyFilters(
+      final base = PatrolReportTableQuery.applyFilters(
         source: _reports,
         query: _viewState.searchQuery,
         fromDate: _viewState.fromDate,
@@ -897,7 +899,7 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
         columns: _columns,
         excludeColumn: column,
       );
-      final valuesInBase = PatrolReportTableHelper.distinctColumnValues(
+      final valuesInBase = PatrolReportTableQuery.distinctColumnValues(
         columnLabel: column,
         source: base,
         columns: _columns,

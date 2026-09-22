@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
 
-import '../../model/patrol_pic_summary.dart';
+import '../../../model/patrol_pic_summary.dart';
 
 class PatrolPicSummaryChart extends StatelessWidget {
   final List<PatrolPicSummary> items;

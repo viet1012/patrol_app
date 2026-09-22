@@ -1,5 +1,3 @@
-
-
 class PatrolReportTableViewState {
   final DateTime? fromDate;
   final DateTime? toDate;

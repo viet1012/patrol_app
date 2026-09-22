@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../../api/patrol_pic_summary_api.dart';
-import '../../model/patrol_pic_summary.dart';
-import 'patrol_pic_summary_chart.dart';
+import '../../../api/patrol_pic_summary_api.dart';
+import '../../../model/patrol_pic_summary.dart';
+import '../charts/patrol_pic_summary_chart.dart';
 
 class PatrolPicSummaryPage extends StatefulWidget {
   final String plant;

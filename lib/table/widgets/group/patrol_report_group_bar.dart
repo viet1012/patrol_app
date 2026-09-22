@@ -1,4 +1,4 @@
-import 'package:chuphinh/table/widgets/patrol_report_table_helpers.dart';
+import 'package:chuphinh/table/core/patrol_report_table_query.dart';
 import 'package:chuphinh/widget/glass_action_button.dart';
 import 'package:flutter/material.dart';
 
@@ -125,10 +125,7 @@ class PatrolReportGroupBar extends StatelessWidget {
           ),
           items: fiscalYears
               .map(
-                (fy) => DropdownMenuItem<int>(
-                  value: fy,
-                  child: Text('FY$fy'),
-                ),
+                (fy) => DropdownMenuItem<int>(value: fy, child: Text('FY$fy')),
               )
               .toList(),
           isDense: true,
@@ -145,8 +142,9 @@ class PatrolReportGroupBar extends StatelessWidget {
     final chips = groupCounts.entries.map((entry) {
       final selected = entry.key == selectedGroup;
       return FilterChip(
-        visualDensity:
-            isMobile ? VisualDensity.compact : VisualDensity.standard,
+        visualDensity: isMobile
+            ? VisualDensity.compact
+            : VisualDensity.standard,
         materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
         label: Text(
           '${entry.key} (${entry.value})',
@@ -170,12 +168,14 @@ class PatrolReportGroupBar extends StatelessWidget {
 
     final fromChip = _dateChip(
       label: 'From',
-      value: fromDate == null ? '--' : PatrolReportTableHelper.fmtDate(fromDate!),
+      value: fromDate == null
+          ? '--'
+          : PatrolReportTableQuery.fmtDate(fromDate!),
       onTap: onPickFromDate,
     );
     final toChip = _dateChip(
       label: 'To',
-      value: toDate == null ? '--' : PatrolReportTableHelper.fmtDate(toDate!),
+      value: toDate == null ? '--' : PatrolReportTableQuery.fmtDate(toDate!),
       onTap: onPickToDate,
     );
 

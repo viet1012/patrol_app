@@ -5,7 +5,7 @@ import 'patrol_report_table_columns.dart';
 typedef ComputedValueGetter =
     String? Function(PatrolReportModel row, String columnLabel);
 
-class PatrolReportTableHelper {
+class PatrolReportTableQuery {
   static String fmtDate(DateTime d) {
     final month = d.month.toString().padLeft(2, '0');
     final day = d.day.toString().padLeft(2, '0');

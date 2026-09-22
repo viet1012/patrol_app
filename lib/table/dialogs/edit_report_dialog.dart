@@ -1,18 +1,18 @@
 import 'package:flutter/material.dart';
 
-import '../api/hse_master_service.dart';
-import '../api/patrol_report_api.dart';
-import '../api/replace_image_api.dart';
-import '../common/common_risk_dropdown.dart';
-import '../common/common_searchable_dropdown.dart';
-import '../common/common_ui_helper.dart';
-import '../model/auth_me.dart';
-import '../model/machine_model.dart';
-import '../model/patrol_report_model.dart';
-import '../model/reason_model.dart';
-import '../model/risk_score_calculator.dart';
-import '../translator.dart';
-import '../widget/glass_action_button.dart';
+import '../../api/hse_master_service.dart';
+import '../../api/patrol_report_api.dart';
+import '../../api/replace_image_api.dart';
+import '../../common/common_risk_dropdown.dart';
+import '../../common/common_searchable_dropdown.dart';
+import '../../common/common_ui_helper.dart';
+import '../../model/auth_me.dart';
+import '../../model/machine_model.dart';
+import '../../model/patrol_report_model.dart';
+import '../../model/reason_model.dart';
+import '../../model/risk_score_calculator.dart';
+import '../../translator.dart';
+import '../../widget/glass_action_button.dart';
 
 class EditReportDialog extends StatefulWidget {
   final PatrolReportModel report;
@@ -253,7 +253,6 @@ class _EditReportDialogState extends State<EditReportDialog> {
         _picItems = {emptyLabel, ...pics}.toList();
 
         _loadingMaster = false;
-
       });
     } catch (e) {
       if (!mounted || generation != _masterLoadGeneration) return;

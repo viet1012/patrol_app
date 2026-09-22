@@ -4,7 +4,7 @@ import 'package:chuphinh/api/api_config.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
-import 'mobile/patrol_mobile_summary_tables.dart';
+import '../mobile/patrol_facility_summary_mobile_tables.dart';
 
 String kBaseUrl = ApiConfig.baseUrl;
 
@@ -194,13 +194,13 @@ class PatrolApi {
   }
 }
 
-class PatrolSummaryScreen extends StatefulWidget {
+class PatrolFacilitySummaryTable extends StatefulWidget {
   final String fromD;
   final String toD;
   final String plant;
   final String type;
 
-  const PatrolSummaryScreen({
+  const PatrolFacilitySummaryTable({
     super.key,
     required this.fromD,
     required this.toD,
@@ -209,10 +209,12 @@ class PatrolSummaryScreen extends StatefulWidget {
   });
 
   @override
-  State<PatrolSummaryScreen> createState() => _PatrolSummaryScreenState();
+  State<PatrolFacilitySummaryTable> createState() =>
+      _PatrolFacilitySummaryTableState();
 }
 
-class _PatrolSummaryScreenState extends State<PatrolSummaryScreen> {
+class _PatrolFacilitySummaryTableState
+    extends State<PatrolFacilitySummaryTable> {
   final PatrolApi _api = const PatrolApi();
   late Future<PatrolSummaryResponseDto> _future;
 

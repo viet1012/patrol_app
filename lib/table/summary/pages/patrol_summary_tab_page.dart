@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../patrol_summary_chart_page.dart';
 import 'patrol_pic_summary_page.dart';
+import 'patrol_risk_summary_page.dart';
 
 class PatrolSummaryTabPage extends StatelessWidget {
   final String plant;
@@ -99,7 +99,7 @@ class PatrolSummaryTabPage extends StatelessWidget {
                 /// TAB 1
                 //////////////////////////////////////////////////////
                 SingleChildScrollView(
-                  child: PatrolRiskSummarySfPage(
+                  child: PatrolRiskSummaryPage(
                     onSelect: onSelect,
                     onDateChanged: onDateChanged,
                     plant: plant,
