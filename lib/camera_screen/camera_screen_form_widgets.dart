@@ -33,6 +33,7 @@ extension _CameraScreenFormWidgets on _CameraScreenState {
         return _buildQualityRiskSection();
       case PatrolGroup.Audit:
       case PatrolGroup.AssetUpdate:
+      case PatrolGroup.FixedAsset:
       case PatrolGroup.Patrol:
         return _buildPatrolRiskSection();
     }

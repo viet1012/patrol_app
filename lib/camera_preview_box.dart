@@ -52,6 +52,10 @@ class CameraPreviewBox extends StatefulWidget {
   /// CameraPreviewBoxState vẫn là nguồn trạng thái thật duy nhất.
   final ValueChanged<bool>? onCameraSleepingChanged;
 
+  /// true: chỉ hiển thị preview + QR guide/badge/warning, ẩn upload,
+  /// nhập QR tay, zoom và nút chụp. Chỉ ẩn UI, không tắt camera/QR logic.
+  final bool qrOnly;
+
   const CameraPreviewBox({
     super.key,
     this.size = 320,
@@ -63,6 +67,7 @@ class CameraPreviewBox extends StatefulWidget {
     required this.patrolGroup,
     this.onQrDetected,
     this.onCameraSleepingChanged,
+    this.qrOnly = false,
   });
 
   @override
@@ -1471,6 +1476,7 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
               ),
             ),
 
+            if (!widget.qrOnly) ...[
             Positioned(
               bottom: 14,
               left: 7,
@@ -1502,6 +1508,7 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
                 ),
               ),
             ),
+            ],
 
             // Chỉ badge QR rebuild khi QR Patrol thay đổi.
             Positioned(
@@ -1560,6 +1567,7 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
               ),
             ),
 
+            if (!widget.qrOnly) ...[
             Positioned(
               bottom: 14,
               right: 14,
@@ -1595,11 +1603,13 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
                 ),
               ),
             ),
+            ],
 
             Positioned(
               left: 12,
               right: 12,
-              bottom: 78,
+              // Không có toolbar ở dưới khi qrOnly nên banner hạ xuống sát đáy.
+              bottom: widget.qrOnly ? 12 : 78,
               child: IgnorePointer(
                 child: RepaintBoundary(
                   child: ValueListenableBuilder<_QrWarningState>(

@@ -14,6 +14,7 @@ import '../api/hse_master_service.dart';
 import '../common/animated_glass_action_button.dart';
 import '../common/app_version_text.dart';
 import '../common/common_ui_helper.dart';
+import '../fixedAsset/fixed_asset_screen.dart';
 import '../model/auth_me.dart';
 import '../model/hse_patrol_team_model.dart';
 import '../model/machine_model.dart';
@@ -23,7 +24,7 @@ import '../session/session_store.dart';
 import '../test.dart';
 import '../translator.dart';
 
-enum PatrolGroup { Patrol, Audit, QualityPatrol, AssetUpdate }
+enum PatrolGroup { Patrol, Audit, QualityPatrol, AssetUpdate, FixedAsset }
 
 enum PatrolAction { before, after, recheck, summary }
 
@@ -481,6 +482,13 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
           prefix: 'Asset Patrol',
           titleScreen: 'Asset Patrol',
         );
+      case PatrolGroup.FixedAsset:
+        return const _GroupConfig(
+          title: 'Fixed Asset',
+          icon: Icons.precision_manufacturing_rounded,
+          prefix: 'Fixed Asset',
+          titleScreen: 'Fixed Asset',
+        );
     }
   }
 
@@ -543,6 +551,8 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
         return Colors.purpleAccent.shade100;
       case PatrolGroup.AssetUpdate:
         return Colors.yellow.shade700;
+      case PatrolGroup.FixedAsset:
+        return Colors.orangeAccent.shade200;
     }
   }
 
@@ -658,6 +668,20 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
     required Color color,
     required String titleScreen,
   }) {
+    // Fixed Asset không thuộc workflow Patrol: chỉ có một action.
+    if (group == PatrolGroup.FixedAsset) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
+        child: _patrolButton(
+          number: '1)',
+          title: 'Open Fixed Asset',
+          color: color,
+          enabled: true,
+          onTap: _openFixedAsset,
+        ),
+      );
+    }
+
     final canBefore = _authMe?.can(group, PatrolAction.before) ?? false;
     final canAfter = _authMe?.can(group, PatrolAction.after) ?? false;
     final canRecheck = _authMe?.can(group, PatrolAction.recheck) ?? false;
@@ -776,6 +800,19 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
   // NAVIGATION
   // ============================================================
 
+  void _openFixedAsset() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => FixedAssetScreen(
+          accountCode: widget.accountCode,
+          selectedPlant: selectedFactory,
+          userName: _employeeName,
+        ),
+      ),
+    );
+  }
+
   void _openBefore(PatrolGroup group, String titleScreen) {
     Navigator.push(
       context,
@@ -841,6 +878,8 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
         return 'QA Recheck';
       case PatrolGroup.AssetUpdate:
         return 'Asset Recheck';
+      case PatrolGroup.FixedAsset:
+        return 'Recheck';
     }
   }
 
