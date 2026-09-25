@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 
+import '../model/fixed_asset_audit_check_response.dart';
 import '../model/fixed_asset_audit_save_response.dart';
 import '../model/fixed_asset_audit_summary.dart';
 import '../model/fixed_asset_machine.dart';
@@ -24,11 +25,14 @@ class FixedAssetLookupException implements Exception {
 class FixedAssetApi {
   static const String _base = '/api/fixed-assets';
 
+  // Backend Fixed Asset cố định scope KVH ở phía server: không API nào
+  // nhận/cần div từ frontend.
+
   static Future<List<String>> fetchFacs() {
     return _getStrings('$_base/facs');
   }
 
-  static Future<List<String>> fetchFloors(String fac) {
+  static Future<List<String>> fetchFloors({required String fac}) {
     return _getStrings('$_base/floors', {'fac': fac});
   }
 
@@ -71,6 +75,39 @@ class FixedAssetApi {
   static Future<FixedAssetAuditSummary> fetchAuditSummary() async {
     final data = await _getMapOnce('$_base/audit-summary');
     return FixedAssetAuditSummary.fromJson(data);
+  }
+
+  /// Kiểm tra trước khi save (AUTO): trạng thái kiểm kê trong kỳ, MASTER
+  /// location, ACTUAL location (resolve từ Floor + PositionAA), mismatch.
+  /// Không retry.
+  static Future<FixedAssetAuditCheckResponse> checkAudit({
+    required String machineCode,
+    required String floor,
+    required String positionAA,
+  }) async {
+    Response res;
+
+    try {
+      res = await DioClient.dio.post(
+        '$_base/audit-check',
+        data: {
+          'machineCode': machineCode,
+          'floor': floor,
+          'positionAA': positionAA,
+        },
+      );
+    } on DioException catch (e) {
+      throw Exception(
+        _serverMessage(e.response?.data) ?? DioErrorHandler.handle(e),
+      );
+    }
+
+    final status = res.statusCode ?? 0;
+    if (status < 200 || status >= 300) {
+      throw Exception(_serverMessage(res.data) ?? 'Server error $status');
+    }
+
+    return FixedAssetAuditCheckResponse.fromJson(_extractMap(res.data));
   }
 
   /// GET một object JSON, không qua _retry. Lỗi 4xx/5xx/format -> Exception
@@ -196,15 +233,19 @@ class FixedAssetApi {
   ///
   /// HTTP 2xx không đồng nghĩa với insert mới: caller phải xét
   /// saved / alreadyAudited / unknownMachine trong response.
+  ///
+  /// [fac] / [positionA] = null khi vị trí đang quét không có trong MAP
+  /// (known machine, đã xác nhận): backend lưu A_Act = null, AA_Act = raw.
   static Future<FixedAssetAuditSaveResponse> saveAudit({
-    required String fac,
+    required String? fac,
     required String floor,
-    required String positionA,
+    required String? positionA,
     required String positionAA,
     required String machineCode,
     required String userId,
     required String userName,
     String note = '',
+    bool confirmLocationMismatch = false,
   }) async {
     try {
       // Dùng DioClient.dio trực tiếp (không qua _retry): POST này INSERT
@@ -220,6 +261,7 @@ class FixedAssetApi {
           'userId': userId,
           'userName': userName,
           'note': note,
+          'confirmLocationMismatch': confirmLocationMismatch,
         },
       );
 

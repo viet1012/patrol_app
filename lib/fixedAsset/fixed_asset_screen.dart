@@ -7,13 +7,15 @@ import '../api/fixed_asset_api.dart';
 import '../common/common_searchable_dropdown.dart';
 import '../common/common_ui_helper.dart';
 import '../homeScreen/patrol_home_screen.dart';
+import '../model/fixed_asset_audit_check_response.dart';
 import '../model/fixed_asset_audit_save_response.dart';
 import '../model/fixed_asset_audit_summary.dart';
 import '../model/fixed_asset_machine.dart';
-import '../model/fixed_asset_scan_info.dart';
 
-/// AUTO: QR -> MachineCode -> scan-info -> (đã kiểm kê: dừng | save).
-/// MANUAL: chọn location bằng cascade -> QR -> save.
+/// AUTO: QR -> MachineCode + Floor + PositionAA -> audit-check
+///       -> (đã kiểm kê: dừng | sai vị trí: hỏi | khớp/ngoài master: save).
+/// MANUAL: chọn location bằng cascade -> QR -> save (backend vẫn có thể
+///         yêu cầu xác nhận sai vị trí).
 enum FixedAssetLocationMode { auto, manual }
 
 /// saved (insert mới) và alreadyAudited (đã có trong kỳ) là hai kết quả
@@ -24,8 +26,47 @@ enum _ScanStatus {
   saving,
   saved,
   alreadyAudited,
+
+  /// Sai vị trí so với MASTER: đang chờ xác nhận hoặc operator đã Hủy.
+  locationMismatch,
+
+  /// Đã lưu sau khi operator xác nhận "Vẫn lưu".
+  mismatchSaved,
   unknownSaved,
   failed,
+}
+
+/// Dữ liệu tách từ QR Fixed Asset.
+/// KVH_A-593_1F_A12-2_Fine Bush -> A-593 / 1F / A12-2 / Fine Bush.
+/// Không suy PositionA/Fac từ QR: backend resolve qua MASTER MAP.
+/// MachineCode = định danh MASTER; Floor + PositionAA = input vị trí ACTUAL.
+class _FixedAssetQrData {
+  final String machineCode;
+  final String floor;
+  final String positionAA;
+  final String displayName;
+
+  const _FixedAssetQrData({
+    required this.machineCode,
+    this.floor = '',
+    this.positionAA = '',
+    this.displayName = '',
+  });
+
+  bool get hasLocation => floor.isNotEmpty && positionAA.isNotEmpty;
+}
+
+/// Giá trị rỗng (ví dụ MASTER Fac chưa map) hiển thị là "-" (chỉ UI).
+String _dash(String value) => value.trim().isEmpty ? '-' : value;
+
+/// Vị trí đang quét KHÔNG có trong MAP (known machine): chỉ có raw Floor +
+/// PositionAA từ backend. Không có Fac/PositionA và không được suy ra
+/// (ví dụ KHÔNG đổi A35-1 thành A35).
+class _UnmappedActual {
+  final String floor;
+  final String positionAA;
+
+  const _UnmappedActual({required this.floor, required this.positionAA});
 }
 
 /// Location dùng để POST audit, không phụ thuộc nguồn (AUTO/MANUAL).
@@ -91,8 +132,19 @@ class _FixedAssetScreenState extends State<FixedAssetScreen> {
 
   bool get _isAutoMode => _locationMode == FixedAssetLocationMode.auto;
 
-  /// Location AUTO lấy từ MASTER (chỉ hiển thị, không phải control).
-  _AuditLocation? _masterLocation;
+  /// Location AUTO = vị trí ĐANG QUÉT (ACTUAL) do audit-check resolve.
+  /// Đây là location audit + machine list, không phải location MASTER.
+  _AuditLocation? _autoLocation;
+
+  /// ACTUAL location hiện tại khác MASTER của machine vừa quét.
+  bool _autoLocationMismatch = false;
+
+  /// Vị trí đang quét không có trong MAP (AUTO). Khi có giá trị thì
+  /// [_autoLocation] = null: location card chỉ hiện Floor / PositionAA.
+  _UnmappedActual? _autoUnmappedActual;
+
+  /// MASTER location của machine sai vị trí (hiển thị trên status card).
+  _AuditLocation? _mismatchMaster;
 
   // ============================================================
   // SCAN STATE
@@ -173,8 +225,8 @@ class _FixedAssetScreenState extends State<FixedAssetScreen> {
 
   /// MachineCode ĐÃ KIỂM KÊ TRONG KỲ HIỆN TẠI, lưu dạng trim().toLowerCase().
   ///
-  /// Chỉ thêm từ bằng chứng trong session này (scan-info
-  /// auditedInCurrentPeriod, POST saved/alreadyAudited). KHÔNG dùng
+  /// Chỉ thêm từ bằng chứng trong session này (audit-check alreadyAudited,
+  /// POST saved/alreadyAudited). KHÔNG dùng
   /// /audited-machine-codes vì endpoint đó là lịch sử trọn đời, không lọc
   /// theo kỳ 3 tháng. Không reset khi location/mode đổi.
   final Set<String> _auditedMachineCodes = <String>{};
@@ -235,7 +287,7 @@ class _FixedAssetScreenState extends State<FixedAssetScreen> {
 
   /// Location đang dùng cho machine list, theo mode hiện tại.
   _AuditLocation? get _activeLocation =>
-      _isAutoMode ? _masterLocation : _selectedManualLocation;
+      _isAutoMode ? _autoLocation : _selectedManualLocation;
 
   bool _isCurrentScan(int generation) =>
       mounted && generation == _scanGeneration;
@@ -250,9 +302,6 @@ class _FixedAssetScreenState extends State<FixedAssetScreen> {
 
   /// KVH_A-1456_1F_A34-2_Sprue Bush -> A-1456
   /// A-2331 -> A-2331
-  ///
-  /// Chỉ lấy MachineCode. Location nhúng trong QR KHÔNG được dùng:
-  /// AUTO lấy từ MASTER, MANUAL lấy từ dropdown.
   String _extractMachineCode(String rawQr) {
     final qr = rawQr.trim();
     if (qr.isEmpty) return '';
@@ -263,6 +312,77 @@ class _FixedAssetScreenState extends State<FixedAssetScreen> {
     }
 
     return qr;
+  }
+
+  /// Tách thêm Floor + PositionAA (+ tên hiển thị) từ QR KVH_ cho AUTO.
+  /// Chỉ nhận khi đủ segment và không rỗng; không suy đoán giá trị.
+  _FixedAssetQrData _parseQr(String rawQr) {
+    final qr = rawQr.trim();
+    final machineCode = _extractMachineCode(qr);
+
+    if (!qr.startsWith('KVH_')) {
+      return _FixedAssetQrData(machineCode: machineCode);
+    }
+
+    final segments = qr.split('_');
+    if (segments.length < 4) {
+      return _FixedAssetQrData(machineCode: machineCode);
+    }
+
+    return _FixedAssetQrData(
+      machineCode: machineCode,
+      floor: segments[2].trim(),
+      positionAA: segments[3].trim(),
+      displayName: segments.length > 4
+          ? segments.sublist(4).join('_').trim()
+          : '',
+    );
+  }
+
+  /// null nếu thiếu bất kỳ field nào.
+  _AuditLocation? _toLocation(
+    String fac,
+    String floor,
+    String positionA,
+    String positionAA,
+  ) {
+    if (fac.isEmpty ||
+        floor.isEmpty ||
+        positionA.isEmpty ||
+        positionAA.isEmpty) {
+      return null;
+    }
+
+    return _AuditLocation(
+      fac: fac,
+      floor: floor,
+      positionA: positionA,
+      positionAA: positionAA,
+    );
+  }
+
+  /// MASTER chỉ để HIỂN THỊ: giữ các field có giá trị, field rỗng hiện "-".
+  /// null chỉ khi backend không trả field MASTER nào. Không dùng cho POST
+  /// hay machine list (các chỗ đó vẫn dùng [_toLocation] strict).
+  _AuditLocation? _toMasterDisplay(
+    String fac,
+    String floor,
+    String positionA,
+    String positionAA,
+  ) {
+    if (fac.isEmpty &&
+        floor.isEmpty &&
+        positionA.isEmpty &&
+        positionAA.isEmpty) {
+      return null;
+    }
+
+    return _AuditLocation(
+      fac: fac,
+      floor: floor,
+      positionA: positionA,
+      positionAA: positionAA,
+    );
   }
 
   /// Gọi bên trong setState khi location/mode đổi.
@@ -276,6 +396,7 @@ class _FixedAssetScreenState extends State<FixedAssetScreen> {
     _scannedFaName = '';
     _statusMessage = null;
     _lastAuditedAt = null;
+    _mismatchMaster = null;
     if (_lastSeenQr != null) _lastSeenAt = DateTime.now();
     _cameraKey.currentState?.resetQr();
   }
@@ -319,35 +440,47 @@ class _FixedAssetScreenState extends State<FixedAssetScreen> {
     if (isRepeat) return;
 
     final generation = ++_scanGeneration;
-    final machineCode = _extractMachineCode(qr);
+    final qrData = _parseQr(qr);
+    final machineCode = qrData.machineCode;
 
-    if (machineCode.isEmpty) {
+    // AUTO cần Floor + PositionAA từ QR để backend resolve vị trí thật.
+    final String? invalidMessage = machineCode.isEmpty
+        ? 'Invalid machine QR'
+        : (_isAutoMode && !qrData.hasLocation)
+        ? 'Invalid Fixed Asset QR location'
+        : null;
+
+    if (invalidMessage != null) {
       setState(() {
-        _scannedCode = '';
+        _scannedCode = machineCode;
         _scannedFaName = '';
+        _mismatchMaster = null;
         _scanStatus = _ScanStatus.failed;
-        _statusMessage = 'Invalid machine QR';
+        _statusMessage = invalidMessage;
       });
       _cameraKey.currentState?.resetQr();
       return;
     }
 
+    // Một pipeline duy nhất cho toàn bộ CHECK -> (CONFIRM) -> SAVE.
     _processingScan = true;
     _processingRawQr = qr;
 
     setState(() {
       _scannedCode = machineCode;
-      _scannedFaName = '';
+      _scannedFaName = qrData.displayName;
       _statusMessage = null;
       _lastAuditedAt = null;
+      _mismatchMaster = null;
       _scanStatus = _isAutoMode ? _ScanStatus.checking : _ScanStatus.saving;
     });
 
     try {
-      final location = await _resolveAuditLocation(machineCode, generation);
-      if (location == null || !_isCurrentScan(generation)) return;
-
-      await _saveAudit(machineCode, location, generation);
+      if (_isAutoMode) {
+        await _runAutoScan(qrData, generation);
+      } else {
+        await _runManualScan(machineCode, generation);
+      }
     } finally {
       _processingScan = false;
       _processingRawQr = null;
@@ -361,106 +494,223 @@ class _FixedAssetScreenState extends State<FixedAssetScreen> {
     }
   }
 
-  /// AUTO: scan-info quyết định (đã kiểm kê -> dừng, chưa -> location MASTER).
-  /// MANUAL: location đang chọn.
-  /// Trả null nếu không POST (đã set trạng thái) hoặc scan đã stale.
-  Future<_AuditLocation?> _resolveAuditLocation(
-    String machineCode,
-    int generation,
-  ) async {
-    if (!_isAutoMode) {
-      final location = _selectedManualLocation;
-      if (location == null) {
-        _failScan(
-          generation,
-          'Select Fac, Floor, PositionA and PositionAA first',
-        );
-      }
-      return location;
+  /// MANUAL: location lấy từ dropdown. Mismatch (nếu có) do POST báo về.
+  Future<void> _runManualScan(String machineCode, int generation) async {
+    final location = _selectedManualLocation;
+    if (location == null) {
+      _failScan(generation, 'Select Fac, Floor, PositionA and PositionAA first');
+      return;
     }
 
-    final FixedAssetScanInfo info;
-
-    try {
-      info = await FixedAssetApi.fetchScanInfo(machineCode);
-    } catch (_) {
-      _failScan(generation, 'Unable to check audit status');
-      return null;
-    }
-
-    if (!_isCurrentScan(generation) || !_isAutoMode) return null;
-
-    // Case A / D: đã kiểm kê trong kỳ -> không POST.
-    if (info.auditedInCurrentPeriod) {
-      _applyScanInfo(machineCode, info, _ScanStatus.alreadyAudited);
-      return null;
-    }
-
-    // Case C: không có trong MASTER và chưa kiểm kê. Chưa có nguồn location
-    // vật lý hợp lệ cho machine lạ -> không POST, không tự suy location.
-    if (!info.existsInMaster) {
-      _applyScanInfo(
-        machineCode,
-        info,
-        _ScanStatus.failed,
-        message: 'Machine not found in master',
-      );
-      return null;
-    }
-
-    if (!info.hasFullLocation) {
-      _applyScanInfo(
-        machineCode,
-        info,
-        _ScanStatus.failed,
-        message: 'Master location is incomplete',
-      );
-      return null;
-    }
-
-    // Case B: MASTER + chưa kiểm kê -> hiển thị location rồi POST.
-    return _applyScanInfo(machineCode, info, _ScanStatus.saving);
+    await _saveAudit(machineCode, location, generation);
   }
 
-  /// Áp kết quả scan-info trong MỘT setState: status, FAName, lastAuditedAt,
-  /// location MASTER (nếu có), audited set. Không đi qua handler cascade
-  /// manual. Machine list chỉ reload khi location đổi hoặc lần trước lỗi.
-  ///
-  /// Trả về location MASTER đã áp (null nếu machine không có trong MASTER).
-  _AuditLocation? _applyScanInfo(
-    String machineCode,
-    FixedAssetScanInfo info,
-    _ScanStatus status, {
-    String? message,
-  }) {
-    final location = info.existsInMaster && info.hasFullLocation
-        ? _AuditLocation(
-            fac: info.fac,
-            floor: info.floor,
-            positionA: info.positionA,
-            positionAA: info.positionAA,
-          )
-        : null;
+  /// AUTO: một POST /audit-check quyết định toàn bộ; không gọi scan-info /
+  /// machine-location cho cùng scan.
+  Future<void> _runAutoScan(_FixedAssetQrData qrData, int generation) async {
+    final machineCode = qrData.machineCode;
 
-    final sameLocation = location == _masterLocation;
+    final FixedAssetAuditCheckResponse check;
+
+    try {
+      check = await FixedAssetApi.checkAudit(
+        machineCode: machineCode,
+        floor: qrData.floor,
+        positionAA: qrData.positionAA,
+      );
+    } catch (error) {
+      _failScan(
+        generation,
+        _checkErrorMessage(_errorText(error), 'Unable to check audit status'),
+      );
+      return;
+    }
+
+    if (!_isCurrentScan(generation) || !_isAutoMode) return;
+
+    final actual = _toLocation(
+      check.actualFac,
+      check.actualFloor,
+      check.actualPositionA,
+      check.actualPositionAA,
+    );
+    final master = _toLocation(
+      check.masterFac,
+      check.masterFloor,
+      check.masterPositionA,
+      check.masterPositionAA,
+    );
+    final faName = check.faName.isNotEmpty ? check.faName : qrData.displayName;
+
+    // 1. Trùng trong kỳ: ưu tiên cao nhất, không POST, không hỏi mismatch.
+    if (check.alreadyAudited) {
+      _applyAutoCheck(
+        machineCode,
+        actual ?? master,
+        faName,
+        _ScanStatus.alreadyAudited,
+        lastAuditedAt: check.lastAuditedAt,
+      );
+      return;
+    }
+
+    // 2a. Known machine, vị trí đang quét KHÔNG có trong MAP nhưng backend cho
+    //     xác nhận: không phải lỗi. Hiện MASTER + raw Floor/PositionAA, hỏi
+    //     rồi mới lưu (Fac/PositionA = null, không suy ra).
+    if (check.existsInMaster &&
+        !check.actualLocationResolved &&
+        check.requiresConfirmation) {
+      final raw = _UnmappedActual(
+        floor: check.actualFloor.isNotEmpty ? check.actualFloor : qrData.floor,
+        positionAA: check.actualPositionAA.isNotEmpty
+            ? check.actualPositionAA
+            : qrData.positionAA,
+      );
+      final masterDisplay = _toMasterDisplay(
+        check.masterFac,
+        check.masterFloor,
+        check.masterPositionA,
+        check.masterPositionAA,
+      );
+
+      _applyUnmappedActual(raw, faName, masterDisplay);
+
+      final confirmed = await _confirmLocationMismatch(
+        generation: generation,
+        machineCode: machineCode,
+        faName: faName,
+        masterLocation: masterDisplay,
+        actualLocation: null,
+        unmappedActual: raw,
+      );
+
+      if (!_isCurrentScan(generation) || !_isAutoMode) return;
+
+      if (!confirmed) {
+        _markMismatchCancelled(generation);
+        return;
+      }
+
+      await _saveAudit(
+        machineCode,
+        null,
+        generation,
+        unmappedActual: raw,
+        confirmLocationMismatch: true,
+      );
+      return;
+    }
+
+    // 2b. Floor + PositionAA không map được / map mơ hồ (không xác nhận được):
+    //     không đoán, không POST.
+    if (!check.actualLocationResolved || actual == null) {
+      _failScan(
+        generation,
+        _checkErrorMessage(check.message, 'QR location not found'),
+      );
+      return;
+    }
+
+    // 3. Machine có trong MASTER nhưng ở vị trí khác: hỏi trước khi save.
+    //    Machine ngoài MASTER không phải mismatch (save thẳng, Phase 13).
+    final mismatch =
+        check.existsInMaster &&
+        (!check.locationMatch || check.requiresConfirmation);
+
+    if (mismatch) {
+      // MASTER hiển thị từ response backend (không suy từ QR); field thiếu
+      // hiện "-" thay vì ẩn toàn bộ MASTER.
+      final masterDisplay = _toMasterDisplay(
+        check.masterFac,
+        check.masterFloor,
+        check.masterPositionA,
+        check.masterPositionAA,
+      );
+
+      _applyAutoCheck(
+        machineCode,
+        actual,
+        faName,
+        _ScanStatus.locationMismatch,
+        mismatchMaster: masterDisplay,
+      );
+
+      final confirmed = await _confirmLocationMismatch(
+        generation: generation,
+        machineCode: machineCode,
+        faName: faName,
+        masterLocation: masterDisplay,
+        actualLocation: actual,
+      );
+
+      if (!_isCurrentScan(generation) || !_isAutoMode) return;
+
+      if (!confirmed) {
+        _markMismatchCancelled(generation);
+        return;
+      }
+
+      await _saveAudit(
+        machineCode,
+        actual,
+        generation,
+        confirmLocationMismatch: true,
+      );
+      return;
+    }
+
+    // 4. Khớp vị trí, hoặc machine ngoài MASTER: POST bằng ACTUAL location.
+    _applyAutoCheck(machineCode, actual, faName, _ScanStatus.saving);
+    await _saveAudit(machineCode, actual, generation);
+  }
+
+  /// Message lỗi thân thiện cho audit-check / ACTUAL location.
+  String _checkErrorMessage(String raw, String fallback) {
+    final lower = raw.toLowerCase();
+    if (lower.contains('ambiguous') || lower.contains('multiple')) {
+      return 'QR location is ambiguous';
+    }
+    if (lower.contains('not found')) {
+      return lower.contains('location')
+          ? 'QR location not found'
+          : raw;
+    }
+    return fallback;
+  }
+
+  /// Áp kết quả audit-check trong MỘT setState. ACTUAL location là location
+  /// audit + machine list. Không đi qua handler cascade manual; machine list
+  /// chỉ reload khi location đổi hoặc lần trước lỗi.
+  void _applyAutoCheck(
+    String machineCode,
+    _AuditLocation? location,
+    String faName,
+    _ScanStatus status, {
+    DateTime? lastAuditedAt,
+    _AuditLocation? mismatchMaster,
+  }) {
+    final sameLocation = location == _autoLocation;
     final reloadMachines =
         location != null && (!sameLocation || _machineError != null);
 
     if (reloadMachines) _machineReq++;
 
     setState(() {
-      _scannedFaName = info.faName;
-      _lastAuditedAt = info.lastAuditedAt;
+      _scannedFaName = faName;
+      _lastAuditedAt = lastAuditedAt;
       _scanStatus = status;
-      _statusMessage = message;
+      _statusMessage = null;
+      _mismatchMaster = mismatchMaster;
 
       if (status == _ScanStatus.alreadyAudited) {
         _auditedMachineCodes.add(machineCode.trim().toLowerCase());
       }
 
-      // Machine không có trong MASTER: giữ nguyên location đang hiển thị,
-      // không điền location từ QR.
-      if (location != null) _masterLocation = location;
+      if (location != null) {
+        _autoLocation = location;
+        _autoUnmappedActual = null;
+        _autoLocationMismatch = mismatchMaster != null;
+      }
 
       if (reloadMachines) {
         machines = const <FixedAssetMachine>[];
@@ -470,7 +720,7 @@ class _FixedAssetScreenState extends State<FixedAssetScreen> {
     });
 
     if (reloadMachines) {
-      // Chạy song song với POST audit, không chặn save.
+      // Chạy song song với dialog / POST audit, không chặn save.
       _loadMachines(
         location.fac,
         location.floor,
@@ -478,22 +728,95 @@ class _FixedAssetScreenState extends State<FixedAssetScreen> {
         location.positionAA,
       );
     }
-
-    return location;
   }
 
-  /// Đường save chung cho AUTO và MANUAL. Request body không đổi.
+  void _markMismatchCancelled(int generation) {
+    if (!_isCurrentScan(generation)) return;
+    setState(() {
+      _scanStatus = _ScanStatus.locationMismatch;
+      _statusMessage = _autoUnmappedActual != null
+          ? 'Không có trong MAP - chưa lưu'
+          : 'Sai vị trí - chưa lưu';
+    });
+  }
+
+  /// AUTO: vị trí đang quét không có trong MAP (known machine). Một setState:
+  /// status cảnh báo, MASTER hiển thị, raw ACTUAL. Không có location đầy đủ
+  /// nên không load machine list (clear list cũ để không gây hiểu nhầm).
+  void _applyUnmappedActual(
+    _UnmappedActual raw,
+    String faName,
+    _AuditLocation? masterDisplay,
+  ) {
+    _machineReq++;
+
+    setState(() {
+      _scannedFaName = faName;
+      _lastAuditedAt = null;
+      _scanStatus = _ScanStatus.locationMismatch;
+      _statusMessage = null;
+      _mismatchMaster = masterDisplay;
+
+      _autoLocation = null;
+      _autoUnmappedActual = raw;
+      _autoLocationMismatch = true;
+
+      machines = const <FixedAssetMachine>[];
+      _loadingMachines = false;
+      _machineError = null;
+      _clearMachineSearch();
+    });
+  }
+
+  /// Dialog xác nhận sai vị trí, dùng chung cho AUTO và MANUAL.
+  /// true = "Vẫn lưu". Scan đã stale (trước hoặc sau dialog) -> false.
+  Future<bool> _confirmLocationMismatch({
+    required int generation,
+    required String machineCode,
+    required String faName,
+    required _AuditLocation? masterLocation,
+    required _AuditLocation? actualLocation,
+    _UnmappedActual? unmappedActual,
+  }) async {
+    if (!_isCurrentScan(generation)) return false;
+
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => _LocationMismatchDialog(
+        machineCode: machineCode,
+        faName: faName,
+        master: masterLocation,
+        actual: actualLocation,
+        unmappedActual: unmappedActual,
+      ),
+    );
+
+    // Kết quả dialog cũ không được save vào context mới.
+    return result == true && _isCurrentScan(generation);
+  }
+
+  /// Đường save chung cho AUTO và MANUAL. Request body không đổi, chỉ thêm
+  /// confirmLocationMismatch.
+  ///
+  /// [location] = location đầy đủ (mapped). [location] = null + [unmappedActual]
+  /// = vị trí đang quét không có trong MAP: gửi fac/positionA = null.
   Future<void> _saveAudit(
     String machineCode,
-    _AuditLocation location,
-    int generation,
-  ) async {
+    _AuditLocation? location,
+    int generation, {
+    _UnmappedActual? unmappedActual,
+    bool confirmLocationMismatch = false,
+  }) async {
     final userId = widget.accountCode.trim();
     final name = widget.userName.trim();
     final userName = name.isEmpty ? userId : name;
 
     if (_scanStatus != _ScanStatus.saving) {
-      setState(() => _scanStatus = _ScanStatus.saving);
+      setState(() {
+        _scanStatus = _ScanStatus.saving;
+        _statusMessage = null;
+      });
     }
 
     FixedAssetAuditSaveResponse? response;
@@ -501,13 +824,14 @@ class _FixedAssetScreenState extends State<FixedAssetScreen> {
 
     try {
       response = await FixedAssetApi.saveAudit(
-        fac: location.fac,
-        floor: location.floor,
-        positionA: location.positionA,
-        positionAA: location.positionAA,
+        fac: location?.fac,
+        floor: location?.floor ?? unmappedActual?.floor ?? '',
+        positionA: location?.positionA,
+        positionAA: location?.positionAA ?? unmappedActual?.positionAA ?? '',
         machineCode: machineCode,
         userId: userId,
         userName: userName,
+        confirmLocationMismatch: confirmLocationMismatch,
       );
     } catch (error) {
       saveError = error;
@@ -518,19 +842,82 @@ class _FixedAssetScreenState extends State<FixedAssetScreen> {
     final result = response;
     final errorText = saveError == null ? '' : _errorText(saveError);
 
-    final newlySavedMaster =
-        result != null &&
+    // Tiến độ MASTER đổi khi có insert mới cho machine MASTER (kể cả
+    // mismatch đã xác nhận). Vẫn refresh khi scan đã stale vì record đã
+    // vào backend.
+    if (result != null &&
         result.saved &&
         !result.alreadyAudited &&
-        !result.unknownMachine;
-
-    // Tiến độ MASTER chỉ đổi khi có insert mới cho machine MASTER.
-    // Vẫn refresh kể cả khi scan đã stale vì record đã vào backend.
-    if (newlySavedMaster) _loadAuditSummary();
+        !result.unknownMachine) {
+      _loadAuditSummary();
+    }
 
     // Location/mode đã đổi trong lúc save: không cập nhật status card /
     // audited set của màn hình hiện tại.
     if (!_isCurrentScan(generation)) return;
+
+    // Backend phát hiện sai vị trí (chủ yếu MANUAL): hỏi rồi POST lại cùng
+    // location với confirmLocationMismatch = true.
+    if (result != null &&
+        !result.saved &&
+        !result.alreadyAudited &&
+        result.requiresConfirmation &&
+        !confirmLocationMismatch) {
+      final master = _toMasterDisplay(
+        result.masterFac,
+        result.masterFloor,
+        result.masterPositionA,
+        result.masterPositionAA,
+      );
+      final actual =
+          _toLocation(
+            result.actualFac,
+            result.actualFloor,
+            result.actualPositionA,
+            result.actualPositionAA,
+          ) ??
+          location;
+      // Không có location đầy đủ -> hiển thị raw Floor/PositionAA.
+      final rawActual = actual != null
+          ? null
+          : (unmappedActual ??
+                _UnmappedActual(
+                  floor: result.actualFloor,
+                  positionAA: result.actualPositionAA,
+                ));
+
+      setState(() {
+        _scanStatus = _ScanStatus.locationMismatch;
+        _statusMessage = null;
+        _mismatchMaster = master;
+      });
+
+      final confirmed = await _confirmLocationMismatch(
+        generation: generation,
+        machineCode: machineCode,
+        faName: _scannedFaName,
+        masterLocation: master,
+        actualLocation: actual,
+        unmappedActual: rawActual,
+      );
+
+      if (!_isCurrentScan(generation)) return;
+
+      if (!confirmed) {
+        _markMismatchCancelled(generation);
+        return;
+      }
+
+      // Luôn POST lại đúng location đã gửi (ACTUAL / manual đã chọn).
+      await _saveAudit(
+        machineCode,
+        location,
+        generation,
+        unmappedActual: unmappedActual,
+        confirmLocationMismatch: true,
+      );
+      return;
+    }
 
     setState(() {
       if (result == null) {
@@ -543,6 +930,9 @@ class _FixedAssetScreenState extends State<FixedAssetScreen> {
       } else if (result.saved && result.unknownMachine) {
         // Hợp lệ về nghiệp vụ, không phải lỗi; không tính vào tiến độ.
         _scanStatus = _ScanStatus.unknownSaved;
+      } else if (result.saved && result.locationMismatch) {
+        _scanStatus = _ScanStatus.mismatchSaved;
+        _auditedMachineCodes.add(machineCode.trim().toLowerCase());
       } else if (result.saved) {
         _scanStatus = _ScanStatus.saved;
         _auditedMachineCodes.add(machineCode.trim().toLowerCase());
@@ -572,7 +962,9 @@ class _FixedAssetScreenState extends State<FixedAssetScreen> {
       _locationMode = mode;
 
       // Không để location của mode cũ bị dùng lại ở mode mới.
-      _masterLocation = null;
+      _autoLocation = null;
+      _autoUnmappedActual = null;
+      _autoLocationMismatch = false;
       selectedFac = null;
       selectedFloor = null;
       selectedPositionA = null;
@@ -666,7 +1058,7 @@ class _FixedAssetScreenState extends State<FixedAssetScreen> {
     setState(() => _loadingFloors = true);
 
     try {
-      final result = await FixedAssetApi.fetchFloors(fac);
+      final result = await FixedAssetApi.fetchFloors(fac: fac);
       if (!mounted || req != _floorReq) return;
       setState(() => floors = result);
     } catch (error) {
@@ -975,6 +1367,7 @@ class _FixedAssetScreenState extends State<FixedAssetScreen> {
   Widget _buildStatusCard() {
     final hasCode = _scannedCode.isNotEmpty;
     final lastAudited = _lastAuditedAt;
+    final mismatchMaster = _mismatchMaster;
 
     final String primary;
     final List<String> details = <String>[];
@@ -1016,10 +1409,44 @@ class _FixedAssetScreenState extends State<FixedAssetScreen> {
         label = 'Đã kiểm kê';
         color = _amber;
         indicator = const Icon(Icons.task_alt_rounded, color: _amber, size: 20);
+      case _ScanStatus.locationMismatch:
+        // Đang chờ xác nhận, hoặc đã Hủy (_statusMessage = "chưa lưu").
+        primary = _scannedCode;
+        if (_scannedFaName.isNotEmpty) details.add(_scannedFaName);
+        if (mismatchMaster != null) {
+          details.add(
+            'MASTER: ${_dash(mismatchMaster.positionA)} / '
+            '${_dash(mismatchMaster.positionAA)}',
+          );
+        }
+        if ((_statusMessage ?? '').isNotEmpty) details.add(_statusMessage!);
+        label = 'Sai vị trí máy';
+        color = _amber;
+        indicator = const Icon(
+          Icons.wrong_location_rounded,
+          color: _amber,
+          size: 20,
+        );
+      case _ScanStatus.mismatchSaved:
+        primary = _scannedCode;
+        if (_scannedFaName.isNotEmpty) details.add(_scannedFaName);
+        if (mismatchMaster != null) {
+          details.add(
+            'MASTER: ${_dash(mismatchMaster.positionA)} / '
+            '${_dash(mismatchMaster.positionAA)}',
+          );
+        }
+        label = 'Đã lưu - sai vị trí';
+        color = _amber;
+        indicator = const Icon(
+          Icons.check_circle_rounded,
+          color: _amber,
+          size: 20,
+        );
       case _ScanStatus.unknownSaved:
         primary = _scannedCode;
         details.add('Saved outside master');
-        label = 'Not in master';
+        label = 'Không có trong MASTER';
         color = _amber;
         indicator = const Icon(
           Icons.warning_amber_rounded,
@@ -1337,7 +1764,7 @@ class _FixedAssetScreenState extends State<FixedAssetScreen> {
             children: [
               Flexible(
                 child: Text(
-                  _isAutoMode ? 'MASTER LOCATION' : 'LOCATION',
+                  _isAutoMode ? 'CURRENT LOCATION' : 'LOCATION',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
@@ -1348,6 +1775,29 @@ class _FixedAssetScreenState extends State<FixedAssetScreen> {
                   ),
                 ),
               ),
+              if (_isAutoMode && _autoLocationMismatch) ...[
+                const SizedBox(width: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: _amber.withOpacity(.15),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: _amber.withOpacity(.6)),
+                  ),
+                  child: const Text(
+                    'MASTER MISMATCH',
+                    style: TextStyle(
+                      color: _amber,
+                      fontSize: 9.5,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: .4,
+                    ),
+                  ),
+                ),
+              ],
               const Spacer(),
               _buildModeToggle(),
             ],
@@ -1431,7 +1881,42 @@ class _FixedAssetScreenState extends State<FixedAssetScreen> {
   }
 
   Widget _buildMasterLocation() {
-    final location = _masterLocation;
+    final location = _autoLocation;
+    final unmapped = _autoUnmappedActual;
+
+    // Vị trí đang quét không có trong MAP: chỉ hiện raw Floor / PositionAA,
+    // không hiện Fac / PositionA (không có, không suy ra).
+    if (location == null && unmapped != null) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(child: _locationValue('Floor', unmapped.floor)),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _locationValue('Position AA', unmapped.positionAA),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          const Row(
+            children: [
+              Icon(Icons.wrong_location_rounded, color: _amber, size: 14),
+              SizedBox(width: 4),
+              Text(
+                'Không tìm thấy trong MAP',
+                style: TextStyle(
+                  color: _amber,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ],
+      );
+    }
 
     if (location == null) {
       return Text(
@@ -1851,6 +2336,251 @@ class _FixedAssetScreenState extends State<FixedAssetScreen> {
               ),
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Dialog "Sai vị trí máy": MASTER vs VỊ TRÍ ĐANG QUÉT. Dùng chung AUTO/MANUAL.
+/// Pop true = "Vẫn lưu", false = "Hủy" (không cho tap ra ngoài để đóng).
+///
+/// Hai trường hợp:
+/// - [actual] có (mapped mismatch): ACTUAL đầy đủ Fac · Floor / A / AA.
+/// - [unmappedActual] có (vị trí đang quét không có trong MAP): chỉ raw
+///   Floor / PositionAA + "Không tìm thấy trong MAP".
+class _LocationMismatchDialog extends StatelessWidget {
+  final String machineCode;
+  final String faName;
+  final _AuditLocation? master;
+  final _AuditLocation? actual;
+  final _UnmappedActual? unmappedActual;
+
+  const _LocationMismatchDialog({
+    required this.machineCode,
+    required this.faName,
+    required this.master,
+    required this.actual,
+    this.unmappedActual,
+  });
+
+  bool get _isUnmapped => actual == null && unmappedActual != null;
+
+  static const Color _amber = Color(0xFFF59E0B);
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: const Color(0xFF1F2937),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+        side: BorderSide(color: _amber.withOpacity(.6)),
+      ),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 420),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(
+                    Icons.warning_amber_rounded,
+                    color: _amber,
+                    size: 22,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    _isUnmapped ? 'Vị trí không có trong MAP' : 'Sai vị trí máy',
+                    style: const TextStyle(
+                      color: _amber,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Text(
+                machineCode,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              if (faName.isNotEmpty)
+                Text(
+                  faName,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(.65),
+                    fontSize: 13,
+                  ),
+                ),
+              const SizedBox(height: 12),
+              _locationBlock(
+                title: 'MASTER',
+                line1: master == null
+                    ? '-'
+                    : '${_dash(master!.fac)} · ${_dash(master!.floor)}',
+                line2: master == null
+                    ? ''
+                    : '${_dash(master!.positionA)} / '
+                          '${_dash(master!.positionAA)}',
+                color: Colors.white.withOpacity(.55),
+                background: Colors.white.withOpacity(.05),
+              ),
+              const SizedBox(height: 8),
+              if (_isUnmapped)
+                _locationBlock(
+                  title: 'VỊ TRÍ ĐANG QUÉT',
+                  line1: _dash(unmappedActual!.floor),
+                  line2: _dash(unmappedActual!.positionAA),
+                  warning: 'Không tìm thấy trong MAP',
+                  color: _amber,
+                  background: _amber.withOpacity(.10),
+                )
+              else
+                _locationBlock(
+                  title: 'VỊ TRÍ ĐANG QUÉT',
+                  line1: actual == null
+                      ? '-'
+                      : '${_dash(actual!.fac)} · ${_dash(actual!.floor)}',
+                  line2: actual == null
+                      ? ''
+                      : '${_dash(actual!.positionA)} / '
+                            '${_dash(actual!.positionAA)}',
+                  color: _amber,
+                  background: _amber.withOpacity(.10),
+                ),
+              const SizedBox(height: 12),
+              Text(
+                _isUnmapped
+                    ? 'Không tìm thấy vị trí đang quét trong MAP.\n'
+                          'Bạn có muốn vẫn lưu kết quả kiểm kê không?'
+                    : 'Vị trí đang quét không trùng MASTER.\n'
+                          'Bạn có muốn vẫn lưu kết quả kiểm kê này?',
+                style: TextStyle(
+                  color: Colors.white.withOpacity(.8),
+                  fontSize: 13,
+                  height: 1.35,
+                ),
+              ),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.of(context).pop(false),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.white,
+                        side: BorderSide(color: Colors.white.withOpacity(.3)),
+                        minimumSize: const Size.fromHeight(44),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text(
+                        'Hủy',
+                        style: TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: () => Navigator.of(context).pop(true),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: _amber,
+                        foregroundColor: Colors.black,
+                        minimumSize: const Size.fromHeight(44),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text(
+                        'Vẫn lưu',
+                        style: TextStyle(fontWeight: FontWeight.w800),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _locationBlock({
+    required String title,
+    required String line1,
+    String line2 = '',
+    String? warning,
+    required Color color,
+    required Color background,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(.6)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: TextStyle(
+              color: color,
+              fontSize: 10.5,
+              fontWeight: FontWeight.w800,
+              letterSpacing: .6,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            line1,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          if (line2.isNotEmpty)
+            Text(
+              line2,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          if (warning != null) ...[
+            const SizedBox(height: 2),
+            Text(
+              warning,
+              style: TextStyle(
+                color: color,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
         ],
       ),
     );
