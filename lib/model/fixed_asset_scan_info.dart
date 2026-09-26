@@ -9,6 +9,10 @@ class FixedAssetScanInfo {
   final String faName;
   final bool auditedInCurrentPeriod;
   final DateTime? lastAuditedAt;
+
+  /// Người kiểm kê gần nhất trong kỳ (null nếu backend không trả).
+  final String? lastAuditedUserId;
+  final String? lastAuditedUserName;
   final DateTime? periodStart;
   final DateTime? periodEnd;
 
@@ -22,6 +26,8 @@ class FixedAssetScanInfo {
     required this.faName,
     required this.auditedInCurrentPeriod,
     this.lastAuditedAt,
+    this.lastAuditedUserId,
+    this.lastAuditedUserName,
     this.periodStart,
     this.periodEnd,
   });
@@ -39,6 +45,8 @@ class FixedAssetScanInfo {
       faName: str('faName'),
       auditedInCurrentPeriod: parseBool(json['auditedInCurrentPeriod']),
       lastAuditedAt: parseDate(json['lastAuditedAt']),
+      lastAuditedUserId: json['lastAuditedUserId']?.toString(),
+      lastAuditedUserName: json['lastAuditedUserName']?.toString(),
       periodStart: parseDate(json['periodStart']),
       periodEnd: parseDate(json['periodEnd']),
     );

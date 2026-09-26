@@ -85,6 +85,7 @@ flutter:
   uses-material-design: true
   generate: true
   assets:
+    - assets/maps/
     - assets/flags/
     - assets/flags/jp.png
   fonts:

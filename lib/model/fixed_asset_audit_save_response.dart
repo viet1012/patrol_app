@@ -12,6 +12,10 @@ class FixedAssetAuditSaveResponse {
   final String machineCode;
   final DateTime? updatedAt;
   final DateTime? lastAuditedAt;
+
+  /// Người kiểm kê gần nhất trong kỳ (null nếu backend không trả).
+  final String? lastAuditedUserId;
+  final String? lastAuditedUserName;
   final String message;
 
   /// Vị trí audit khác MASTER. Khi [requiresConfirmation] = true và
@@ -38,6 +42,8 @@ class FixedAssetAuditSaveResponse {
     required this.machineCode,
     this.updatedAt,
     this.lastAuditedAt,
+    this.lastAuditedUserId,
+    this.lastAuditedUserName,
     required this.message,
     this.locationMismatch = false,
     this.requiresConfirmation = false,
@@ -62,6 +68,8 @@ class FixedAssetAuditSaveResponse {
       machineCode: str('machineCode'),
       updatedAt: parseDate(json['updatedAt']),
       lastAuditedAt: parseDate(json['lastAuditedAt']),
+      lastAuditedUserId: json['lastAuditedUserId']?.toString(),
+      lastAuditedUserName: json['lastAuditedUserName']?.toString(),
       message: str('message'),
       locationMismatch: parseBool(json['locationMismatch']),
       requiresConfirmation: parseBool(json['requiresConfirmation']),

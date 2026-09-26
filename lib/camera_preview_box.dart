@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:html' as html;
+import 'dart:js_util' as js_util;
 import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui_web' as ui_web;
@@ -56,6 +57,11 @@ class CameraPreviewBox extends StatefulWidget {
   /// nhập QR tay, zoom và nút chụp. Chỉ ẩn UI, không tắt camera/QR logic.
   final bool qrOnly;
 
+  /// true: zoom THẬT trên camera track (MediaStreamTrack zoom constraint) +
+  /// nút [-] 1.0x [+] và pinch. QR loop đọc frame từ chính video đã zoom.
+  /// false (mặc định): giữ nguyên hành vi cũ của mọi màn hình khác.
+  final bool enableZoomControls;
+
   const CameraPreviewBox({
     super.key,
     this.size = 320,
@@ -68,6 +74,7 @@ class CameraPreviewBox extends StatefulWidget {
     this.onQrDetected,
     this.onCameraSleepingChanged,
     this.qrOnly = false,
+    this.enableZoomControls = false,
   });
 
   @override
@@ -116,6 +123,35 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
   int _cameraSession = 0;
 
   double _zoom = 1.0;
+
+  // =========================
+  // Camera zoom thật (chỉ khi enableZoomControls)
+  // =========================
+
+  /// Trần zoom cho QR: zoom số quá lớn thường làm QR mờ hơn, không giúp đọc.
+  static const double _qrMaxZoom = 4.0;
+
+  /// Bỏ qua thay đổi pinch nhỏ hơn mức này (tránh gọi applyConstraints dày).
+  static const double _zoomUpdateThreshold = 0.05;
+
+  static const double _zoomButtonStep = 0.5;
+
+  bool _hwZoomSupported = false;
+  double _hwMinZoom = 1.0;
+  double _hwMaxZoom = 1.0;
+  double _hwZoom = 1.0;
+  double _hwScaleStartZoom = 1.0;
+
+  /// Chỉ một applyConstraints chạy tại một thời điểm; giá trị mới nhất
+  /// được gộp vào [_hwPendingZoom].
+  bool _hwZoomApplying = false;
+  double? _hwPendingZoom;
+
+  bool get _hwZoomVisible =>
+      widget.enableZoomControls &&
+      _hwZoomSupported &&
+      _video != null &&
+      !_cameraSleeping;
 
   bool get isCameraSleeping => _cameraSleeping;
 
@@ -649,6 +685,9 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
       }
 
       await _startAutoQrScan();
+
+      // Đọc khả năng zoom sau khi QR đã chạy; lỗi ở đây không ảnh hưởng camera.
+      _initHardwareZoom(session);
     } catch (error, stackTrace) {
       debugPrint('Camera start error: $error');
       debugPrintStack(stackTrace: stackTrace);
@@ -1377,6 +1416,236 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
   // =========================
   // UI
   // =========================
+  // =========================
+  // Camera zoom thật (MediaStreamTrack)
+  // =========================
+
+  /// Track video hiện tại: cùng stream với <video id="qr-video"> mà QR loop
+  /// đọc frame, nên zoom track = đổi chính input của decoder.
+  html.MediaStreamTrack? _currentVideoTrack() {
+    final stream = _stream;
+    if (stream == null) return null;
+    final tracks = stream.getVideoTracks();
+    return tracks.isEmpty ? null : tracks.first;
+  }
+
+  double? _jsNumber(Object? object, String name) {
+    if (object == null || !js_util.hasProperty(object, name)) return null;
+    final value = js_util.getProperty<Object?>(object, name);
+    return value is num ? value.toDouble() : null;
+  }
+
+  /// Đọc zoom capability của track (Chrome Android...). Không hỗ trợ /
+  /// lỗi -> ẩn control, camera và QR vẫn chạy bình thường.
+  void _initHardwareZoom(int session) {
+    if (!widget.enableZoomControls) return;
+
+    var supported = false;
+    var minZoom = 1.0;
+    var maxZoom = 1.0;
+    var currentZoom = 1.0;
+
+    try {
+      final track = _currentVideoTrack();
+      if (track != null && js_util.hasProperty(track, 'getCapabilities')) {
+        final capabilities =
+            js_util.callMethod<Object?>(track, 'getCapabilities', const []);
+        final zoom = capabilities == null
+            ? null
+            : js_util.getProperty<Object?>(capabilities, 'zoom');
+        final deviceMin = _jsNumber(zoom, 'min');
+        final deviceMax = _jsNumber(zoom, 'max');
+
+        if (deviceMin != null && deviceMax != null && deviceMax > deviceMin) {
+          minZoom = deviceMin;
+          // Trần QR: min(device max, 4x); không thấp hơn min của device.
+          maxZoom = math.max(minZoom, math.min(deviceMax, _qrMaxZoom));
+          supported = maxZoom > minZoom;
+
+          final settings =
+              js_util.hasProperty(track, 'getSettings')
+                  ? js_util.callMethod<Object?>(track, 'getSettings', const [])
+                  : null;
+          currentZoom = (_jsNumber(settings, 'zoom') ?? minZoom)
+              .clamp(minZoom, maxZoom)
+              .toDouble();
+        }
+      }
+    } catch (error) {
+      debugPrint('Camera zoom not available: $error');
+      supported = false;
+    }
+
+    if (!mounted || session != _cameraSession) return;
+
+    setState(() {
+      _hwZoomSupported = supported;
+      _hwMinZoom = minZoom;
+      _hwMaxZoom = maxZoom;
+      _hwZoom = currentZoom;
+      _hwPendingZoom = null;
+    });
+
+    if (!supported) return;
+
+    // Phiên camera mới bắt đầu ở 1x (hoặc giá trị hợp lệ gần nhất).
+    final initialZoom = 1.0.clamp(minZoom, maxZoom).toDouble();
+    if ((initialZoom - currentZoom).abs() >= 0.001) {
+      _setHardwareZoom(initialZoom);
+    }
+  }
+
+  /// Áp zoom lên camera track (applyConstraints). Không restart camera,
+  /// không đổi resolution; lỗi chỉ log, scanner tiếp tục chạy.
+  Future<void> _setHardwareZoom(double requested) async {
+    if (!_hwZoomSupported) return;
+
+    final target = requested.clamp(_hwMinZoom, _hwMaxZoom).toDouble();
+    if (mounted && (target - _hwZoom).abs() >= 0.001) {
+      setState(() => _hwZoom = target);
+    }
+
+    _hwPendingZoom = target;
+    if (_hwZoomApplying) return;
+
+    _hwZoomApplying = true;
+    try {
+      while (_hwPendingZoom != null) {
+        final value = _hwPendingZoom!;
+        _hwPendingZoom = null;
+
+        final track = _currentVideoTrack();
+        if (!mounted || track == null) break;
+
+        final constraints = js_util.jsify({
+          'advanced': [
+            {'zoom': value},
+          ],
+        });
+        await js_util.promiseToFuture<Object?>(
+          js_util.callMethod<Object>(track, 'applyConstraints', [constraints]),
+        );
+      }
+    } catch (error) {
+      debugPrint('Camera zoom apply failed: $error');
+    } finally {
+      _hwZoomApplying = false;
+      _hwPendingZoom = null;
+    }
+  }
+
+  /// Pinch 2 ngón trên preview -> zoom thật. 1 ngón không bị bắt (vẫn cuộn
+  /// trang bình thường). Không ảnh hưởng QR callback (QR đến từ JS event).
+  Widget _wrapPinchZoom(Widget child) {
+    if (!widget.enableZoomControls) return child;
+
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onScaleStart: (_) => _hwScaleStartZoom = _hwZoom,
+      onScaleUpdate: (details) {
+        if (!_hwZoomVisible || details.pointerCount < 2) return;
+
+        final next = (_hwScaleStartZoom * details.scale)
+            .clamp(_hwMinZoom, _hwMaxZoom)
+            .toDouble();
+        if ((next - _hwZoom).abs() < _zoomUpdateThreshold) return;
+
+        _setHardwareZoom(next);
+      },
+      child: child,
+    );
+  }
+
+  Widget _buildHardwareZoomControl() {
+    final quickValues = const [1.0, 2.0, 3.0]
+        .where((v) => v >= _hwMinZoom - 0.001 && v <= _hwMaxZoom + 0.001)
+        .toList();
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+      decoration: BoxDecoration(
+        color: const Color(0xCC111827),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: Colors.white.withOpacity(.25)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _zoomIconButton(
+            Icons.remove_rounded,
+            _hwZoom > _hwMinZoom + 0.001
+                ? () => _setHardwareZoom(_hwZoom - _zoomButtonStep)
+                : null,
+          ),
+          SizedBox(
+            width: 42,
+            child: Text(
+              '${_hwZoom.toStringAsFixed(1)}x',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          _zoomIconButton(
+            Icons.add_rounded,
+            _hwZoom < _hwMaxZoom - 0.001
+                ? () => _setHardwareZoom(_hwZoom + _zoomButtonStep)
+                : null,
+          ),
+          if (quickValues.length > 1) ...[
+            const SizedBox(width: 2),
+            for (final value in quickValues) _zoomQuickChip(value),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _zoomIconButton(IconData icon, VoidCallback? onTap) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(999),
+      onTap: onTap,
+      child: SizedBox(
+        width: 30,
+        height: 30,
+        child: Icon(
+          icon,
+          size: 18,
+          color: onTap == null ? Colors.white30 : Colors.white,
+        ),
+      ),
+    );
+  }
+
+  Widget _zoomQuickChip(double value) {
+    final selected = (_hwZoom - value).abs() < _zoomUpdateThreshold;
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(999),
+      onTap: selected ? null : () => _setHardwareZoom(value),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+        decoration: BoxDecoration(
+          color: selected
+              ? const Color(0xFF4DD0E1).withOpacity(.25)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Text(
+          '${value.toInt()}x',
+          style: TextStyle(
+            color: selected ? Colors.white : Colors.white70,
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -1393,12 +1662,15 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
                 ),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(20),
-                  child: Stack(
+                  child: _wrapPinchZoom(
+                    Stack(
                     fit: StackFit.expand,
                     children: [
                       _video != null && !_cameraSleeping
                           ? Transform.scale(
-                              scale: _zoom,
+                              // Zoom thật đã nằm trong frame camera: không
+                              // phóng UI thêm (giữ _zoom cũ cho màn hình khác).
+                              scale: widget.enableZoomControls ? 1.0 : _zoom,
                               child: HtmlElementView(
                                 key: ValueKey(_viewType),
                                 viewType: _viewType,
@@ -1471,6 +1743,7 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
                         },
                       ),
                     ],
+                  ),
                   ),
                 ),
               ),
@@ -1568,6 +1841,7 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
             ),
 
             if (!widget.qrOnly) ...[
+            if (!widget.enableZoomControls)
             Positioned(
               bottom: 14,
               right: 14,
@@ -1608,8 +1882,9 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
             Positioned(
               left: 12,
               right: 12,
-              // Không có toolbar ở dưới khi qrOnly nên banner hạ xuống sát đáy.
-              bottom: widget.qrOnly ? 12 : 78,
+              // Không có toolbar ở dưới khi qrOnly nên banner hạ xuống sát đáy
+              // (nhường chỗ cho zoom control nếu đang hiện).
+              bottom: widget.qrOnly ? (_hwZoomVisible ? 52 : 12) : 78,
               child: IgnorePointer(
                 child: RepaintBoundary(
                   child: ValueListenableBuilder<_QrWarningState>(
@@ -1629,6 +1904,14 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
                 ),
               ),
             ),
+
+            if (_hwZoomVisible)
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 10,
+                child: Center(child: _buildHardwareZoomControl()),
+              ),
 
             if (_qrLoading)
               const Positioned(

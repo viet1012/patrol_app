@@ -10,6 +10,10 @@ class FixedAssetAuditCheckResponse {
   final bool alreadyAudited;
   final DateTime? lastAuditedAt;
 
+  /// Người kiểm kê gần nhất trong kỳ (null nếu backend không trả).
+  final String? lastAuditedUserId;
+  final String? lastAuditedUserName;
+
   final bool existsInMaster;
   final bool actualLocationResolved;
 
@@ -33,6 +37,8 @@ class FixedAssetAuditCheckResponse {
     required this.machineCode,
     required this.alreadyAudited,
     this.lastAuditedAt,
+    this.lastAuditedUserId,
+    this.lastAuditedUserName,
     required this.existsInMaster,
     required this.actualLocationResolved,
     required this.locationMatch,
@@ -56,6 +62,8 @@ class FixedAssetAuditCheckResponse {
       machineCode: str('machineCode'),
       alreadyAudited: parseBool(json['alreadyAudited']),
       lastAuditedAt: parseDate(json['lastAuditedAt']),
+      lastAuditedUserId: json['lastAuditedUserId']?.toString(),
+      lastAuditedUserName: json['lastAuditedUserName']?.toString(),
       existsInMaster: parseBool(json['existsInMaster']),
       actualLocationResolved: parseBool(json['actualLocationResolved']),
       locationMatch: parseBool(json['locationMatch']),
