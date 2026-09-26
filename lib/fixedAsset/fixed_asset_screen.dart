@@ -6,6 +6,7 @@ import '../common/common_ui_helper.dart';
 import '../homeScreen/patrol_home_screen.dart';
 import 'fixed_asset_audit_flow.dart';
 import 'fixed_asset_controller.dart';
+import 'map/fixed_asset_detected_map.dart';
 import 'widgets/fixed_asset_audit_progress_card.dart';
 import 'widgets/fixed_asset_location_section.dart';
 import 'widgets/fixed_asset_machine_section.dart';
@@ -119,6 +120,26 @@ class _FixedAssetScreenState extends State<FixedAssetScreen> {
   Widget build(BuildContext context) {
     final c = _controller;
     final manual = c.manual;
+    final isMobile = MediaQuery.sizeOf(context).width < 600;
+    final String? mapFac;
+    final String? mapFloor;
+    final String? mapPositionA;
+    final String? mapPositionAA;
+
+    if (c.isAutoMode) {
+      final location = c.autoLocation;
+      mapFac = location?.fac;
+      mapFloor = location?.floor;
+      mapPositionA = location?.positionA;
+      mapPositionAA = location?.positionAA;
+    } else {
+      mapFac = manual.selectedFac;
+      mapFloor = manual.selectedFloor;
+      mapPositionA = manual.selectedPositionA;
+      mapPositionAA = manual.selectedPositionAA;
+    }
+
+    final showDetectedMap = mapPositionA?.trim().isNotEmpty == true;
 
     return Scaffold(
       appBar: AppBar(
@@ -172,7 +193,16 @@ class _FixedAssetScreenState extends State<FixedAssetScreen> {
           padding: const EdgeInsets.all(8),
           child: Column(
             children: [
-              _cameraSection,
+              _buildResponsiveCameraSection(isMobile),
+              if (showDetectedMap) ...[
+                const SizedBox(height: 6),
+                FixedAssetDetectedMap(
+                  fac: mapFac,
+                  floor: mapFloor,
+                  positionA: mapPositionA,
+                  positionAA: mapPositionAA,
+                ),
+              ],
               const SizedBox(height: 6),
               FixedAssetStatusCard(
                 status: c.scanStatus,
@@ -191,7 +221,7 @@ class _FixedAssetScreenState extends State<FixedAssetScreen> {
                 error: c.auditSummaryError,
                 onRetry: c.loadAuditSummary,
               ),
-              const SizedBox(height: 8),
+              SizedBox(height: isMobile ? 6 : 8),
               FixedAssetLocationSection(
                 locationMode: c.locationMode,
                 autoLocation: c.autoLocation,
@@ -217,7 +247,7 @@ class _FixedAssetScreenState extends State<FixedAssetScreen> {
                   onPositionAAChanged: c.onPositionAAChanged,
                 ),
               ),
-              const SizedBox(height: 8),
+              SizedBox(height: isMobile ? 6 : 8),
               FixedAssetMachineSection(
                 visible: c.activeLocation != null,
                 machines: c.machines,
@@ -252,6 +282,14 @@ class _FixedAssetScreenState extends State<FixedAssetScreen> {
           enableZoomControls: true,
         ),
       ),
+    );
+  }
+
+  Widget _buildResponsiveCameraSection(bool isMobile) {
+    final displaySize = isMobile ? 260.0 : 340.0;
+    return SizedBox.square(
+      dimension: displaySize,
+      child: FittedBox(fit: BoxFit.contain, child: _cameraSection),
     );
   }
 }

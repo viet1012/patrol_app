@@ -13,7 +13,8 @@ class ApiErrorMessage {
         return "Send Timeout: Uploading data or images took too long.";
 
       case DioExceptionType.receiveTimeout:
-        return "Receive Timeout: The server took too long to respond.";
+      case DioExceptionType.transformTimeout:
+        return "Receive Timeout: The server response or response processing took too long.";
 
       case DioExceptionType.connectionError:
         return "Connection Error: Unable to reach the backend server. Please check your network connection or verify that the server is running.";
