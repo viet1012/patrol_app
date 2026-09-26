@@ -86,7 +86,7 @@ class FloorMapPainter extends CustomPainter {
 }
 
 /// Traveling edge highlight for the selected polygon, repainted by
-/// [progress] (0..1, linear loop) without rebuilding any widget.
+/// [progress] (one linear 0..1 run spanning [loops] trips) without rebuilding any widget.
 ///
 /// Per frame: one `extractPath` and two `drawPath` calls. The contour
 /// (traced twice, so a segment crossing the start corner stays one
@@ -95,8 +95,14 @@ class SelectedAreaHighlightPainter extends CustomPainter {
   final MapArea area;
   final Animation<double> progress;
 
-  SelectedAreaHighlightPainter({required this.area, required this.progress})
-    : super(repaint: progress);
+  /// Trips around the perimeter over one 0..1 run of [progress].
+  final int loops;
+
+  SelectedAreaHighlightPainter({
+    required this.area,
+    required this.progress,
+    this.loops = 1,
+  }) : super(repaint: progress);
 
   /// Fraction of the perimeter covered by the moving segment.
   static const double segmentFraction = 0.2;
@@ -151,7 +157,7 @@ class SelectedAreaHighlightPainter extends CustomPainter {
     if (metric == null) return;
     // start ∈ [0, perimeter), end ≤ 2·perimeter: never needs wrapping, so
     // progress 1.0 → 0.0 lands on the identical segment (seamless loop).
-    final start = (progress.value % 1.0) * _perimeter;
+    final start = ((progress.value * loops) % 1.0) * _perimeter;
     final segment = metric.extractPath(
       start,
       start + _perimeter * segmentFraction,
@@ -162,6 +168,8 @@ class SelectedAreaHighlightPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant SelectedAreaHighlightPainter oldDelegate) {
-    return oldDelegate.area != area || oldDelegate.progress != progress;
+    return oldDelegate.area != area ||
+        oldDelegate.progress != progress ||
+        oldDelegate.loops != loops;
   }
 }

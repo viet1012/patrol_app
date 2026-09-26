@@ -62,6 +62,11 @@ class CameraPreviewBox extends StatefulWidget {
   /// false (mặc định): giữ nguyên hành vi cũ của mọi màn hình khác.
   final bool enableZoomControls;
 
+  /// false: ẩn badge "No. x" góc phải (chỉ hiển thị; STT vẫn load như cũ)
+  /// và cho badge QR dùng hết chiều ngang. true (mặc định): giữ nguyên hành
+  /// vi cũ của mọi màn hình khác.
+  final bool showQrNumber;
+
   const CameraPreviewBox({
     super.key,
     this.size = 320,
@@ -75,6 +80,7 @@ class CameraPreviewBox extends StatefulWidget {
     this.onCameraSleepingChanged,
     this.qrOnly = false,
     this.enableZoomControls = false,
+    this.showQrNumber = true,
   });
 
   @override
@@ -1787,16 +1793,25 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
             Positioned(
               top: 12,
               left: 12,
+              // Không có badge "No.": badge QR được dùng hết chiều ngang.
+              right: widget.showQrNumber ? null : 12,
               child: RepaintBoundary(
                 child: ValueListenableBuilder<String?>(
                   valueListenable: _patrolQrNotifier,
                   builder: (context, qr, _) {
-                    return _QrStatusBadge(qr: qr);
+                    final badge = _QrStatusBadge(
+                      qr: qr,
+                      ellipsize: !widget.showQrNumber,
+                    );
+                    return widget.showQrNumber
+                        ? badge
+                        : Align(alignment: Alignment.centerLeft, child: badge);
                   },
                 ),
               ),
             ),
 
+            if (widget.showQrNumber)
             Positioned(
               top: 12,
               right: 12,
@@ -1992,12 +2007,26 @@ class _QrWarningBanner extends StatelessWidget {
 class _QrStatusBadge extends StatelessWidget {
   final String? qr;
 
-  const _QrStatusBadge({required this.qr});
+  /// true: text co theo chiều ngang được cấp, cắt "..." khi quá dài.
+  final bool ellipsize;
+
+  const _QrStatusBadge({required this.qr, this.ellipsize = false});
 
   @override
   Widget build(BuildContext context) {
     final value = qr?.trim() ?? '';
     final hasQr = value.isNotEmpty;
+    final text = Text(
+      hasQr ? value : 'Scan Patrol QR',
+      maxLines: ellipsize ? 1 : null,
+      overflow: ellipsize ? TextOverflow.ellipsis : null,
+      style: TextStyle(
+        color: Colors.white,
+        fontSize: 13,
+        fontWeight: hasQr ? FontWeight.w800 : FontWeight.w600,
+        letterSpacing: hasQr ? 0.8 : 0,
+      ),
+    );
 
     return Container(
       constraints: const BoxConstraints(minHeight: 34),
@@ -2027,15 +2056,7 @@ class _QrStatusBadge extends StatelessWidget {
             color: hasQr ? const Color(0xFF22C55E) : Colors.redAccent,
           ),
           const SizedBox(width: 7),
-          Text(
-            hasQr ? value : 'Scan Patrol QR',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 13,
-              fontWeight: hasQr ? FontWeight.w800 : FontWeight.w600,
-              letterSpacing: hasQr ? 0.8 : 0,
-            ),
-          ),
+          if (ellipsize) Flexible(child: text) else text,
         ],
       ),
     );

@@ -147,9 +147,32 @@ class _FloorMapWidgetState extends State<FloorMapWidget>
     with SingleTickerProviderStateMixin {
   late final TransformationController _transformationController;
 
-  /// Loop for the selected polygon traveling edge highlight. Runs only
-  /// while a selected parent polygon is visible and motion is allowed.
+  /// Short attention effect: one forward run covering
+  /// [highlightLoops] trips around the selected parent polygon, then the
+  /// ticker stops for good (static outline stays).
   late final AnimationController _highlightController;
+
+  static const int highlightLoops = 3;
+  static const Duration _highlightLoopDuration = Duration(milliseconds: 3200);
+
+  /// `mapId|parent` the highlight belongs to. Only a change here restarts
+  /// it; child changes, rebuilds, pan/zoom and collapse never do.
+  String? _highlightKey;
+
+  /// All loops finished for [_highlightKey].
+  bool _highlightDone = false;
+
+  // Focused-mode filter cache: reused while the source map instance and
+  // focusParentZone are unchanged, so rebuilds (child change, controller
+  // notifications, pan/zoom) keep identical lists and painters skip repaint.
+  FloorMapData? _visibleSource;
+  String? _visibleFocus;
+  List<MapArea> _visibleAreas = const <MapArea>[];
+  List<MapZone> _visibleZones = const <MapZone>[];
+
+  /// Reused while the highlighted area is the same instance, so its cached
+  /// path metric survives rebuilds.
+  SelectedAreaHighlightPainter? _highlightPainter;
 
   /// `mapId|parent` last auto-focused (null = full-floor view), so the
   /// viewport is refit only when that changes, never on ordinary rebuilds.
@@ -167,9 +190,18 @@ class _FloorMapWidgetState extends State<FloorMapWidget>
     _transformationController = TransformationController();
     _highlightController = AnimationController(
       vsync: this,
-      // Linear repeat: constant perimeter speed, no corner easing.
-      duration: const Duration(milliseconds: 3200),
-    );
+      // Linear: constant perimeter speed, no corner easing.
+      duration: _highlightLoopDuration * highlightLoops,
+    )..addStatusListener(_onHighlightStatus);
+  }
+
+  /// One setState at the end (not per frame) to drop the highlight layer.
+  void _onHighlightStatus(AnimationStatus status) {
+    if (status != AnimationStatus.completed || !mounted) return;
+    setState(() {
+      _highlightDone = true;
+      _highlightActive = false;
+    });
   }
 
   @override
@@ -186,17 +218,25 @@ class _FloorMapWidgetState extends State<FloorMapWidget>
     return widget.data.areas.any((area) => area.code == parent);
   }
 
-  /// Static outline only when disabled or under the platform reduce-motion
-  /// setting; otherwise loops, holding still during pan/zoom gestures.
+  /// Static outline only when disabled, finished, or under the platform
+  /// reduce-motion setting. Otherwise runs (holding still during pan/zoom or
+  /// while disabled e.g. collapsed) and resumes from the same point.
   void _syncHighlight() {
+    final key = '${widget.data.id}|${widget.selectedParentZone}';
+    if (key != _highlightKey) {
+      _highlightKey = key;
+      _highlightDone = false;
+      _highlightController.reset();
+    }
     final reduceMotion = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
     _highlightActive =
+        !_highlightDone &&
         widget.enablePolygonAnimation &&
         !reduceMotion &&
         _hasVisibleSelectedArea;
     final shouldRun = _highlightActive && !_interacting;
     if (shouldRun) {
-      if (!_highlightController.isAnimating) _highlightController.repeat();
+      if (!_highlightController.isAnimating) _highlightController.forward();
     } else if (_highlightController.isAnimating) {
       _highlightController.stop();
     }
@@ -326,18 +366,39 @@ class _FloorMapWidgetState extends State<FloorMapWidget>
     );
   }
 
-  Widget _buildLogicalScene(double rotationRadians) {
+  /// Visible areas/zones; full mode returns the source lists directly.
+  void _syncVisibleOverlays() {
+    final data = widget.data;
     final focus = widget.focusParentZone;
-    final areas = focus == null
-        ? widget.data.areas
-        : widget.data.areas
+    if (identical(data, _visibleSource) && focus == _visibleFocus) return;
+    _visibleSource = data;
+    _visibleFocus = focus;
+    _visibleAreas = focus == null
+        ? data.areas
+        : data.areas
               .where((area) => isFocusRelatedZoneCode(area.code, focus))
               .toList(growable: false);
-    final zones = focus == null
-        ? widget.data.zones
-        : widget.data.zones
+    _visibleZones = focus == null
+        ? data.zones
+        : data.zones
               .where((zone) => isFocusRelatedZoneCode(zone.code, focus))
               .toList(growable: false);
+  }
+
+  SelectedAreaHighlightPainter _highlightPainterFor(MapArea area) {
+    final cached = _highlightPainter;
+    if (cached != null && identical(cached.area, area)) return cached;
+    return _highlightPainter = SelectedAreaHighlightPainter(
+      area: area,
+      progress: _highlightController,
+      loops: highlightLoops,
+    );
+  }
+
+  Widget _buildLogicalScene(double rotationRadians) {
+    _syncVisibleOverlays();
+    final areas = _visibleAreas;
+    final zones = _visibleZones;
     MapArea? highlightArea;
     if (_highlightActive) {
       for (final area in areas) {
@@ -371,10 +432,7 @@ class _FloorMapWidgetState extends State<FloorMapWidget>
               // the floor image, static polygons or badges.
               child: RepaintBoundary(
                 child: CustomPaint(
-                  painter: SelectedAreaHighlightPainter(
-                    area: highlightArea,
-                    progress: _highlightController,
-                  ),
+                  painter: _highlightPainterFor(highlightArea),
                 ),
               ),
             ),
@@ -403,7 +461,6 @@ class _FloorMapWidgetState extends State<FloorMapWidget>
                             isRelated:
                                 widget.selectedChildZone != null &&
                                 zone.code == widget.selectedParentZone,
-                            focused: focus != null,
                             onTap: widget.onZoneTap,
                           ),
                         ),
@@ -425,8 +482,6 @@ class _MapZoneBadge extends StatefulWidget {
   final bool isActive;
   final bool isRelated;
 
-  /// Focused display uses a stronger selected/parent hierarchy.
-  final bool focused;
   final ValueChanged<MapZone>? onTap;
 
   const _MapZoneBadge({
@@ -434,7 +489,6 @@ class _MapZoneBadge extends StatefulWidget {
     required this.isMajor,
     required this.isActive,
     required this.isRelated,
-    required this.focused,
     required this.onTap,
   });
 
@@ -449,17 +503,39 @@ class _MapZoneBadgeState extends State<_MapZoneBadge> {
   Widget build(BuildContext context) {
     const blue = Color(0xFF2563EB);
     const selectedBlue = Color(0xFF1D4ED8);
+    const lightBlue = Color(0xFF3B82F6);
+    const paleBlue = Color(0xFFDBEAFE);
     final selected = widget.isActive;
-    // Focused: selected = solid blue, parent = tinted, siblings = white.
-    final solidSelected = widget.focused && selected;
-    final tintedParent = widget.focused && widget.isRelated;
+    final parent = !selected && widget.isRelated;
+
+    // Glass badges: low-opacity fill so the drawing underneath stays
+    // visible; the border carries the emphasis and a thin text halo keeps
+    // the code readable over both light and dark parts of the map.
     final Color fillColor;
-    if (solidSelected) {
-      fillColor = selectedBlue;
-    } else if (selected || tintedParent) {
-      fillColor = const Color(0xFFEFF6FF);
+    final Color borderColor;
+    final double borderWidth;
+    final Color textColor;
+    final Color haloColor;
+    if (selected) {
+      // Pale-blue glass (stronger than parent/sibling) keeps the royal-blue
+      // label high-contrast while the drawing stays visible underneath.
+      fillColor = paleBlue.withValues(alpha: 0.40);
+      borderColor = selectedBlue;
+      borderWidth = 3.0;
+      textColor = selectedBlue;
+      haloColor = Colors.white;
+    } else if (parent) {
+      fillColor = paleBlue.withValues(alpha: 0.12);
+      borderColor = blue;
+      borderWidth = 2.0;
+      textColor = blue;
+      haloColor = Colors.white;
     } else {
-      fillColor = Colors.white.withValues(alpha: 0.94);
+      fillColor = Colors.white.withValues(alpha: 0.05);
+      borderColor = lightBlue;
+      borderWidth = widget.isMajor ? 1.8 : 1.5;
+      textColor = lightBlue;
+      haloColor = Colors.white;
     }
     final scale = selected ? 1.06 : (_hovered ? 1.03 : 1.0);
 
@@ -478,49 +554,96 @@ class _MapZoneBadgeState extends State<_MapZoneBadge> {
             scale: scale,
             duration: const Duration(milliseconds: 120),
             curve: Curves.easeOut,
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 120),
-              padding: EdgeInsets.symmetric(
-                horizontal: widget.isMajor ? 8 : 6,
-                vertical: widget.isMajor ? 4 : 3,
-              ),
-              decoration: BoxDecoration(
-                color: fillColor,
-                borderRadius: BorderRadius.circular(7),
-                border: Border.all(
-                  color: solidSelected
-                      ? const Color(0xFF1E3A8A)
-                      : (selected || widget.isRelated ? selectedBlue : blue),
-                  width: selected
-                      ? 2.2
-                      : (tintedParent ? 2.0 : (widget.isMajor ? 1.8 : 1.4)),
+            child: _withSelectionMarks(
+              selected: selected,
+              badge: AnimatedContainer(
+                duration: const Duration(milliseconds: 120),
+                padding: EdgeInsets.symmetric(
+                  horizontal: widget.isMajor ? 8 : 6,
+                  vertical: widget.isMajor ? 4 : 3,
                 ),
-                boxShadow: <BoxShadow>[
-                  BoxShadow(
-                    color: Colors.black.withValues(
-                      alpha: selected ? 0.20 : 0.12,
-                    ),
-                    blurRadius: selected ? 6 : 3,
-                    offset: const Offset(0, 1),
+                // No box shadow: it would smear through the translucent fill.
+                decoration: BoxDecoration(
+                  color: fillColor,
+                  borderRadius: BorderRadius.circular(7),
+                  border: Border.all(color: borderColor, width: borderWidth),
+                ),
+                child: Text(
+                  widget.zone.code,
+                  maxLines: 1,
+                  style: TextStyle(
+                    color: textColor,
+                    fontSize: widget.isMajor ? 11.5 : 10,
+                    fontWeight: selected || widget.isMajor
+                        ? FontWeight.w800
+                        : FontWeight.w700,
+                    height: 1,
+                    shadows: <Shadow>[
+                      Shadow(color: haloColor, blurRadius: 2.5),
+                      Shadow(color: haloColor.withValues(alpha: 0.7)),
+                    ],
                   ),
-                ],
-              ),
-              child: Text(
-                widget.zone.code,
-                maxLines: 1,
-                style: TextStyle(
-                  color: solidSelected ? Colors.white : selectedBlue,
-                  fontSize: widget.isMajor ? 11.5 : 10,
-                  fontWeight: selected || widget.isMajor
-                      ? FontWeight.w800
-                      : FontWeight.w700,
-                  height: 1,
                 ),
               ),
             ),
           ),
         ),
       ),
+    );
+  }
+
+  static const Color _selectionCyan = Color(0xFF22D3EE);
+
+  /// Selected-only emphasis drawn outside the badge bounds (no layout
+  /// change, so size and anchor stay identical): a cyan outer ring with an
+  /// outside-only glow, plus a small corner dot. The fill stays translucent.
+  Widget _withSelectionMarks({required bool selected, required Widget badge}) {
+    if (!selected) return badge;
+    return Stack(
+      clipBehavior: Clip.none,
+      children: <Widget>[
+        badge,
+        Positioned(
+          left: -3,
+          top: -3,
+          right: -3,
+          bottom: -3,
+          child: IgnorePointer(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: _selectionCyan.withValues(alpha: 0.85),
+                  width: 1.5,
+                ),
+                boxShadow: <BoxShadow>[
+                  // Outer-only blur: nothing smears under the glass fill.
+                  BoxShadow(
+                    color: _selectionCyan.withValues(alpha: 0.45),
+                    blurRadius: 5,
+                    blurStyle: BlurStyle.outer,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        Positioned(
+          top: -5,
+          right: -5,
+          child: IgnorePointer(
+            child: Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(
+                color: _selectionCyan,
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 1.2),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

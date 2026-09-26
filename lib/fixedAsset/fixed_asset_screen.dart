@@ -12,6 +12,7 @@ import 'widgets/fixed_asset_location_section.dart';
 import 'widgets/fixed_asset_machine_section.dart';
 import 'widgets/fixed_asset_manual_selectors.dart';
 import 'widgets/fixed_asset_mismatch_dialog.dart';
+import 'widgets/fixed_asset_selector.dart';
 import 'widgets/fixed_asset_status_card.dart';
 
 export 'fixed_asset_audit_flow.dart' show FixedAssetLocationMode;
@@ -57,7 +58,7 @@ class _FixedAssetScreenState extends State<FixedAssetScreen> {
       confirmMismatch: _showMismatchDialog,
       showError: _showError,
       resetQr: () => _cameraKey.currentState?.resetQr(),
-    )..addListener(_onControllerChanged);
+    );
 
     // AUTO là mặc định: Fac chỉ load khi chuyển sang MANUAL.
     // Summary chạy độc lập, không chặn camera.
@@ -66,13 +67,8 @@ class _FixedAssetScreenState extends State<FixedAssetScreen> {
 
   @override
   void dispose() {
-    _controller.removeListener(_onControllerChanged);
     _controller.dispose();
     super.dispose();
-  }
-
-  void _onControllerChanged() {
-    if (mounted) setState(() {});
   }
 
   // ============================================================
@@ -116,30 +112,167 @@ class _FixedAssetScreenState extends State<FixedAssetScreen> {
   // UI
   // ============================================================
 
+  // Mỗi section là một rebuild boundary riêng: màn hình không còn
+  // setState theo controller, chỉ section có giá trị liên quan đổi mới
+  // rebuild (camera, AppBar không bao giờ rebuild theo controller).
+
+  /// Map chỉ rebuild khi location hiển thị đổi (AUTO: autoLocation,
+  /// MANUAL: 4 dropdown), không theo summary/machine/search/status.
+  Widget _buildDetectedMap() {
+    final c = _controller;
+    return FixedAssetSelector<
+      ({String? fac, String? floor, String? positionA, String? positionAA})
+    >(
+      listenable: c,
+      select: () {
+        if (c.isAutoMode) {
+          final location = c.autoLocation;
+          return (
+            fac: location?.fac,
+            floor: location?.floor,
+            positionA: location?.positionA,
+            positionAA: location?.positionAA,
+          );
+        }
+        final manual = c.manual;
+        return (
+          fac: manual.selectedFac,
+          floor: manual.selectedFloor,
+          positionA: manual.selectedPositionA,
+          positionAA: manual.selectedPositionAA,
+        );
+      },
+      builder: (context, map) {
+        final showDetectedMap = map.positionA?.trim().isNotEmpty == true;
+        if (!showDetectedMap) return const SizedBox.shrink();
+        return Padding(
+          padding: const EdgeInsets.only(top: 6),
+          child: FixedAssetDetectedMap(
+            fac: map.fac,
+            floor: map.floor,
+            positionA: map.positionA,
+            positionAA: map.positionAA,
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildStatusCard() {
+    final c = _controller;
+    return FixedAssetSelector(
+      listenable: c,
+      select: () => (
+        status: c.scanStatus,
+        machineCode: c.scannedCode,
+        faName: c.scannedFaName,
+        message: c.statusMessage,
+        lastAuditedAt: c.lastAuditedAt,
+        lastAuditedUserId: c.lastAuditedUserId,
+        lastAuditedUserName: c.lastAuditedUserName,
+        mismatchMaster: c.mismatchMaster,
+      ),
+      builder: (context, v) => FixedAssetStatusCard(
+        status: v.status,
+        machineCode: v.machineCode,
+        faName: v.faName,
+        message: v.message,
+        lastAuditedAt: v.lastAuditedAt,
+        lastAuditedUserId: v.lastAuditedUserId,
+        lastAuditedUserName: v.lastAuditedUserName,
+        mismatchMaster: v.mismatchMaster,
+      ),
+    );
+  }
+
+  Widget _buildAuditProgressCard() {
+    final c = _controller;
+    return FixedAssetSelector(
+      listenable: c,
+      select: () => (
+        summary: c.auditSummary,
+        loading: c.loadingAuditSummary,
+        error: c.auditSummaryError,
+      ),
+      builder: (context, v) => FixedAssetAuditProgressCard(
+        summary: v.summary,
+        loading: v.loading,
+        error: v.error,
+        onRetry: c.loadAuditSummary,
+      ),
+    );
+  }
+
+  /// Location + MANUAL cascade phụ thuộc ~20 field (mode, auto location,
+  /// 4 dropdown + list + loading): rebuild theo mọi notify cho chắc chắn
+  /// đúng; section nhẹ, không chứa map/machine list.
+  Widget _buildLocationSection() {
+    final c = _controller;
+    return ListenableBuilder(
+      listenable: c,
+      builder: (context, _) {
+        final manual = c.manual;
+        return FixedAssetLocationSection(
+          locationMode: c.locationMode,
+          autoLocation: c.autoLocation,
+          autoUnmappedActual: c.autoUnmappedActual,
+          autoLocationMismatch: c.autoLocationMismatch,
+          onModeChanged: c.setLocationMode,
+          manualSelectors: FixedAssetManualSelectors(
+            selectedFac: manual.selectedFac,
+            selectedFloor: manual.selectedFloor,
+            selectedPositionA: manual.selectedPositionA,
+            selectedPositionAA: manual.selectedPositionAA,
+            facs: manual.facs,
+            floors: manual.floors,
+            positionAs: manual.positionAs,
+            positionAAs: manual.positionAAs,
+            loadingFacs: manual.loadingFacs,
+            loadingFloors: manual.loadingFloors,
+            loadingPositionA: manual.loadingPositionA,
+            loadingPositionAA: manual.loadingPositionAA,
+            onFacChanged: c.onFacChanged,
+            onFloorChanged: c.onFloorChanged,
+            onPositionAChanged: c.onPositionAChanged,
+            onPositionAAChanged: c.onPositionAAChanged,
+          ),
+        );
+      },
+    );
+  }
+
+  /// auditedMachineCodes bị mutate tại chỗ (chỉ thêm): length là version.
+  /// Filter/sort vẫn cache bên trong FixedAssetMachineSection.
+  Widget _buildMachineSection() {
+    final c = _controller;
+    return FixedAssetSelector(
+      listenable: c,
+      select: () => (
+        visible: c.activeLocation != null,
+        machines: c.machines,
+        loading: c.loadingMachines,
+        error: c.machineError,
+        search: c.machineSearch,
+        audited: c.auditedMachineCodes,
+        auditedCount: c.auditedMachineCodes.length,
+      ),
+      builder: (context, v) => FixedAssetMachineSection(
+        visible: v.visible,
+        machines: v.machines,
+        loading: v.loading,
+        error: v.error,
+        search: v.search,
+        searchController: c.machineSearchController,
+        auditedMachineCodes: v.audited,
+        onSearchChanged: c.setMachineSearch,
+        onClearSearch: c.clearMachineSearch,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final c = _controller;
-    final manual = c.manual;
     final isMobile = MediaQuery.sizeOf(context).width < 600;
-    final String? mapFac;
-    final String? mapFloor;
-    final String? mapPositionA;
-    final String? mapPositionAA;
-
-    if (c.isAutoMode) {
-      final location = c.autoLocation;
-      mapFac = location?.fac;
-      mapFloor = location?.floor;
-      mapPositionA = location?.positionA;
-      mapPositionAA = location?.positionAA;
-    } else {
-      mapFac = manual.selectedFac;
-      mapFloor = manual.selectedFloor;
-      mapPositionA = manual.selectedPositionA;
-      mapPositionAA = manual.selectedPositionAA;
-    }
-
-    final showDetectedMap = mapPositionA?.trim().isNotEmpty == true;
 
     return Scaffold(
       appBar: AppBar(
@@ -194,71 +327,15 @@ class _FixedAssetScreenState extends State<FixedAssetScreen> {
           child: Column(
             children: [
               _buildResponsiveCameraSection(isMobile),
-              if (showDetectedMap) ...[
-                const SizedBox(height: 6),
-                FixedAssetDetectedMap(
-                  fac: mapFac,
-                  floor: mapFloor,
-                  positionA: mapPositionA,
-                  positionAA: mapPositionAA,
-                ),
-              ],
+              _buildDetectedMap(),
               const SizedBox(height: 6),
-              FixedAssetStatusCard(
-                status: c.scanStatus,
-                machineCode: c.scannedCode,
-                faName: c.scannedFaName,
-                message: c.statusMessage,
-                lastAuditedAt: c.lastAuditedAt,
-                lastAuditedUserId: c.lastAuditedUserId,
-                lastAuditedUserName: c.lastAuditedUserName,
-                mismatchMaster: c.mismatchMaster,
-              ),
+              _buildStatusCard(),
               const SizedBox(height: 6),
-              FixedAssetAuditProgressCard(
-                summary: c.auditSummary,
-                loading: c.loadingAuditSummary,
-                error: c.auditSummaryError,
-                onRetry: c.loadAuditSummary,
-              ),
+              _buildAuditProgressCard(),
               SizedBox(height: isMobile ? 6 : 8),
-              FixedAssetLocationSection(
-                locationMode: c.locationMode,
-                autoLocation: c.autoLocation,
-                autoUnmappedActual: c.autoUnmappedActual,
-                autoLocationMismatch: c.autoLocationMismatch,
-                onModeChanged: c.setLocationMode,
-                manualSelectors: FixedAssetManualSelectors(
-                  selectedFac: manual.selectedFac,
-                  selectedFloor: manual.selectedFloor,
-                  selectedPositionA: manual.selectedPositionA,
-                  selectedPositionAA: manual.selectedPositionAA,
-                  facs: manual.facs,
-                  floors: manual.floors,
-                  positionAs: manual.positionAs,
-                  positionAAs: manual.positionAAs,
-                  loadingFacs: manual.loadingFacs,
-                  loadingFloors: manual.loadingFloors,
-                  loadingPositionA: manual.loadingPositionA,
-                  loadingPositionAA: manual.loadingPositionAA,
-                  onFacChanged: c.onFacChanged,
-                  onFloorChanged: c.onFloorChanged,
-                  onPositionAChanged: c.onPositionAChanged,
-                  onPositionAAChanged: c.onPositionAAChanged,
-                ),
-              ),
+              _buildLocationSection(),
               SizedBox(height: isMobile ? 6 : 8),
-              FixedAssetMachineSection(
-                visible: c.activeLocation != null,
-                machines: c.machines,
-                loading: c.loadingMachines,
-                error: c.machineError,
-                search: c.machineSearch,
-                searchController: c.machineSearchController,
-                auditedMachineCodes: c.auditedMachineCodes,
-                onSearchChanged: c.setMachineSearch,
-                onClearSearch: c.clearMachineSearch,
-              ),
+              _buildMachineSection(),
             ],
           ),
         ),
@@ -280,6 +357,7 @@ class _FixedAssetScreenState extends State<FixedAssetScreen> {
           onQrDetected: _onQrDetected,
           qrOnly: true,
           enableZoomControls: true,
+          showQrNumber: false,
         ),
       ),
     );

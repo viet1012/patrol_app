@@ -477,17 +477,17 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
         );
       case PatrolGroup.AssetUpdate:
         return const _GroupConfig(
-          title: 'Asset Update',
+          title: 'MA Asset Patrol',
           icon: Icons.inventory_rounded,
           prefix: 'Asset Patrol',
-          titleScreen: 'Asset Patrol',
+          titleScreen: 'MA Asset Patrol',
         );
       case PatrolGroup.FixedAsset:
         return const _GroupConfig(
-          title: 'Fixed Asset',
+          title: 'Fixed Asset Audit',
           icon: Icons.precision_manufacturing_rounded,
-          prefix: 'Fixed Asset',
-          titleScreen: 'Fixed Asset',
+          prefix: 'Fixed Asset Audit',
+          titleScreen: 'Fixed Asset Audit',
         );
     }
   }

@@ -218,4 +218,169 @@ void main() {
       );
     });
   });
+
+  group('Finite highlight', () {
+    final mold = fixedAssetFloorMaps.firstWhere(
+      (m) => m.title == 'Floor 1 - Mold',
+    );
+
+    Future<void> pumpMap(
+      WidgetTester tester, {
+      required String parent,
+      String? child,
+      bool enabled = true,
+    }) {
+      return tester.pumpWidget(
+        MaterialApp(
+          home: SizedBox(
+            width: 400,
+            height: 250,
+            child: FloorMapWidget(
+              data: mold,
+              selectedParentZone: parent,
+              selectedChildZone: child,
+              enablePolygonAnimation: enabled,
+            ),
+          ),
+        ),
+      );
+    }
+
+    bool highlightShown(WidgetTester tester) => tester
+        .widgetList<CustomPaint>(find.byType(CustomPaint))
+        .map((w) => w.painter)
+        .whereType<SelectedAreaHighlightPainter>()
+        .isNotEmpty;
+
+    bool baseOutlineShown(WidgetTester tester) => tester
+        .widgetList<CustomPaint>(find.byType(CustomPaint))
+        .map((w) => w.painter)
+        .whereType<FloorMapPainter>()
+        .any((p) => p.selectedParentZone != null);
+
+    testWidgets('runs ~3 loops then stops with no further frames', (
+      tester,
+    ) async {
+      await pumpMap(tester, parent: 'A35');
+      await tester.pump(const Duration(milliseconds: 9000));
+      expect(highlightShown(tester), isTrue);
+
+      await tester.pump(const Duration(milliseconds: 700));
+      await tester.pump();
+      expect(highlightShown(tester), isFalse);
+      expect(baseOutlineShown(tester), isTrue);
+      expect(tester.binding.hasScheduledFrame, isFalse);
+    });
+
+    testWidgets('child change does not restart, parent change does', (
+      tester,
+    ) async {
+      await pumpMap(tester, parent: 'A35', child: 'A35-1');
+      await tester.pump(const Duration(milliseconds: 6000));
+      await pumpMap(tester, parent: 'A35', child: 'A35-2');
+      await tester.pump(const Duration(milliseconds: 4000));
+      await tester.pump();
+      expect(highlightShown(tester), isFalse, reason: 'child kept timeline');
+
+      await pumpMap(tester, parent: 'A31', child: 'A31-4');
+      await tester.pump();
+      expect(highlightShown(tester), isTrue, reason: 'new parent restarts');
+    });
+
+    testWidgets('disabled (collapsed) stops ticker; finished stays static', (
+      tester,
+    ) async {
+      await pumpMap(tester, parent: 'A35');
+      await tester.pump(const Duration(milliseconds: 2000));
+      await pumpMap(tester, parent: 'A35', enabled: false);
+      await tester.pump();
+      expect(highlightShown(tester), isFalse);
+      expect(tester.binding.hasScheduledFrame, isFalse);
+
+      // Re-enabled: resumes the remaining loops, then finishes.
+      await pumpMap(tester, parent: 'A35');
+      await tester.pump(const Duration(milliseconds: 8000));
+      await tester.pump();
+      expect(highlightShown(tester), isFalse);
+
+      // Collapse + expand again after completion: no automatic restart.
+      await pumpMap(tester, parent: 'A35', enabled: false);
+      await pumpMap(tester, parent: 'A35');
+      await tester.pump();
+      expect(highlightShown(tester), isFalse);
+      expect(tester.binding.hasScheduledFrame, isFalse);
+    });
+  });
+
+  group('Focused overlay cache', () {
+    final mold = fixedAssetFloorMaps.firstWhere(
+      (m) => m.title == 'Floor 1 - Mold',
+    );
+    final press = fixedAssetFloorMaps.first;
+
+    Future<void> pumpMap(
+      WidgetTester tester, {
+      required FloorMapData data,
+      required String parent,
+      String? child,
+      bool focused = true,
+    }) {
+      return tester.pumpWidget(
+        MaterialApp(
+          home: SizedBox(
+            width: 400,
+            height: 250,
+            child: FloorMapWidget(
+              data: data,
+              selectedParentZone: parent,
+              selectedChildZone: child,
+              focusParentZone: focused ? parent : null,
+            ),
+          ),
+        ),
+      );
+    }
+
+    FloorMapPainter basePainter(WidgetTester tester) => tester
+        .widgetList<CustomPaint>(find.byType(CustomPaint))
+        .map((w) => w.painter)
+        .whereType<FloorMapPainter>()
+        .single;
+
+    SelectedAreaHighlightPainter highlightPainter(WidgetTester tester) => tester
+        .widgetList<CustomPaint>(find.byType(CustomPaint))
+        .map((w) => w.painter)
+        .whereType<SelectedAreaHighlightPainter>()
+        .single;
+
+    testWidgets('reuses lists and highlight painter across rebuilds', (
+      tester,
+    ) async {
+      await pumpMap(tester, data: mold, parent: 'A35', child: 'A35-1');
+      final areas = basePainter(tester).areas;
+      final highlight = highlightPainter(tester);
+
+      // Child change + plain rebuild: same instances.
+      await pumpMap(tester, data: mold, parent: 'A35', child: 'A35-2');
+      await pumpMap(tester, data: mold, parent: 'A35', child: 'A35-2');
+      expect(basePainter(tester).areas, same(areas));
+      expect(highlightPainter(tester), same(highlight));
+
+      // Parent change recomputes.
+      await pumpMap(tester, data: mold, parent: 'A31');
+      final a31Areas = basePainter(tester).areas;
+      expect(a31Areas, isNot(same(areas)));
+      expect(a31Areas.map((a) => a.code), <String>['A31']);
+
+      // Map change recomputes.
+      await pumpMap(tester, data: press, parent: 'A1');
+      expect(basePainter(tester).areas, isNot(same(a31Areas)));
+      expect(basePainter(tester).areas.map((a) => a.code), <String>['A1']);
+    });
+
+    testWidgets('full mode passes source lists through', (tester) async {
+      await pumpMap(tester, data: mold, parent: 'A35', focused: false);
+      expect(basePainter(tester).areas, same(mold.areas));
+    });
+  });
 }

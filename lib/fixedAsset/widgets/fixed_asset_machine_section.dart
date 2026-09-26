@@ -4,7 +4,7 @@ import '../../model/fixed_asset_machine.dart';
 
 /// Machine list của location đang dùng: search cục bộ, audited-first,
 /// ✓ = đã kiểm kê trong kỳ (session). Rows chỉ đọc. Không gọi API.
-class FixedAssetMachineSection extends StatelessWidget {
+class FixedAssetMachineSection extends StatefulWidget {
   /// false khi chưa có location (AUTO chưa scan / MANUAL chưa chọn đủ).
   final bool visible;
   final List<FixedAssetMachine> machines;
@@ -29,16 +29,85 @@ class FixedAssetMachineSection extends StatelessWidget {
     required this.onClearSearch,
   });
 
+  @override
+  State<FixedAssetMachineSection> createState() =>
+      _FixedAssetMachineSectionState();
+}
+
+class _FixedAssetMachineSectionState extends State<FixedAssetMachineSection> {
   static const Color _accent = Color(0xFF4DD0E1);
+
+  // Cache filter + audited-first order. Recomputed only when the source
+  // list instance, the query, or the audited set (grows in place, so its
+  // length is the version signal) changes; unrelated parent rebuilds reuse
+  // it.
+  List<FixedAssetMachine>? _cacheSource;
+  String? _cacheQuery;
+  Set<String>? _cacheAuditedSet;
+  int _cacheAuditedLength = -1;
+  int _filteredCount = 0;
+  List<FixedAssetMachine> _displayMachines = const <FixedAssetMachine>[];
+
+  // Lower-cased search fields, built once per source list (not per
+  // keystroke).
+  List<FixedAssetMachine>? _normalizedSource;
+  List<String> _codeLower = const <String>[];
+  List<String> _nameLower = const <String>[];
+
+  void _syncDisplayMachines() {
+    final machines = widget.machines;
+    final query = widget.search.trim().toLowerCase();
+    final auditedSet = widget.auditedMachineCodes;
+    if (identical(machines, _cacheSource) &&
+        query == _cacheQuery &&
+        identical(auditedSet, _cacheAuditedSet) &&
+        auditedSet.length == _cacheAuditedLength) {
+      return;
+    }
+    _cacheSource = machines;
+    _cacheQuery = query;
+    _cacheAuditedSet = auditedSet;
+    _cacheAuditedLength = auditedSet.length;
+
+    if (!identical(machines, _normalizedSource)) {
+      _normalizedSource = machines;
+      _codeLower = <String>[
+        for (final m in machines) m.machineCode.toLowerCase(),
+      ];
+      _nameLower = <String>[for (final m in machines) m.faName.toLowerCase()];
+    }
+
+    // Machine đã audit lên đầu. Chia nhóm (stable) để giữ nguyên thứ tự
+    // gốc trong từng nhóm; không mutate `machines`.
+    final audited = <FixedAssetMachine>[];
+    final notAudited = <FixedAssetMachine>[];
+    var filteredCount = 0;
+    for (var i = 0; i < machines.length; i++) {
+      if (query.isNotEmpty &&
+          !_codeLower[i].contains(query) &&
+          !_nameLower[i].contains(query)) {
+        continue;
+      }
+      filteredCount++;
+      final machine = machines[i];
+      (_isAuditedMachine(machine) ? audited : notAudited).add(machine);
+    }
+    _filteredCount = filteredCount;
+    _displayMachines = List<FixedAssetMachine>.unmodifiable(<FixedAssetMachine>[
+      ...audited,
+      ...notAudited,
+    ]);
+  }
+
   static const Color _success = Color(0xFF22C55E);
 
   @override
   Widget build(BuildContext context) {
-    if (!visible) {
+    if (!widget.visible) {
       return const SizedBox.shrink();
     }
 
-    if (loading) {
+    if (widget.loading) {
       return const Padding(
         padding: EdgeInsets.symmetric(vertical: 10),
         child: Center(
@@ -51,37 +120,21 @@ class FixedAssetMachineSection extends StatelessWidget {
       );
     }
 
-    if (error != null) {
+    if (widget.error != null) {
       return _compactMessage(
-        error!,
+        widget.error!,
         icon: Icons.error_outline_rounded,
         iconColor: Colors.redAccent,
       );
     }
 
-    if (machines.isEmpty) {
+    if (widget.machines.isEmpty) {
       return _compactMessage('No machines found.');
     }
 
-    final query = search.trim().toLowerCase();
-    final filtered = query.isEmpty
-        ? machines
-        : machines
-              .where(
-                (m) =>
-                    m.machineCode.toLowerCase().contains(query) ||
-                    m.faName.toLowerCase().contains(query),
-              )
-              .toList(growable: false);
-
-    // Machine đã audit lên đầu. Chia nhóm (stable) để giữ nguyên thứ tự
-    // gốc trong từng nhóm; không mutate `machines`.
-    final audited = <FixedAssetMachine>[];
-    final notAudited = <FixedAssetMachine>[];
-    for (final machine in filtered) {
-      (_isAuditedMachine(machine) ? audited : notAudited).add(machine);
-    }
-    final displayMachines = [...audited, ...notAudited];
+    _syncDisplayMachines();
+    final filteredCount = _filteredCount;
+    final displayMachines = _displayMachines;
 
     // Chiều cao list có giới hạn, list tự cuộn bên trong.
     final maxListHeight = (MediaQuery.of(context).size.height * 0.38).clamp(
@@ -92,9 +145,9 @@ class FixedAssetMachineSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildMachineHeader(filtered.length),
+        _buildMachineHeader(filteredCount),
         const SizedBox(height: 6),
-        if (filtered.isEmpty)
+        if (filteredCount == 0)
           _compactMessage('No matching machines.')
         else
           ConstrainedBox(
@@ -114,8 +167,8 @@ class FixedAssetMachineSection extends StatelessWidget {
   }
 
   Widget _buildMachineHeader(int visibleCount) {
-    final total = machines.length;
-    final countText = search.trim().isEmpty
+    final total = widget.machines.length;
+    final countText = widget.search.trim().isEmpty
         ? '$total'
         : '$visibleCount / $total';
 
@@ -152,13 +205,13 @@ class FixedAssetMachineSection extends StatelessWidget {
   }
 
   Widget _buildMachineSearchField() {
-    final hasText = search.isNotEmpty;
+    final hasText = widget.search.isNotEmpty;
 
     return SizedBox(
       height: 38,
       child: TextField(
-        controller: searchController,
-        onChanged: onSearchChanged,
+        controller: widget.searchController,
+        onChanged: widget.onSearchChanged,
         style: const TextStyle(color: Colors.white, fontSize: 13),
         cursorColor: _accent,
         decoration: InputDecoration(
@@ -183,7 +236,7 @@ class FixedAssetMachineSection extends StatelessWidget {
           suffixIcon: hasText
               ? InkWell(
                   borderRadius: BorderRadius.circular(999),
-                  onTap: onClearSearch,
+                  onTap: widget.onClearSearch,
                   child: Icon(
                     Icons.close_rounded,
                     size: 16,
@@ -212,7 +265,7 @@ class FixedAssetMachineSection extends StatelessWidget {
   /// thường). Chỉ là feedback hiển thị, không phải selection.
   bool _isAuditedMachine(FixedAssetMachine machine) {
     final code = machine.machineCode.trim().toLowerCase();
-    return code.isNotEmpty && auditedMachineCodes.contains(code);
+    return code.isNotEmpty && widget.auditedMachineCodes.contains(code);
   }
 
   Widget _buildMachineRow(FixedAssetMachine machine) {
@@ -267,11 +320,7 @@ class FixedAssetMachineSection extends StatelessWidget {
     );
   }
 
-  Widget _compactMessage(
-    String message, {
-    IconData? icon,
-    Color? iconColor,
-  }) {
+  Widget _compactMessage(String message, {IconData? icon, Color? iconColor}) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
