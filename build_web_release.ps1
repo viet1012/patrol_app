@@ -1,6 +1,6 @@
 $pubspec = "pubspec.yaml"
 
-# ?? luôn ép thành array
+# Luôn ép thành array
 $lines = @(Get-Content $pubspec)
 
 $idx = -1
@@ -16,8 +16,8 @@ if ($idx -lt 0) {
     exit 1
 }
 
-# match version: x.y.z (cho phép có +N nhung không dùng)
-if ($lines[$idx] -notmatch '^\s*version:\s*([0-9]+)\.([0-9]+)\.([0-9]+)(\+([0-9]+))?\s*$') {
+# match version: x.y.z ho?c x.y.z+N
+if ($lines[$idx] -notmatch '^\s*version:\s*([0-9]+)\.([0-9]+)\.([0-9]+)(\+[0-9]+)?\s*$') {
     Write-Host "? Dòng version không dúng format:"
     Write-Host "   $($lines[$idx])"
     exit 1
@@ -29,17 +29,32 @@ $patch = [int]$Matches[3]
 
 $old = "$major.$minor.$patch"
 
-# ?? bump patch
+# ===== RULE C?A B?N =====
+$MAX_PATCH = 9
+$MAX_MINOR = 9
+
 $patch++
+
+if ($patch -gt $MAX_PATCH) {
+    $patch = 0
+    $minor++
+}
+
+if ($minor -gt $MAX_MINOR) {
+    $minor = 0
+    $major++
+}
+
 $new = "$major.$minor.$patch"
 
 $lines[$idx] = "version: $new"
 
-# ? ghi l?i file, gi? newline dúng YAML
+# ghi l?i file
 Set-Content -Path $pubspec -Value $lines -Encoding UTF8
 
 Write-Host "? Version bumped: $old ? $new"
 
+# ===== Flutter build =====
 flutter clean
 flutter pub get
 flutter build web --release
