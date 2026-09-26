@@ -1,64 +1,137 @@
+$ErrorActionPreference = "Stop"
+
 $pubspec = "pubspec.yaml"
+$generatedIndex = "build\web\index.html"
+$versionJson = "build\web\version.json"
 
-# Luôn ép thành array
-$lines = @(Get-Content $pubspec)
+function Invoke-FlutterStep {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Description,
 
-$idx = -1
-for ($i = 0; $i -lt $lines.Count; $i++) {
-    if ($lines[$i] -match '^\s*version:\s*') {
-        $idx = $i
-        break
+        [Parameter(Mandatory = $true)]
+        [string[]]$Arguments
+    )
+
+    & flutter @Arguments
+    if ($LASTEXITCODE -ne 0) {
+        throw "$Description failed with exit code $LASTEXITCODE."
     }
 }
 
-if ($idx -lt 0) {
-    Write-Host "? Không tìm th?y dòng version:"
-    exit 1
+if (-not (Test-Path -LiteralPath $pubspec -PathType Leaf)) {
+    throw "Missing $pubspec. Run this script from the project root."
 }
 
-# match version: x.y.z ho?c x.y.z+N
-if ($lines[$idx] -notmatch '^\s*version:\s*([0-9]+)\.([0-9]+)\.([0-9]+)(\+[0-9]+)?\s*$') {
-    Write-Host "? Dòng version không dúng format:"
-    Write-Host "   $($lines[$idx])"
-    exit 1
+$pubspecContent = Get-Content -LiteralPath $pubspec -Raw -Encoding UTF8
+$versionMatch = [regex]::Match(
+    $pubspecContent,
+    '(?m)^\s*version:\s*([0-9]+)\.([0-9]+)\.([0-9]+)\s*$'
+)
+
+if (-not $versionMatch.Success) {
+    throw "The pubspec version must use the x.y.z format without a build number."
 }
 
-$major = [int]$Matches[1]
-$minor = [int]$Matches[2]
-$patch = [int]$Matches[3]
+$major = [int]$versionMatch.Groups[1].Value
+$minor = [int]$versionMatch.Groups[2].Value
+$patch = [int]$versionMatch.Groups[3].Value
+$oldVersion = "$major.$minor.$patch"
 
-$old = "$major.$minor.$patch"
-
-# ===== RULE C?A B?N =====
-$MAX_PATCH = 9
-$MAX_MINOR = 9
-
+$maxPatch = 9
+$maxMinor = 9
 $patch++
 
-if ($patch -gt $MAX_PATCH) {
+if ($patch -gt $maxPatch) {
     $patch = 0
     $minor++
 }
 
-if ($minor -gt $MAX_MINOR) {
+if ($minor -gt $maxMinor) {
     $minor = 0
     $major++
 }
 
-$new = "$major.$minor.$patch"
+$newVersion = "$major.$minor.$patch"
+$updatedPubspec = $pubspecContent.Remove(
+    $versionMatch.Index,
+    $versionMatch.Length
+).Insert($versionMatch.Index, "version: $newVersion")
 
-$lines[$idx] = "version: $new"
+$utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+[System.IO.File]::WriteAllText(
+    (Resolve-Path -LiteralPath $pubspec),
+    $updatedPubspec,
+    $utf8NoBom
+)
 
-# ghi l?i file
-Set-Content -Path $pubspec -Value $lines -Encoding UTF8
+Write-Host "Version bumped: $oldVersion -> $newVersion"
 
-Write-Host "? Version bumped: $old ? $new"
+Invoke-FlutterStep -Description "flutter clean" -Arguments @("clean")
+Invoke-FlutterStep -Description "flutter pub get" -Arguments @("pub", "get")
+Invoke-FlutterStep -Description "flutter build web" -Arguments @(
+    "build",
+    "web",
+    "--release",
+    "--pwa-strategy=none"
+)
 
-# ===== Flutter build =====
-flutter clean
-flutter pub get
-flutter build web --release
+if (-not (Test-Path -LiteralPath $generatedIndex -PathType Leaf)) {
+    throw "Generated index was not found: $generatedIndex"
+}
 
-# inject version vào index.html
-$index = "build\web\index.html"
-(Get-Content $index) -replace "__APP_VERSION__", $new | Set-Content $index -Encoding UTF8
+$generatedIndexContent = Get-Content `
+    -LiteralPath $generatedIndex `
+    -Raw `
+    -Encoding UTF8
+$generatedIndexContent = $generatedIndexContent.Replace(
+    "__APP_VERSION__",
+    $newVersion
+)
+[System.IO.File]::WriteAllText(
+    (Resolve-Path -LiteralPath $generatedIndex),
+    $generatedIndexContent,
+    $utf8NoBom
+)
+
+$verifiedIndexContent = Get-Content `
+    -LiteralPath $generatedIndex `
+    -Raw `
+    -Encoding UTF8
+if ($verifiedIndexContent.Contains("__APP_VERSION__")) {
+    throw "Version placeholder remains in $generatedIndex."
+}
+
+$versionPayload = [ordered]@{ version = $newVersion } | ConvertTo-Json
+[System.IO.File]::WriteAllText(
+    (Join-Path (Get-Location) $versionJson),
+    "$versionPayload`n",
+    $utf8NoBom
+)
+
+$requiredFiles = @(
+    $generatedIndex,
+    "build\web\flutter_bootstrap.js",
+    "build\web\main.dart.js",
+    $versionJson,
+    "build\web\js\zxing.min.js",
+    "build\web\js\jsQR.js",
+    "build\web\assets\fonts\MaterialIcons-Regular.otf"
+)
+
+foreach ($requiredFile in $requiredFiles) {
+    if (-not (Test-Path -LiteralPath $requiredFile -PathType Leaf)) {
+        throw "Required build output is missing: $requiredFile"
+    }
+}
+
+$expectedZxing = "./js/zxing.min.js?v=$newVersion"
+$expectedJsQr = "./js/jsQR.js?v=$newVersion"
+if (-not $verifiedIndexContent.Contains($expectedZxing)) {
+    throw "Generated index does not reference $expectedZxing"
+}
+if (-not $verifiedIndexContent.Contains($expectedJsQr)) {
+    throw "Generated index does not reference $expectedJsQr"
+}
+
+Write-Host "Web build verified for version $newVersion."
