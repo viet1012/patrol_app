@@ -143,6 +143,14 @@ class FloorMapWidget extends StatefulWidget {
   /// low-end devices) keeps only the static selected fill + outline.
   final bool enablePolygonAnimation;
 
+  /// Washes the floor drawing towards white so outlines and badges stand
+  /// out (effective 0–0.8, 0 = original image). Overlays are not faded.
+  final double imageFade;
+
+  /// Extra wash outside the selected parent polygon while focused
+  /// (effective 0–0.6, 0 = off). Ignored when [focusParentZone] is null.
+  final double spotlightFade;
+
   const FloorMapWidget({
     super.key,
     required this.data,
@@ -154,6 +162,8 @@ class FloorMapWidget extends StatefulWidget {
     this.enablePolygonAnimation = true,
     this.enableZoom = true,
     this.onZoneTap,
+    this.imageFade = 0.40,
+    this.spotlightFade = 0.30,
   });
 
   @override
@@ -506,12 +516,44 @@ class _FloorMapWidgetState extends State<FloorMapWidget>
         }
       }
     }
+    final imageFade = widget.imageFade.clamp(0.0, 0.8).toDouble();
+    final spotlightFade = widget.spotlightFade.clamp(0.0, 0.6).toDouble();
+    MapArea? spotlightArea;
+    if (widget.focusParentZone != null && spotlightFade > 0) {
+      spotlightArea = findAreaByCode(widget.data, widget.selectedParentZone);
+    }
 
     return Stack(
       clipBehavior: Clip.none,
       fit: StackFit.expand,
       children: <Widget>[
-        Image.asset(widget.data.imageAsset, fit: BoxFit.fill),
+        // Own layers for the image and the spotlight: changing either fade
+        // repaints only that layer, never the outlines or badges above.
+        // A white srcATop wash (not Opacity) keeps the drawing bright on the
+        // dark card background.
+        RepaintBoundary(
+          child: Image.asset(
+            widget.data.imageAsset,
+            fit: BoxFit.fill,
+            color: imageFade > 0
+                ? Colors.white.withValues(alpha: imageFade)
+                : null,
+            colorBlendMode: imageFade > 0 ? BlendMode.srcATop : null,
+          ),
+        ),
+        if (spotlightArea != null)
+          Positioned.fill(
+            child: IgnorePointer(
+              child: RepaintBoundary(
+                child: CustomPaint(
+                  painter: _SpotlightPainter(
+                    area: spotlightArea,
+                    fade: spotlightFade,
+                  ),
+                ),
+              ),
+            ),
+          ),
         Positioned.fill(
           child: IgnorePointer(
             child: CustomPaint(
@@ -577,6 +619,35 @@ class _FloorMapWidgetState extends State<FloorMapWidget>
           ),
       ],
     );
+  }
+}
+
+/// White wash over the whole scene except the selected parent polygon
+/// (even-odd fill: scene rect + polygon), so the focused area stands out.
+class _SpotlightPainter extends CustomPainter {
+  final MapArea area;
+  final double fade;
+
+  const _SpotlightPainter({required this.area, required this.fade});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (area.points.isEmpty) return;
+    final path = Path()
+      ..fillType = PathFillType.evenOdd
+      ..addRect(Offset.zero & size)
+      ..addPath(mapAreaPath(area, size), Offset.zero);
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = Colors.white.withValues(alpha: fade)
+        ..style = PaintingStyle.fill,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _SpotlightPainter oldDelegate) {
+    return !identical(oldDelegate.area, area) || oldDelegate.fade != fade;
   }
 }
 

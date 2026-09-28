@@ -120,6 +120,8 @@ class _FixedAssetDetectedMapState extends State<FixedAssetDetectedMap> {
                       enablePolygonAnimation:
                           widget.enablePolygonAnimation && !_collapsed,
                       onZoneTap: widget.onZoneTap,
+                      imageFade: 0.40,
+                      spotlightFade: 0.30,
                     ),
                   ),
                 ),
@@ -175,6 +177,9 @@ class _ExpandedMapView extends StatefulWidget {
 class _ExpandedMapViewState extends State<_ExpandedMapView> {
   bool _showAll = false;
 
+  /// Faded drawing + spotlight; dialog-local, reopening starts faded.
+  bool _faded = true;
+
   @override
   Widget build(BuildContext context) {
     final selection = widget.selection;
@@ -184,6 +189,8 @@ class _ExpandedMapViewState extends State<_ExpandedMapView> {
           _MapHeader(
             title: selection.map.title,
             zoneText: selection.childZoneCode ?? selection.parentZoneCode,
+            faded: _faded,
+            onToggleFaded: () => setState(() => _faded = !_faded),
             showAll: _showAll,
             onToggleShowAll: () => setState(() => _showAll = !_showAll),
             onClose: widget.onClose,
@@ -210,6 +217,10 @@ class _ExpandedMapViewState extends State<_ExpandedMapView> {
                       enableZoom: true,
                       enablePolygonAnimation: widget.enablePolygonAnimation,
                       onZoneTap: widget.onZoneTap,
+                      imageFade: _faded ? 0.50 : 0,
+                      // Spotlight needs a focus parent, so "Show all" turns
+                      // it off on its own.
+                      spotlightFade: _faded ? 0.30 : 0,
                     ),
                   ),
                 ),
@@ -227,6 +238,8 @@ class _MapHeader extends StatelessWidget {
   final String? zoneText;
   final VoidCallback? onExpand;
   final VoidCallback? onClose;
+  final bool faded;
+  final VoidCallback? onToggleFaded;
   final bool showAll;
   final VoidCallback? onToggleShowAll;
   final bool collapsed;
@@ -237,6 +250,8 @@ class _MapHeader extends StatelessWidget {
     required this.zoneText,
     this.onExpand,
     this.onClose,
+    this.faded = false,
+    this.onToggleFaded,
     this.showAll = false,
     this.onToggleShowAll,
     this.collapsed = false,
@@ -291,6 +306,12 @@ class _MapHeader extends StatelessWidget {
                     fontWeight: FontWeight.w800,
                   ),
                 ),
+              ),
+            if (onToggleFaded != null)
+              _HeaderAction(
+                tooltip: faded ? 'Show original' : 'Fade drawing',
+                icon: Icons.contrast_rounded,
+                onPressed: onToggleFaded,
               ),
             if (onToggleShowAll != null)
               _HeaderAction(
