@@ -623,7 +623,7 @@ class _MapZoneBadgeState extends State<_MapZoneBadge> {
                     blurRadius: 5,
                     blurStyle: BlurStyle.outer,
                   ),
-                ],
+               ],
               ),
             ),
           ),

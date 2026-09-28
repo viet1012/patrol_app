@@ -128,10 +128,6 @@ class _FixedAssetMachineSectionState extends State<FixedAssetMachineSection> {
       );
     }
 
-    if (widget.machines.isEmpty) {
-      return _compactMessage('No machines found.');
-    }
-
     _syncDisplayMachines();
     final filteredCount = _filteredCount;
     final displayMachines = _displayMachines;
@@ -145,9 +141,11 @@ class _FixedAssetMachineSectionState extends State<FixedAssetMachineSection> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildMachineHeader(filteredCount),
+        _buildMachineHeader(),
         const SizedBox(height: 6),
-        if (filteredCount == 0)
+        if (widget.machines.isEmpty)
+          _compactMessage('No machines found.')
+        else if (filteredCount == 0)
           _compactMessage('No matching machines.')
         else
           ConstrainedBox(
@@ -166,11 +164,11 @@ class _FixedAssetMachineSectionState extends State<FixedAssetMachineSection> {
     );
   }
 
-  Widget _buildMachineHeader(int visibleCount) {
+  Widget _buildMachineHeader() {
     final total = widget.machines.length;
-    final countText = widget.search.trim().isEmpty
-        ? '$total'
-        : '$visibleCount / $total';
+    final auditedAtCurrentLocation = widget.machines
+        .where(_isAuditedMachine)
+        .length;
 
     final title = Row(
       mainAxisSize: MainAxisSize.min,
@@ -184,13 +182,25 @@ class _FixedAssetMachineSectionState extends State<FixedAssetMachineSection> {
           ),
         ),
         const SizedBox(width: 6),
-        Text(
-          countText,
-          style: const TextStyle(
-            color: _accent,
-            fontSize: 11.5,
-            fontWeight: FontWeight.w700,
+        Text.rich(
+          TextSpan(
+            children: [
+              TextSpan(
+                text: '$auditedAtCurrentLocation',
+                style: const TextStyle(color: _accent),
+              ),
+              TextSpan(
+                text: ' / $total ',
+                style: const TextStyle(color: Colors.white70),
+              ),
+              TextSpan(
+                text: total == 0 ? '' : 'audited',
+                style: const TextStyle(color: _accent),
+              ),
+            ],
           ),
+          maxLines: 1,
+          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
         ),
       ],
     );

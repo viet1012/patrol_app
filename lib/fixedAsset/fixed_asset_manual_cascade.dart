@@ -158,21 +158,22 @@ class FixedAssetManualCascade {
   // LOADERS
   // ------------------------------------------------------------
 
-  Future<void> loadFacs() async {
+  /// Returns the accepted options, or null when the request failed/stale.
+  Future<List<String>?> loadFacs() async {
     final req = ++_facReq;
     loadingFacs = true;
     onChanged();
 
     try {
       final result = await FixedAssetApi.fetchFacs();
-      if (isDisposed() || req != _facReq) return;
+      if (isDisposed() || req != _facReq) return null;
       facs = result;
-      onChanged();
+      return result;
     } catch (error) {
-      if (isDisposed() || req != _facReq) return;
+      if (isDisposed() || req != _facReq) return null;
       facs = const <String>[];
-      onChanged();
       onError('Load Fac failed: ${fixedAssetErrorText(error)}');
+      return null;
     } finally {
       if (!isDisposed() && req == _facReq) {
         loadingFacs = false;
@@ -181,21 +182,22 @@ class FixedAssetManualCascade {
     }
   }
 
-  Future<void> loadFloors(String fac) async {
+  /// Returns the accepted options, or null when the request failed/stale.
+  Future<List<String>?> loadFloors(String fac) async {
     final req = _floorReq;
     loadingFloors = true;
     onChanged();
 
     try {
       final result = await FixedAssetApi.fetchFloors(fac: fac);
-      if (isDisposed() || req != _floorReq) return;
+      if (isDisposed() || req != _floorReq) return null;
       floors = result;
-      onChanged();
+      return result;
     } catch (error) {
-      if (isDisposed() || req != _floorReq) return;
+      if (isDisposed() || req != _floorReq) return null;
       floors = const <String>[];
-      onChanged();
       onError('Load Floor failed: ${fixedAssetErrorText(error)}');
+      return null;
     } finally {
       if (!isDisposed() && req == _floorReq) {
         loadingFloors = false;
@@ -204,7 +206,8 @@ class FixedAssetManualCascade {
     }
   }
 
-  Future<void> loadPositionA(String fac, String floor) async {
+  /// Returns the accepted options, or null when the request failed/stale.
+  Future<List<String>?> loadPositionA(String fac, String floor) async {
     final req = _positionAReq;
     loadingPositionA = true;
     onChanged();
@@ -214,14 +217,14 @@ class FixedAssetManualCascade {
         fac: fac,
         floor: floor,
       );
-      if (isDisposed() || req != _positionAReq) return;
+      if (isDisposed() || req != _positionAReq) return null;
       positionAs = result;
-      onChanged();
+      return result;
     } catch (error) {
-      if (isDisposed() || req != _positionAReq) return;
+      if (isDisposed() || req != _positionAReq) return null;
       positionAs = const <String>[];
-      onChanged();
       onError('Load PositionA failed: ${fixedAssetErrorText(error)}');
+      return null;
     } finally {
       if (!isDisposed() && req == _positionAReq) {
         loadingPositionA = false;
@@ -230,7 +233,8 @@ class FixedAssetManualCascade {
     }
   }
 
-  Future<void> loadPositionAA(
+  /// Returns the accepted options, or null when the request failed/stale.
+  Future<List<String>?> loadPositionAA(
     String fac,
     String floor,
     String positionA,
@@ -245,14 +249,14 @@ class FixedAssetManualCascade {
         floor: floor,
         positionA: positionA,
       );
-      if (isDisposed() || req != _positionAAReq) return;
+      if (isDisposed() || req != _positionAAReq) return null;
       positionAAs = result;
-      onChanged();
+      return result;
     } catch (error) {
-      if (isDisposed() || req != _positionAAReq) return;
+      if (isDisposed() || req != _positionAAReq) return null;
       positionAAs = const <String>[];
-      onChanged();
       onError('Load PositionAA failed: ${fixedAssetErrorText(error)}');
+      return null;
     } finally {
       if (!isDisposed() && req == _positionAAReq) {
         loadingPositionAA = false;

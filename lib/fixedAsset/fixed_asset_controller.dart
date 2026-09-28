@@ -24,6 +24,7 @@ class FixedAssetController extends ChangeNotifier {
     required this.confirmMismatch,
     required this.showError,
     required this.resetQr,
+    this.onScanAccepted,
   }) {
     manual = FixedAssetManualCascade(
       onChanged: _notify,
@@ -37,6 +38,7 @@ class FixedAssetController extends ChangeNotifier {
   final FixedAssetConfirmMismatch confirmMismatch;
   final ValueChanged<String> showError;
   final VoidCallback resetQr;
+  final void Function(String rawQr, String machineCode)? onScanAccepted;
 
   late final FixedAssetManualCascade manual;
 
@@ -317,9 +319,10 @@ class FixedAssetController extends ChangeNotifier {
 
     try {
       if (isAutoMode) {
+        _notifyScanAccepted(qr, machineCode);
         await _runAutoScan(qrData, generation);
       } else {
-        await _runManualScan(machineCode, generation);
+        await _runManualScan(machineCode, generation, rawQr: qr);
       }
     } finally {
       _processingScan = false;
@@ -335,13 +338,26 @@ class FixedAssetController extends ChangeNotifier {
   }
 
   /// MANUAL: location lấy từ dropdown. Mismatch (nếu có) do POST báo về.
-  Future<void> _runManualScan(String machineCode, int generation) async {
+  void _notifyScanAccepted(String rawQr, String machineCode) {
+    try {
+      onScanAccepted?.call(rawQr, machineCode);
+    } catch (_) {
+      // Visual feedback must never interrupt the audit/save pipeline.
+    }
+  }
+
+  Future<void> _runManualScan(
+    String machineCode,
+    int generation, {
+    required String rawQr,
+  }) async {
     final location = manual.selectedLocation;
     if (location == null) {
       _failScan(generation, 'Select Fac, Floor, PositionA and PositionAA first');
       return;
     }
 
+    _notifyScanAccepted(rawQr, machineCode);
     await _saveAudit(
       machineCode,
       FixedAssetSaveTarget.mapped(location),
@@ -820,7 +836,10 @@ class FixedAssetController extends ChangeNotifier {
 
     // Lazy-load Fac lần đầu vào MANUAL, sau đó dùng lại cache.
     if (mode == FixedAssetLocationMode.manual && manual.needsFacs) {
-      manual.loadFacs();
+      _loadManualFacs();
+    } else if (mode == FixedAssetLocationMode.manual &&
+        manual.facs.length == 1) {
+      onFacChanged(manual.facs.first);
     }
   }
 
@@ -839,33 +858,61 @@ class FixedAssetController extends ChangeNotifier {
     _notify();
   }
 
-  void onFacChanged(String? value) {
+  Future<void> _loadManualFacs() async {
+    final options = await manual.loadFacs();
+    if (_disposed || isAutoMode || options?.length != 1) return;
+
+    await onFacChanged(options!.first);
+  }
+
+  Future<void> onFacChanged(String? value) async {
     if (!manual.selectFac(value)) return;
     _resetForManualSelection();
 
-    if (value != null) manual.loadFloors(value);
+    if (value == null) return;
+
+    final options = await manual.loadFloors(value);
+    if (_disposed || isAutoMode || manual.selectedFac != value) return;
+    if (options?.length == 1) await onFloorChanged(options!.first);
   }
 
-  void onFloorChanged(String? value) {
+  Future<void> onFloorChanged(String? value) async {
     if (!manual.selectFloor(value)) return;
     _resetForManualSelection();
 
     final fac = manual.selectedFac;
-    if (fac != null && value != null) manual.loadPositionA(fac, value);
+    if (fac == null || value == null) return;
+
+    final options = await manual.loadPositionA(fac, value);
+    if (_disposed ||
+        isAutoMode ||
+        manual.selectedFac != fac ||
+        manual.selectedFloor != value) {
+      return;
+    }
+    if (options?.length == 1) await onPositionAChanged(options!.first);
   }
 
-  void onPositionAChanged(String? value) {
+  Future<void> onPositionAChanged(String? value) async {
     if (!manual.selectPositionA(value)) return;
     _resetForManualSelection();
 
     final fac = manual.selectedFac;
     final floor = manual.selectedFloor;
-    if (fac != null && floor != null && value != null) {
-      manual.loadPositionAA(fac, floor, value);
+    if (fac == null || floor == null || value == null) return;
+
+    final options = await manual.loadPositionAA(fac, floor, value);
+    if (_disposed ||
+        isAutoMode ||
+        manual.selectedFac != fac ||
+        manual.selectedFloor != floor ||
+        manual.selectedPositionA != value) {
+      return;
     }
+    if (options?.length == 1) await onPositionAAChanged(options!.first);
   }
 
-  void onPositionAAChanged(String? value) {
+  Future<void> onPositionAAChanged(String? value) async {
     if (!manual.selectPositionAA(value)) return;
     _resetForManualSelection();
 

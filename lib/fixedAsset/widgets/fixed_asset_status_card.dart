@@ -31,7 +31,7 @@ class FixedAssetStatusCard extends StatelessWidget {
   });
 
   /// "Việt (KVH_IT_Mem_Viet)" / "Việt" / "KVH_IT_Mem_Viet".
-  /// null khi không có cả hai -> không hiện dòng "Bởi:".
+  /// null khi không có cả hai -> không hiện phần auditor.
   static String? auditorLabel(String? userName, String? userId) {
     final name = userName?.trim() ?? '';
     final id = userId?.trim() ?? '';
@@ -56,6 +56,8 @@ class FixedAssetStatusCard extends StatelessWidget {
 
     final String primary;
     final List<String> details = <String>[];
+    String? alreadyAuditedBy;
+    String? alreadyAuditedTime;
     String? label;
     Color color;
     Widget? indicator;
@@ -88,10 +90,9 @@ class FixedAssetStatusCard extends StatelessWidget {
       case FixedAssetScanStatus.alreadyAudited:
         primary = machineCode;
         if (faName.isNotEmpty) details.add(faName);
-        final auditor = auditorLabel(lastAuditedUserName, lastAuditedUserId);
-        if (auditor != null) details.add('Bởi: $auditor');
+        alreadyAuditedBy = auditorLabel(lastAuditedUserName, lastAuditedUserId);
         if (lastAudited != null) {
-          details.add('Lúc: ${_dateTimeFormat.format(lastAudited)}');
+          alreadyAuditedTime = _dateTimeFormat.format(lastAudited);
         }
         label = 'Đã kiểm kê';
         color = _amber;
@@ -156,6 +157,11 @@ class FixedAssetStatusCard extends StatelessWidget {
 
     final idle = status == FixedAssetScanStatus.idle;
     final failed = status == FixedAssetScanStatus.failed;
+    final statusIndicator = _statusIndicator(
+      label: label,
+      color: color,
+      indicator: indicator,
+    );
 
     return Container(
       width: double.infinity,
@@ -168,6 +174,7 @@ class FixedAssetStatusCard extends StatelessWidget {
         ),
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(Icons.qr_code_2_rounded, color: color, size: 24),
           const SizedBox(width: 10),
@@ -176,15 +183,27 @@ class FixedAssetStatusCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  primary,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: idle ? Colors.white.withOpacity(.6) : Colors.white,
-                    fontSize: idle ? 13.5 : 15.5,
-                    fontWeight: idle ? FontWeight.w500 : FontWeight.w800,
-                  ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        primary,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: idle
+                              ? Colors.white.withOpacity(.6)
+                              : Colors.white,
+                          fontSize: idle ? 13.5 : 15.5,
+                          fontWeight: idle ? FontWeight.w500 : FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                    if (statusIndicator != null) ...[
+                      const SizedBox(width: 8),
+                      statusIndicator,
+                    ],
+                  ],
                 ),
                 for (final detail in details)
                   Padding(
@@ -201,23 +220,45 @@ class FixedAssetStatusCard extends StatelessWidget {
                       ),
                     ),
                   ),
+                if (status == FixedAssetScanStatus.alreadyAudited &&
+                    (alreadyAuditedBy != null || alreadyAuditedTime != null))
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: _alreadyAuditedMetadata(
+                      auditor: alreadyAuditedBy,
+                      time: alreadyAuditedTime,
+                    ),
+                  ),
               ],
             ),
           ),
-          if (label != null) ...[
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: TextStyle(
-                color: color,
-                fontSize: 11.5,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ],
-          if (indicator != null) ...[const SizedBox(width: 6), indicator],
         ],
       ),
+    );
+  }
+
+  Widget? _statusIndicator({
+    required String? label,
+    required Color color,
+    required Widget? indicator,
+  }) {
+    if (label == null && indicator == null) return null;
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (label != null)
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: 11.5,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        if (label != null && indicator != null) const SizedBox(width: 6),
+        if (indicator != null) indicator,
+      ],
     );
   }
 
@@ -226,6 +267,67 @@ class FixedAssetStatusCard extends StatelessWidget {
       width: 16,
       height: 16,
       child: CircularProgressIndicator(strokeWidth: 2, color: _accent),
+    );
+  }
+
+  Widget _alreadyAuditedMetadata({String? auditor, String? time}) {
+    Widget auditorSection() => Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Icon(
+          Icons.person_outline_rounded,
+          size: 12,
+          color: Colors.white70,
+        ),
+        const SizedBox(width: 3),
+        Flexible(
+          child: Text(
+            auditor!,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(color: Colors.white70, fontSize: 10.5),
+          ),
+        ),
+      ],
+    );
+
+    Widget timeSection() => Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Icon(Icons.schedule_rounded, size: 12, color: Colors.white60),
+        const SizedBox(width: 3),
+        Text(
+          time!,
+          maxLines: 1,
+          style: const TextStyle(color: Colors.white60, fontSize: 10.5),
+        ),
+      ],
+    );
+
+    if (auditor == null) return timeSection();
+    if (time == null) return auditorSection();
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth < 230) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              auditorSection(),
+              const SizedBox(height: 1),
+              timeSection(),
+            ],
+          );
+        }
+        return Row(
+          children: [
+            Expanded(child: auditorSection()),
+            const SizedBox(width: 8),
+            timeSection(),
+          ],
+        );
+      },
     );
   }
 }

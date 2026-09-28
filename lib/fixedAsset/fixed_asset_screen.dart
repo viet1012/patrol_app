@@ -43,6 +43,7 @@ class _FixedAssetScreenState extends State<FixedAssetScreen> {
       GlobalKey<CameraPreviewBoxState>();
 
   late final FixedAssetController _controller;
+  QrDetectionGeometry? _latestQrDetection;
 
   /// Camera chỉ build một lần: rebuild của màn hình (search, check,
   /// status...) không rebuild CameraPreviewBox.
@@ -58,6 +59,11 @@ class _FixedAssetScreenState extends State<FixedAssetScreen> {
       confirmMismatch: _showMismatchDialog,
       showError: _showError,
       resetQr: () => _cameraKey.currentState?.resetQr(),
+      onScanAccepted: (rawQr, machineCode) {
+        final detailedMatches = _latestQrDetection?.value == rawQr;
+        if (!detailedMatches) _latestQrDetection = null;
+        _cameraKey.currentState?.showAcceptedQrLock(rawQr, machineCode);
+      },
     );
 
     // AUTO là mặc định: Fac chỉ load khi chuyển sang MANUAL.
@@ -77,6 +83,10 @@ class _FixedAssetScreenState extends State<FixedAssetScreen> {
 
   void _onQrDetected(String qr) {
     _controller.processScannedQr(qr);
+  }
+
+  void _onQrDetectedDetailed(QrDetectionGeometry detection) {
+    _latestQrDetection = detection;
   }
 
   /// Dialog xác nhận sai vị trí (mapped mismatch / unmapped ACTUAL).
@@ -355,8 +365,12 @@ class _FixedAssetScreenState extends State<FixedAssetScreen> {
           type: PatrolGroup.AssetUpdate.name,
           patrolGroup: PatrolGroup.AssetUpdate,
           onQrDetected: _onQrDetected,
+          onQrDetectedDetailed: _onQrDetectedDetailed,
           qrOnly: true,
           enableZoomControls: true,
+          enableQrLockAnimation: true,
+          enablePowerControl: true,
+          useSwitchPowerControl: true,
           showQrNumber: false,
         ),
       ),

@@ -185,10 +185,6 @@ extension _CameraScreenView on _CameraScreenState {
             children: [
               // CAMERA + QR CHECK OVERLAY
               _buildCameraSection(),
-              const SizedBox(height: 8),
-
-              _buildBatterySavingTip(),
-
               const SizedBox(height: 16),
               if (widget.patrolGroup != PatrolGroup.AssetUpdate) ...[
                 // CÁC DROPDOWN PHÍA TRÊN

@@ -116,10 +116,6 @@ class _CameraScreenState extends State<CameraScreen> {
   /// Dùng d? tránh scanner g?i cùng QR nhi?u l?n.
   String? _checkingQrKey;
 
-  // CameraPreviewBoxState là nguồn trạng thái camera thật duy nhất.
-  // Hai biến dưới đây chỉ phục vụ render UI và khóa thao tác.
-  bool _cameraUiSleeping = false;
-  bool _cameraSwitching = false;
   bool _isSubmitting = false;
 
   // Chỉ phần AppBar ảnh/nút Send lắng nghe notifier này.

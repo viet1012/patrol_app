@@ -27,6 +27,22 @@ import 'homeScreen/patrol_home_screen.dart';
 
 enum _QrWarningState { hidden, reading, unreadable, error }
 
+enum CameraPowerState { starting, on, stopping, off, error }
+
+class QrDetectionGeometry {
+  final String value;
+  final List<Offset> corners;
+  final double sourceWidth;
+  final double sourceHeight;
+
+  const QrDetectionGeometry({
+    required this.value,
+    required this.corners,
+    required this.sourceWidth,
+    required this.sourceHeight,
+  });
+}
+
 @JS('startQrLoop')
 external void startQrLoop();
 
@@ -48,6 +64,7 @@ class CameraPreviewBox extends StatefulWidget {
 
   /// Gửi QR về màn hình cha.
   final ValueChanged<String>? onQrDetected;
+  final ValueChanged<QrDetectionGeometry>? onQrDetectedDetailed;
 
   /// Chỉ thông báo trạng thái để màn hình cha cập nhật UI.
   /// CameraPreviewBoxState vẫn là nguồn trạng thái thật duy nhất.
@@ -66,6 +83,9 @@ class CameraPreviewBox extends StatefulWidget {
   /// và cho badge QR dùng hết chiều ngang. true (mặc định): giữ nguyên hành
   /// vi cũ của mọi màn hình khác.
   final bool showQrNumber;
+  final bool enableQrLockAnimation;
+  final bool enablePowerControl;
+  final bool useSwitchPowerControl;
 
   const CameraPreviewBox({
     super.key,
@@ -77,10 +97,14 @@ class CameraPreviewBox extends StatefulWidget {
     this.wsUrl,
     required this.patrolGroup,
     this.onQrDetected,
+    this.onQrDetectedDetailed,
     this.onCameraSleepingChanged,
     this.qrOnly = false,
     this.enableZoomControls = false,
     this.showQrNumber = true,
+    this.enableQrLockAnimation = false,
+    this.enablePowerControl = false,
+    this.useSwitchPowerControl = false,
   });
 
   @override
@@ -123,6 +147,12 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
   bool _cameraSleeping = false;
   bool _cameraStarting = false;
   bool _cameraStopping = false;
+  bool _cameraStartFailed = false;
+
+  bool _userCameraEnabled = true;
+  bool _lifecycleSuspended = false;
+  bool _powerReconciling = false;
+  StreamSubscription<html.Event>? _visibilitySub;
 
   /// Mỗi lần start/wake tạo một session mới.
   /// Khi OFF, tăng session để vô hiệu hóa getUserMedia đang chạy dở.
@@ -146,12 +176,14 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
   double _hwMinZoom = 1.0;
   double _hwMaxZoom = 1.0;
   double _hwZoom = 1.0;
+  double _desiredHwZoom = 1.0;
   double _hwScaleStartZoom = 1.0;
 
   /// Chỉ một applyConstraints chạy tại một thời điểm; giá trị mới nhất
   /// được gộp vào [_hwPendingZoom].
   bool _hwZoomApplying = false;
   double? _hwPendingZoom;
+  int _zoomOperationGeneration = 0;
 
   bool get _hwZoomVisible =>
       widget.enableZoomControls &&
@@ -162,6 +194,22 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
   bool get isCameraSleeping => _cameraSleeping;
 
   bool get isCameraStarting => _cameraStarting;
+
+  bool get _cameraShouldRun =>
+      !widget.enablePowerControl ||
+      (_userCameraEnabled && !_lifecycleSuspended);
+
+  CameraPowerState get cameraPowerState {
+    if (_cameraStarting) return CameraPowerState.starting;
+    if (_cameraStopping) return CameraPowerState.stopping;
+    if (_cameraStartFailed && _userCameraEnabled && !_lifecycleSuspended) {
+      return CameraPowerState.error;
+    }
+    if (!_cameraSleeping && _stream != null && _video != null) {
+      return CameraPowerState.on;
+    }
+    return CameraPowerState.off;
+  }
 
   void _setCameraSleeping(bool value, {bool notifyParent = true}) {
     final changed = _cameraSleeping != value;
@@ -200,6 +248,11 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
   /// QR raw gần nhất, dùng chống callback lặp liên tục.
   String? _lastDetectedQr;
   DateTime? _lastDetectedQrAt;
+  QrDetectionGeometry? _latestQrGeometry;
+  DateTime? _latestQrGeometryAt;
+  late final AnimationController _qrLockController;
+  final ValueNotifier<_QrLockData?> _qrLockNotifier =
+      ValueNotifier<_QrLockData?>(null);
 
   // =========================
   // Capture
@@ -260,9 +313,27 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
       vsync: this,
       duration: const Duration(milliseconds: 200),
     );
+    _qrLockController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 700),
+    );
 
     _bindQrListeners();
-    _startCamera();
+    if (widget.enablePowerControl) {
+      _lifecycleSuspended = html.document.hidden == true;
+      _visibilitySub = html.document.onVisibilityChange.listen((_) {
+        final hidden = html.document.hidden == true;
+        if (_lifecycleSuspended == hidden) return;
+        _lifecycleSuspended = hidden;
+        if (hidden) _invalidateActiveCameraSession();
+        _reconcileCameraPower();
+      });
+    }
+    if (_cameraShouldRun) {
+      _startCamera();
+    } else {
+      _setCameraSleeping(true, notifyParent: false);
+    }
     _loadStt();
     _connectSocket();
   }
@@ -306,6 +377,11 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
     _qrStatusSub = null;
     _qrScanning = false;
 
+    try {
+      _visibilitySub?.cancel();
+    } catch (_) {}
+    _visibilitySub = null;
+
     _stopCamera();
 
     try {
@@ -313,6 +389,8 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
     } catch (_) {}
 
     _flashController.dispose();
+    _qrLockController.dispose();
+    _qrLockNotifier.dispose();
     _patrolQrNotifier.dispose();
     _showQrGuideNotifier.dispose();
     _qrWarningStateNotifier.dispose();
@@ -332,8 +410,109 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
   }
 
   /// Tắt camera thật trên Web nhưng giữ state widget, ảnh đã chụp và QR Patrol.
+  void _invalidateActiveCameraSession() {
+    _cameraSession++;
+    _qrScanning = false;
+    _qrLoading = false;
+    try {
+      stopQrLoop();
+    } catch (_) {}
+  }
+
+  void _clearCameraSessionUi() {
+    _lastDetectedQr = null;
+    _lastDetectedQrAt = null;
+    _latestQrGeometry = null;
+    _latestQrGeometryAt = null;
+    _patrolQrNotifier.value = null;
+    _showQrGuideNotifier.value = true;
+    _qrLockController.stop();
+    _qrLockController.reset();
+    _qrLockNotifier.value = null;
+    _hideQrWarning();
+  }
+
+  Future<void> suspendCamera() async {
+    if (!widget.enablePowerControl) {
+      await sleepCamera();
+      return;
+    }
+    _userCameraEnabled = false;
+    _cameraStartFailed = false;
+    _invalidateActiveCameraSession();
+    if (mounted) setState(() {});
+    await _reconcileCameraPower();
+  }
+
+  Future<bool> resumeCamera() async {
+    if (!widget.enablePowerControl) return wakeCamera();
+    _userCameraEnabled = true;
+    _cameraStartFailed = false;
+    if (mounted) setState(() {});
+    await _reconcileCameraPower();
+    return cameraPowerState == CameraPowerState.on;
+  }
+
+  Future<void> _toggleCameraPower() async {
+    if (_userCameraEnabled) {
+      await suspendCamera();
+    } else {
+      await resumeCamera();
+    }
+  }
+
+  Future<void> _reconcileCameraPower() async {
+    if (_powerReconciling || !mounted) return;
+    _powerReconciling = true;
+    try {
+      while (mounted) {
+        if (_cameraShouldRun) {
+          if (!_cameraSleeping && _stream != null && _video != null) break;
+          if (_cameraStarting || _cameraStopping) {
+            await Future.delayed(const Duration(milliseconds: 25));
+            continue;
+          }
+          await wakeCamera();
+          if (_cameraStartFailed) break;
+        } else {
+          if (_cameraStarting) _invalidateActiveCameraSession();
+          if (_cameraStopping) {
+            await Future.delayed(const Duration(milliseconds: 25));
+            continue;
+          }
+          if (_stream == null && _video == null && !_cameraStarting) {
+            _setCameraSleeping(true);
+            if (mounted) setState(() {});
+            break;
+          }
+          await sleepCamera();
+        }
+
+        final settledOn = !_cameraSleeping && _stream != null && _video != null;
+        final settledOff = _cameraSleeping && _stream == null && _video == null;
+        if ((_cameraShouldRun && settledOn) ||
+            (!_cameraShouldRun && settledOff)) {
+          break;
+        }
+      }
+    } finally {
+      _powerReconciling = false;
+      if (mounted) setState(() {});
+      final settledOn = !_cameraSleeping && _stream != null && _video != null;
+      final settledOff = _cameraSleeping && _stream == null && _video == null;
+      if (mounted &&
+          ((_cameraShouldRun && !settledOn && !_cameraStartFailed) ||
+              (!_cameraShouldRun && !settledOff))) {
+        _reconcileCameraPower();
+      }
+    }
+  }
+
   Future<void> sleepCamera() async {
-    if (_cameraSleeping || _cameraStopping) return;
+    if (_cameraStopping) return;
+    if (_cameraSleeping && _stream == null && _video == null && !_cameraStarting) {
+      return;
+    }
 
     // Vô hiệu hóa mọi request getUserMedia đang chạy dở.
     _cameraSession++;
@@ -348,7 +527,13 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
 
     try {
       await _stopQrScan(updateUi: false);
-      _hideQrWarning();
+      _clearCameraSessionUi();
+
+      _hwZoomSupported = false;
+      _hwMinZoom = 1.0;
+      _hwMaxZoom = 1.0;
+      _hwPendingZoom = null;
+      _zoomOperationGeneration++;
 
       final oldStream = _stream;
       final oldVideo = _video;
@@ -402,6 +587,7 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
      * stream mới ngay sau khi getUserMedia trả về.
      */
     _setCameraSleeping(false);
+    _clearCameraSessionUi();
 
     if (mounted) {
       setState(() {});
@@ -434,7 +620,11 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
 
   /// Nhận QR từ camera, nhập tay hoặc ảnh upload.
   /// Hàm này không gọi setState nên không rebuild toàn bộ camera.
-  void _acceptDetectedQr(String rawQr, {bool haptic = true}) {
+  void _acceptDetectedQr(
+    String rawQr, {
+    bool haptic = true,
+    QrDetectionGeometry? geometry,
+  }) {
     if (!mounted) return;
 
     final qr = rawQr.trim();
@@ -496,12 +686,34 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
     }
 
     try {
+      if (geometry != null) {
+        widget.onQrDetectedDetailed?.call(geometry);
+      }
       widget.onQrDetected?.call(qr);
     } catch (error, stackTrace) {
       debugPrint('onQrDetected callback error: $error');
 
       debugPrintStack(stackTrace: stackTrace);
     }
+  }
+
+  /// Called by Fixed Asset only after its validation accepts this raw QR.
+  /// The backend pipeline is not awaited by this visual-only method.
+  void showAcceptedQrLock(String rawQr, String machineCode) {
+    if (!mounted || !widget.enableQrLockAnimation) return;
+    final normalized = rawQr.trim();
+    final geometry = _latestQrGeometry;
+    final isFreshMatch = geometry != null &&
+        geometry.value == normalized &&
+        _latestQrGeometryAt != null &&
+        DateTime.now().difference(_latestQrGeometryAt!) <
+            const Duration(seconds: 2);
+
+    _qrLockNotifier.value = _QrLockData(
+      label: machineCode.trim(),
+      geometry: isFreshMatch ? geometry : null,
+    );
+    _qrLockController.forward(from: 0);
   }
 
   // =========================
@@ -572,8 +784,10 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
 
   Future<void> _startCamera() async {
     if (_cameraStopping || _cameraStarting) return;
+    if (!_cameraShouldRun) return;
 
     _cameraStarting = true;
+    _cameraStartFailed = false;
     final session = ++_cameraSession;
 
     _hideQrWarning();
@@ -650,6 +864,7 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
       });
 
       _setCameraSleeping(false);
+      _cameraStartFailed = false;
 
       try {
         await createdVideo.play();
@@ -702,6 +917,8 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
       _stopStream(createdStream);
 
       if (!mounted || session != _cameraSession) return;
+
+      _cameraStartFailed = true;
 
       setState(() {
         _stream = null;
@@ -779,6 +996,9 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
 
   void _stopCamera() {
     _cameraSession++;
+    _zoomOperationGeneration++;
+    _hwPendingZoom = null;
+    _hwZoomSupported = false;
 
     final oldStream = _stream;
     final oldVideo = _video;
@@ -999,8 +1219,70 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
     }
 
     debugPrint('QR detected from camera: $text');
+    final geometry = _geometryFromJsDetail(text, detail);
+    if (geometry != null) {
+      _latestQrGeometry = geometry;
+      _latestQrGeometryAt = DateTime.now();
+    }
 
-    _acceptDetectedQr(text);
+    _acceptDetectedQr(text, geometry: geometry);
+  }
+
+  QrDetectionGeometry? _geometryFromJsDetail(
+    String text,
+    Map<String, dynamic> detail,
+  ) {
+    double number(String key) =>
+        double.tryParse(detail[key]?.toString() ?? '') ?? 0;
+
+    final sourceWidth = number('sourceWidth');
+    final sourceHeight = number('sourceHeight');
+    final cropX = number('cropX');
+    final cropY = number('cropY');
+    final cropWidth = number('cropWidth');
+    final cropHeight = number('cropHeight');
+    final analysisWidth = number('analysisWidth');
+    final analysisHeight = number('analysisHeight');
+    final rawCorners = detail['corners'];
+
+    if (sourceWidth <= 0 ||
+        sourceHeight <= 0 ||
+        cropWidth <= 0 ||
+        cropHeight <= 0 ||
+        analysisWidth <= 0 ||
+        analysisHeight <= 0 ||
+        rawCorners is! List ||
+        rawCorners.length < 3) {
+      return null;
+    }
+
+    final corners = <Offset>[];
+    for (final raw in rawCorners.take(4)) {
+      if (raw is! Map) continue;
+      final x = double.tryParse(raw['x']?.toString() ?? '');
+      final y = double.tryParse(raw['y']?.toString() ?? '');
+      if (x == null || y == null) continue;
+      corners.add(Offset(
+        cropX + x * cropWidth / analysisWidth,
+        cropY + y * cropHeight / analysisHeight,
+      ));
+    }
+    if (corners.length < 3) return null;
+    if (corners.length == 3) {
+      // ZXing QRCodeReader commonly returns bottom-left, top-left, top-right.
+      corners.add(corners[0] + corners[2] - corners[1]);
+      final ordered = <Offset>[corners[1], corners[2], corners[3], corners[0]];
+      corners
+        ..clear()
+        ..addAll(ordered);
+    }
+
+    return QrDetectionGeometry(
+      value: text,
+      corners: List<Offset>.unmodifiable(corners),
+      sourceWidth: sourceWidth,
+      sourceHeight: sourceHeight,
+    );
   }
 
   // =========================
@@ -1495,7 +1777,7 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
     if (!supported) return;
 
     // Phiên camera mới bắt đầu ở 1x (hoặc giá trị hợp lệ gần nhất).
-    final initialZoom = 1.0.clamp(minZoom, maxZoom).toDouble();
+    final initialZoom = _desiredHwZoom.clamp(minZoom, maxZoom).toDouble();
     if ((initialZoom - currentZoom).abs() >= 0.001) {
       _setHardwareZoom(initialZoom);
     }
@@ -1507,6 +1789,7 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
     if (!_hwZoomSupported) return;
 
     final target = requested.clamp(_hwMinZoom, _hwMaxZoom).toDouble();
+    _desiredHwZoom = target;
     if (mounted && (target - _hwZoom).abs() >= 0.001) {
       setState(() => _hwZoom = target);
     }
@@ -1514,14 +1797,16 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
     _hwPendingZoom = target;
     if (_hwZoomApplying) return;
 
+    final operationGeneration = _zoomOperationGeneration;
     _hwZoomApplying = true;
     try {
       while (_hwPendingZoom != null) {
+        if (operationGeneration != _zoomOperationGeneration) break;
         final value = _hwPendingZoom!;
         _hwPendingZoom = null;
 
         final track = _currentVideoTrack();
-        if (!mounted || track == null) break;
+        if (!mounted || track == null || _cameraSleeping) break;
 
         final constraints = js_util.jsify({
           'advanced': [
@@ -1535,8 +1820,16 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
     } catch (error) {
       debugPrint('Camera zoom apply failed: $error');
     } finally {
+      final restartForNewTrack =
+          operationGeneration != _zoomOperationGeneration &&
+          mounted &&
+          _hwZoomSupported &&
+          !_cameraSleeping;
       _hwZoomApplying = false;
       _hwPendingZoom = null;
+      if (restartForNewTrack) {
+        unawaited(_setHardwareZoom(_desiredHwZoom));
+      }
     }
   }
 
@@ -1652,6 +1945,213 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
     );
   }
 
+  Widget _buildCameraUnavailableView() {
+    final state = cameraPowerState;
+    if (state == CameraPowerState.starting || state == CameraPowerState.stopping) {
+      return Container(
+        color: const Color(0xFF111827),
+        alignment: Alignment.center,
+        child: const SizedBox(
+          width: 26,
+          height: 26,
+          child: CircularProgressIndicator(
+            strokeWidth: 2.4,
+            color: Color(0xFF4DD0E1),
+          ),
+        ),
+      );
+    }
+
+    if (!widget.enablePowerControl) {
+      return Container(
+        color: const Color(0xFF111827),
+        alignment: Alignment.center,
+        child: const Icon(
+          Icons.videocam_off_rounded,
+          color: Colors.white38,
+          size: 42,
+        ),
+      );
+    }
+
+    final failed = state == CameraPowerState.error;
+    return Container(
+      color: const Color(0xFF111827),
+      alignment: Alignment.center,
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            failed ? Icons.error_outline_rounded : Icons.videocam_off_rounded,
+            color: failed ? const Color(0xFFF59E0B) : Colors.white54,
+            size: 44,
+          ),
+          const SizedBox(height: 10),
+          Text(
+            failed ? 'Camera is unavailable' : 'Camera is off',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: _lifecycleSuspended ? null : resumeCamera,
+            icon: Icon(
+              failed ? Icons.refresh_rounded : Icons.videocam_rounded,
+              size: 18,
+            ),
+            label: Text(failed ? 'TRY AGAIN' : 'TURN ON CAMERA'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: const Color(0xFF67E8F9),
+              side: const BorderSide(color: Color(0x884DD0E1)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+          if (!failed) ...[
+            const SizedBox(height: 6),
+            const Text(
+              'Turn off the camera to save battery',
+              style: TextStyle(color: Colors.white38, fontSize: 10),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCameraPowerControl() {
+    if (widget.useSwitchPowerControl) {
+      return _buildCameraPowerSwitchControl();
+    }
+
+    final state = cameraPowerState;
+    final transitioning =
+        state == CameraPowerState.starting || state == CameraPowerState.stopping;
+    final enabled = _userCameraEnabled && state != CameraPowerState.error;
+    final color = enabled ? const Color(0xFF4DD0E1) : Colors.white54;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: transitioning ? null : _toggleCameraPower,
+        borderRadius: BorderRadius.circular(999),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: const Color(0xDD111827),
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: color.withOpacity(.55)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (transitioning)
+                const SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(strokeWidth: 1.8),
+                )
+              else
+                Icon(
+                  enabled ? Icons.videocam_rounded : Icons.videocam_off_rounded,
+                  size: 16,
+                  color: color,
+                ),
+              const SizedBox(width: 5),
+              Text(
+                enabled ? 'ON' : 'OFF',
+                style: TextStyle(
+                  color: color,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCameraPowerSwitchControl() {
+    final state = cameraPowerState;
+    final transitioning =
+        state == CameraPowerState.starting || state == CameraPowerState.stopping;
+    final enabled = _userCameraEnabled && state != CameraPowerState.error;
+    final activeColor = const Color(0xFF22B8C7);
+
+    return Semantics(
+      button: true,
+      enabled: !transitioning,
+      toggled: enabled,
+      label: 'Camera power',
+      value: enabled ? 'On' : 'Off',
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: transitioning ? null : _toggleCameraPower,
+          borderRadius: BorderRadius.circular(999),
+          child: SizedBox(
+            width: 46,
+            height: 42,
+            child: Center(
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 140),
+                width: 38,
+                height: 22,
+                padding: const EdgeInsets.all(2),
+                decoration: BoxDecoration(
+                  color: enabled ? activeColor : const Color(0xFF4B5563),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: Colors.white.withOpacity(.24)),
+                  boxShadow: enabled
+                      ? [
+                          BoxShadow(
+                            color: activeColor.withOpacity(.28),
+                            blurRadius: 8,
+                          ),
+                        ]
+                      : null,
+                ),
+                child: transitioning
+                    ? const Center(
+                        child: SizedBox(
+                          width: 12,
+                          height: 12,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 1.7,
+                            color: Colors.white,
+                          ),
+                        ),
+                      )
+                    : AnimatedAlign(
+                        duration: const Duration(milliseconds: 140),
+                        curve: Curves.easeOut,
+                        alignment: enabled
+                            ? Alignment.centerRight
+                            : Alignment.centerLeft,
+                        child: Container(
+                          width: 16,
+                          height: 16,
+                          decoration: const BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                      ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -1682,27 +2182,10 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
                                 viewType: _viewType,
                               ),
                             )
-                          : Container(
-                              color: const Color(0xFF111827),
-                              alignment: Alignment.center,
-                              child: _cameraStarting
-                                  ? const SizedBox(
-                                      width: 26,
-                                      height: 26,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2.4,
-                                        color: Color(0xFF22C55E),
-                                      ),
-                                    )
-                                  : const Icon(
-                                      Icons.videocam_off_rounded,
-                                      color: Colors.white38,
-                                      size: 42,
-                                    ),
-                            ),
+                          : _buildCameraUnavailableView(),
 
                       // Khung căn QR tĩnh: vẽ một lần, không chạy animation.
-                      Positioned.fill(
+                      if (!_cameraSleeping) Positioned.fill(
                         child: IgnorePointer(
                           child: ValueListenableBuilder<bool>(
                             valueListenable: _showQrGuideNotifier,
@@ -1719,6 +2202,31 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
                       ),
 
                       // Tint nhẹ thay cho BackdropFilter.
+                      if (widget.enableQrLockAnimation)
+                        Positioned.fill(
+                          child: IgnorePointer(
+                            child: RepaintBoundary(
+                              child: ValueListenableBuilder<_QrLockData?>(
+                                valueListenable: _qrLockNotifier,
+                                builder: (context, data, _) {
+                                  if (data == null) {
+                                    return const SizedBox.shrink();
+                                  }
+                                  return AnimatedBuilder(
+                                    animation: _qrLockController,
+                                    builder: (context, _) => CustomPaint(
+                                      painter: _QrLockPainter(
+                                        data: data,
+                                        progress: _qrLockController.value,
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                          ),
+                        ),
+
                       IgnorePointer(
                         child: DecoratedBox(
                           decoration: BoxDecoration(
@@ -1794,7 +2302,11 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
               top: 12,
               left: 12,
               // Không có badge "No.": badge QR được dùng hết chiều ngang.
-              right: widget.showQrNumber ? null : 12,
+              right: widget.showQrNumber
+                  ? null
+                  : (widget.useSwitchPowerControl
+                        ? 70
+                        : (widget.enablePowerControl ? 86 : 12)),
               child: RepaintBoundary(
                 child: ValueListenableBuilder<String?>(
                   valueListenable: _patrolQrNotifier,
@@ -1813,7 +2325,7 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
 
             if (widget.showQrNumber)
             Positioned(
-              top: 12,
+              top: widget.enablePowerControl ? 50 : 12,
               right: 12,
               child: RepaintBoundary(
                 child: Container(
@@ -1855,6 +2367,13 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
               ),
             ),
 
+            if (widget.enablePowerControl)
+              Positioned(
+                top: 12,
+                right: 12,
+                child: _buildCameraPowerControl(),
+              ),
+
             if (!widget.qrOnly) ...[
             if (!widget.enableZoomControls)
             Positioned(
@@ -1894,6 +2413,7 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
             ),
             ],
 
+            if (!widget.enablePowerControl || !_cameraSleeping)
             Positioned(
               left: 12,
               right: 12,
@@ -1943,6 +2463,135 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
       ],
     );
   }
+}
+
+class _QrLockData {
+  final String label;
+  final QrDetectionGeometry? geometry;
+
+  const _QrLockData({required this.label, required this.geometry});
+}
+
+class _QrLockPainter extends CustomPainter {
+  final _QrLockData data;
+  final double progress;
+
+  const _QrLockPainter({required this.data, required this.progress});
+
+  double _ease(double value) =>
+      Curves.easeOutCubic.transform(value.clamp(0.0, 1.0).toDouble());
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final geometry = data.geometry;
+    List<Offset> points;
+    if (geometry != null) {
+      final coverScale = math.max(
+        size.width / geometry.sourceWidth,
+        size.height / geometry.sourceHeight,
+      );
+      final dx = (size.width - geometry.sourceWidth * coverScale) / 2;
+      final dy = (size.height - geometry.sourceHeight * coverScale) / 2;
+      points = geometry.corners
+          .map((p) => Offset(dx + p.dx * coverScale, dy + p.dy * coverScale))
+          .toList(growable: false);
+    } else {
+      final side = size.shortestSide * .48;
+      final rect = Rect.fromCenter(
+        center: size.center(Offset.zero),
+        width: side,
+        height: side,
+      );
+      points = [rect.topLeft, rect.topRight, rect.bottomRight, rect.bottomLeft];
+    }
+
+    final double scale;
+    if (progress < .15) {
+      scale = .92 + .08 * _ease(progress / .15);
+    } else if (progress < .35) {
+      scale = 1 + .06 * _ease((progress - .15) / .20);
+    } else if (progress < .58) {
+      scale = 1.06 - .06 * _ease((progress - .35) / .23);
+    } else {
+      scale = 1;
+    }
+    final opacity = progress < .15
+        ? _ease(progress / .15)
+        : progress < .75
+        ? 1.0
+        : 1 - _ease((progress - .75) / .25);
+    if (opacity <= 0) return;
+
+    final center = points.reduce((a, b) => a + b) / points.length.toDouble();
+    final animated = points.map((p) => center + (p - center) * scale).toList();
+    final color = Color.lerp(
+      const Color(0xFF4DD0E1),
+      const Color(0xFF4ADE80),
+      progress.clamp(.20, .62).toDouble(),
+    )!.withOpacity(opacity);
+    final glow = Paint()
+      ..color = color.withOpacity(.28 * opacity)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 7
+      ..strokeCap = StrokeCap.round
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6);
+    final stroke = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3
+      ..strokeCap = StrokeCap.round;
+
+    for (var i = 0; i < animated.length; i++) {
+      final p = animated[i];
+      final previous = animated[(i - 1 + animated.length) % animated.length];
+      final next = animated[(i + 1) % animated.length];
+      final towardPrevious = (previous - p) / (previous - p).distance * 18;
+      final towardNext = (next - p) / (next - p).distance * 18;
+      canvas.drawLine(p, p + towardPrevious, glow);
+      canvas.drawLine(p, p + towardNext, glow);
+      canvas.drawLine(p, p + towardPrevious, stroke);
+      canvas.drawLine(p, p + towardNext, stroke);
+    }
+
+    if (data.label.isEmpty) return;
+    final painter = TextPainter(
+      text: TextSpan(
+        text: data.label,
+        style: TextStyle(
+          color: Colors.white.withOpacity(opacity),
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          letterSpacing: .4,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    final minX = animated.map((p) => p.dx).reduce(math.min);
+    final maxX = animated.map((p) => p.dx).reduce(math.max);
+    final minY = animated.map((p) => p.dy).reduce(math.min);
+    final maxY = animated.map((p) => p.dy).reduce(math.max);
+    final pill = Size(painter.width + 18, painter.height + 9);
+    final below = maxY + 9 + pill.height <= size.height - 5;
+    final left = ((minX + maxX - pill.width) / 2)
+        .clamp(5.0, size.width - pill.width - 5)
+        .toDouble();
+    final top = below ? maxY + 9 : minY - pill.height - 9;
+    final rect = Rect.fromLTWH(
+      left,
+      top.clamp(5.0, size.height - pill.height - 5).toDouble(),
+      pill.width,
+      pill.height,
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(rect, const Radius.circular(10)),
+      Paint()..color = const Color(0xDD111827).withOpacity(.86 * opacity),
+    );
+    painter.paint(canvas, Offset(rect.left + 9, rect.top + 4.5));
+  }
+
+  @override
+  bool shouldRepaint(covariant _QrLockPainter oldDelegate) =>
+      oldDelegate.progress != progress || oldDelegate.data != data;
 }
 
 class _QrWarningBanner extends StatelessWidget {

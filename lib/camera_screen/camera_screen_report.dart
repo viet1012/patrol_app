@@ -128,10 +128,6 @@ extension _CameraScreenReport on _CameraScreenState {
 
     final machine = _selectedMachine?.trim() ?? '';
 
-    final cameraState = _cameraKey.currentState;
-
-    final cameraWasSleeping = cameraState?.isCameraSleeping ?? true;
-
     final totalWatch = Stopwatch()..start();
 
     var loadingVisible = false;
@@ -159,23 +155,6 @@ extension _CameraScreenReport on _CameraScreenState {
     loadingVisible = true;
 
     try {
-      // ==========================================================
-      // CAMERA SLEEP
-      // ==========================================================
-
-      if (!cameraWasSleeping) {
-        final cameraSleepWatch = Stopwatch()..start();
-
-        await cameraState?.sleepCamera();
-
-        cameraSleepWatch.stop();
-
-        debugPrint(
-          'REPORT CAMERA SLEEP TIME: '
-          '${cameraSleepWatch.elapsedMilliseconds} ms',
-        );
-      }
-
       // ==========================================================
       // PREPARE
       // ==========================================================
@@ -423,16 +402,6 @@ extension _CameraScreenReport on _CameraScreenState {
       hideLoading();
 
       totalWatch.stop();
-
-      // ==========================================================
-      // CAMERA WAKE
-      // ==========================================================
-
-      if (!cameraWasSleeping && mounted) {
-        final cameraWakeWatch = Stopwatch()..start();
-
-        cameraWakeWatch.stop();
-      }
 
       if (mounted) {
         setState(() {

@@ -34,7 +34,7 @@ class FixedAssetLocationSection extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(12, 8, 8, 10),
+      padding: const EdgeInsets.fromLTRB(12, 4, 8, 10),
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(.06),
         borderRadius: BorderRadius.circular(14),
@@ -44,44 +44,59 @@ class FixedAssetLocationSection extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Flexible(
-                child: Text(
-                  _isAuto ? 'CURRENT LOCATION' : 'LOCATION',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(.6),
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: .8,
-                  ),
+              Expanded(
+                child: Row(
+                  mainAxisSize: MainAxisSize.max,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        _isAuto ? 'CURRENT LOCATION' : 'LOCATION',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(.6),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: .8,
+                        ),
+                      ),
+                    ),
+
+                    if (_isAuto && autoLocationMismatch) ...[
+                      const SizedBox(width: 6),
+                      Flexible(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: _amber.withOpacity(.15),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: _amber.withOpacity(.6)),
+                          ),
+                          child: const Text(
+                            'MASTER MISMATCH',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: _amber,
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: .4,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
-              if (_isAuto && autoLocationMismatch) ...[
-                const SizedBox(width: 6),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 6,
-                    vertical: 2,
-                  ),
-                  decoration: BoxDecoration(
-                    color: _amber.withOpacity(.15),
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: _amber.withOpacity(.6)),
-                  ),
-                  child: const Text(
-                    'MASTER MISMATCH',
-                    style: TextStyle(
-                      color: _amber,
-                      fontSize: 9.5,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: .4,
-                    ),
-                  ),
-                ),
-              ],
-              const Spacer(),
+
+              const SizedBox(width: 8),
+
               _buildModeToggle(),
             ],
           ),
