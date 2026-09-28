@@ -185,10 +185,11 @@
         }
       }
 
-      function dispatchCameraResult(text, error = "") {
+      function dispatchCameraResult(text, error = "", geometry = null) {
         dispatchJsonEvent("qr-from-image", {
           text: String(text || ""),
-          error: String(error || "")
+          error: String(error || ""),
+          ...(geometry || {})
         });
       }
 
@@ -351,7 +352,18 @@
         console.debug("[QR] mode =", mode);
       }
 
-      async function decodeCanvasWithNative(targetCanvas) {
+      function pointOf(point) {
+        const x = Number(point?.x ?? point?.getX?.());
+        const y = Number(point?.y ?? point?.getY?.());
+        return Number.isFinite(x) && Number.isFinite(y) ? { x, y } : null;
+      }
+
+      function pointsOf(points) {
+        const result = Array.from(points || []).map(pointOf).filter(Boolean);
+        return result.length >= 3 ? result.slice(0, 4) : [];
+      }
+
+      async function decodeCanvasWithNative(targetCanvas, withGeometry = false) {
         if (barcodeDetectorUnavailable || typeof window.BarcodeDetector !== "function") {
           barcodeDetectorUnavailable = true;
           return "";
@@ -363,14 +375,17 @@
 
           for (const barcode of barcodes || []) {
             const text = normalizeQr(barcode?.rawValue);
-            if (isValidQrText(text)) return text;
+            if (isValidQrText(text)) {
+              const corners = pointsOf(barcode?.cornerPoints);
+              return withGeometry ? { text, corners } : text;
+            }
           }
         } catch (_) {
           barcodeDetectorUnavailable = true;
           barcodeDetector = null;
         }
 
-        return "";
+        return withGeometry ? { text: "", corners: [] } : "";
       }
 
       // ============================================================
@@ -475,7 +490,8 @@
       async function decodeCanvasWithZxing(
         targetCanvas,
         tryHarder,
-        allowBrowserFallback = true
+        allowBrowserFallback = true,
+        withGeometry = false
       ) {
         const ZXingLib = getZxingLibrary();
 
@@ -521,7 +537,10 @@
             );
 
             if (isValidQrText(text)) {
-              return text;
+              const corners = pointsOf(
+                result?.resultPoints ?? result?.getResultPoints?.()
+              ).slice(0, 3);
+              return withGeometry ? { text, corners } : text;
             }
           } catch (_) {
             /*
@@ -550,19 +569,23 @@
             );
 
             if (isValidQrText(text)) {
-              return text;
+              const corners = pointsOf(
+                result?.resultPoints ?? result?.getResultPoints?.()
+              ).slice(0, 3);
+              return withGeometry ? { text, corners } : text;
             }
           } catch (_) {
             // Không tìm thấy QR trong frame là trạng thái bình thường.
           }
         }
 
-        return "";
+        return withGeometry ? { text: "", corners: [] } : "";
       }
 
       function decodeCanvasWithJsQr(
         targetCanvas,
-        inversionAttempts = "attemptBoth"
+        inversionAttempts = "attemptBoth",
+        withGeometry = false
       ) {
         if (typeof window.jsQR !== "function") {
           return "";
@@ -597,9 +620,19 @@
 
           const text = normalizeQr(result?.data);
 
-          return isValidQrText(text) ? text : "";
+          if (!isValidQrText(text)) {
+            return withGeometry ? { text: "", corners: [] } : "";
+          }
+          const location = result?.location;
+          const corners = pointsOf([
+            location?.topLeftCorner,
+            location?.topRightCorner,
+            location?.bottomRightCorner,
+            location?.bottomLeftCorner
+          ]);
+          return withGeometry ? { text, corners } : text;
         } catch (_) {
-          return "";
+          return withGeometry ? { text: "", corners: [] } : "";
         }
       }
 
@@ -889,40 +922,65 @@
           context.restore();
         }
 
-        const nativeText = await decodeCanvasWithNative(targetCanvas);
+        const nativeResult = await decodeCanvasWithNative(targetCanvas, true);
 
-        if (nativeText) {
+        if (nativeResult.text) {
           return {
-            text: nativeText,
+            ...nativeResult,
             engine: "native",
-            candidate: true
+            candidate: true,
+            sourceWidth: videoWidth,
+            sourceHeight: videoHeight,
+            cropX: crop.sx,
+            cropY: crop.sy,
+            cropWidth: crop.sw,
+            cropHeight: crop.sh,
+            analysisWidth: targetCanvas.width,
+            analysisHeight: targetCanvas.height
           };
         }
 
-        const zxingText =
+        const zxingResult =
           await decodeCanvasWithZxing(
             targetCanvas,
             mode === "hard",
-            false
+            false,
+            true
           );
 
-        if (zxingText) {
+        if (zxingResult.text) {
           return {
-            text: zxingText,
+            ...zxingResult,
             engine: "zxing",
-            candidate: true
+            candidate: true,
+            sourceWidth: videoWidth,
+            sourceHeight: videoHeight,
+            cropX: crop.sx,
+            cropY: crop.sy,
+            cropWidth: crop.sw,
+            cropHeight: crop.sh,
+            analysisWidth: targetCanvas.width,
+            analysisHeight: targetCanvas.height
           };
         }
 
-        const jsQrText = mode === "hard"
-          ? decodeCanvasWithJsQr(targetCanvas, "attemptBoth")
-          : "";
+        const jsQrResult = mode === "hard"
+          ? decodeCanvasWithJsQr(targetCanvas, "attemptBoth", true)
+          : { text: "", corners: [] };
 
-        if (jsQrText) {
+        if (jsQrResult.text) {
           return {
-            text: jsQrText,
+            ...jsQrResult,
             engine: "jsqr",
-            candidate: true
+            candidate: true,
+            sourceWidth: videoWidth,
+            sourceHeight: videoHeight,
+            cropX: crop.sx,
+            cropY: crop.sy,
+            cropWidth: crop.sw,
+            cropHeight: crop.sh,
+            analysisWidth: targetCanvas.width,
+            analysisHeight: targetCanvas.height
           };
         }
 
@@ -972,12 +1030,12 @@
         return true;
       }
 
-      function emitDetectedQr(text, engine, detectedMode) {
+      function emitDetectedQr(result, detectedMode) {
         if (emissionLocked) {
           return;
         }
 
-        const normalized = normalizeQr(text);
+        const normalized = normalizeQr(result?.text);
 
         if (!isValidQrText(normalized)) {
           return;
@@ -1006,13 +1064,23 @@
          */
         emissionLocked = true;
         try {
-          dispatchCameraResult(normalized, "");
+          dispatchCameraResult(normalized, "", {
+            corners: result?.corners || [],
+            sourceWidth: result?.sourceWidth || 0,
+            sourceHeight: result?.sourceHeight || 0,
+            cropX: result?.cropX || 0,
+            cropY: result?.cropY || 0,
+            cropWidth: result?.cropWidth || 0,
+            cropHeight: result?.cropHeight || 0,
+            analysisWidth: result?.analysisWidth || 0,
+            analysisHeight: result?.analysisHeight || 0
+          });
         } finally {
           emissionLocked = false;
         }
 
         console.info(
-          `[QR-SUCCESS] ${normalized} | engine=${engine || "unknown"} | mode=${detectedMode}`
+          `[QR-SUCCESS] ${normalized} | engine=${result?.engine || "unknown"} | mode=${detectedMode}`
         );
 
         /*
@@ -1107,7 +1175,7 @@
           }
 
           if (result.text) {
-            emitDetectedQr(result.text, result.engine, detectedMode);
+            emitDetectedQr(result, detectedMode);
           } else {
             updateCandidateState(
               Boolean(result.candidate)
