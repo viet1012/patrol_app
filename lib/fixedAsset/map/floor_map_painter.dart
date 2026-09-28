@@ -38,6 +38,7 @@ class FloorMapPainter extends CustomPainter {
 
   static const Color _normalBlue = Color(0xFF2563EB);
   static const Color _selectedBlue = Color(0xFF1D4ED8);
+  static const Color _parentRed = Color(0xFFE53935);
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -45,9 +46,9 @@ class FloorMapPainter extends CustomPainter {
       ..color = _normalBlue.withValues(alpha: 0.02)
       ..style = PaintingStyle.fill;
     final normalStroke = Paint()
-      ..color = _normalBlue.withValues(alpha: 0.70)
+      ..color = _parentRed
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.8
+      ..strokeWidth = 2.5
       ..strokeJoin = StrokeJoin.round;
     final selectedFill = Paint()
       ..color = _normalBlue.withValues(alpha: 0.10)

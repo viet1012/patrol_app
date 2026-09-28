@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import 'floor_map_data.dart';
 import 'floor_map_models.dart';
 import 'floor_map_painter.dart';
 
@@ -103,6 +104,22 @@ bool isFocusRelatedZoneCode(String code, String parentCode) {
   return code == parentCode || code.startsWith('$parentCode-');
 }
 
+/// Ray-casting point-in-polygon test in map percentage space.
+bool mapAreaContains(MapArea area, double x, double y) {
+  final points = area.points;
+  if (points.length < 3) return false;
+  var inside = false;
+  for (var i = 0, j = points.length - 1; i < points.length; j = i++) {
+    final a = points[i];
+    final b = points[j];
+    if ((a.y > y) != (b.y > y) &&
+        x < (b.x - a.x) * (y - a.y) / (b.y - a.y) + a.x) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
+
 class FloorMapWidget extends StatefulWidget {
   final FloorMapData data;
   final String? selectedParentZone;
@@ -169,6 +186,10 @@ class _FloorMapWidgetState extends State<FloorMapWidget>
   String? _visibleFocus;
   List<MapArea> _visibleAreas = const <MapArea>[];
   List<MapZone> _visibleZones = const <MapZone>[];
+  List<MapArea> _visibleChildAreas = const <MapArea>[];
+
+  /// Un-inset tap targets for [_visibleChildAreas], same focus filter.
+  List<MapArea> _visibleChildHitAreas = const <MapArea>[];
 
   /// Reused while the highlighted area is the same instance, so its cached
   /// path metric survives rebuilds.
@@ -345,6 +366,11 @@ class _FloorMapWidgetState extends State<FloorMapWidget>
         : displaySize;
     final rotationRadians =
         normalizedMapRotation(widget.data.rotationDeg) * math.pi / 180;
+    // Badges shrink on small (embedded) maps; full size from 900px up.
+    final labelReference = quarterTurn
+        ? displaySize.longestSide
+        : displaySize.width;
+    final labelScale = (labelReference / 900).clamp(0.8, 1.0).toDouble();
 
     // OverflowBox lets the swapped (quarter-turn) scene keep its true size;
     // a plain Center would clamp it to the display box and squash the image.
@@ -359,14 +385,19 @@ class _FloorMapWidgetState extends State<FloorMapWidget>
           child: SizedBox(
             width: logicalSize.width,
             height: logicalSize.height,
-            child: _buildLogicalScene(rotationRadians),
+            child: _buildLogicalScene(
+              rotationRadians,
+              logicalSize,
+              labelScale,
+            ),
           ),
         ),
       ),
     );
   }
 
-  /// Visible areas/zones; full mode returns the source lists directly.
+  /// Visible areas/zones/child areas; full mode returns the source lists
+  /// directly.
   void _syncVisibleOverlays() {
     final data = widget.data;
     final focus = widget.focusParentZone;
@@ -378,11 +409,31 @@ class _FloorMapWidgetState extends State<FloorMapWidget>
         : data.areas
               .where((area) => isFocusRelatedZoneCode(area.code, focus))
               .toList(growable: false);
-    _visibleZones = focus == null
-        ? data.zones
-        : data.zones
-              .where((zone) => isFocusRelatedZoneCode(zone.code, focus))
-              .toList(growable: false);
+    if (focus == null) {
+      _visibleZones = data.zones;
+    } else {
+      final related = data.zones
+          .where((zone) => isFocusRelatedZoneCode(zone.code, focus))
+          .toList(growable: false);
+      // A focused parent with visible children drops its own badge: the
+      // children label the area and the parent badge would sit on their
+      // shared dividers.
+      final hasChildLabel = related.any((zone) => zone.code != focus);
+      _visibleZones = hasChildLabel
+          ? related
+                .where((zone) => zone.code != focus)
+                .toList(growable: false)
+          : related;
+    }
+    _visibleChildAreas = _focusFiltered(childAreasFor(data), focus);
+    _visibleChildHitAreas = _focusFiltered(childHitAreasFor(data), focus);
+  }
+
+  static List<MapArea> _focusFiltered(List<MapArea> areas, String? focus) {
+    if (focus == null || areas.isEmpty) return areas;
+    return areas
+        .where((area) => isFocusRelatedZoneCode(area.code, focus))
+        .toList(growable: false);
   }
 
   SelectedAreaHighlightPainter _highlightPainterFor(MapArea area) {
@@ -395,10 +446,57 @@ class _FloorMapWidgetState extends State<FloorMapWidget>
     );
   }
 
-  Widget _buildLogicalScene(double rotationRadians) {
+  /// Smallest visible polygon (child or parent) containing the tap, so a
+  /// tap inside A1-1 resolves to A1-1 rather than A1. Children are tested
+  /// with their un-inset hit areas, so the drawn gap between siblings still
+  /// resolves to a child. [local] is in the unrotated logical scene, so
+  /// rotated layouts need no extra mapping.
+  void _handleSceneTap(Offset local, Size logicalSize) {
+    final onZoneTap = widget.onZoneTap;
+    if (onZoneTap == null || logicalSize.isEmpty) return;
+    final x = local.dx / logicalSize.width * 100;
+    final y = local.dy / logicalSize.height * 100;
+
+    MapArea? best;
+    var bestBoxSize = double.infinity;
+    for (final candidates in <List<MapArea>>[
+      _visibleChildHitAreas,
+      _visibleAreas,
+    ]) {
+      for (final area in candidates) {
+        if (!mapAreaContains(area, x, y)) continue;
+        var minX = double.infinity, minY = double.infinity;
+        var maxX = -double.infinity, maxY = -double.infinity;
+        for (final point in area.points) {
+          minX = math.min(minX, point.x);
+          maxX = math.max(maxX, point.x);
+          minY = math.min(minY, point.y);
+          maxY = math.max(maxY, point.y);
+        }
+        final boxSize = (maxX - minX) * (maxY - minY);
+        if (boxSize < bestBoxSize) {
+          bestBoxSize = boxSize;
+          best = area;
+        }
+      }
+    }
+
+    final code = best?.code;
+    if (code == null) return;
+    onZoneTap(
+      findZoneByCode(widget.data, code) ?? MapZone(code: code, x: x, y: y),
+    );
+  }
+
+  Widget _buildLogicalScene(
+    double rotationRadians,
+    Size logicalSize,
+    double labelScale,
+  ) {
     _syncVisibleOverlays();
     final areas = _visibleAreas;
     final zones = _visibleZones;
+    final childAreas = _visibleChildAreas;
     MapArea? highlightArea;
     if (_highlightActive) {
       for (final area in areas) {
@@ -425,11 +523,22 @@ class _FloorMapWidgetState extends State<FloorMapWidget>
             ),
           ),
         ),
+        if (childAreas.isNotEmpty)
+          Positioned.fill(
+            child: IgnorePointer(
+              child: CustomPaint(
+                painter: _ChildAreaPainter(
+                  areas: childAreas,
+                  selectedChildZone: widget.selectedChildZone,
+                ),
+              ),
+            ),
+          ),
         if (highlightArea != null)
           Positioned.fill(
             child: IgnorePointer(
               // Own layer: animation frames repaint only this segment, never
-              // the floor image, static polygons or badges.
+              // the floor image, static polygons or labels.
               child: RepaintBoundary(
                 child: CustomPaint(
                   painter: _highlightPainterFor(highlightArea),
@@ -437,213 +546,195 @@ class _FloorMapWidgetState extends State<FloorMapWidget>
               ),
             ),
           ),
-        Positioned.fill(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              return Stack(
-                clipBehavior: Clip.none,
-                children: <Widget>[
-                  for (final zone in zones)
-                    Positioned(
-                      left: constraints.maxWidth * zone.x / 100 + zone.offsetX,
-                      top: constraints.maxHeight * zone.y / 100 + zone.offsetY,
-                      child: FractionalTranslation(
-                        translation: const Offset(-0.5, -0.5),
-                        child: Transform.rotate(
-                          angle: -rotationRadians,
-                          child: _MapZoneBadge(
-                            zone: zone,
-                            isMajor: isMajorMapZone(widget.data, zone),
-                            isActive:
-                                zone.code == widget.selectedChildZone ||
-                                (widget.selectedChildZone == null &&
-                                    zone.code == widget.selectedParentZone),
-                            isRelated:
-                                widget.selectedChildZone != null &&
-                                zone.code == widget.selectedParentZone,
-                            onTap: widget.onZoneTap,
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              );
-            },
+        if (widget.onZoneTap != null)
+          Positioned.fill(
+            child: GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onTapUp: (details) =>
+                  _handleSceneTap(details.localPosition, logicalSize),
+            ),
           ),
-        ),
+        for (final zone in zones)
+          Positioned(
+            left: logicalSize.width * zone.x / 100 + zone.offsetX,
+            top: logicalSize.height * zone.y / 100 + zone.offsetY,
+            child: FractionalTranslation(
+              translation: const Offset(-0.5, -0.5),
+              child: Transform.rotate(
+                angle: -rotationRadians,
+                child: _MapZoneLabel(
+                  zone: zone,
+                  isMajor: isMajorMapZone(widget.data, zone),
+                  isActive:
+                      zone.code == widget.selectedChildZone ||
+                      (widget.selectedChildZone == null &&
+                          zone.code == widget.selectedParentZone),
+                  scale: labelScale,
+                  onTap: widget.onZoneTap,
+                ),
+              ),
+            ),
+          ),
       ],
     );
   }
 }
 
-class _MapZoneBadge extends StatefulWidget {
+/// Child sub-area outlines, drawn above the parent layer. Repaints only when
+/// the (cached) area list instance or the selected child changes.
+class _ChildAreaPainter extends CustomPainter {
+  final List<MapArea> areas;
+  final String? selectedChildZone;
+
+  const _ChildAreaPainter({required this.areas, this.selectedChildZone});
+
+  static const Color _childPurple = Color(0xFFD63AF9);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final stroke = Paint()
+      ..color = _childPurple
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.4
+      ..strokeJoin = StrokeJoin.round;
+
+    MapArea? selected;
+    for (final area in areas) {
+      if (area.points.isEmpty) continue;
+      if (area.code == selectedChildZone) {
+        // Drawn last so its outline sits above neighbours.
+        selected = area;
+        continue;
+      }
+      canvas.drawPath(mapAreaPath(area, size), stroke);
+    }
+
+    if (selected == null) return;
+    final path = mapAreaPath(selected, size);
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = _childPurple.withValues(alpha: 0.16)
+        ..style = PaintingStyle.fill,
+    );
+    canvas.drawPath(path, stroke..strokeWidth = 2.6);
+  }
+
+  @override
+  bool shouldRepaint(covariant _ChildAreaPainter oldDelegate) {
+    return !identical(oldDelegate.areas, areas) ||
+        oldDelegate.selectedChildZone != selectedChildZone;
+  }
+}
+
+/// Zone code on a compact white badge: red for parents, purple for children
+/// (matching their outlines); the selected label turns solid.
+class _MapZoneLabel extends StatelessWidget {
   final MapZone zone;
   final bool isMajor;
   final bool isActive;
-  final bool isRelated;
-
   final ValueChanged<MapZone>? onTap;
 
-  const _MapZoneBadge({
+  /// Multiplier for font size and padding (0.8–1.0, from the map size).
+  final double scale;
+
+  const _MapZoneLabel({
     required this.zone,
     required this.isMajor,
     required this.isActive,
-    required this.isRelated,
     required this.onTap,
+    this.scale = 1,
   });
 
-  @override
-  State<_MapZoneBadge> createState() => _MapZoneBadgeState();
-}
+  static const Color _parentRed = Color(0xFFE53935);
+  static const Color _childBorder = Color(0xFFD63AF9);
+  static const Color _childText = Color(0xFFC026D3);
 
-class _MapZoneBadgeState extends State<_MapZoneBadge> {
-  bool _hovered = false;
+  static const double _activeBorderWidth = 1.5;
+  static const double _minTouchHeight = 24;
+  static const Duration _transition = Duration(milliseconds: 120);
 
   @override
   Widget build(BuildContext context) {
-    const blue = Color(0xFF2563EB);
-    const selectedBlue = Color(0xFF1D4ED8);
-    const lightBlue = Color(0xFF3B82F6);
-    const paleBlue = Color(0xFFDBEAFE);
-    final selected = widget.isActive;
-    final parent = !selected && widget.isRelated;
+    final accent = isMajor ? _parentRed : _childText;
+    final borderWidth = isActive
+        ? _activeBorderWidth
+        : (isMajor ? 1.2 : 1.0);
+    // Base padding minus the extra border width, so the badge's outer size
+    // (and its centred anchor) stays the same when it becomes active.
+    final restBorderWidth = isMajor ? 1.2 : 1.0;
+    final borderDelta = borderWidth - restBorderWidth;
+    final padding = EdgeInsets.symmetric(
+      horizontal: (isMajor ? 6.0 : 4.0) * scale - borderDelta,
+      vertical: (isMajor ? 2.5 : 1.5) * scale - borderDelta,
+    );
+    final fillColor = isActive
+        ? accent
+        : Colors.white.withValues(alpha: isMajor ? 0.92 : 0.90);
 
-    // Glass badges: low-opacity fill so the drawing underneath stays
-    // visible; the border carries the emphasis and a thin text halo keeps
-    // the code readable over both light and dark parts of the map.
-    final Color fillColor;
-    final Color borderColor;
-    final double borderWidth;
-    final Color textColor;
-    final Color haloColor;
-    if (selected) {
-      // Pale-blue glass (stronger than parent/sibling) keeps the royal-blue
-      // label high-contrast while the drawing stays visible underneath.
-      fillColor = paleBlue.withValues(alpha: 0.40);
-      borderColor = selectedBlue;
-      borderWidth = 3.0;
-      textColor = selectedBlue;
-      haloColor = Colors.white;
-    } else if (parent) {
-      fillColor = paleBlue.withValues(alpha: 0.12);
-      borderColor = blue;
-      borderWidth = 2.0;
-      textColor = blue;
-      haloColor = Colors.white;
-    } else {
-      fillColor = Colors.white.withValues(alpha: 0.05);
-      borderColor = lightBlue;
-      borderWidth = widget.isMajor ? 1.8 : 1.5;
-      textColor = lightBlue;
-      haloColor = Colors.white;
-    }
-    final scale = selected ? 1.06 : (_hovered ? 1.03 : 1.0);
-
-    return Tooltip(
-      message: widget.zone.code,
-      child: MouseRegion(
-        cursor: widget.onTap == null
-            ? MouseCursor.defer
-            : SystemMouseCursors.click,
-        onEnter: (_) => setState(() => _hovered = true),
-        onExit: (_) => setState(() => _hovered = false),
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: widget.onTap == null ? null : () => widget.onTap!(widget.zone),
-          child: AnimatedScale(
-            scale: scale,
-            duration: const Duration(milliseconds: 120),
-            curve: Curves.easeOut,
-            child: _withSelectionMarks(
-              selected: selected,
-              badge: AnimatedContainer(
-                duration: const Duration(milliseconds: 120),
-                padding: EdgeInsets.symmetric(
-                  horizontal: widget.isMajor ? 8 : 6,
-                  vertical: widget.isMajor ? 4 : 3,
-                ),
-                // No box shadow: it would smear through the translucent fill.
-                decoration: BoxDecoration(
-                  color: fillColor,
-                  borderRadius: BorderRadius.circular(7),
-                  border: Border.all(color: borderColor, width: borderWidth),
-                ),
-                child: Text(
-                  widget.zone.code,
-                  maxLines: 1,
-                  style: TextStyle(
-                    color: textColor,
-                    fontSize: widget.isMajor ? 11.5 : 10,
-                    fontWeight: selected || widget.isMajor
-                        ? FontWeight.w800
-                        : FontWeight.w700,
-                    height: 1,
-                    shadows: <Shadow>[
-                      Shadow(color: haloColor, blurRadius: 2.5),
-                      Shadow(color: haloColor.withValues(alpha: 0.7)),
-                    ],
-                  ),
-                ),
-              ),
-            ),
+    final badge = AnimatedContainer(
+      duration: _transition,
+      padding: padding,
+      decoration: BoxDecoration(
+        color: fillColor,
+        borderRadius: BorderRadius.circular(isMajor ? 4 : 3),
+        border: Border.all(
+          color: isActive
+              ? Colors.white
+              : (isMajor ? _parentRed : _childBorder),
+          width: borderWidth,
+        ),
+        boxShadow: <BoxShadow>[
+          // Selected: 1px outer ring in the fill colour, drawn outside the
+          // box so layout is unchanged; separates the white border from the
+          // drawing underneath.
+          BoxShadow(
+            color: isActive ? accent : accent.withValues(alpha: 0),
+            spreadRadius: 1,
+          ),
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.18),
+            blurRadius: 2,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+      child: AnimatedDefaultTextStyle(
+        duration: _transition,
+        style: DefaultTextStyle.of(context).style.merge(
+          TextStyle(
+            color: isActive ? Colors.white : accent,
+            fontSize: (isMajor ? 12.5 : 9.5) * scale,
+            fontWeight: isActive
+                ? FontWeight.w900
+                : (isMajor ? FontWeight.w800 : FontWeight.w700),
+            height: 1,
           ),
         ),
+        child: Text(zone.code, maxLines: 1, softWrap: false),
       ),
     );
-  }
 
-  static const Color _selectionCyan = Color(0xFF22D3EE);
+    // Invisible touch area around the badge (no fill); the badge itself
+    // stays centred, so the anchor is unchanged.
+    final label = Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 3),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: _minTouchHeight),
+        child: Center(widthFactor: 1, heightFactor: 1, child: badge),
+      ),
+    );
 
-  /// Selected-only emphasis drawn outside the badge bounds (no layout
-  /// change, so size and anchor stay identical): a cyan outer ring with an
-  /// outside-only glow, plus a small corner dot. The fill stays translucent.
-  Widget _withSelectionMarks({required bool selected, required Widget badge}) {
-    if (!selected) return badge;
-    return Stack(
-      clipBehavior: Clip.none,
-      children: <Widget>[
-        badge,
-        Positioned(
-          left: -3,
-          top: -3,
-          right: -3,
-          bottom: -3,
-          child: IgnorePointer(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                  color: _selectionCyan.withValues(alpha: 0.85),
-                  width: 1.5,
-                ),
-                boxShadow: <BoxShadow>[
-                  // Outer-only blur: nothing smears under the glass fill.
-                  BoxShadow(
-                    color: _selectionCyan.withValues(alpha: 0.45),
-                    blurRadius: 5,
-                    blurStyle: BlurStyle.outer,
-                  ),
-               ],
-              ),
-            ),
-          ),
-        ),
-        Positioned(
-          top: -5,
-          right: -5,
-          child: IgnorePointer(
-            child: Container(
-              width: 8,
-              height: 8,
-              decoration: BoxDecoration(
-                color: _selectionCyan,
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 1.2),
-              ),
-            ),
-          ),
-        ),
-      ],
+    final tap = onTap;
+    if (tap == null) return IgnorePointer(child: label);
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        // Opaque so the padding counts as part of the target.
+        behavior: HitTestBehavior.opaque,
+        onTap: () => tap(zone),
+        child: label,
+      ),
     );
   }
 }

@@ -227,6 +227,8 @@ class _FixedAssetScreenState extends State<FixedAssetScreen> {
           autoLocation: c.autoLocation,
           autoUnmappedActual: c.autoUnmappedActual,
           autoLocationMismatch: c.autoLocationMismatch,
+          machineCount: c.machineCount,
+          auditedMachineCount: c.auditedMachineCount,
           onModeChanged: c.setLocationMode,
           manualSelectors: FixedAssetManualSelectors(
             selectedFac: manual.selectedFac,

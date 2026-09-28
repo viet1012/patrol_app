@@ -12,6 +12,8 @@ class FixedAssetLocationSection extends StatelessWidget {
   final FixedAssetAuditLocation? autoLocation;
   final FixedAssetUnmappedActual? autoUnmappedActual;
   final bool autoLocationMismatch;
+  final int machineCount;
+  final int auditedMachineCount;
   final Widget manualSelectors;
   final ValueChanged<FixedAssetLocationMode> onModeChanged;
 
@@ -21,6 +23,8 @@ class FixedAssetLocationSection extends StatelessWidget {
     required this.autoLocation,
     required this.autoUnmappedActual,
     required this.autoLocationMismatch,
+    required this.machineCount,
+    required this.auditedMachineCount,
     required this.manualSelectors,
     required this.onModeChanged,
   });
@@ -227,17 +231,27 @@ class FixedAssetLocationSection extends StatelessWidget {
       children: [
         Row(
           children: [
-            Expanded(child: _locationValue('Fac', location.fac)),
-            const SizedBox(width: 12),
-            Expanded(child: _locationValue('Floor', location.floor)),
+            Expanded(flex: 2, child: _locationValue('Fac', location.fac)),
+            const SizedBox(width: 8),
+            Expanded(flex: 2, child: _locationValue('Floor', location.floor)),
+            const SizedBox(width: 8),
+            Expanded(child: _locationValue('Machines', '$machineCount')),
           ],
         ),
         const SizedBox(height: 6),
         Row(
           children: [
-            Expanded(child: _locationValue('Position A', location.positionA)),
-            const SizedBox(width: 12),
-            Expanded(child: _locationValue('Position AA', location.positionAA)),
+            Expanded(
+              flex: 2,
+              child: _locationValue('Position A', location.positionA),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              flex: 2,
+              child: _locationValue('Position AA', location.positionAA),
+            ),
+            const SizedBox(width: 8),
+            Expanded(child: _locationValue('Audited', '$auditedMachineCount')),
           ],
         ),
       ],
@@ -252,6 +266,7 @@ class FixedAssetLocationSection extends StatelessWidget {
         Text(
           label,
           maxLines: 1,
+          overflow: TextOverflow.ellipsis,
           style: TextStyle(color: Colors.white.withOpacity(.5), fontSize: 11),
         ),
         Text(

@@ -143,6 +143,11 @@ class FixedAssetController extends ChangeNotifier {
 
   List<FixedAssetMachine> _machines = const <FixedAssetMachine>[];
   List<FixedAssetMachine> get machines => _machines;
+  int get machineCount => _machines.length;
+  int get auditedMachineCount => _machines.where((machine) {
+    final code = machine.machineCode.trim().toLowerCase();
+    return code.isNotEmpty && _auditedMachineCodes.contains(code);
+  }).length;
 
   bool _loadingMachines = false;
   bool get loadingMachines => _loadingMachines;

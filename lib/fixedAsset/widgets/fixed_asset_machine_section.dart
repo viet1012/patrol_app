@@ -165,53 +165,7 @@ class _FixedAssetMachineSectionState extends State<FixedAssetMachineSection> {
   }
 
   Widget _buildMachineHeader() {
-    final total = widget.machines.length;
-    final auditedAtCurrentLocation = widget.machines
-        .where(_isAuditedMachine)
-        .length;
-
-    final title = Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        const Text(
-          'Machines',
-          style: TextStyle(
-            color: Colors.white70,
-            fontSize: 12.5,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        const SizedBox(width: 6),
-        Text.rich(
-          TextSpan(
-            children: [
-              TextSpan(
-                text: '$auditedAtCurrentLocation',
-                style: const TextStyle(color: _accent),
-              ),
-              TextSpan(
-                text: ' / $total ',
-                style: const TextStyle(color: Colors.white70),
-              ),
-              TextSpan(
-                text: total == 0 ? '' : 'audited',
-                style: const TextStyle(color: _accent),
-              ),
-            ],
-          ),
-          maxLines: 1,
-          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-        ),
-      ],
-    );
-
-    return Row(
-      children: [
-        Padding(padding: const EdgeInsets.only(left: 4), child: title),
-        const SizedBox(width: 8),
-        Expanded(child: _buildMachineSearchField()),
-      ],
-    );
+    return _buildMachineSearchField();
   }
 
   Widget _buildMachineSearchField() {
