@@ -26,6 +26,22 @@ bool isMajorMapZone(FloorMapData data, MapZone zone) {
   return data.areas.any((area) => area.code == zone.code);
 }
 
+/// Bounding-box area of the [areaCode] parent polygon as a fraction of the
+/// whole map (0–1); null when the polygon is missing.
+double? floorMapAreaBoundsRatio(FloorMapData data, String? areaCode) {
+  final area = findAreaByCode(data, areaCode);
+  if (area == null || area.points.isEmpty) return null;
+  var minX = double.infinity, minY = double.infinity;
+  var maxX = -double.infinity, maxY = -double.infinity;
+  for (final point in area.points) {
+    minX = math.min(minX, point.x);
+    maxX = math.max(maxX, point.x);
+    minY = math.min(minY, point.y);
+    maxY = math.max(maxY, point.y);
+  }
+  return (maxX - minX) * (maxY - minY) / (100 * 100);
+}
+
 /// Initial viewport matrix that fits the [areaCode] polygon inside
 /// [viewport] with [padding] (fraction of the polygon bounds on each side;
 /// 0.2 makes the polygon fill roughly 70% of the limiting viewport axis).
@@ -140,16 +156,21 @@ class FloorMapWidget extends StatefulWidget {
   final double maxScale;
 
   /// Traveling edge highlight on the selected polygon. False (e.g. for
-  /// low-end devices) keeps only the static selected fill + outline.
+  /// low-end devices) keeps only the static selected outline.
   final bool enablePolygonAnimation;
 
   /// Washes the floor drawing towards white so outlines and badges stand
-  /// out (effective 0–0.8, 0 = original image). Overlays are not faded.
+  /// out (effective 0–0.8, 0 = original image). Overlays are not faded;
+  /// while focused, the selected parent polygon keeps the original drawing.
   final double imageFade;
 
   /// Extra wash outside the selected parent polygon while focused
   /// (effective 0–0.6, 0 = off). Ignored when [focusParentZone] is null.
   final double spotlightFade;
+
+  /// Auto-focus padding around the parent polygon (fraction of its bounds
+  /// per side), passed to [floorMapFocusMatrix].
+  final double focusPadding;
 
   const FloorMapWidget({
     super.key,
@@ -164,6 +185,7 @@ class FloorMapWidget extends StatefulWidget {
     this.onZoneTap,
     this.imageFade = 0.40,
     this.spotlightFade = 0.30,
+    this.focusPadding = 0.2,
   });
 
   @override
@@ -314,6 +336,7 @@ class _FloorMapWidgetState extends State<FloorMapWidget>
             widget.data,
             widget.selectedParentZone,
             viewport,
+            padding: widget.focusPadding,
             maxScale: widget.maxScale,
           );
     // Controller changes notify InteractiveViewer; defer past this build.
@@ -518,37 +541,32 @@ class _FloorMapWidgetState extends State<FloorMapWidget>
     }
     final imageFade = widget.imageFade.clamp(0.0, 0.8).toDouble();
     final spotlightFade = widget.spotlightFade.clamp(0.0, 0.6).toDouble();
-    MapArea? spotlightArea;
-    if (widget.focusParentZone != null && spotlightFade > 0) {
-      spotlightArea = findAreaByCode(widget.data, widget.selectedParentZone);
-    }
+    final focused = widget.focusParentZone != null;
+    final fadeHole = focused
+        ? findAreaByCode(widget.data, widget.selectedParentZone)
+        : null;
+    final hasFade = imageFade > 0 || (focused && spotlightFade > 0);
 
     return Stack(
       clipBehavior: Clip.none,
       fit: StackFit.expand,
       children: <Widget>[
-        // Own layers for the image and the spotlight: changing either fade
-        // repaints only that layer, never the outlines or badges above.
-        // A white srcATop wash (not Opacity) keeps the drawing bright on the
-        // dark card background.
+        // Original drawing; any wash is a separate layer above it.
         RepaintBoundary(
-          child: Image.asset(
-            widget.data.imageAsset,
-            fit: BoxFit.fill,
-            color: imageFade > 0
-                ? Colors.white.withValues(alpha: imageFade)
-                : null,
-            colorBlendMode: imageFade > 0 ? BlendMode.srcATop : null,
-          ),
+          child: Image.asset(widget.data.imageAsset, fit: BoxFit.fill),
         ),
-        if (spotlightArea != null)
+        if (hasFade)
           Positioned.fill(
             child: IgnorePointer(
+              // Own layer: changing a fade repaints only this wash, never
+              // the image, outlines or badges.
               child: RepaintBoundary(
                 child: CustomPaint(
-                  painter: _SpotlightPainter(
-                    area: spotlightArea,
-                    fade: spotlightFade,
+                  painter: _FadePainter(
+                    hole: fadeHole,
+                    imageFade: imageFade,
+                    spotlightFade: spotlightFade,
+                    focused: focused,
                   ),
                 ),
               ),
@@ -622,32 +640,51 @@ class _FloorMapWidgetState extends State<FloorMapWidget>
   }
 }
 
-/// White wash over the whole scene except the selected parent polygon
-/// (even-odd fill: scene rect + polygon), so the focused area stands out.
-class _SpotlightPainter extends CustomPainter {
-  final MapArea area;
-  final double fade;
+/// White wash over the floor drawing. Unfocused: [imageFade] everywhere.
+/// Focused: the combined wash `1 − (1 − imageFade)(1 − spotlightFade)`
+/// everywhere except [hole] (the selected parent polygon, even-odd fill),
+/// which keeps the original drawing. A white wash, not Opacity, so the
+/// dark card background never greys the drawing.
+class _FadePainter extends CustomPainter {
+  final MapArea? hole;
+  final double imageFade;
+  final double spotlightFade;
+  final bool focused;
 
-  const _SpotlightPainter({required this.area, required this.fade});
+  const _FadePainter({
+    required this.hole,
+    required this.imageFade,
+    required this.spotlightFade,
+    required this.focused,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
-    if (area.points.isEmpty) return;
+    final alpha = focused
+        ? 1 - (1 - imageFade) * (1 - spotlightFade)
+        : imageFade;
+    if (alpha <= 0) return;
     final path = Path()
       ..fillType = PathFillType.evenOdd
-      ..addRect(Offset.zero & size)
-      ..addPath(mapAreaPath(area, size), Offset.zero);
+      ..addRect(Offset.zero & size);
+    final hole = this.hole;
+    if (focused && hole != null && hole.points.isNotEmpty) {
+      path.addPath(mapAreaPath(hole, size), Offset.zero);
+    }
     canvas.drawPath(
       path,
       Paint()
-        ..color = Colors.white.withValues(alpha: fade)
+        ..color = Colors.white.withValues(alpha: alpha)
         ..style = PaintingStyle.fill,
     );
   }
 
   @override
-  bool shouldRepaint(covariant _SpotlightPainter oldDelegate) {
-    return !identical(oldDelegate.area, area) || oldDelegate.fade != fade;
+  bool shouldRepaint(covariant _FadePainter oldDelegate) {
+    return !identical(oldDelegate.hole, hole) ||
+        oldDelegate.imageFade != imageFade ||
+        oldDelegate.spotlightFade != spotlightFade ||
+        oldDelegate.focused != focused;
   }
 }
 

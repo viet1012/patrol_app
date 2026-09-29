@@ -40,6 +40,9 @@ class _FixedAssetDetectedMapState extends State<FixedAssetDetectedMap> {
 
   static const Duration _collapseDuration = Duration(milliseconds: 260);
 
+  /// Parent bounding-box / floor area below which the card auto-zooms.
+  static const double _autoZoomAreaRatio = 0.25;
+
   @override
   Widget build(BuildContext context) {
     final selection = resolveFixedAssetMapSelection(
@@ -73,6 +76,14 @@ class _FixedAssetDetectedMapState extends State<FixedAssetDetectedMap> {
         final height = math.min(heightCap, availableWidth / aspectRatio);
         final width = height * aspectRatio;
         final zoneText = selection.childZoneCode ?? selection.parentZoneCode;
+        // Small parents (bounds < 25% of the floor) start zoomed in; larger
+        // ones keep the full-card view.
+        final parentRatio = floorMapAreaBoundsRatio(
+          selection.map,
+          selection.parentZoneCode,
+        );
+        final zoomToParent =
+            parentRatio != null && parentRatio < _autoZoomAreaRatio;
 
         return Container(
           width: double.infinity,
@@ -114,6 +125,9 @@ class _FixedAssetDetectedMapState extends State<FixedAssetDetectedMap> {
                       // Embedded view shows only the resolved parent context;
                       // the expanded dialog keeps the full floor.
                       focusParentZone: selection.parentZoneCode,
+                      // Fitted once per map/parent; manual pan/zoom kept.
+                      autoFocusParent: zoomToParent,
+                      focusPadding: 0.35,
                       enableZoom: widget.enableZoom,
                       // Hidden map: stop the highlight ticker (no wasted
                       // frames); it resumes when shown again.

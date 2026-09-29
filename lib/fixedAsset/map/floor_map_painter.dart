@@ -37,7 +37,6 @@ class FloorMapPainter extends CustomPainter {
   });
 
   static const Color _normalBlue = Color(0xFF2563EB);
-  static const Color _selectedBlue = Color(0xFF1D4ED8);
   static const Color _parentRed = Color(0xFFE53935);
 
   @override
@@ -50,13 +49,18 @@ class FloorMapPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2.5
       ..strokeJoin = StrokeJoin.round;
-    final selectedFill = Paint()
-      ..color = _normalBlue.withValues(alpha: 0.10)
-      ..style = PaintingStyle.fill;
-    final selectedStroke = Paint()
-      ..color = _selectedBlue.withValues(alpha: 0.92)
+    // Selected area: no fill (the drawing inside stays crisp), a soft red
+    // glow under a heavier red outline.
+    final selectedGlow = Paint()
+      ..color = _parentRed.withValues(alpha: 0.25)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.0
+      ..strokeWidth = 6
+      ..strokeJoin = StrokeJoin.round
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3);
+    final selectedStroke = Paint()
+      ..color = _parentRed
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3
       ..strokeJoin = StrokeJoin.round
       ..strokeCap = StrokeCap.round;
 
@@ -74,7 +78,7 @@ class FloorMapPainter extends CustomPainter {
     }
 
     if (selectedPath == null) return;
-    canvas.drawPath(selectedPath, selectedFill);
+    canvas.drawPath(selectedPath, selectedGlow);
     canvas.drawPath(selectedPath, selectedStroke);
   }
 
