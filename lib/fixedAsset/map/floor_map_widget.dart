@@ -220,6 +220,10 @@ class _FloorMapWidgetState extends State<FloorMapWidget>
   List<MapZone> _visibleZones = const <MapZone>[];
   List<MapArea> _visibleChildAreas = const <MapArea>[];
 
+  /// Focused parent's zone (null in full mode); its badge is drawn last,
+  /// above its `parent-*` child badges.
+  MapZone? _visibleFocusZone;
+
   /// Un-inset tap targets for [_visibleChildAreas], same focus filter.
   List<MapArea> _visibleChildHitAreas = const <MapArea>[];
 
@@ -418,11 +422,7 @@ class _FloorMapWidgetState extends State<FloorMapWidget>
           child: SizedBox(
             width: logicalSize.width,
             height: logicalSize.height,
-            child: _buildLogicalScene(
-              rotationRadians,
-              logicalSize,
-              labelScale,
-            ),
+            child: _buildLogicalScene(rotationRadians, logicalSize, labelScale),
           ),
         ),
       ),
@@ -442,22 +442,18 @@ class _FloorMapWidgetState extends State<FloorMapWidget>
         : data.areas
               .where((area) => isFocusRelatedZoneCode(area.code, focus))
               .toList(growable: false);
-    if (focus == null) {
-      _visibleZones = data.zones;
-    } else {
-      final related = data.zones
-          .where((zone) => isFocusRelatedZoneCode(zone.code, focus))
-          .toList(growable: false);
-      // A focused parent with visible children drops its own badge: the
-      // children label the area and the parent badge would sit on their
-      // shared dividers.
-      final hasChildLabel = related.any((zone) => zone.code != focus);
-      _visibleZones = hasChildLabel
-          ? related
-                .where((zone) => zone.code != focus)
-                .toList(growable: false)
-          : related;
-    }
+    // Focused: the parent badge is kept apart (drawn last, at its zone
+    // position); _visibleZones holds only its `parent-*` children.
+    _visibleZones = focus == null
+        ? data.zones
+        : data.zones
+              .where(
+                (zone) =>
+                    zone.code != focus &&
+                    isFocusRelatedZoneCode(zone.code, focus),
+              )
+              .toList(growable: false);
+    _visibleFocusZone = focus == null ? null : findZoneByCode(data, focus);
     _visibleChildAreas = _focusFiltered(childAreasFor(data), focus);
     _visibleChildHitAreas = _focusFiltered(childHitAreasFor(data), focus);
   }
@@ -529,6 +525,7 @@ class _FloorMapWidgetState extends State<FloorMapWidget>
     _syncVisibleOverlays();
     final areas = _visibleAreas;
     final zones = _visibleZones;
+    final focusZone = _visibleFocusZone;
     final childAreas = _visibleChildAreas;
     MapArea? highlightArea;
     if (_highlightActive) {
@@ -629,6 +626,26 @@ class _FloorMapWidgetState extends State<FloorMapWidget>
                       zone.code == widget.selectedChildZone ||
                       (widget.selectedChildZone == null &&
                           zone.code == widget.selectedParentZone),
+                  scale: labelScale,
+                  onTap: widget.onZoneTap,
+                ),
+              ),
+            ),
+          ),
+        // Focused parent badge last, so it sits above child badges and
+        // outlines; solid (active) unless a child is selected.
+        if (focusZone != null)
+          Positioned(
+            left: logicalSize.width * focusZone.x / 100 + focusZone.offsetX,
+            top: logicalSize.height * focusZone.y / 100 + focusZone.offsetY,
+            child: FractionalTranslation(
+              translation: const Offset(-0.5, -0.5),
+              child: Transform.rotate(
+                angle: -rotationRadians,
+                child: _MapZoneLabel(
+                  zone: focusZone,
+                  isMajor: isMajorMapZone(widget.data, focusZone),
+                  isActive: widget.selectedChildZone == null,
                   scale: labelScale,
                   onTap: widget.onZoneTap,
                 ),
@@ -762,12 +779,13 @@ class _MapZoneLabel extends StatelessWidget {
   static const double _minTouchHeight = 24;
   static const Duration _transition = Duration(milliseconds: 120);
 
+  /// Invisible horizontal touch padding on each side of the badge.
+  static const double touchPaddingX = 3;
+
   @override
   Widget build(BuildContext context) {
     final accent = isMajor ? _parentRed : _childText;
-    final borderWidth = isActive
-        ? _activeBorderWidth
-        : (isMajor ? 1.2 : 1.0);
+    final borderWidth = isActive ? _activeBorderWidth : (isMajor ? 1.2 : 1.0);
     // Base padding minus the extra border width, so the badge's outer size
     // (and its centred anchor) stays the same when it becomes active.
     final restBorderWidth = isMajor ? 1.2 : 1.0;
@@ -796,10 +814,10 @@ class _MapZoneLabel extends StatelessWidget {
           // Selected: 1px outer ring in the fill colour, drawn outside the
           // box so layout is unchanged; separates the white border from the
           // drawing underneath.
-          BoxShadow(
-            color: isActive ? accent : accent.withValues(alpha: 0),
-            spreadRadius: 1,
-          ),
+          // BoxShadow(
+          //   color: isActive ? accent : accent.withValues(alpha: 0),
+          //   spreadRadius: 1,
+          // ),
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.18),
             blurRadius: 2,
@@ -812,7 +830,7 @@ class _MapZoneLabel extends StatelessWidget {
         style: DefaultTextStyle.of(context).style.merge(
           TextStyle(
             color: isActive ? Colors.white : accent,
-            fontSize: (isMajor ? 12.5 : 9.5) * scale,
+            fontSize: (isMajor ? 10.5 : 9.5) * scale,
             fontWeight: isActive
                 ? FontWeight.w900
                 : (isMajor ? FontWeight.w800 : FontWeight.w700),
@@ -826,7 +844,7 @@ class _MapZoneLabel extends StatelessWidget {
     // Invisible touch area around the badge (no fill); the badge itself
     // stays centred, so the anchor is unchanged.
     final label = Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 3),
+      padding: const EdgeInsets.symmetric(horizontal: touchPaddingX),
       child: ConstrainedBox(
         constraints: const BoxConstraints(minHeight: _minTouchHeight),
         child: Center(widthFactor: 1, heightFactor: 1, child: badge),
