@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 
+import '../../model/fixed_asset_zone_progress.dart';
 import 'floor_map_data.dart';
 import 'floor_map_models.dart';
 import 'floor_map_painter.dart';
@@ -179,9 +180,7 @@ enum _HighlightQuality {
 /// `--dart-define=FLOOR_MAP_HIGHLIGHT=full|lite|static`.
 /// Logging in any build mode: `--dart-define=FLOOR_MAP_DEBUG=true`.
 abstract final class _HighlightQualityGovernor {
-  static const String _override = String.fromEnvironment(
-    'FLOOR_MAP_HIGHLIGHT',
-  );
+  static const String _override = String.fromEnvironment('FLOOR_MAP_HIGHLIGHT');
   static const bool _logEnabled =
       kDebugMode || bool.fromEnvironment('FLOOR_MAP_DEBUG');
 
@@ -234,11 +233,7 @@ abstract final class _HighlightQualityGovernor {
 
   /// [owner] started or stopped animating its highlight. [reduceMotion] is
   /// the platform setting it saw (logged only).
-  static void setAnimating(
-    Object owner,
-    bool animating, {
-    bool? reduceMotion,
-  }) {
+  static void setAnimating(Object owner, bool animating, {bool? reduceMotion}) {
     if (reduceMotion != null && reduceMotion != _reduceMotion) {
       _reduceMotion = reduceMotion;
       _log('disableAnimations changed ($_state)');
@@ -374,6 +369,10 @@ class FloorMapWidget extends StatefulWidget {
   /// per side), passed to [floorMapFocusMatrix].
   final double focusPadding;
 
+  /// Audited / total machines per zone code (parents and children). Null
+  /// keeps the plain code-only badges.
+  final Map<String, ZoneProgress>? zoneProgress;
+
   /// Added to `data.rotationDeg` for display only (e.g. 90 to fit a portrait
   /// screen). Data, tap hit-testing and zones stay in the logical scene.
   final double extraRotationDeg;
@@ -398,6 +397,7 @@ class FloorMapWidget extends StatefulWidget {
     this.focusPadding = 0.2,
     this.extraRotationDeg = 0,
     this.zoomedInImageFade,
+    this.zoneProgress,
   });
 
   /// Viewer scale above which the full-floor view counts as zoomed in:
@@ -471,6 +471,15 @@ class _FloorMapWidgetState extends State<FloorMapWidget>
   /// viewport is refit only when that changes, never on ordinary rebuilds.
   String? _autoFocusKey;
 
+  /// Viewport the current auto-focus matrix was computed for. A later,
+  /// different viewport (late layout) refits once if the user has not
+  /// panned/zoomed since; otherwise the current view is only clamped.
+  Size? _autoFocusViewport;
+  bool _userAdjustedView = false;
+
+  /// Last logged display size (debug log only on change).
+  Size? _loggedDisplaySize;
+
   /// Highlight layer is shown (selection visible, animation allowed).
   bool _highlightActive = false;
 
@@ -491,13 +500,13 @@ class _FloorMapWidgetState extends State<FloorMapWidget>
   static const double _badgeScaleStep = 0.05;
 
   /// Badge layer rebuild trigger: zoom threshold or badge scale step.
-  late final Listenable _badgeLayerListenable = Listenable.merge(
-    <Listenable>[_zoomedIn, _viewerScale],
-  );
+  late final Listenable _badgeLayerListenable = Listenable.merge(<Listenable>[
+    _zoomedIn,
+    _viewerScale,
+  ]);
 
   /// Display rotation: the map's own rotation plus the extra one.
-  double get _rotationDeg =>
-      widget.data.rotationDeg + widget.extraRotationDeg;
+  double get _rotationDeg => widget.data.rotationDeg + widget.extraRotationDeg;
 
   void _onTransformChanged() {
     final scale = _transformationController.value.getMaxScaleOnAxis();
@@ -646,6 +655,7 @@ class _FloorMapWidgetState extends State<FloorMapWidget>
   // continues from the same point.
   void _onInteractionStart(ScaleStartDetails _) {
     _interacting = true;
+    _userAdjustedView = true;
     _HighlightQualityGovernor.setInteracting(this, true);
     _highlightVisibility.value = 0;
     _syncHighlight();
@@ -686,13 +696,42 @@ class _FloorMapWidgetState extends State<FloorMapWidget>
     super.dispose();
   }
 
+  void _mapLog(String message) {
+    if (kDebugMode) debugPrint('[FA-MAP] ${widget.data.id}: $message');
+  }
+
+  static bool _sameSize(Size a, Size b) =>
+      (a.width - b.width).abs() < 0.5 && (a.height - b.height).abs() < 0.5;
+
   void _maybeAutoFocus(Size viewport) {
     final key = widget.autoFocusParent
         ? '${widget.data.id}|${widget.selectedParentZone}|$_rotationDeg'
         : null;
-    if (key == _autoFocusKey) return;
-    if (key != null && (viewport.isEmpty || !viewport.isFinite)) return;
+    final validViewport = !viewport.isEmpty && viewport.isFinite;
+    final previousViewport = _autoFocusViewport;
+    final viewportChanged =
+        validViewport &&
+        previousViewport != null &&
+        !_sameSize(viewport, previousViewport);
+    if (key == _autoFocusKey && !viewportChanged) return;
+    if (key != null && !validViewport) return;
+
+    if (key == _autoFocusKey) {
+      // Same map/parent, viewport resized after the first fit (late layout).
+      _autoFocusViewport = viewport;
+      if (key == null) return; // Identity always fits any viewport.
+      if (_userAdjustedView) {
+        // Keep the user's zoom; only pull the view back over the drawing.
+        _mapLog('viewport $previousViewport -> $viewport: clamp user view');
+        _clampViewTo(viewport);
+        return;
+      }
+      _mapLog('viewport $previousViewport -> $viewport: refit auto-focus');
+    }
+
     _autoFocusKey = key;
+    _autoFocusViewport = validViewport ? viewport : null;
+    _userAdjustedView = false;
     final matrix = key == null
         ? null
         : floorMapFocusMatrix(
@@ -703,10 +742,38 @@ class _FloorMapWidgetState extends State<FloorMapWidget>
             maxScale: widget.maxScale,
             extraRotationDeg: widget.extraRotationDeg,
           );
+    if (key != null) {
+      final t = matrix?.getTranslation();
+      _mapLog(
+        'auto-focus ${widget.selectedParentZone} viewport=$viewport '
+        'aspect=${floorMapDisplayAspectRatio(widget.data, extraRotationDeg: widget.extraRotationDeg).toStringAsFixed(3)} '
+        'scale=${matrix?.getMaxScaleOnAxis().toStringAsFixed(3)} '
+        'translate=(${t?.x.toStringAsFixed(1)}, ${t?.y.toStringAsFixed(1)})',
+      );
+    }
     // Controller changes notify InteractiveViewer; defer past this build.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _transformationController.value = matrix ?? Matrix4.identity();
+    });
+  }
+
+  /// Keeps scale ≥ 1 and the translation inside [viewport − viewport·scale,
+  /// 0], so the drawing (the viewer's viewport-sized child) always covers
+  /// the view: no dark band beyond the drawing.
+  void _clampViewTo(Size viewport) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final current = _transformationController.value;
+      final scale = math.max(1.0, current.getMaxScaleOnAxis());
+      final t = current.getTranslation();
+      final tx = t.x.clamp(viewport.width - viewport.width * scale, 0.0);
+      final ty = t.y.clamp(viewport.height - viewport.height * scale, 0.0);
+      if (tx == t.x && ty == t.y && scale == current.getMaxScaleOnAxis()) {
+        return;
+      }
+      _transformationController.value = Matrix4.diagonal3Values(scale, scale, 1)
+        ..setTranslationRaw(tx.toDouble(), ty.toDouble(), 0);
     });
   }
 
@@ -730,7 +797,9 @@ class _FloorMapWidgetState extends State<FloorMapWidget>
       transformationController: _transformationController,
       minScale: 1,
       maxScale: widget.maxScale,
-      boundaryMargin: const EdgeInsets.all(80),
+      // No margin: panning never reveals the dark background beyond the
+      // drawing (the child spans the whole viewport).
+      boundaryMargin: EdgeInsets.zero,
       panEnabled: widget.enableZoom,
       scaleEnabled: widget.enableZoom,
       clipBehavior: Clip.hardEdge,
@@ -764,13 +833,21 @@ class _FloorMapWidgetState extends State<FloorMapWidget>
     final logicalSize = quarterTurn
         ? Size(displaySize.height, displaySize.width)
         : displaySize;
-    final rotationRadians =
-        normalizedMapRotation(_rotationDeg) * math.pi / 180;
+    final rotationRadians = normalizedMapRotation(_rotationDeg) * math.pi / 180;
     // Badges shrink on small (embedded) maps; full size from 900px up.
     final labelReference = quarterTurn
         ? displaySize.longestSide
         : displaySize.width;
     final labelScale = (labelReference / 900).clamp(0.8, 1.0).toDouble();
+    if (kDebugMode &&
+        (_loggedDisplaySize == null ||
+            !_sameSize(_loggedDisplaySize!, displaySize))) {
+      _loggedDisplaySize = displaySize;
+      _mapLog(
+        'displaySize=$displaySize logical=$logicalSize '
+        'rotation=${normalizedMapRotation(_rotationDeg)}',
+      );
+    }
 
     // OverflowBox lets the swapped (quarter-turn) scene keep its true size;
     // a plain Center would clamp it to the display box and squash the image.
@@ -961,8 +1038,7 @@ class _FloorMapWidgetState extends State<FloorMapWidget>
             // First frame of a newly shown map image: tells the quality
             // governor to skip the decode/upload frames that follow.
             frameBuilder: (context, child, frame, _) {
-              if (frame != null &&
-                  _shownImageAsset != widget.data.imageAsset) {
+              if (frame != null && _shownImageAsset != widget.data.imageAsset) {
                 _shownImageAsset = widget.data.imageAsset;
                 _HighlightQualityGovernor.noteMapImageShown();
               }
@@ -1012,6 +1088,9 @@ class _FloorMapWidgetState extends State<FloorMapWidget>
                     selectedChildZone: widget.selectedChildZone,
                     selectedParentZone: widget.selectedParentZone,
                     raised: !focused,
+                    // Focus: children of the focused parent tinted by
+                    // progress (repaints only this layer on change).
+                    progress: focused ? widget.zoneProgress : null,
                   ),
                 ),
               ),
@@ -1113,6 +1192,7 @@ class _FloorMapWidgetState extends State<FloorMapWidget>
                   isActive: isActive,
                   isOtherParent:
                       isMajor && zone.code != widget.selectedParentZone,
+                  progress: widget.zoneProgress?[zone.code],
                   scale: labelScale,
                   onTap: widget.onZoneTap,
                 ),
@@ -1205,18 +1285,45 @@ class _ChildAreaPainter extends CustomPainter {
   final String? selectedParentZone;
   final bool raised;
 
+  /// Tints each (non-target) child by its progress at alpha 0.09: 0%
+  /// slate, 1–99% amber, 100% green; no entry (total 0) = no tint.
+  final Map<String, ZoneProgress>? progress;
+
   const _ChildAreaPainter({
     required this.areas,
     this.selectedChildZone,
     this.selectedParentZone,
     this.raised = false,
+    this.progress,
   });
 
   static const Color _childPurple = Color(0xFFD63AF9);
   static const Color _dashGrey = Color(0xFF94A3B8);
+  static const Color _tintNone = Color(0xFF94A3B8);
+  static const Color _tintPartial = Color(0xFFF59E0B);
+  static const Color _tintDone = Color(0xFF22C55E);
+  static const double _tintAlpha = 0.09;
+
+  static Color? _tintFor(ZoneProgress? p) {
+    if (p == null || p.total <= 0) return null;
+    if (p.isDone) return _tintDone;
+    return p.audited <= 0 ? _tintNone : _tintPartial;
+  }
 
   @override
   void paint(Canvas canvas, Size size) {
+    final progress = this.progress;
+    if (progress != null) {
+      final tint = Paint()..style = PaintingStyle.fill;
+      for (final area in areas) {
+        if (area.points.isEmpty || area.code == selectedChildZone) continue;
+        final color = _tintFor(progress[area.code]);
+        if (color == null) continue;
+        tint.color = color.withValues(alpha: _tintAlpha);
+        canvas.drawPath(mapAreaPath(area, size), tint);
+      }
+    }
+
     final stroke = Paint()
       ..color = _childPurple
       ..style = PaintingStyle.stroke
@@ -1253,7 +1360,8 @@ class _ChildAreaPainter extends CustomPainter {
     return !identical(oldDelegate.areas, areas) ||
         oldDelegate.selectedChildZone != selectedChildZone ||
         oldDelegate.selectedParentZone != selectedParentZone ||
-        oldDelegate.raised != raised;
+        oldDelegate.raised != raised ||
+        !identical(oldDelegate.progress, progress);
   }
 }
 
@@ -1261,6 +1369,10 @@ class _ChildAreaPainter extends CustomPainter {
 /// select-blue with a white border and a 1px outer ring. The selected
 /// parent while one of its children is selected: white with select-blue
 /// text/border. Other parents: neutral grey. Children: purple.
+///
+/// With [progress] (total > 0) the badge also shows `audited/total` and a
+/// thin progress bar along its bottom; a finished zone (not the target)
+/// turns solid green with a leading "✓ ".
 class _MapZoneLabel extends StatelessWidget {
   final MapZone zone;
   final bool isMajor;
@@ -1269,6 +1381,9 @@ class _MapZoneLabel extends StatelessWidget {
   /// A parent other than the selected one: neutral grey style.
   final bool isOtherParent;
   final ValueChanged<MapZone>? onTap;
+
+  /// Audited / total of this zone; null (or total 0) shows the code only.
+  final ZoneProgress? progress;
 
   /// Multiplier for font size and padding (0.8–1.0, from the map size).
   final double scale;
@@ -1279,6 +1394,7 @@ class _MapZoneLabel extends StatelessWidget {
     required this.isActive,
     required this.onTap,
     this.isOtherParent = false,
+    this.progress,
     this.scale = 1,
   });
 
@@ -1286,9 +1402,14 @@ class _MapZoneLabel extends StatelessWidget {
   static const Color _otherParentBorder = Color(0xFFCBD5E1);
   static const Color _childBorder = Color(0xFFD63AF9);
   static const Color _childText = Color(0xFFC026D3);
+  static const Color _doneGreen = Color(0xFF16A34A);
+  static const Color _countText = Color(0xFF64748B);
+  static const Color _barTrack = Color(0xFFE2E8F0);
+  static const Color _barFill = Color(0xFFF59E0B);
 
   static const double _activeBorderWidth = 1.5;
   static const double _minTouchHeight = 24;
+  static const double _barHeight = 2.2;
   static const Duration _transition = Duration(milliseconds: 120);
 
   /// Invisible horizontal touch padding on each side of the badge.
@@ -1296,19 +1417,29 @@ class _MapZoneLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final otherParent = isOtherParent && !isActive;
-    final textColor = isActive
+    final progress = this.progress;
+    final hasProgress = progress != null && progress.total > 0;
+    final done = hasProgress && progress.isDone && !isActive;
+    // Solid badges (selected, or finished) use white text/bar on colour.
+    final solid = isActive || done;
+    final otherParent = isOtherParent && !isActive && !done;
+
+    final textColor = solid
         ? Colors.white
         : otherParent
         ? _otherParentText
         : (isMajor ? mapSelectColor : _childText);
     final borderColor = isActive
         ? Colors.white
+        : done
+        ? _doneGreen
         : otherParent
         ? _otherParentBorder
         : (isMajor ? mapSelectColor : _childBorder);
     final fillColor = isActive
         ? mapSelectColor
+        : done
+        ? _doneGreen
         : Colors.white.withValues(
             alpha: otherParent ? 0.95 : (isMajor ? 0.92 : 0.90),
           );
@@ -1317,10 +1448,57 @@ class _MapZoneLabel extends StatelessWidget {
     // (and its centred anchor) stays the same when it becomes active.
     final restBorderWidth = isMajor ? 1.2 : 1.0;
     final borderDelta = borderWidth - restBorderWidth;
-    final padding = EdgeInsets.symmetric(
-      horizontal: (isMajor ? 6.0 : 4.0) * scale - borderDelta,
-      vertical: (isMajor ? 2.5 : 1.5) * scale - borderDelta,
+    final verticalPadding = (isMajor ? 2.5 : 1.5) * scale - borderDelta;
+    final padding = EdgeInsets.fromLTRB(
+      (isMajor ? 6.0 : 4.0) * scale - borderDelta,
+      verticalPadding,
+      (isMajor ? 6.0 : 4.0) * scale - borderDelta,
+      // The progress bar sits close to the bottom edge.
+      hasProgress ? math.max(1.0, verticalPadding - 1) : verticalPadding,
     );
+    final codeSize = (isMajor ? 11.5 : 10.5) * scale;
+
+    Widget content = Text(
+      done ? '✓ ${zone.code}' : zone.code,
+      maxLines: 1,
+      softWrap: false,
+    );
+    if (hasProgress) {
+      content = IntrinsicWidth(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                content,
+                const SizedBox(width: 4),
+                Text(
+                  '${progress.audited}/${progress.total}',
+                  maxLines: 1,
+                  softWrap: false,
+                  style: TextStyle(
+                    color: solid
+                        ? Colors.white.withValues(alpha: 0.9)
+                        : _countText,
+                    fontSize: codeSize * 0.9,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 1.5 * scale),
+            _ProgressBar(
+              ratio: progress.ratio,
+              height: _barHeight,
+              track: solid ? Colors.white.withValues(alpha: 0.35) : _barTrack,
+              fill: solid ? Colors.white : _barFill,
+            ),
+          ],
+        ),
+      );
+    }
 
     final badge = AnimatedContainer(
       duration: _transition,
@@ -1351,14 +1529,14 @@ class _MapZoneLabel extends StatelessWidget {
         style: DefaultTextStyle.of(context).style.merge(
           TextStyle(
             color: textColor,
-            fontSize: (isMajor ? 10.5 : 9.5) * scale,
-            fontWeight: isActive
+            fontSize: codeSize,
+            fontWeight: solid
                 ? FontWeight.w900
                 : (isMajor ? FontWeight.w800 : FontWeight.w700),
             height: 1,
           ),
         ),
-        child: Text(zone.code, maxLines: 1, softWrap: false),
+        child: content,
       ),
     );
 
@@ -1383,5 +1561,64 @@ class _MapZoneLabel extends StatelessWidget {
         child: label,
       ),
     );
+  }
+}
+
+/// Thin rounded progress bar, as wide as its parent (stretched by the badge
+/// column). Painted directly: no intrinsic-size widgets, so a 0% bar never
+/// divides by zero during IntrinsicWidth layout.
+class _ProgressBar extends StatelessWidget {
+  final double ratio;
+  final double height;
+  final Color track;
+  final Color fill;
+
+  const _ProgressBar({
+    required this.ratio,
+    required this.height,
+    required this.track,
+    required this.fill,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      painter: _ProgressBarPainter(ratio: ratio, track: track, fill: fill),
+      child: SizedBox(height: height),
+    );
+  }
+}
+
+class _ProgressBarPainter extends CustomPainter {
+  final double ratio;
+  final Color track;
+  final Color fill;
+
+  const _ProgressBarPainter({
+    required this.ratio,
+    required this.track,
+    required this.fill,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final radius = Radius.circular(size.height / 2);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(Offset.zero & size, radius),
+      Paint()..color = track,
+    );
+    final width = size.width * ratio.clamp(0.0, 1.0);
+    if (width <= 0) return;
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(Rect.fromLTWH(0, 0, width, size.height), radius),
+      Paint()..color = fill,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _ProgressBarPainter oldDelegate) {
+    return oldDelegate.ratio != ratio ||
+        oldDelegate.track != track ||
+        oldDelegate.fill != fill;
   }
 }

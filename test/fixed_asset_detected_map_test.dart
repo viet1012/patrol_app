@@ -15,13 +15,17 @@ void main() {
     return tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
-          body: SizedBox(
-            width: width,
-            child: FixedAssetDetectedMap(
-              fac: fac,
-              floor: floor,
-              positionA: positionA,
-              positionAA: positionAA,
+          // Scrollable like the real screen: the card is full width and as
+          // tall as the floor's aspect needs (e.g. Warehouse ~1.18:1).
+          body: SingleChildScrollView(
+            child: SizedBox(
+              width: width,
+              child: FixedAssetDetectedMap(
+                fac: fac,
+                floor: floor,
+                positionA: positionA,
+                positionAA: positionAA,
+              ),
             ),
           ),
         ),

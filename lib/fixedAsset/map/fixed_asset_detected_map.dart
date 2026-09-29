@@ -1,7 +1,9 @@
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 
+import '../../model/fixed_asset_zone_progress.dart';
 import 'floor_map_data.dart';
 import 'floor_map_models.dart';
 import 'floor_map_widget.dart';
@@ -18,6 +20,12 @@ class FixedAssetDetectedMap extends StatefulWidget {
   final bool enablePolygonAnimation;
   final ValueChanged<MapZone>? onZoneTap;
 
+  /// Called when the fullscreen dialog is opened (e.g. to refresh data).
+  final VoidCallback? onExpand;
+
+  /// Audited / total per zone code of this floor. Null = code-only badges.
+  final Map<String, ZoneProgress>? zoneProgress;
+
   const FixedAssetDetectedMap({
     super.key,
     this.fac,
@@ -27,6 +35,8 @@ class FixedAssetDetectedMap extends StatefulWidget {
     this.enableZoom = true,
     this.enablePolygonAnimation = true,
     this.onZoneTap,
+    this.onExpand,
+    this.zoneProgress,
   });
 
   @override
@@ -43,6 +53,23 @@ class _FixedAssetDetectedMapState extends State<FixedAssetDetectedMap> {
   bool _expanded = false;
 
   static const Duration _collapseDuration = Duration(milliseconds: 260);
+
+  /// Latest [FixedAssetDetectedMap.zoneProgress], so an open dialog (built
+  /// once) follows reloads too.
+  late final ValueNotifier<Map<String, ZoneProgress>?> _zoneProgress =
+      ValueNotifier<Map<String, ZoneProgress>?>(widget.zoneProgress);
+
+  @override
+  void didUpdateWidget(covariant FixedAssetDetectedMap oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _zoneProgress.value = widget.zoneProgress;
+  }
+
+  @override
+  void dispose() {
+    _zoneProgress.dispose();
+    super.dispose();
+  }
 
   /// Parent bounding-box / floor area below which the card auto-zooms.
   static const double _autoZoomAreaRatio = 0.25;
@@ -64,21 +91,14 @@ class _FixedAssetDetectedMapState extends State<FixedAssetDetectedMap> {
         final cardWidth = constraints.maxWidth.isFinite
             ? constraints.maxWidth
             : viewportWidth;
-        final narrow = cardWidth < 600;
         // Edge-to-edge inside the 1 px card border; the card's own clip
         // handles the rounded corners, so no inner map padding is needed.
         const cardBorderWidth = 1.0;
-        // Mobile cap scales with screen height so tall-ish floors (e.g.
-        // Warehouse, ~1.18:1) still fit the full width on common phones.
-        final heightCap = narrow
-            ? (viewport.height * 0.42).clamp(300.0, 350.0).toDouble()
-            : 460.0;
-        // Full card width; height follows the rendered (rotated) aspect and
-        // only shrinks the width when the height cap is hit.
-        final availableWidth = math.max(0.0, cardWidth - 2 * cardBorderWidth);
+        // Always the full card width, height from the rendered (rotated)
+        // aspect: the drawing fills the card with no side bands.
+        final width = math.max(0.0, cardWidth - 2 * cardBorderWidth);
         final aspectRatio = floorMapDisplayAspectRatio(selection.map);
-        final height = math.min(heightCap, availableWidth / aspectRatio);
-        final width = height * aspectRatio;
+        final height = width / aspectRatio;
         final zoneText = selection.childZoneCode ?? selection.parentZoneCode;
         // Small parents (bounds < 25% of the floor) start zoomed in; larger
         // ones keep the full-card view.
@@ -106,6 +126,7 @@ class _FixedAssetDetectedMapState extends State<FixedAssetDetectedMap> {
               _MapHeader(
                 title: selection.map.title,
                 zoneText: zoneText,
+                progress: widget.zoneProgress?[zoneText],
                 onExpand: () => _showExpandedMap(context, selection),
                 collapsed: _collapsed,
                 onToggleCollapsed: () =>
@@ -143,6 +164,7 @@ class _FixedAssetDetectedMapState extends State<FixedAssetDetectedMap> {
                       onZoneTap: widget.onZoneTap,
                       imageFade: 0.40,
                       spotlightFade: 0.30,
+                      zoneProgress: widget.zoneProgress,
                     ),
                   ),
                 ),
@@ -159,6 +181,7 @@ class _FixedAssetDetectedMapState extends State<FixedAssetDetectedMap> {
     FixedAssetMapSelection selection,
   ) async {
     setState(() => _expanded = true);
+    widget.onExpand?.call();
     await showDialog<void>(
       context: context,
       builder: (dialogContext) {
@@ -166,6 +189,7 @@ class _FixedAssetDetectedMapState extends State<FixedAssetDetectedMap> {
           backgroundColor: const Color(0xFF121826),
           child: _ExpandedMapView(
             selection: selection,
+            zoneProgress: _zoneProgress,
             enablePolygonAnimation: widget.enablePolygonAnimation,
             onZoneTap: widget.onZoneTap,
             onClose: () => Navigator.of(dialogContext).pop(),
@@ -182,12 +206,14 @@ class _FixedAssetDetectedMapState extends State<FixedAssetDetectedMap> {
 /// "Show all" switches to the whole floor at fit-all scale.
 class _ExpandedMapView extends StatefulWidget {
   final FixedAssetMapSelection selection;
+  final ValueListenable<Map<String, ZoneProgress>?> zoneProgress;
   final bool enablePolygonAnimation;
   final ValueChanged<MapZone>? onZoneTap;
   final VoidCallback onClose;
 
   const _ExpandedMapView({
     required this.selection,
+    required this.zoneProgress,
     required this.enablePolygonAnimation,
     required this.onZoneTap,
     required this.onClose,
@@ -205,13 +231,25 @@ class _ExpandedMapViewState extends State<_ExpandedMapView> {
 
   @override
   Widget build(BuildContext context) {
+    return ValueListenableBuilder<Map<String, ZoneProgress>?>(
+      valueListenable: widget.zoneProgress,
+      builder: (context, zoneProgress, _) => _build(context, zoneProgress),
+    );
+  }
+
+  Widget _build(
+    BuildContext context,
+    Map<String, ZoneProgress>? zoneProgress,
+  ) {
     final selection = widget.selection;
+    final zoneText = selection.childZoneCode ?? selection.parentZoneCode;
     return SafeArea(
       child: Column(
         children: <Widget>[
           _MapHeader(
             title: selection.map.title,
-            zoneText: selection.childZoneCode ?? selection.parentZoneCode,
+            zoneText: zoneText,
+            progress: zoneProgress?[zoneText],
             faded: _faded,
             onToggleFaded: () => setState(() => _faded = !_faded),
             showAll: _showAll,
@@ -250,6 +288,7 @@ class _ExpandedMapViewState extends State<_ExpandedMapView> {
                       // Same orientation as the card (data rotation only);
                       // the user zooms/pans by hand.
                       extraRotationDeg: 0,
+                      zoneProgress: zoneProgress,
                     ),
                   ),
                 ),
@@ -265,6 +304,10 @@ class _ExpandedMapViewState extends State<_ExpandedMapView> {
 class _MapHeader extends StatelessWidget {
   final String title;
   final String? zoneText;
+
+  /// Progress of the target zone (selected child, else parent): shown as a
+  /// small `audited/total máy · %` line under [zoneText].
+  final ZoneProgress? progress;
   final VoidCallback? onExpand;
   final VoidCallback? onClose;
   final bool faded;
@@ -277,6 +320,7 @@ class _MapHeader extends StatelessWidget {
   const _MapHeader({
     required this.title,
     required this.zoneText,
+    this.progress,
     this.onExpand,
     this.onClose,
     this.faded = false,
@@ -326,14 +370,32 @@ class _MapHeader extends StatelessWidget {
             if (zoneText?.isNotEmpty == true)
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 6),
-                child: Text(
-                  zoneText!,
-                  maxLines: 1,
-                  style: const TextStyle(
-                    color: Color(0xFF67E8F9),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w800,
-                  ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: <Widget>[
+                    Text(
+                      zoneText!,
+                      maxLines: 1,
+                      style: const TextStyle(
+                        color: Color(0xFF67E8F9),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    if (progress != null && progress!.total > 0)
+                      Text(
+                        '${progress!.audited}/${progress!.total} máy · '
+                        '${progress!.percent}%',
+                        maxLines: 1,
+                        textAlign: TextAlign.right,
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.55),
+                          fontSize: 11,
+                          height: 1.1,
+                        ),
+                      ),
+                  ],
                 ),
               ),
             if (onToggleFaded != null)

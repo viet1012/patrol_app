@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/widgets.dart';
 
 import '../api/fixed_asset_api.dart';
@@ -5,6 +8,7 @@ import '../model/fixed_asset_audit_check_response.dart';
 import '../model/fixed_asset_audit_save_response.dart';
 import '../model/fixed_asset_audit_summary.dart';
 import '../model/fixed_asset_machine.dart';
+import '../model/fixed_asset_zone_progress.dart';
 import 'fixed_asset_audit_flow.dart';
 import 'fixed_asset_location.dart';
 import 'fixed_asset_manual_cascade.dart';
@@ -51,6 +55,7 @@ class FixedAssetController extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    _zoneRefreshTimer?.cancel();
     machineSearchController.dispose();
     super.dispose();
   }
@@ -116,9 +121,19 @@ class FixedAssetController extends ChangeNotifier {
   FixedAssetAuditLocation? _mismatchMaster;
   FixedAssetAuditLocation? get mismatchMaster => _mismatchMaster;
 
-  /// Chỉ một scan pipeline (check -> confirm -> save) chạy tại một thời điểm.
-  bool _processingScan = false;
+  /// Pipeline (check -> confirm -> save) đang chạy: scan generation của nó
+  /// và mode generation lúc bắt đầu. Chỉ một pipeline của MODE HIỆN TẠI chặn
+  /// scan mới; pipeline của mode cũ bị bỏ (kết quả đã bị generation chặn),
+  /// nên đổi mode không bao giờ để cờ "đang xử lý" kẹt sang mode mới.
+  int? _activeScan;
+  int _activeScanMode = -1;
   String? _processingRawQr;
+
+  /// Tăng mỗi lần đổi mode.
+  int _modeGeneration = 0;
+
+  bool get _pipelineBusy =>
+      _activeScan != null && _activeScanMode == _modeGeneration;
 
   /// QR camera nhìn thấy gần nhất + thời điểm. Cập nhật ở mỗi lần detect
   /// lặp, nên QR còn nằm trong khung camera luôn bị coi là "cũ".
@@ -136,6 +151,16 @@ class FixedAssetController extends ChangeNotifier {
 
   bool _isCurrentScan(int generation) =>
       !_disposed && generation == _scanGeneration;
+
+  /// Log tạm cho luồng scan (chỉ debug).
+  void _scanLog(String message) {
+    if (!kDebugMode) return;
+    debugPrint(
+      '[FA-SCAN] $message | mode=${_locationMode.name} '
+      'modeGen=$_modeGeneration scanGen=$_scanGeneration '
+      'busy=$_pipelineBusy lastSeen=$_lastSeenQr',
+    );
+  }
 
   // ============================================================
   // MACHINE LIST STATE
@@ -165,10 +190,11 @@ class FixedAssetController extends ChangeNotifier {
 
   /// MachineCode ĐÃ KIỂM KÊ TRONG KỲ HIỆN TẠI, lưu dạng trim().toLowerCase().
   ///
-  /// Chỉ thêm từ bằng chứng trong session này (audit-check alreadyAudited,
-  /// POST saved/alreadyAudited). KHÔNG dùng
-  /// /audited-machine-codes vì endpoint đó là lịch sử trọn đời, không lọc
-  /// theo kỳ 3 tháng. Không reset khi location/mode đổi.
+  /// Hai nguồn, chỉ thêm: bằng chứng trong session này (audit-check
+  /// alreadyAudited, POST saved/alreadyAudited) và `auditedInPeriod` của
+  /// GET /machines. KHÔNG dùng /audited-machine-codes vì endpoint đó là lịch
+  /// sử trọn đời, không lọc theo kỳ 3 tháng. Không reset khi location/mode
+  /// đổi; chỉ xóa khi kỳ kiểm kê đổi (period của audit-summary).
   final Set<String> _auditedMachineCodes = <String>{};
   Set<String> get auditedMachineCodes => _auditedMachineCodes;
 
@@ -214,15 +240,186 @@ class FixedAssetController extends ChangeNotifier {
     try {
       final result = await FixedAssetApi.fetchAuditSummary();
       if (_disposed || req != _summaryReq) return;
+      final previous = _auditSummary;
+      final periodChanged =
+          previous != null &&
+          (previous.periodStart != result.periodStart ||
+              previous.periodEnd != result.periodEnd);
       _auditSummary = result;
       _loadingAuditSummary = false;
-      _notify();
+      if (periodChanged) {
+        _onAuditPeriodChanged();
+      } else {
+        _notify();
+      }
     } catch (error) {
       if (_disposed || req != _summaryReq) return;
       _auditSummaryError = fixedAssetErrorText(error);
       _loadingAuditSummary = false;
       _notify();
     }
+  }
+
+  /// Kỳ kiểm kê đổi (ví dụ sang quý mới): bỏ dấu ✓ của kỳ cũ và tải lại
+  /// machine list của location hiện tại (auditedInPeriod theo kỳ mới).
+  void _onAuditPeriodChanged() {
+    _auditedMachineCodes.clear();
+    final location = activeLocation;
+    if (location == null) {
+      _notify();
+      return;
+    }
+    _machineReq++;
+    _machines = const <FixedAssetMachine>[];
+    _machineError = null;
+    _loadMachines(
+      location.fac,
+      location.floor,
+      location.positionA,
+      location.positionAA,
+    );
+  }
+
+  // ============================================================
+  // ZONE PROGRESS (số máy đã kiểm kê / tổng theo vùng, theo kỳ)
+  // ============================================================
+
+  /// "fac|floor" -> mã vùng -> tiến độ. Cache trong phiên.
+  final Map<String, Map<String, ZoneProgress>> _zoneProgressCache =
+      <String, Map<String, ZoneProgress>>{};
+
+  /// Key có dữ liệu có thể đã cũ (sau save): lần load kế tiếp gọi lại API.
+  final Set<String> _staleZoneKeys = <String>{};
+
+  /// Số thứ tự request theo key: kết quả không còn mới nhất thì bỏ.
+  final Map<String, int> _zoneReqByKey = <String, int>{};
+
+  /// Debounce reload sau save khi quét liên tục.
+  Timer? _zoneRefreshTimer;
+  static const Duration _zoneRefreshDelay = Duration(milliseconds: 800);
+
+  static String _zoneKey(String fac, String floor) =>
+      '${fac.trim()}|${floor.trim()}';
+
+  void _zoneLog(String message) {
+    if (kDebugMode) debugPrint('[FA-ZONE] $message');
+  }
+
+  Map<String, ZoneProgress>? zoneProgressFor(String fac, String floor) =>
+      _zoneProgressCache[_zoneKey(fac, floor)];
+
+  /// Tiến độ theo vùng của floor chứa [activeLocation]; null khi chưa có
+  /// location hoặc chưa tải được.
+  Map<String, ZoneProgress>? get zoneProgress {
+    final location = activeLocation;
+    if (location == null) return null;
+    return zoneProgressFor(location.fac, location.floor);
+  }
+
+  /// Tiến độ của đúng vị trí đang dùng: vùng cha không con (PositionAA rỗng
+  /// hoặc = PositionA) tra theo PositionA, còn lại theo PositionAA. Map đã
+  /// tải nhưng vùng không có dòng nào -> [ZoneProgress.empty] (hiển thị 0).
+  ZoneProgress? get activeZoneProgress {
+    final location = activeLocation;
+    final map = zoneProgress;
+    if (location == null || map == null) return null;
+    final positionA = location.positionA.trim();
+    final positionAA = location.positionAA.trim();
+    final key = positionAA.isEmpty || positionAA == positionA
+        ? positionA
+        : positionAA;
+    return map[key] ?? ZoneProgress.empty;
+  }
+
+  /// CURRENT LOCATION: số theo kỳ từ zone-progress; chưa tải / lỗi thì dùng
+  /// số cũ (machine list + audited trong phiên).
+  int get displayMachineCount => activeZoneProgress?.total ?? machineCount;
+  int get displayAuditedCount =>
+      activeZoneProgress?.audited ?? auditedMachineCount;
+
+  /// [checkMachines]: after a successful load, if the active zone reports
+  /// more audited machines than the list shows ✓ (audited elsewhere, e.g.
+  /// another device), refresh the list silently — at most once per load.
+  Future<void> loadZoneProgress(
+    String fac,
+    String floor, {
+    bool force = false,
+    bool checkMachines = true,
+  }) async {
+    if (_disposed) return;
+    final f = fac.trim();
+    final fl = floor.trim();
+    if (f.isEmpty || fl.isEmpty) return;
+
+    final key = _zoneKey(f, fl);
+    if (!force &&
+        _zoneProgressCache.containsKey(key) &&
+        !_staleZoneKeys.contains(key)) {
+      return;
+    }
+
+    final req = (_zoneReqByKey[key] ?? 0) + 1;
+    _zoneReqByKey[key] = req;
+
+    try {
+      final rows = await FixedAssetApi.fetchZoneProgress(fac: f, floor: fl);
+      if (_disposed || _zoneReqByKey[key] != req) return;
+      _zoneProgressCache[key] = buildZoneProgressMap(rows);
+      _staleZoneKeys.remove(key);
+      _zoneLog('loaded $key: ${rows.length} rows');
+      _notify();
+      if (checkMachines) _refreshMachinesIfBehind(key);
+    } catch (error) {
+      if (_disposed || _zoneReqByKey[key] != req) return;
+      // Giữ dữ liệu cũ (nếu có); không báo lỗi cho người dùng.
+      _zoneLog('load $key failed: ${fixedAssetErrorText(error)}');
+    }
+  }
+
+  /// Force tải lại (fac, floor) của [activeLocation], kèm machine list
+  /// (tải ngầm): app resume, mở dialog map, sau save (debounce).
+  Future<void> refreshZoneProgress() async {
+    final location = activeLocation;
+    if (location == null) return;
+    _refreshMachinesSilently();
+    // The list is already being refreshed: no extra mismatch refresh.
+    await loadZoneProgress(
+      location.fac,
+      location.floor,
+      force: true,
+      checkMachines: false,
+    );
+  }
+
+  /// Machines of the active list that currently show ✓.
+  int get _checkedMachineCount => _machines.where((machine) {
+    final code = machine.machineCode.trim().toLowerCase();
+    return code.isNotEmpty && _auditedMachineCodes.contains(code);
+  }).length;
+
+  /// Zone-progress [key] just loaded: if it belongs to the active location
+  /// and reports more audited machines than the list shows ✓, reload the
+  /// list silently once. No loop: a silent refresh never reloads zones.
+  void _refreshMachinesIfBehind(String key) {
+    final location = activeLocation;
+    if (location == null || _zoneKey(location.fac, location.floor) != key) {
+      return;
+    }
+    final audited = activeZoneProgress?.audited ?? 0;
+    final checked = _checkedMachineCount;
+    if (audited <= checked) return;
+    _zoneLog('zone audited $audited > list ✓ $checked: refresh machines');
+    _refreshMachinesSilently();
+  }
+
+  /// Sau save: máy được đếm theo vị trí MASTER (có thể ở floor khác), nên
+  /// đánh dấu cũ mọi key đã cache; reload floor hiện tại sau debounce.
+  void _scheduleZoneProgressRefresh() {
+    _staleZoneKeys.addAll(_zoneProgressCache.keys);
+    _zoneRefreshTimer?.cancel();
+    _zoneRefreshTimer = Timer(_zoneRefreshDelay, () {
+      if (!_disposed) refreshZoneProgress();
+    });
   }
 
   // ============================================================
@@ -256,17 +453,22 @@ class FixedAssetController extends ChangeNotifier {
 
   Future<void> processScannedQr(String rawQr) async {
     final qr = rawQr.trim();
-    if (qr.isEmpty || _disposed) return;
+    _scanLog('received "$qr"');
+    if (qr.isEmpty || _disposed) {
+      _scanLog('skip: empty or disposed');
+      return;
+    }
 
     final now = DateTime.now();
 
-    if (_processingScan) {
+    if (_pipelineBusy) {
       // Giữ QR đang xử lý ở trạng thái "cũ" để không xử lý lại sau khi xong.
       // QR khác không được ghi nhận, để lần detect sau vẫn là scan mới.
       if (qr == _processingRawQr) {
         _lastSeenQr = qr;
         _lastSeenAt = now;
       }
+      _scanLog('skip: pipeline busy (processing "$_processingRawQr")');
       return;
     }
 
@@ -282,7 +484,10 @@ class FixedAssetController extends ChangeNotifier {
     _lastSeenQr = qr;
     _lastSeenAt = now;
 
-    if (isRepeat) return;
+    if (isRepeat) {
+      _scanLog('skip: repeat within ${_repeatScanWindow.inSeconds}s');
+      return;
+    }
 
     final generation = ++_scanGeneration;
     final qrData = parseFixedAssetQr(qr);
@@ -296,6 +501,7 @@ class FixedAssetController extends ChangeNotifier {
         : null;
 
     if (invalidMessage != null) {
+      _scanLog('skip: invalid ($invalidMessage)');
       _scannedCode = machineCode;
       _scannedFaName = '';
       _mismatchMaster = null;
@@ -307,8 +513,10 @@ class FixedAssetController extends ChangeNotifier {
     }
 
     // Một pipeline duy nhất cho toàn bộ CHECK -> (CONFIRM) -> SAVE.
-    _processingScan = true;
+    _activeScan = generation;
+    _activeScanMode = _modeGeneration;
     _processingRawQr = qr;
+    _scanLog('start pipeline #$generation for $machineCode');
 
     _scannedCode = machineCode;
     _scannedFaName = qrData.displayName;
@@ -330,8 +538,13 @@ class FixedAssetController extends ChangeNotifier {
         await _runManualScan(machineCode, generation, rawQr: qr);
       }
     } finally {
-      _processingScan = false;
-      _processingRawQr = null;
+      // Chỉ pipeline này tự trả cờ: pipeline cũ (mode trước) kết thúc muộn
+      // không được xóa cờ của pipeline mới.
+      if (_activeScan == generation) {
+        _activeScan = null;
+        _processingRawQr = null;
+      }
+      _scanLog('end pipeline #$generation (current=${_isCurrentScan(generation)})');
 
       if (_isCurrentScan(generation)) {
         // Cửa sổ chống lặp tính từ lúc pipeline xong.
@@ -381,6 +594,7 @@ class FixedAssetController extends ChangeNotifier {
 
     final FixedAssetAuditCheckResponse check;
 
+    _scanLog('checkAudit → $machineCode ${qrData.floor}/${qrData.positionAA}');
     try {
       check = await FixedAssetApi.checkAudit(
         machineCode: machineCode,
@@ -388,6 +602,7 @@ class FixedAssetController extends ChangeNotifier {
         positionAA: qrData.positionAA,
       );
     } catch (error) {
+      _scanLog('checkAudit error #$generation: $error');
       _failScan(
         generation,
         fixedAssetCheckErrorMessage(
@@ -398,12 +613,17 @@ class FixedAssetController extends ChangeNotifier {
       return;
     }
 
-    if (!_isCurrentScan(generation) || !isAutoMode) return;
+    if (!_isCurrentScan(generation) || !isAutoMode) {
+      _scanLog('checkAudit result dropped: stale #$generation');
+      return;
+    }
 
     final actual = fixedAssetActualOf(check);
     final faName = check.faName.isNotEmpty ? check.faName : qrData.displayName;
+    final outcome = classifyFixedAssetAutoCheck(check, actual);
+    _scanLog('checkAudit #$generation → ${outcome.name}, actual=$actual');
 
-    switch (classifyFixedAssetAutoCheck(check, actual)) {
+    switch (outcome) {
       case FixedAssetAutoCheckOutcome.alreadyAudited:
         // 1. Trùng trong kỳ: không POST. Location card ưu tiên ACTUAL,
         //    không có thì dùng MASTER (strict).
@@ -582,6 +802,7 @@ class FixedAssetController extends ChangeNotifier {
       _autoUnmappedActual = null;
       _autoLocationMismatch = mismatchMaster != null;
     }
+    _scanLog('apply auto: status=${status.name} location=$location');
 
     if (reloadMachines) {
       _machines = const <FixedAssetMachine>[];
@@ -677,6 +898,8 @@ class FixedAssetController extends ChangeNotifier {
     FixedAssetAuditSaveResponse? response;
     Object? saveError;
 
+    _scanLog('saveAudit → $machineCode #$generation '
+        '(confirm=$confirmLocationMismatch)');
     try {
       response = await FixedAssetApi.saveAudit(
         fac: target.fac,
@@ -696,11 +919,17 @@ class FixedAssetController extends ChangeNotifier {
 
     final result = response;
     final errorText = saveError == null ? '' : fixedAssetErrorText(saveError);
+    _scanLog('saveAudit #$generation → '
+        '${result == null ? 'error: $errorText' : 'saved=${result.saved} '
+            'alreadyAudited=${result.alreadyAudited}'}');
 
     // Tiến độ MASTER đổi khi có insert mới cho machine MASTER (kể cả
     // mismatch đã xác nhận). Vẫn refresh khi scan đã stale vì record đã
     // vào backend.
-    if (isNewFixedAssetMasterAudit(result)) loadAuditSummary();
+    if (isNewFixedAssetMasterAudit(result)) {
+      loadAuditSummary();
+      _scheduleZoneProgressRefresh();
+    }
 
     // Location/mode đã đổi trong lúc save: không cập nhật status card /
     // audited set của màn hình hiện tại.
@@ -828,6 +1057,7 @@ class FixedAssetController extends ChangeNotifier {
     _machineReq++;
 
     _locationMode = mode;
+    _modeGeneration++;
     _autoLocation = null;
     _autoUnmappedActual = null;
     _autoLocationMismatch = false;
@@ -837,6 +1067,21 @@ class FixedAssetController extends ChangeNotifier {
     _machineError = null;
     _clearMachineSearch();
     _clearScanState();
+
+    // Pipeline của mode cũ không còn chặn scan mới (kết quả của nó đã bị
+    // scan generation chặn), dù request của nó chưa trả về.
+    _activeScan = null;
+    _processingRawQr = null;
+
+    // AUTO resolve vị trí từ chính QR: QR đang nằm trong khung phải được
+    // xử lý ngay, không bị coi là "lặp" của lần detect ở MANUAL / trước đó.
+    // (Sang MANUAL vẫn giữ cửa sổ chống lặp: QR trong khung không được tự
+    // lưu vào location manual vừa chọn.)
+    if (mode == FixedAssetLocationMode.auto) {
+      _lastSeenQr = null;
+      _lastSeenAt = null;
+    }
+    _scanLog('mode switched');
     _notify();
 
     // Lazy-load Fac lần đầu vào MANUAL, sau đó dùng lại cache.
@@ -933,12 +1178,88 @@ class FixedAssetController extends ChangeNotifier {
   // MACHINE LIST LOADING (AUTO + MANUAL)
   // ============================================================
 
+  /// Gộp `auditedInPeriod` của [machines] vào [_auditedMachineCodes] (chỉ
+  /// thêm). true nếu tập thay đổi.
+  bool _mergeAuditedInPeriod(List<FixedAssetMachine> machines) {
+    var changed = false;
+    for (final machine in machines) {
+      if (!machine.auditedInPeriod) continue;
+      final code = machine.machineCode.trim().toLowerCase();
+      if (code.isNotEmpty && _auditedMachineCodes.add(code)) changed = true;
+    }
+    return changed;
+  }
+
+  static bool _sameMachines(
+    List<FixedAssetMachine> a,
+    List<FixedAssetMachine> b,
+  ) {
+    if (identical(a, b)) return true;
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      final x = a[i];
+      final y = b[i];
+      if (x.machineCode != y.machineCode ||
+          x.faName != y.faName ||
+          x.auditedInPeriod != y.auditedInPeriod) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  bool _silentMachineRefreshInFlight = false;
+
+  /// Reload GET /machines for [activeLocation] without UI churn: the list
+  /// is not cleared, no loading state, search kept. Notifies only when the
+  /// list or the audited set actually changed. Errors keep the old list.
+  /// Dropped when the location changed meanwhile ([_machineReq]).
+  Future<void> _refreshMachinesSilently() async {
+    final location = activeLocation;
+    // A normal load (location change) or another silent one is running.
+    if (_disposed ||
+        location == null ||
+        _loadingMachines ||
+        _silentMachineRefreshInFlight) {
+      return;
+    }
+    final req = _machineReq;
+    _silentMachineRefreshInFlight = true;
+    try {
+      final result = await FixedAssetApi.fetchMachines(
+        fac: location.fac,
+        floor: location.floor,
+        positionA: location.positionA,
+        positionAA: location.positionAA,
+      );
+      if (_disposed || req != _machineReq) return;
+      final listChanged = !_sameMachines(_machines, result);
+      if (listChanged) _machines = result;
+      final auditedChanged = _mergeAuditedInPeriod(result);
+      final errorCleared = _machineError != null;
+      if (errorCleared) _machineError = null;
+      if (listChanged || auditedChanged || errorCleared) _notify();
+      _zoneLog(
+        'silent machines refresh: list=$listChanged audited=$auditedChanged',
+      );
+    } catch (error) {
+      if (_disposed || req != _machineReq) return;
+      _zoneLog('silent machines refresh failed: ${fixedAssetErrorText(error)}');
+    } finally {
+      _silentMachineRefreshInFlight = false;
+    }
+  }
+
   Future<void> _loadMachines(
     String fac,
     String floor,
     String positionA,
     String positionAA,
   ) async {
+    // Location mới (AUTO hoặc MANUAL): tiến độ theo vùng của floor này.
+    // Có cache nên không gọi dư.
+    loadZoneProgress(fac, floor);
+
     final req = _machineReq;
     _loadingMachines = true;
     _machineError = null;
@@ -953,6 +1274,9 @@ class FixedAssetController extends ChangeNotifier {
       );
       if (_disposed || req != _machineReq) return;
       _machines = result;
+      // Gộp nguồn theo kỳ (backend) với mã đã audit trong phiên; không xóa
+      // mã nào đã có.
+      _mergeAuditedInPeriod(result);
       _notify();
     } catch (error) {
       if (_disposed || req != _machineReq) return;

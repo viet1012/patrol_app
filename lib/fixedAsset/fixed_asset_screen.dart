@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../common/common_ui_helper.dart';
 import '../homeScreen/patrol_home_screen.dart';
+import '../model/fixed_asset_zone_progress.dart';
 import 'fixed_asset_audit_flow.dart';
 import 'fixed_asset_controller.dart';
 import 'map/fixed_asset_detected_map.dart';
@@ -38,7 +39,8 @@ class FixedAssetScreen extends StatefulWidget {
   State<FixedAssetScreen> createState() => _FixedAssetScreenState();
 }
 
-class _FixedAssetScreenState extends State<FixedAssetScreen> {
+class _FixedAssetScreenState extends State<FixedAssetScreen>
+    with WidgetsBindingObserver {
   final GlobalKey<CameraPreviewBoxState> _cameraKey =
       GlobalKey<CameraPreviewBoxState>();
 
@@ -69,12 +71,23 @@ class _FixedAssetScreenState extends State<FixedAssetScreen> {
     // AUTO là mặc định: Fac chỉ load khi chuyển sang MANUAL.
     // Summary chạy độc lập, không chặn camera.
     _controller.loadAuditSummary();
+
+    WidgetsBinding.instance.addObserver(this);
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _controller.dispose();
     super.dispose();
+  }
+
+  /// Quay lại foreground: tải lại số theo kỳ (có thể đã sang kỳ mới).
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed) return;
+    _controller.refreshZoneProgress();
+    _controller.loadAuditSummary();
   }
 
   // ============================================================
@@ -131,10 +144,17 @@ class _FixedAssetScreenState extends State<FixedAssetScreen> {
   Widget _buildDetectedMap() {
     final c = _controller;
     return FixedAssetSelector<
-      ({String? fac, String? floor, String? positionA, String? positionAA})
+      ({
+        String? fac,
+        String? floor,
+        String? positionA,
+        String? positionAA,
+        Map<String, ZoneProgress>? zoneProgress,
+      })
     >(
       listenable: c,
       select: () {
+        // zoneProgress: a new map instance per load (identity compare).
         if (c.isAutoMode) {
           final location = c.autoLocation;
           return (
@@ -142,6 +162,7 @@ class _FixedAssetScreenState extends State<FixedAssetScreen> {
             floor: location?.floor,
             positionA: location?.positionA,
             positionAA: location?.positionAA,
+            zoneProgress: c.zoneProgress,
           );
         }
         final manual = c.manual;
@@ -150,6 +171,7 @@ class _FixedAssetScreenState extends State<FixedAssetScreen> {
           floor: manual.selectedFloor,
           positionA: manual.selectedPositionA,
           positionAA: manual.selectedPositionAA,
+          zoneProgress: c.zoneProgress,
         );
       },
       builder: (context, map) {
@@ -162,6 +184,8 @@ class _FixedAssetScreenState extends State<FixedAssetScreen> {
             floor: map.floor,
             positionA: map.positionA,
             positionAA: map.positionAA,
+            onExpand: c.refreshZoneProgress,
+            zoneProgress: map.zoneProgress,
           ),
         );
       },
@@ -227,8 +251,9 @@ class _FixedAssetScreenState extends State<FixedAssetScreen> {
           autoLocation: c.autoLocation,
           autoUnmappedActual: c.autoUnmappedActual,
           autoLocationMismatch: c.autoLocationMismatch,
-          machineCount: c.machineCount,
-          auditedMachineCount: c.auditedMachineCount,
+          // Số theo kỳ từ zone-progress; chưa có thì số cũ.
+          machineCount: c.displayMachineCount,
+          auditedMachineCount: c.displayAuditedCount,
           onModeChanged: c.setLocationMode,
           manualSelectors: FixedAssetManualSelectors(
             selectedFac: manual.selectedFac,

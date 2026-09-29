@@ -6,6 +6,7 @@ import '../model/fixed_asset_audit_summary.dart';
 import '../model/fixed_asset_machine.dart';
 import '../model/fixed_asset_machine_location.dart';
 import '../model/fixed_asset_scan_info.dart';
+import '../model/fixed_asset_zone_progress.dart';
 import '../network/dio_error_handler.dart';
 import 'dio_client.dart';
 
@@ -75,6 +76,31 @@ class FixedAssetApi {
   static Future<FixedAssetAuditSummary> fetchAuditSummary() async {
     final data = await _getMapOnce('$_base/audit-summary');
     return FixedAssetAuditSummary.fromJson(data);
+  }
+
+  /// Tiến độ kiểm kê theo vùng của (fac, floor), kỳ 3 tháng hiện tại. Chỉ
+  /// vùng có total > 0; vùng cha không có con: positionAA == positionA.
+  static Future<List<FixedAssetZoneProgressRow>> fetchZoneProgress({
+    required String fac,
+    required String floor,
+  }) async {
+    try {
+      final Response res = await DioClient.get(
+        '$_base/zone-progress',
+        queryParameters: {'fac': fac, 'floor': floor},
+      );
+
+      return _extractList(res.data)
+          .whereType<Map>()
+          .map(
+            (e) => FixedAssetZoneProgressRow.fromJson(
+              Map<String, dynamic>.from(e),
+            ),
+          )
+          .toList();
+    } on DioException catch (e) {
+      throw Exception(DioErrorHandler.handle(e));
+    }
   }
 
   /// Kiểm tra trước khi save (AUTO): trạng thái kiểm kê trong kỳ, MASTER
