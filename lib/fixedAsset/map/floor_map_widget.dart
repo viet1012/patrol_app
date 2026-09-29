@@ -1,6 +1,8 @@
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 
 import 'floor_map_data.dart';
 import 'floor_map_models.dart';
@@ -146,6 +148,196 @@ bool mapAreaContains(MapArea area, double x, double y) {
   return inside;
 }
 
+/// Running-highlight quality, shared by every [FloorMapWidget] in the
+/// session (card and dialog alike).
+enum _HighlightQuality {
+  /// Running segment (trail + two-stroke halo) repainted every tick (60 fps).
+  full,
+
+  /// "Breathing" static glow: opacity-only animation, never repainted.
+  lite,
+
+  /// No animation: only the static outline + glow of [FloorMapPainter].
+  off,
+}
+
+/// Session-wide adaptive quality for the running highlight.
+///
+/// Frame timings are sampled only while some highlight is animating and no
+/// map is being panned/zoomed, and never during a grace period: the first
+/// [_startupGrace] after the session's first animation start (CanvasKit
+/// load, image decode, shader warm-up) and [_imageGrace] after each newly
+/// shown map image (map change, dialog open). The quality drops one level
+/// only when two consecutive [_window]-frame windows each have more than
+/// [_slowShare] of frames over [_slowFrame] (build or raster), at most once
+/// per [_cooldown]. Auto-degrade stops at lite (the breathing glow costs
+/// almost nothing to draw); only the override (or reduce-motion, handled
+/// by the widget) means static. Never rises again in the session.
+///
+/// Never degrades in debug builds (artificially slow); a one-line notice is
+/// printed instead. Overrides (also disable adaptation):
+/// `--dart-define=FLOOR_MAP_HIGHLIGHT=full|lite|static`.
+/// Logging in any build mode: `--dart-define=FLOOR_MAP_DEBUG=true`.
+abstract final class _HighlightQualityGovernor {
+  static const String _override = String.fromEnvironment(
+    'FLOOR_MAP_HIGHLIGHT',
+  );
+  static const bool _logEnabled =
+      kDebugMode || bool.fromEnvironment('FLOOR_MAP_DEBUG');
+
+  static final ValueNotifier<_HighlightQuality> quality =
+      ValueNotifier<_HighlightQuality>(switch (_override) {
+        'lite' => _HighlightQuality.lite,
+        'static' => _HighlightQuality.off,
+        _ => _HighlightQuality.full,
+      });
+
+  static bool get _adaptive => _override.isEmpty && !kDebugMode;
+
+  static const int _window = 60;
+  static const double _slowShare = 0.25;
+  static const Duration _slowFrame = Duration(milliseconds: 28);
+  static const int _badWindowsToDegrade = 2;
+  static const Duration _startupGrace = Duration(seconds: 3);
+  static const Duration _imageGrace = Duration(seconds: 1);
+  static const Duration _cooldown = Duration(seconds: 5);
+
+  /// Timings batches arrive late (~100 ms); frames right after a gesture
+  /// ends may still be the gesture's.
+  static const Duration _interactionTail = Duration(milliseconds: 300);
+
+  static final Stopwatch _clock = Stopwatch()..start();
+  static final Set<Object> _animating = <Object>{};
+  static final Set<Object> _interacting = <Object>{};
+  static final List<bool> _samples = <bool>[];
+  static bool _listening = false;
+  static bool _sessionStarted = false;
+  static bool _debugNoticeShown = false;
+  static bool _reduceMotion = false;
+  static Duration _ignoreUntil = Duration.zero;
+  static int _badWindows = 0;
+  static final List<int> _badWindowCounts = <int>[];
+
+  static void _log(String message) {
+    if (_logEnabled) debugPrint('FloorMap highlight: $message');
+  }
+
+  static String get _state =>
+      'level=${quality.value.name}, adaptive=$_adaptive, '
+      'disableAnimations=$_reduceMotion';
+
+  /// No samples until at least [grace] from now.
+  static void _extendIgnore(Duration grace) {
+    final until = _clock.elapsed + grace;
+    if (until > _ignoreUntil) _ignoreUntil = until;
+  }
+
+  /// [owner] started or stopped animating its highlight. [reduceMotion] is
+  /// the platform setting it saw (logged only).
+  static void setAnimating(
+    Object owner,
+    bool animating, {
+    bool? reduceMotion,
+  }) {
+    if (reduceMotion != null && reduceMotion != _reduceMotion) {
+      _reduceMotion = reduceMotion;
+      _log('disableAnimations changed ($_state)');
+    }
+    final changed = animating
+        ? _animating.add(owner)
+        : _animating.remove(owner);
+    if (animating && !_sessionStarted) {
+      _sessionStarted = true;
+      _extendIgnore(_startupGrace);
+      _log('first animation start ($_state)');
+    }
+    if (animating && kDebugMode && _override.isEmpty && !_debugNoticeShown) {
+      _debugNoticeShown = true;
+      debugPrint('FloorMap highlight: auto-degrade disabled in debug');
+    }
+    if (!changed || !_adaptive) return;
+    // Auto-degrade stops at lite: nothing left to measure there.
+    final shouldListen =
+        _animating.isNotEmpty && quality.value == _HighlightQuality.full;
+    if (shouldListen == _listening) return;
+    _listening = shouldListen;
+    if (shouldListen) {
+      _resetWindows();
+      SchedulerBinding.instance.addTimingsCallback(_onTimings);
+    } else {
+      SchedulerBinding.instance.removeTimingsCallback(_onTimings);
+    }
+  }
+
+  /// [owner] started or ended a pan/zoom gesture; its frames are skipped.
+  static void setInteracting(Object owner, bool interacting) {
+    final changed = interacting
+        ? _interacting.add(owner)
+        : _interacting.remove(owner);
+    if (!changed) return;
+    // The current window mixes gesture frames: start over after it.
+    _samples.clear();
+    if (!interacting) _extendIgnore(_interactionTail);
+  }
+
+  /// A map image was just shown for the first time in its widget (map
+  /// change, dialog open): decode/upload frames follow.
+  static void noteMapImageShown() {
+    _samples.clear();
+    _extendIgnore(_imageGrace);
+  }
+
+  static void _resetWindows() {
+    _samples.clear();
+    _badWindows = 0;
+    _badWindowCounts.clear();
+  }
+
+  static void _onTimings(List<FrameTiming> timings) {
+    if (_interacting.isNotEmpty || _clock.elapsed < _ignoreUntil) return;
+    for (final timing in timings) {
+      _samples.add(
+        timing.buildDuration > _slowFrame || timing.rasterDuration > _slowFrame,
+      );
+      if (_samples.length < _window) continue;
+      // One full window (consecutive, non-overlapping).
+      final slow = _samples.where((isSlow) => isSlow).length;
+      _samples.clear();
+      if (slow > _window * _slowShare) {
+        _badWindows++;
+        _badWindowCounts.add(slow);
+      } else {
+        _badWindows = 0;
+        _badWindowCounts.clear();
+      }
+      if (_badWindows >= _badWindowsToDegrade) {
+        _degrade();
+        return;
+      }
+    }
+  }
+
+  static void _degrade() {
+    final current = quality.value;
+    if (current != _HighlightQuality.full) return;
+    const next = _HighlightQuality.lite;
+    _log(
+      '${current.name} -> ${next.name}: $_badWindowsToDegrade consecutive '
+      'windows with ${_badWindowCounts.join(', ')}/$_window frames over '
+      '${_slowFrame.inMilliseconds} ms (disableAnimations=$_reduceMotion)',
+    );
+    _resetWindows();
+    // Lite is the floor of auto-degrade: stop sampling. The cooldown still
+    // guards any further step should the floor ever move.
+    _extendIgnore(_cooldown);
+    if (_listening) {
+      _listening = false;
+      SchedulerBinding.instance.removeTimingsCallback(_onTimings);
+    }
+    quality.value = next;
+  }
+}
+
 class FloorMapWidget extends StatefulWidget {
   final FloorMapData data;
   final String? selectedParentZone;
@@ -229,12 +421,19 @@ class _FloorMapWidgetState extends State<FloorMapWidget>
   /// Running segment opacity: 0 during pan/zoom, fades back in on release.
   late final AnimationController _highlightVisibility;
 
+  /// Lite level: breathing glow, opacity 0.35 → 1 → 0.35 every 1.6 s
+  /// (easeInOut, repeat with reverse). Opacity only: the glow layer is never
+  /// repainted by it.
+  late final AnimationController _breathController;
+  late final Animation<double> _breathOpacity;
+  static const Duration _breathHalfCycle = Duration(milliseconds: 800);
+
   static const Duration _highlightFadeIn = Duration(milliseconds: 150);
 
   /// On-screen speed of the running segment and the trip-duration bounds.
-  static const double _highlightScreenSpeed = 120;
-  static const double _highlightMinSeconds = 2;
-  static const double _highlightMaxSeconds = 6;
+  static const double _highlightScreenSpeed = 90;
+  static const double _highlightMinSeconds = 2.5;
+  static const double _highlightMaxSeconds = 7;
 
   /// Viewer-scale step at which the trip duration is recomputed.
   static const double _durationScaleStep = 0.25;
@@ -266,6 +465,7 @@ class _FloorMapWidgetState extends State<FloorMapWidget>
   /// Reused while the highlighted area is the same instance, so its cached
   /// path metric survives rebuilds.
   SelectedAreaHighlightPainter? _highlightPainter;
+  SelectedAreaGlowPainter? _glowPainter;
 
   /// `mapId|parent` last auto-focused (null = full-floor view), so the
   /// viewport is refit only when that changes, never on ordinary rebuilds.
@@ -276,6 +476,9 @@ class _FloorMapWidgetState extends State<FloorMapWidget>
 
   /// Pan/zoom gesture in progress: the highlight holds its position.
   bool _interacting = false;
+
+  /// Map image already reported as shown to the quality governor.
+  String? _shownImageAsset;
 
   /// Viewer scale is past [FloorMapWidget.zoomedInScale]. Flips only when
   /// the threshold is crossed, so listeners rebuild once, not per frame.
@@ -321,7 +524,7 @@ class _FloorMapWidgetState extends State<FloorMapWidget>
   }
 
   /// One trip = on-screen perimeter / [_highlightScreenSpeed], clamped to
-  /// 2–6 s. Recomputed only on target/size change or per 0.25 scale step,
+  /// 2.5–7 s. Recomputed only on target/size change or per 0.25 scale step,
   /// never per frame; a running loop restarts from its current position.
   void _applyHighlightDuration() {
     if (_highlightPerimeter <= 0) return;
@@ -358,6 +561,14 @@ class _FloorMapWidgetState extends State<FloorMapWidget>
       // perimeter-based duration once the target is laid out.
       duration: const Duration(milliseconds: 3200),
     );
+    _breathController = AnimationController(
+      vsync: this,
+      duration: _breathHalfCycle,
+    );
+    _breathOpacity = Tween<double>(begin: 0.35, end: 1).animate(
+      CurvedAnimation(parent: _breathController, curve: Curves.easeInOut),
+    );
+    _HighlightQualityGovernor.quality.addListener(_onQualityChanged);
     _highlightVisibility = AnimationController(
       vsync: this,
       duration: _highlightFadeIn,
@@ -369,6 +580,12 @@ class _FloorMapWidgetState extends State<FloorMapWidget>
   void didChangeDependencies() {
     super.didChangeDependencies();
     _syncHighlight();
+  }
+
+  /// A session downgrade: switch to the breathing glow or stop animating.
+  void _onQualityChanged() {
+    if (!mounted) return;
+    setState(_syncHighlight);
   }
 
   bool get _hasVisibleSelectedArea {
@@ -389,20 +606,39 @@ class _FloorMapWidgetState extends State<FloorMapWidget>
     if (key != _highlightKey) {
       _highlightKey = key;
       _highlightController.reset();
+      _breathController.reset();
     }
     final reduceMotion = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    // Reduce-motion and the session's 'static' level both mean no animated
+    // layer: only FloorMapPainter's static outline + glow remain.
     _highlightActive =
         widget.enablePolygonAnimation &&
         !reduceMotion &&
+        _HighlightQualityGovernor.quality.value != _HighlightQuality.off &&
         _hasVisibleSelectedArea;
     final shouldRun = _highlightActive && !_interacting;
-    if (shouldRun) {
-      // repeat() continues from the current value, so a paused segment
-      // resumes where it stopped.
+    final lite =
+        _HighlightQualityGovernor.quality.value == _HighlightQuality.lite;
+    // repeat() continues from the current value, so a paused animation
+    // resumes where it stopped.
+    if (shouldRun && !lite) {
       if (!_highlightController.isAnimating) _highlightController.repeat();
     } else if (_highlightController.isAnimating) {
       _highlightController.stop();
     }
+    if (shouldRun && lite) {
+      if (!_breathController.isAnimating) {
+        _breathController.repeat(reverse: true);
+      }
+    } else if (_breathController.isAnimating) {
+      _breathController.stop();
+    }
+    // Frame timings are sampled only while a highlight is animating.
+    _HighlightQualityGovernor.setAnimating(
+      this,
+      _highlightController.isAnimating || _breathController.isAnimating,
+      reduceMotion: reduceMotion,
+    );
   }
 
   // Gesture pause: no rebuild. The running segment is hidden (static
@@ -410,12 +646,14 @@ class _FloorMapWidgetState extends State<FloorMapWidget>
   // continues from the same point.
   void _onInteractionStart(ScaleStartDetails _) {
     _interacting = true;
+    _HighlightQualityGovernor.setInteracting(this, true);
     _highlightVisibility.value = 0;
     _syncHighlight();
   }
 
   void _onInteractionEnd(ScaleEndDetails _) {
     _interacting = false;
+    _HighlightQualityGovernor.setInteracting(this, false);
     _syncHighlight();
     _highlightVisibility.forward(from: 0);
   }
@@ -434,7 +672,11 @@ class _FloorMapWidgetState extends State<FloorMapWidget>
 
   @override
   void dispose() {
+    _HighlightQualityGovernor.setAnimating(this, false);
+    _HighlightQualityGovernor.setInteracting(this, false);
+    _HighlightQualityGovernor.quality.removeListener(_onQualityChanged);
     _highlightController.dispose();
+    _breathController.dispose();
     _highlightVisibility.dispose();
     _transformationController
       ..removeListener(_onTransformChanged)
@@ -588,13 +830,24 @@ class _FloorMapWidgetState extends State<FloorMapWidget>
 
   SelectedAreaHighlightPainter _highlightPainterFor(MapArea area) {
     final cached = _highlightPainter;
+    // One painter (and one cached contour metric) per area.
     if (cached != null && identical(cached.area, area)) return cached;
     return _highlightPainter = SelectedAreaHighlightPainter(
       area: area,
+      // Every controller tick (60 fps).
       progress: _highlightController,
       // Constant on-screen width/length; repaints (no rebuild) per step.
       viewerScale: _viewerScale,
       visibility: _highlightVisibility,
+    );
+  }
+
+  SelectedAreaGlowPainter _glowPainterFor(MapArea area) {
+    final cached = _glowPainter;
+    if (cached != null && identical(cached.area, area)) return cached;
+    return _glowPainter = SelectedAreaGlowPainter(
+      area: area,
+      viewerScale: _viewerScale,
     );
   }
 
@@ -702,7 +955,20 @@ class _FloorMapWidgetState extends State<FloorMapWidget>
       children: <Widget>[
         // Original drawing; any wash is a separate layer above it.
         RepaintBoundary(
-          child: Image.asset(widget.data.imageAsset, fit: BoxFit.fill),
+          child: Image.asset(
+            widget.data.imageAsset,
+            fit: BoxFit.fill,
+            // First frame of a newly shown map image: tells the quality
+            // governor to skip the decode/upload frames that follow.
+            frameBuilder: (context, child, frame, _) {
+              if (frame != null &&
+                  _shownImageAsset != widget.data.imageAsset) {
+                _shownImageAsset = widget.data.imageAsset;
+                _HighlightQualityGovernor.noteMapImageShown();
+              }
+              return child;
+            },
+          ),
         ),
         if (hasFade)
           Positioned.fill(
@@ -754,13 +1020,30 @@ class _FloorMapWidgetState extends State<FloorMapWidget>
         if (highlightArea != null)
           Positioned.fill(
             child: IgnorePointer(
-              // Own layer: animation frames repaint only this segment, never
-              // the floor image, static polygons or labels.
-              child: RepaintBoundary(
-                child: CustomPaint(
-                  painter: _highlightPainterFor(highlightArea),
-                ),
-              ),
+              child:
+                  _HighlightQualityGovernor.quality.value ==
+                      _HighlightQuality.lite
+                  // Lite: static glow painted once (per scale step); the
+                  // breathing and the pan/zoom hide are opacity changes at
+                  // compositing time, no repaint.
+                  ? FadeTransition(
+                      opacity: _highlightVisibility,
+                      child: FadeTransition(
+                        opacity: _breathOpacity,
+                        child: RepaintBoundary(
+                          child: CustomPaint(
+                            painter: _glowPainterFor(highlightArea),
+                          ),
+                        ),
+                      ),
+                    )
+                  // Full: own layer; animation frames repaint only this
+                  // segment, never the image, static polygons or labels.
+                  : RepaintBoundary(
+                      child: CustomPaint(
+                        painter: _highlightPainterFor(highlightArea),
+                      ),
+                    ),
             ),
           ),
         if (widget.onZoneTap != null)

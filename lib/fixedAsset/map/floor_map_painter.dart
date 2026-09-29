@@ -185,19 +185,79 @@ class FloorMapPainter extends CustomPainter {
   }
 }
 
+/// Static glow around the highlight target for the lite ("breathing")
+/// level: two solid select-light strokes (w + 8 px at 0.12, w + 4 px at
+/// 0.20) plus a select-blue outline of w = [coreScreenWidth] screen px.
+/// Widths follow [viewerScale] (constant on screen), so it repaints only on
+/// a scale step; the breathing itself is an opacity animation applied when
+/// compositing (e.g. FadeTransition), with no repaint.
+class SelectedAreaGlowPainter extends CustomPainter {
+  final MapArea area;
+  final ValueListenable<double>? viewerScale;
+
+  SelectedAreaGlowPainter({required this.area, this.viewerScale})
+    : super(repaint: viewerScale);
+
+  /// On-screen width of the outline; the halo strokes are +4 / +8 px.
+  static const double coreScreenWidth = 3;
+
+  Size? _cachedSize;
+  Path? _path;
+
+  final Paint _haloOuterPaint = _strokePaint(
+    mapSelectLightColor.withValues(alpha: 0.12),
+  );
+  final Paint _haloInnerPaint = _strokePaint(
+    mapSelectLightColor.withValues(alpha: 0.20),
+  );
+  final Paint _outlinePaint = _strokePaint(mapSelectColor);
+
+  static Paint _strokePaint(Color color) => Paint()
+    ..color = color
+    ..style = PaintingStyle.stroke
+    ..strokeCap = StrokeCap.round
+    ..strokeJoin = StrokeJoin.round;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (area.points.isEmpty) return;
+    if (size != _cachedSize) {
+      _cachedSize = size;
+      _path = mapAreaPath(area, size);
+    }
+    final path = _path!;
+    final scale = viewerScale?.value ?? 1;
+    final px = 1 / (scale <= 0 ? 1 : scale); // one screen pixel, logical
+    final width = coreScreenWidth * px;
+    canvas.drawPath(path, _haloOuterPaint..strokeWidth = width + 8 * px);
+    canvas.drawPath(path, _haloInnerPaint..strokeWidth = width + 4 * px);
+    canvas.drawPath(path, _outlinePaint..strokeWidth = width);
+  }
+
+  @override
+  bool shouldRepaint(covariant SelectedAreaGlowPainter oldDelegate) {
+    return oldDelegate.area != area || oldDelegate.viewerScale != viewerScale;
+  }
+}
+
 /// Running highlight around the highlight target, repainted by [progress]
 /// (a repeating linear 0..1 cycle, [loops] trips per cycle) without
 /// rebuilding any widget.
 ///
+/// With [progressValue] the painter reads and repaints on that notifier
+/// instead of [progress] (optional; FloorMapWidget repaints on every
+/// controller tick).
 /// With [viewerScale] (the InteractiveViewer scale) every stroke width and
 /// the segment length are divided by the scale, so on screen the segment
 /// is always [segmentScreenLength] px long and [coreScreenWidth] px thick,
 /// at any zoom and for any polygon size. [visibility] (0..1) fades the
-/// segment in and out, e.g. hidden during pan/zoom.
+/// segment in and out, e.g. hidden during pan/zoom. [simplified] drops the
+/// trail and the halo (white underlay + core only).
 ///
-/// Per frame: two `extractPath` and four `drawPath` calls. The contour
-/// (traced twice, so a segment crossing the start corner stays one
-/// continuous stroke) and its metric are cached until the size changes.
+/// No blur: the halo is two solid strokes. The contour (traced twice, so a
+/// segment crossing the start corner stays one continuous stroke) and its
+/// metric are computed once per painter (one per area) and size; a frame
+/// only extracts the segment (and trail) and strokes it.
 class SelectedAreaHighlightPainter extends CustomPainter {
   final MapArea area;
   final Animation<double> progress;
@@ -205,18 +265,22 @@ class SelectedAreaHighlightPainter extends CustomPainter {
   /// Trips around the perimeter over one 0..1 run of [progress].
   final int loops;
 
+  final ValueListenable<double>? progressValue;
   final ValueListenable<double>? viewerScale;
   final Animation<double>? visibility;
+  final bool simplified;
 
   SelectedAreaHighlightPainter({
     required this.area,
     required this.progress,
     this.loops = 1,
+    this.progressValue,
     this.viewerScale,
     this.visibility,
+    this.simplified = false,
   }) : super(
          repaint: Listenable.merge(<Listenable?>[
-           progress,
+           progressValue ?? progress,
            viewerScale,
            visibility,
          ]),
@@ -237,6 +301,18 @@ class SelectedAreaHighlightPainter extends CustomPainter {
   Size? _cachedSize;
   PathMetric? _loopMetric;
   double _perimeter = 0;
+
+  // Reused every frame; only colour alpha and width change.
+  final Paint _trailPaint = _strokePaint();
+  final Paint _haloOuterPaint = _strokePaint();
+  final Paint _haloInnerPaint = _strokePaint();
+  final Paint _underlayPaint = _strokePaint();
+  final Paint _corePaint = _strokePaint();
+
+  static Paint _strokePaint() => Paint()
+    ..style = PaintingStyle.stroke
+    ..strokeCap = StrokeCap.round
+    ..strokeJoin = StrokeJoin.round;
 
   /// Perimeter of [area] in logical pixels at [size].
   static double perimeterFor(MapArea area, Size size) {
@@ -277,13 +353,6 @@ class SelectedAreaHighlightPainter extends CustomPainter {
     return _loopMetric;
   }
 
-  static Paint _stroke(Color color, double width) => Paint()
-    ..color = color
-    ..style = PaintingStyle.stroke
-    ..strokeWidth = width
-    ..strokeCap = StrokeCap.round
-    ..strokeJoin = StrokeJoin.round;
-
   @override
   void paint(Canvas canvas, Size size) {
     final opacity = (visibility?.value ?? 1).clamp(0.0, 1.0);
@@ -296,39 +365,52 @@ class SelectedAreaHighlightPainter extends CustomPainter {
     final segment = viewerScale == null
         ? _perimeter * segmentFraction
         : math.min(segmentScreenLength * px, _perimeter);
-    final trail = math.min(trailScreenLength * px, _perimeter - segment);
     final width = coreScreenWidth * px;
 
     // Head position; the trail and segment sit behind it. Offsetting by one
     // perimeter keeps every extract range inside [0, 2·perimeter].
-    final head =
-        ((progress.value * loops) % 1.0) * _perimeter + _perimeter;
+    final t = progressValue?.value ?? progress.value;
+    final head = ((t * loops) % 1.0) * _perimeter + _perimeter;
     final segmentStart = head - segment;
 
-    if (trail > 0) {
-      canvas.drawPath(
-        metric.extractPath(segmentStart - trail, segmentStart),
-        _stroke(
-          mapSelectLightColor.withValues(alpha: 0.25 * opacity),
-          width,
-        ),
-      );
+    if (!simplified) {
+      final trail = math.min(trailScreenLength * px, _perimeter - segment);
+      if (trail > 0) {
+        canvas.drawPath(
+          metric.extractPath(segmentStart - trail, segmentStart),
+          _trailPaint
+            ..color = mapSelectLightColor.withValues(alpha: 0.25 * opacity)
+            ..strokeWidth = width,
+        );
+      }
     }
     final path = metric.extractPath(segmentStart, head);
+    if (!simplified) {
+      // Halo as two solid strokes (no MaskFilter on the animated layer).
+      canvas.drawPath(
+        path,
+        _haloOuterPaint
+          ..color = mapSelectLightColor.withValues(alpha: 0.12 * opacity)
+          ..strokeWidth = width + 8 * px,
+      );
+      canvas.drawPath(
+        path,
+        _haloInnerPaint
+          ..color = mapSelectLightColor.withValues(alpha: 0.20 * opacity)
+          ..strokeWidth = width + 4 * px,
+      );
+    }
     canvas.drawPath(
       path,
-      _stroke(
-        mapSelectLightColor.withValues(alpha: 0.18 * opacity),
-        width + 6 * px,
-      ),
+      _underlayPaint
+        ..color = Colors.white.withValues(alpha: opacity)
+        ..strokeWidth = width + 2 * px,
     );
     canvas.drawPath(
       path,
-      _stroke(Colors.white.withValues(alpha: opacity), width + 2 * px),
-    );
-    canvas.drawPath(
-      path,
-      _stroke(mapSelectLightColor.withValues(alpha: opacity), width),
+      _corePaint
+        ..color = mapSelectLightColor.withValues(alpha: opacity)
+        ..strokeWidth = width,
     );
   }
 
@@ -337,7 +419,9 @@ class SelectedAreaHighlightPainter extends CustomPainter {
     return oldDelegate.area != area ||
         oldDelegate.progress != progress ||
         oldDelegate.loops != loops ||
+        oldDelegate.progressValue != progressValue ||
         oldDelegate.viewerScale != viewerScale ||
-        oldDelegate.visibility != visibility;
+        oldDelegate.visibility != visibility ||
+        oldDelegate.simplified != simplified;
   }
 }
