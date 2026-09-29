@@ -38,6 +38,10 @@ class _FixedAssetDetectedMapState extends State<FixedAssetDetectedMap> {
   /// changes (new scans update the header but never force it open).
   bool _collapsed = false;
 
+  /// Fullscreen dialog is open: the card underneath stops its highlight so
+  /// only one animation runs at a time.
+  bool _expanded = false;
+
   static const Duration _collapseDuration = Duration(milliseconds: 260);
 
   /// Parent bounding-box / floor area below which the card auto-zooms.
@@ -129,10 +133,13 @@ class _FixedAssetDetectedMapState extends State<FixedAssetDetectedMap> {
                       autoFocusParent: zoomToParent,
                       focusPadding: 0.35,
                       enableZoom: widget.enableZoom,
-                      // Hidden map: stop the highlight ticker (no wasted
-                      // frames); it resumes when shown again.
+                      // Hidden map, or covered by the dialog: stop the
+                      // highlight ticker (no wasted frames); it resumes
+                      // when shown again.
                       enablePolygonAnimation:
-                          widget.enablePolygonAnimation && !_collapsed,
+                          widget.enablePolygonAnimation &&
+                          !_collapsed &&
+                          !_expanded,
                       onZoneTap: widget.onZoneTap,
                       imageFade: 0.40,
                       spotlightFade: 0.30,
@@ -150,8 +157,9 @@ class _FixedAssetDetectedMapState extends State<FixedAssetDetectedMap> {
   Future<void> _showExpandedMap(
     BuildContext context,
     FixedAssetMapSelection selection,
-  ) {
-    return showDialog<void>(
+  ) async {
+    setState(() => _expanded = true);
+    await showDialog<void>(
       context: context,
       builder: (dialogContext) {
         return Dialog.fullscreen(
@@ -165,6 +173,7 @@ class _FixedAssetDetectedMapState extends State<FixedAssetDetectedMap> {
         );
       },
     );
+    if (mounted) setState(() => _expanded = false);
   }
 }
 
@@ -194,9 +203,19 @@ class _ExpandedMapViewState extends State<_ExpandedMapView> {
   /// Faded drawing + spotlight; dialog-local, reopening starts faded.
   bool _faded = true;
 
+  /// User override for the extra 90° turn; null follows the screen.
+  bool? _rotateOverride;
+
   @override
   Widget build(BuildContext context) {
     final selection = widget.selection;
+    // Auto: a landscape floor on a portrait screen is turned 90° so it
+    // fills the screen.
+    final screen = MediaQuery.sizeOf(context);
+    final autoRotate =
+        screen.height > screen.width &&
+        floorMapDisplayAspectRatio(selection.map) > 1;
+    final rotated = _rotateOverride ?? autoRotate;
     return SafeArea(
       child: Column(
         children: <Widget>[
@@ -205,6 +224,8 @@ class _ExpandedMapViewState extends State<_ExpandedMapView> {
             zoneText: selection.childZoneCode ?? selection.parentZoneCode,
             faded: _faded,
             onToggleFaded: () => setState(() => _faded = !_faded),
+            rotated: rotated,
+            onToggleRotated: () => setState(() => _rotateOverride = !rotated),
             showAll: _showAll,
             onToggleShowAll: () => setState(() => _showAll = !_showAll),
             onClose: widget.onClose,
@@ -231,10 +252,22 @@ class _ExpandedMapViewState extends State<_ExpandedMapView> {
                       enableZoom: true,
                       enablePolygonAnimation: widget.enablePolygonAnimation,
                       onZoneTap: widget.onZoneTap,
-                      imageFade: _faded ? 0.50 : 0,
+                      // Show all: heavier wash zoomed out (0.68), lighter
+                      // once zoomed in (0.50); focus keeps 0.50.
+                      imageFade: _faded ? (_showAll ? 0.68 : 0.50) : 0,
+                      zoomedInImageFade: _faded && _showAll ? 0.50 : null,
                       // Spotlight needs a focus parent, so "Show all" turns
                       // it off on its own.
                       spotlightFade: _faded ? 0.30 : 0,
+                      // Turn back to 0° for maps the data already rotated
+                      // (e.g. Mold), so the drawing is never upside down.
+                      extraRotationDeg: rotated
+                          ? (isQuarterTurnMapRotation(
+                                  selection.map.rotationDeg,
+                                )
+                                ? -90
+                                : 90)
+                          : 0,
                     ),
                   ),
                 ),
@@ -254,6 +287,8 @@ class _MapHeader extends StatelessWidget {
   final VoidCallback? onClose;
   final bool faded;
   final VoidCallback? onToggleFaded;
+  final bool rotated;
+  final VoidCallback? onToggleRotated;
   final bool showAll;
   final VoidCallback? onToggleShowAll;
   final bool collapsed;
@@ -266,6 +301,8 @@ class _MapHeader extends StatelessWidget {
     this.onClose,
     this.faded = false,
     this.onToggleFaded,
+    this.rotated = false,
+    this.onToggleRotated,
     this.showAll = false,
     this.onToggleShowAll,
     this.collapsed = false,
@@ -326,6 +363,12 @@ class _MapHeader extends StatelessWidget {
                 tooltip: faded ? 'Show original' : 'Fade drawing',
                 icon: Icons.contrast_rounded,
                 onPressed: onToggleFaded,
+              ),
+            if (onToggleRotated != null)
+              _HeaderAction(
+                tooltip: rotated ? 'Original orientation' : 'Rotate map',
+                icon: Icons.screen_rotation_rounded,
+                onPressed: onToggleRotated,
               ),
             if (onToggleShowAll != null)
               _HeaderAction(

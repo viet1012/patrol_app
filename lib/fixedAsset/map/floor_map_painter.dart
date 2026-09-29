@@ -23,47 +23,48 @@ Path mapAreaPath(MapArea area, Size size) {
   return path..close();
 }
 
+/// Dashed copy of [source] ([dash] on, [gap] off, in pixels).
+Path dashedPath(Path source, {double dash = 4, double gap = 3}) {
+  final dashed = Path();
+  for (final metric in source.computeMetrics()) {
+    var distance = 0.0;
+    while (distance < metric.length) {
+      final end = (distance + dash).clamp(0.0, metric.length).toDouble();
+      dashed.addPath(metric.extractPath(distance, end), Offset.zero);
+      distance = end + gap;
+    }
+  }
+  return dashed;
+}
+
 /// Static polygon layer (fills + outlines). Repaints only when its inputs
 /// change, never per animation frame.
+///
+/// [raised] (full-floor view): unselected parents are drawn as raised cards
+/// (drop shadow, light fill, blue outline) in three passes, so every
+/// shadow sits under every card. The selected parent always gets a red
+/// glow + 3px red outline, drawn last (plus a faint red fill when raised).
 class FloorMapPainter extends CustomPainter {
   final List<MapArea> areas;
   final String? selectedParentZone;
   final String? selectedChildZone;
+  final bool raised;
 
   const FloorMapPainter({
     required this.areas,
     this.selectedParentZone,
     this.selectedChildZone,
+    this.raised = false,
   });
 
   static const Color _normalBlue = Color(0xFF2563EB);
   static const Color _parentRed = Color(0xFFE53935);
+  static const Color _cardShadow = Color(0xFF1E3A8A);
+  static const Color _cardFill = Color(0xFFEFF6FF);
 
   @override
   void paint(Canvas canvas, Size size) {
-    final normalFill = Paint()
-      ..color = _normalBlue.withValues(alpha: 0.02)
-      ..style = PaintingStyle.fill;
-    final normalStroke = Paint()
-      ..color = _parentRed
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.5
-      ..strokeJoin = StrokeJoin.round;
-    // Selected area: no fill (the drawing inside stays crisp), a soft red
-    // glow under a heavier red outline.
-    final selectedGlow = Paint()
-      ..color = _parentRed.withValues(alpha: 0.25)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 6
-      ..strokeJoin = StrokeJoin.round
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3);
-    final selectedStroke = Paint()
-      ..color = _parentRed
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 3
-      ..strokeJoin = StrokeJoin.round
-      ..strokeCap = StrokeCap.round;
-
+    final paths = <Path>[];
     Path? selectedPath;
     for (final area in areas) {
       if (area.points.isEmpty) continue;
@@ -71,27 +72,89 @@ class FloorMapPainter extends CustomPainter {
       if (isSelectedMapArea(area, selectedParentZone)) {
         // Drawn last so its outline sits above neighbours.
         selectedPath = path;
-        continue;
+      } else {
+        paths.add(path);
       }
-      canvas.drawPath(path, normalFill);
-      canvas.drawPath(path, normalStroke);
+    }
+
+    if (raised) {
+      final shadow = Paint()
+        ..color = _cardShadow.withValues(alpha: 0.30)
+        ..style = PaintingStyle.fill
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1.8);
+      final fill = Paint()
+        ..color = _cardFill.withValues(alpha: 0.55)
+        ..style = PaintingStyle.fill;
+      final stroke = Paint()
+        ..color = _normalBlue
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.8
+        ..strokeJoin = StrokeJoin.round;
+      for (final path in paths) {
+        canvas.drawPath(path.shift(const Offset(0, 1.5)), shadow);
+      }
+      for (final path in paths) {
+        canvas.drawPath(path, fill);
+      }
+      for (final path in paths) {
+        canvas.drawPath(path, stroke);
+      }
+    } else {
+      final fill = Paint()
+        ..color = _normalBlue.withValues(alpha: 0.02)
+        ..style = PaintingStyle.fill;
+      final stroke = Paint()
+        ..color = _parentRed
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.5
+        ..strokeJoin = StrokeJoin.round;
+      for (final path in paths) {
+        canvas.drawPath(path, fill);
+        canvas.drawPath(path, stroke);
+      }
     }
 
     if (selectedPath == null) return;
-    canvas.drawPath(selectedPath, selectedGlow);
-    canvas.drawPath(selectedPath, selectedStroke);
+    canvas.drawPath(
+      selectedPath,
+      Paint()
+        ..color = _parentRed.withValues(alpha: 0.45)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 7
+        ..strokeJoin = StrokeJoin.round
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3),
+    );
+    if (raised) {
+      canvas.drawPath(
+        selectedPath,
+        Paint()
+          ..color = _parentRed.withValues(alpha: 0.05)
+          ..style = PaintingStyle.fill,
+      );
+    }
+    canvas.drawPath(
+      selectedPath,
+      Paint()
+        ..color = _parentRed
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 3
+        ..strokeJoin = StrokeJoin.round
+        ..strokeCap = StrokeCap.round,
+    );
   }
 
   @override
   bool shouldRepaint(covariant FloorMapPainter oldDelegate) {
     return oldDelegate.areas != areas ||
         oldDelegate.selectedParentZone != selectedParentZone ||
-        oldDelegate.selectedChildZone != selectedChildZone;
+        oldDelegate.selectedChildZone != selectedChildZone ||
+        oldDelegate.raised != raised;
   }
 }
 
 /// Traveling edge highlight for the selected polygon, repainted by
-/// [progress] (one linear 0..1 run spanning [loops] trips) without rebuilding any widget.
+/// [progress] (a repeating linear 0..1 cycle, [loops] trips per cycle)
+/// without rebuilding any widget.
 ///
 /// Per frame: one `extractPath` and two `drawPath` calls. The contour
 /// (traced twice, so a segment crossing the start corner stays one

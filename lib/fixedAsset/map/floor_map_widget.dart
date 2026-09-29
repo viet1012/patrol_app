@@ -16,8 +16,13 @@ bool isQuarterTurnMapRotation(double rotationDeg) {
   return normalized == 90 || normalized == 270;
 }
 
-double floorMapDisplayAspectRatio(FloorMapData data) {
-  return isQuarterTurnMapRotation(data.rotationDeg)
+/// Display aspect of [data] rotated by its own `rotationDeg` plus
+/// [extraRotationDeg] (e.g. a fullscreen auto-rotation).
+double floorMapDisplayAspectRatio(
+  FloorMapData data, {
+  double extraRotationDeg = 0,
+}) {
+  return isQuarterTurnMapRotation(data.rotationDeg + extraRotationDeg)
       ? data.imageHeight / data.imageWidth
       : data.imageWidth / data.imageHeight;
 }
@@ -56,8 +61,10 @@ Matrix4? floorMapFocusMatrix(
   Size viewport, {
   double padding = 0.2,
   double maxScale = 4,
+  double extraRotationDeg = 0,
 }) {
   if (areaCode == null || viewport.isEmpty || !viewport.isFinite) return null;
+  final rotationDeg = data.rotationDeg + extraRotationDeg;
   MapArea? area;
   for (final candidate in data.areas) {
     if (candidate.code == areaCode) {
@@ -68,15 +75,18 @@ Matrix4? floorMapFocusMatrix(
   if (area == null || area.points.isEmpty) return null;
 
   // Rendered child: AspectRatio fitted and centred inside the viewport.
-  final aspect = floorMapDisplayAspectRatio(data);
+  final aspect = floorMapDisplayAspectRatio(
+    data,
+    extraRotationDeg: extraRotationDeg,
+  );
   final displayWidth = math.min(viewport.width, viewport.height * aspect);
   final display = Size(displayWidth, displayWidth / aspect);
   final originX = (viewport.width - display.width) / 2;
   final originY = (viewport.height - display.height) / 2;
-  final logical = isQuarterTurnMapRotation(data.rotationDeg)
+  final logical = isQuarterTurnMapRotation(rotationDeg)
       ? Size(display.height, display.width)
       : display;
-  final angle = normalizedMapRotation(data.rotationDeg) * math.pi / 180;
+  final angle = normalizedMapRotation(rotationDeg) * math.pi / 180;
   final cosA = math.cos(angle);
   final sinA = math.sin(angle);
 
@@ -172,6 +182,14 @@ class FloorMapWidget extends StatefulWidget {
   /// per side), passed to [floorMapFocusMatrix].
   final double focusPadding;
 
+  /// Added to `data.rotationDeg` for display only (e.g. 90 to fit a portrait
+  /// screen). Data, tap hit-testing and zones stay in the logical scene.
+  final double extraRotationDeg;
+
+  /// Full-floor mode only: [imageFade] used once zoomed in past
+  /// [zoomedInScale]. Null keeps [imageFade] at every zoom.
+  final double? zoomedInImageFade;
+
   const FloorMapWidget({
     super.key,
     required this.data,
@@ -186,7 +204,13 @@ class FloorMapWidget extends StatefulWidget {
     this.imageFade = 0.40,
     this.spotlightFade = 0.30,
     this.focusPadding = 0.2,
+    this.extraRotationDeg = 0,
+    this.zoomedInImageFade,
   });
+
+  /// Viewer scale above which the full-floor view counts as zoomed in:
+  /// child badges appear and [zoomedInImageFade] applies.
+  static const double zoomedInScale = 1.5;
 
   @override
   State<FloorMapWidget> createState() => _FloorMapWidgetState();
@@ -196,20 +220,17 @@ class _FloorMapWidgetState extends State<FloorMapWidget>
     with SingleTickerProviderStateMixin {
   late final TransformationController _transformationController;
 
-  /// Short attention effect: one forward run covering
-  /// [highlightLoops] trips around the selected parent polygon, then the
-  /// ticker stops for good (static outline stays).
+  /// Traveling edge highlight: repeats one linear trip around the selected
+  /// parent polygon every [_highlightLoopDuration] while a parent is
+  /// selected and visible.
   late final AnimationController _highlightController;
 
-  static const int highlightLoops = 3;
   static const Duration _highlightLoopDuration = Duration(milliseconds: 3200);
 
   /// `mapId|parent` the highlight belongs to. Only a change here restarts
-  /// it; child changes, rebuilds, pan/zoom and collapse never do.
+  /// it from the start; child changes, rebuilds, pan/zoom and collapse never
+  /// do.
   String? _highlightKey;
-
-  /// All loops finished for [_highlightKey].
-  bool _highlightDone = false;
 
   // Focused-mode filter cache: reused while the source map instance and
   // focusParentZone are unchanged, so rebuilds (child change, controller
@@ -241,24 +262,47 @@ class _FloorMapWidgetState extends State<FloorMapWidget>
   /// Pan/zoom gesture in progress: the highlight holds its position.
   bool _interacting = false;
 
+  /// Viewer scale is past [FloorMapWidget.zoomedInScale]. Flips only when
+  /// the threshold is crossed, so listeners rebuild once, not per frame.
+  final ValueNotifier<bool> _zoomedIn = ValueNotifier<bool>(false);
+
+  /// Viewer scale rounded to [_badgeScaleStep]; badges are drawn at its
+  /// inverse so they keep their on-screen size. Only the badge layer
+  /// listens, and only once per step.
+  final ValueNotifier<double> _viewerScale = ValueNotifier<double>(1);
+  static const double _badgeScaleStep = 0.05;
+
+  /// Badge layer rebuild trigger: zoom threshold or badge scale step.
+  late final Listenable _badgeLayerListenable = Listenable.merge(
+    <Listenable>[_zoomedIn, _viewerScale],
+  );
+
+  /// Display rotation: the map's own rotation plus the extra one.
+  double get _rotationDeg =>
+      widget.data.rotationDeg + widget.extraRotationDeg;
+
+  void _onTransformChanged() {
+    final scale = _transformationController.value.getMaxScaleOnAxis();
+    _zoomedIn.value = scale > FloorMapWidget.zoomedInScale;
+    // Rounded DOWN (epsilon absorbs float error at exact steps), so the
+    // inverse-scaled badge is never smaller on screen than at 1×: the touch
+    // target stays ≥ 24 px.
+    _viewerScale.value = math.max(
+      _badgeScaleStep,
+      (scale / _badgeScaleStep + 1e-6).floorToDouble() * _badgeScaleStep,
+    );
+  }
+
   @override
   void initState() {
     super.initState();
-    _transformationController = TransformationController();
+    _transformationController = TransformationController()
+      ..addListener(_onTransformChanged);
     _highlightController = AnimationController(
       vsync: this,
       // Linear: constant perimeter speed, no corner easing.
-      duration: _highlightLoopDuration * highlightLoops,
-    )..addStatusListener(_onHighlightStatus);
-  }
-
-  /// One setState at the end (not per frame) to drop the highlight layer.
-  void _onHighlightStatus(AnimationStatus status) {
-    if (status != AnimationStatus.completed || !mounted) return;
-    setState(() {
-      _highlightDone = true;
-      _highlightActive = false;
-    });
+      duration: _highlightLoopDuration,
+    );
   }
 
   @override
@@ -275,25 +319,26 @@ class _FloorMapWidgetState extends State<FloorMapWidget>
     return widget.data.areas.any((area) => area.code == parent);
   }
 
-  /// Static outline only when disabled, finished, or under the platform
-  /// reduce-motion setting. Otherwise runs (holding still during pan/zoom or
-  /// while disabled e.g. collapsed) and resumes from the same point.
+  /// Static outline only when disabled (e.g. collapsed card, or a card
+  /// under the expanded dialog) or under the platform reduce-motion
+  /// setting. Otherwise repeats continuously, holding still during pan/zoom
+  /// and resuming from the same point.
   void _syncHighlight() {
     final key = '${widget.data.id}|${widget.selectedParentZone}';
     if (key != _highlightKey) {
       _highlightKey = key;
-      _highlightDone = false;
       _highlightController.reset();
     }
     final reduceMotion = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
     _highlightActive =
-        !_highlightDone &&
         widget.enablePolygonAnimation &&
         !reduceMotion &&
         _hasVisibleSelectedArea;
     final shouldRun = _highlightActive && !_interacting;
     if (shouldRun) {
-      if (!_highlightController.isAnimating) _highlightController.forward();
+      // repeat() continues from the current value, so a paused segment
+      // resumes where it stopped.
+      if (!_highlightController.isAnimating) _highlightController.repeat();
     } else if (_highlightController.isAnimating) {
       _highlightController.stop();
     }
@@ -314,7 +359,10 @@ class _FloorMapWidgetState extends State<FloorMapWidget>
   @override
   void didUpdateWidget(covariant FloorMapWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.data.id != widget.data.id) {
+    // New map or new display rotation: old pan/zoom no longer fits. A
+    // focused view is refit by _maybeAutoFocus (its key includes both).
+    if (oldWidget.data.id != widget.data.id ||
+        oldWidget.extraRotationDeg != widget.extraRotationDeg) {
       _transformationController.value = Matrix4.identity();
     }
     _syncHighlight();
@@ -323,13 +371,17 @@ class _FloorMapWidgetState extends State<FloorMapWidget>
   @override
   void dispose() {
     _highlightController.dispose();
-    _transformationController.dispose();
+    _transformationController
+      ..removeListener(_onTransformChanged)
+      ..dispose();
+    _zoomedIn.dispose();
+    _viewerScale.dispose();
     super.dispose();
   }
 
   void _maybeAutoFocus(Size viewport) {
     final key = widget.autoFocusParent
-        ? '${widget.data.id}|${widget.selectedParentZone}'
+        ? '${widget.data.id}|${widget.selectedParentZone}|$_rotationDeg'
         : null;
     if (key == _autoFocusKey) return;
     if (key != null && (viewport.isEmpty || !viewport.isFinite)) return;
@@ -342,6 +394,7 @@ class _FloorMapWidgetState extends State<FloorMapWidget>
             viewport,
             padding: widget.focusPadding,
             maxScale: widget.maxScale,
+            extraRotationDeg: widget.extraRotationDeg,
           );
     // Controller changes notify InteractiveViewer; defer past this build.
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -361,7 +414,10 @@ class _FloorMapWidgetState extends State<FloorMapWidget>
   }
 
   Widget _buildViewer() {
-    final displayAspect = floorMapDisplayAspectRatio(widget.data);
+    final displayAspect = floorMapDisplayAspectRatio(
+      widget.data,
+      extraRotationDeg: widget.extraRotationDeg,
+    );
 
     return InteractiveViewer(
       transformationController: _transformationController,
@@ -397,12 +453,12 @@ class _FloorMapWidgetState extends State<FloorMapWidget>
   }
 
   Widget _buildRotationFrame({required Size displaySize}) {
-    final quarterTurn = isQuarterTurnMapRotation(widget.data.rotationDeg);
+    final quarterTurn = isQuarterTurnMapRotation(_rotationDeg);
     final logicalSize = quarterTurn
         ? Size(displaySize.height, displaySize.width)
         : displaySize;
     final rotationRadians =
-        normalizedMapRotation(widget.data.rotationDeg) * math.pi / 180;
+        normalizedMapRotation(_rotationDeg) * math.pi / 180;
     // Badges shrink on small (embedded) maps; full size from 900px up.
     final labelReference = quarterTurn
         ? displaySize.longestSide
@@ -471,7 +527,6 @@ class _FloorMapWidgetState extends State<FloorMapWidget>
     return _highlightPainter = SelectedAreaHighlightPainter(
       area: area,
       progress: _highlightController,
-      loops: highlightLoops,
     );
   }
 
@@ -539,10 +594,25 @@ class _FloorMapWidgetState extends State<FloorMapWidget>
     final imageFade = widget.imageFade.clamp(0.0, 0.8).toDouble();
     final spotlightFade = widget.spotlightFade.clamp(0.0, 0.6).toDouble();
     final focused = widget.focusParentZone != null;
-    final fadeHole = focused
-        ? findAreaByCode(widget.data, widget.selectedParentZone)
-        : null;
-    final hasFade = imageFade > 0 || (focused && spotlightFade > 0);
+    // The selected parent always keeps the original drawing (focus and full
+    // floor alike).
+    final fadeHole = findAreaByCode(widget.data, widget.selectedParentZone);
+    // Full-floor view may use a lighter wash once zoomed in.
+    final zoomedFade = widget.zoomedInImageFade?.clamp(0.0, 0.8).toDouble();
+    final fadeFollowsZoom =
+        !focused && zoomedFade != null && zoomedFade != imageFade;
+    final hasFade =
+        imageFade > 0 ||
+        (fadeFollowsZoom && zoomedFade > 0) ||
+        (focused && spotlightFade > 0);
+    Widget fadeLayer(double fade) => CustomPaint(
+      painter: _FadePainter(
+        hole: fadeHole,
+        imageFade: fade,
+        spotlightFade: spotlightFade,
+        focused: focused,
+      ),
+    );
 
     return Stack(
       clipBehavior: Clip.none,
@@ -555,27 +625,30 @@ class _FloorMapWidgetState extends State<FloorMapWidget>
         if (hasFade)
           Positioned.fill(
             child: IgnorePointer(
-              // Own layer: changing a fade repaints only this wash, never
-              // the image, outlines or badges.
+              // Own layer: changing a fade (or crossing the zoom threshold)
+              // repaints only this wash, never the image, outlines or badges.
               child: RepaintBoundary(
-                child: CustomPaint(
-                  painter: _FadePainter(
-                    hole: fadeHole,
-                    imageFade: imageFade,
-                    spotlightFade: spotlightFade,
-                    focused: focused,
-                  ),
-                ),
+                child: fadeFollowsZoom
+                    ? ValueListenableBuilder<bool>(
+                        valueListenable: _zoomedIn,
+                        builder: (context, zoomedIn, _) =>
+                            fadeLayer(zoomedIn ? zoomedFade : imageFade),
+                      )
+                    : fadeLayer(imageFade),
               ),
             ),
           ),
         Positioned.fill(
           child: IgnorePointer(
-            child: CustomPaint(
-              painter: FloorMapPainter(
-                areas: areas,
-                selectedParentZone: widget.selectedParentZone,
-                selectedChildZone: widget.selectedChildZone,
+            child: RepaintBoundary(
+              child: CustomPaint(
+                painter: FloorMapPainter(
+                  areas: areas,
+                  selectedParentZone: widget.selectedParentZone,
+                  selectedChildZone: widget.selectedChildZone,
+                  // Full floor: unselected parents as raised cards.
+                  raised: !focused,
+                ),
               ),
             ),
           ),
@@ -583,10 +656,14 @@ class _FloorMapWidgetState extends State<FloorMapWidget>
         if (childAreas.isNotEmpty)
           Positioned.fill(
             child: IgnorePointer(
-              child: CustomPaint(
-                painter: _ChildAreaPainter(
-                  areas: childAreas,
-                  selectedChildZone: widget.selectedChildZone,
+              child: RepaintBoundary(
+                child: CustomPaint(
+                  painter: _ChildAreaPainter(
+                    areas: childAreas,
+                    selectedChildZone: widget.selectedChildZone,
+                    selectedParentZone: widget.selectedParentZone,
+                    dashUnselected: !focused,
+                  ),
                 ),
               ),
             ),
@@ -611,57 +688,103 @@ class _FloorMapWidgetState extends State<FloorMapWidget>
                   _handleSceneTap(details.localPosition, logicalSize),
             ),
           ),
-        for (final zone in zones)
-          Positioned(
-            left: logicalSize.width * zone.x / 100 + zone.offsetX,
-            top: logicalSize.height * zone.y / 100 + zone.offsetY,
-            child: FractionalTranslation(
-              translation: const Offset(-0.5, -0.5),
-              child: Transform.rotate(
-                angle: -rotationRadians,
+        // Badges in their own layer; the only layer that follows zoom (the
+        // threshold for child badges and the 0.05-step inverse scale).
+        Positioned.fill(
+          child: RepaintBoundary(
+            child: ListenableBuilder(
+              listenable: _badgeLayerListenable,
+              builder: (context, _) => _buildBadges(
+                zones,
+                focusZone,
+                rotationRadians,
+                logicalSize,
+                labelScale,
+                showChildren: focused || _zoomedIn.value,
+                inverseScale: 1 / _viewerScale.value,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Zone badges. Without [showChildren] (full floor, zoomed out) only
+  /// parent badges plus the selected child's badge are shown. [focusZone]
+  /// (the focused parent) is drawn last, above child badges.
+  ///
+  /// Each badge is anchored at its zone point, counter-rotated upright,
+  /// nudged by `offsetX/offsetY` along the SCREEN axes, then scaled by
+  /// [inverseScale] so it keeps its on-screen size (touch target included)
+  /// at any zoom.
+  Widget _buildBadges(
+    List<MapZone> zones,
+    MapZone? focusZone,
+    double rotationRadians,
+    Size logicalSize,
+    double labelScale, {
+    required bool showChildren,
+    required double inverseScale,
+  }) {
+    Widget badge(MapZone zone, {required bool isActive}) {
+      final isMajor = isMajorMapZone(widget.data, zone);
+      return Positioned(
+        left: logicalSize.width * zone.x / 100,
+        top: logicalSize.height * zone.y / 100,
+        child: FractionalTranslation(
+          translation: const Offset(-0.5, -0.5),
+          child: Transform.rotate(
+            angle: -rotationRadians,
+            // Upright (screen-aligned) frame from here on.
+            child: Transform.translate(
+              offset: Offset(zone.offsetX, zone.offsetY),
+              child: Transform.scale(
+                scale: inverseScale,
                 child: _MapZoneLabel(
                   zone: zone,
-                  isMajor: isMajorMapZone(widget.data, zone),
-                  isActive:
-                      zone.code == widget.selectedChildZone ||
-                      (widget.selectedChildZone == null &&
-                          zone.code == widget.selectedParentZone),
+                  isMajor: isMajor,
+                  isActive: isActive,
+                  isOtherParent:
+                      isMajor && zone.code != widget.selectedParentZone,
                   scale: labelScale,
                   onTap: widget.onZoneTap,
                 ),
               ),
             ),
           ),
+        ),
+      );
+    }
+
+    return Stack(
+      clipBehavior: Clip.none,
+      children: <Widget>[
+        for (final zone in zones)
+          if (showChildren ||
+              zone.code == widget.selectedChildZone ||
+              isMajorMapZone(widget.data, zone))
+            badge(
+              zone,
+              isActive:
+                  zone.code == widget.selectedChildZone ||
+                  (widget.selectedChildZone == null &&
+                      zone.code == widget.selectedParentZone),
+            ),
         // Focused parent badge last, so it sits above child badges and
         // outlines; solid (active) unless a child is selected.
         if (focusZone != null)
-          Positioned(
-            left: logicalSize.width * focusZone.x / 100 + focusZone.offsetX,
-            top: logicalSize.height * focusZone.y / 100 + focusZone.offsetY,
-            child: FractionalTranslation(
-              translation: const Offset(-0.5, -0.5),
-              child: Transform.rotate(
-                angle: -rotationRadians,
-                child: _MapZoneLabel(
-                  zone: focusZone,
-                  isMajor: isMajorMapZone(widget.data, focusZone),
-                  isActive: widget.selectedChildZone == null,
-                  scale: labelScale,
-                  onTap: widget.onZoneTap,
-                ),
-              ),
-            ),
-          ),
+          badge(focusZone, isActive: widget.selectedChildZone == null),
       ],
     );
   }
 }
 
-/// White wash over the floor drawing. Unfocused: [imageFade] everywhere.
-/// Focused: the combined wash `1 − (1 − imageFade)(1 − spotlightFade)`
-/// everywhere except [hole] (the selected parent polygon, even-odd fill),
-/// which keeps the original drawing. A white wash, not Opacity, so the
-/// dark card background never greys the drawing.
+/// White wash over the floor drawing: [imageFade] everywhere, or the
+/// combined `1 − (1 − imageFade)(1 − spotlightFade)` while [focused]; always
+/// except [hole] (the selected parent polygon, even-odd fill), which keeps
+/// the original drawing. A white wash, not Opacity, so the dark card
+/// background never greys the drawing.
 class _FadePainter extends CustomPainter {
   final MapArea? hole;
   final double imageFade;
@@ -685,7 +808,7 @@ class _FadePainter extends CustomPainter {
       ..fillType = PathFillType.evenOdd
       ..addRect(Offset.zero & size);
     final hole = this.hole;
-    if (focused && hole != null && hole.points.isNotEmpty) {
+    if (hole != null && hole.points.isNotEmpty) {
       path.addPath(mapAreaPath(hole, size), Offset.zero);
     }
     canvas.drawPath(
@@ -705,15 +828,25 @@ class _FadePainter extends CustomPainter {
   }
 }
 
-/// Child sub-area outlines, drawn above the parent layer. Repaints only when
-/// the (cached) area list instance or the selected child changes.
+/// Child sub-area outlines, drawn above the parent layer. Children of the
+/// selected parent are purple (the selected child filled, 2.4px); with
+/// [dashUnselected] (full floor) the other parents' children are thin
+/// dashed blue lines. Repaints only when an input changes.
 class _ChildAreaPainter extends CustomPainter {
   final List<MapArea> areas;
   final String? selectedChildZone;
+  final String? selectedParentZone;
+  final bool dashUnselected;
 
-  const _ChildAreaPainter({required this.areas, this.selectedChildZone});
+  const _ChildAreaPainter({
+    required this.areas,
+    this.selectedChildZone,
+    this.selectedParentZone,
+    this.dashUnselected = false,
+  });
 
   static const Color _childPurple = Color(0xFFD63AF9);
+  static const Color _dashBlue = Color(0xFF60A5FA);
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -722,6 +855,10 @@ class _ChildAreaPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.4
       ..strokeJoin = StrokeJoin.round;
+    final dash = Paint()
+      ..color = _dashBlue
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1;
 
     MapArea? selected;
     for (final area in areas) {
@@ -731,7 +868,13 @@ class _ChildAreaPainter extends CustomPainter {
         selected = area;
         continue;
       }
-      canvas.drawPath(mapAreaPath(area, size), stroke);
+      final path = mapAreaPath(area, size);
+      final parent = area.code.substring(0, area.code.lastIndexOf('-'));
+      if (dashUnselected && parent != selectedParentZone) {
+        canvas.drawPath(dashedPath(path), dash);
+      } else {
+        canvas.drawPath(path, stroke);
+      }
     }
 
     if (selected == null) return;
@@ -742,22 +885,28 @@ class _ChildAreaPainter extends CustomPainter {
         ..color = _childPurple.withValues(alpha: 0.16)
         ..style = PaintingStyle.fill,
     );
-    canvas.drawPath(path, stroke..strokeWidth = 2.6);
+    canvas.drawPath(path, stroke..strokeWidth = 2.4);
   }
 
   @override
   bool shouldRepaint(covariant _ChildAreaPainter oldDelegate) {
     return !identical(oldDelegate.areas, areas) ||
-        oldDelegate.selectedChildZone != selectedChildZone;
+        oldDelegate.selectedChildZone != selectedChildZone ||
+        oldDelegate.selectedParentZone != selectedParentZone ||
+        oldDelegate.dashUnselected != dashUnselected;
   }
 }
 
-/// Zone code on a compact white badge: red for parents, purple for children
+/// Zone code on a compact badge: red for the selected parent (solid unless
+/// a child is selected), blue for other parents, purple for children
 /// (matching their outlines); the selected label turns solid.
 class _MapZoneLabel extends StatelessWidget {
   final MapZone zone;
   final bool isMajor;
   final bool isActive;
+
+  /// A parent other than the selected one: blue passive style.
+  final bool isOtherParent;
   final ValueChanged<MapZone>? onTap;
 
   /// Multiplier for font size and padding (0.8–1.0, from the map size).
@@ -768,10 +917,13 @@ class _MapZoneLabel extends StatelessWidget {
     required this.isMajor,
     required this.isActive,
     required this.onTap,
+    this.isOtherParent = false,
     this.scale = 1,
   });
 
   static const Color _parentRed = Color(0xFFE53935);
+  static const Color _otherParentText = Color(0xFF1D4ED8);
+  static const Color _otherParentBorder = Color(0xFF60A5FA);
   static const Color _childBorder = Color(0xFFD63AF9);
   static const Color _childText = Color(0xFFC026D3);
 
@@ -784,7 +936,10 @@ class _MapZoneLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final accent = isMajor ? _parentRed : _childText;
+    final passiveBlue = isOtherParent && !isActive;
+    final accent = passiveBlue
+        ? _otherParentText
+        : (isMajor ? _parentRed : _childText);
     final borderWidth = isActive ? _activeBorderWidth : (isMajor ? 1.2 : 1.0);
     // Base padding minus the extra border width, so the badge's outer size
     // (and its centred anchor) stays the same when it becomes active.
@@ -796,7 +951,14 @@ class _MapZoneLabel extends StatelessWidget {
     );
     final fillColor = isActive
         ? accent
-        : Colors.white.withValues(alpha: isMajor ? 0.92 : 0.90);
+        : Colors.white.withValues(
+            alpha: passiveBlue ? 0.95 : (isMajor ? 0.92 : 0.90),
+          );
+    final borderColor = isActive
+        ? Colors.white
+        : passiveBlue
+        ? _otherParentBorder
+        : (isMajor ? _parentRed : _childBorder);
 
     final badge = AnimatedContainer(
       duration: _transition,
@@ -804,12 +966,7 @@ class _MapZoneLabel extends StatelessWidget {
       decoration: BoxDecoration(
         color: fillColor,
         borderRadius: BorderRadius.circular(isMajor ? 4 : 3),
-        border: Border.all(
-          color: isActive
-              ? Colors.white
-              : (isMajor ? _parentRed : _childBorder),
-          width: borderWidth,
-        ),
+        border: Border.all(color: borderColor, width: borderWidth),
         boxShadow: <BoxShadow>[
           // Selected: 1px outer ring in the fill colour, drawn outside the
           // box so layout is unchanged; separates the white border from the
