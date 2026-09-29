@@ -203,19 +203,9 @@ class _ExpandedMapViewState extends State<_ExpandedMapView> {
   /// Faded drawing + spotlight; dialog-local, reopening starts faded.
   bool _faded = true;
 
-  /// User override for the extra 90° turn; null follows the screen.
-  bool? _rotateOverride;
-
   @override
   Widget build(BuildContext context) {
     final selection = widget.selection;
-    // Auto: a landscape floor on a portrait screen is turned 90° so it
-    // fills the screen.
-    final screen = MediaQuery.sizeOf(context);
-    final autoRotate =
-        screen.height > screen.width &&
-        floorMapDisplayAspectRatio(selection.map) > 1;
-    final rotated = _rotateOverride ?? autoRotate;
     return SafeArea(
       child: Column(
         children: <Widget>[
@@ -224,8 +214,6 @@ class _ExpandedMapViewState extends State<_ExpandedMapView> {
             zoneText: selection.childZoneCode ?? selection.parentZoneCode,
             faded: _faded,
             onToggleFaded: () => setState(() => _faded = !_faded),
-            rotated: rotated,
-            onToggleRotated: () => setState(() => _rotateOverride = !rotated),
             showAll: _showAll,
             onToggleShowAll: () => setState(() => _showAll = !_showAll),
             onClose: widget.onClose,
@@ -259,15 +247,9 @@ class _ExpandedMapViewState extends State<_ExpandedMapView> {
                       // Spotlight needs a focus parent, so "Show all" turns
                       // it off on its own.
                       spotlightFade: _faded ? 0.30 : 0,
-                      // Turn back to 0° for maps the data already rotated
-                      // (e.g. Mold), so the drawing is never upside down.
-                      extraRotationDeg: rotated
-                          ? (isQuarterTurnMapRotation(
-                                  selection.map.rotationDeg,
-                                )
-                                ? -90
-                                : 90)
-                          : 0,
+                      // Same orientation as the card (data rotation only);
+                      // the user zooms/pans by hand.
+                      extraRotationDeg: 0,
                     ),
                   ),
                 ),
@@ -287,8 +269,6 @@ class _MapHeader extends StatelessWidget {
   final VoidCallback? onClose;
   final bool faded;
   final VoidCallback? onToggleFaded;
-  final bool rotated;
-  final VoidCallback? onToggleRotated;
   final bool showAll;
   final VoidCallback? onToggleShowAll;
   final bool collapsed;
@@ -301,8 +281,6 @@ class _MapHeader extends StatelessWidget {
     this.onClose,
     this.faded = false,
     this.onToggleFaded,
-    this.rotated = false,
-    this.onToggleRotated,
     this.showAll = false,
     this.onToggleShowAll,
     this.collapsed = false,
@@ -363,12 +341,6 @@ class _MapHeader extends StatelessWidget {
                 tooltip: faded ? 'Show original' : 'Fade drawing',
                 icon: Icons.contrast_rounded,
                 onPressed: onToggleFaded,
-              ),
-            if (onToggleRotated != null)
-              _HeaderAction(
-                tooltip: rotated ? 'Original orientation' : 'Rotate map',
-                icon: Icons.screen_rotation_rounded,
-                onPressed: onToggleRotated,
               ),
             if (onToggleShowAll != null)
               _HeaderAction(

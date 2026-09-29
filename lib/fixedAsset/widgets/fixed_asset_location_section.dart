@@ -251,14 +251,20 @@ class FixedAssetLocationSection extends StatelessWidget {
               child: _locationValue('Position AA', location.positionAA),
             ),
             const SizedBox(width: 8),
-            Expanded(child: _locationValue('Audited', '$auditedMachineCount')),
+            Expanded(
+              child: _locationValue(
+                'Audited',
+                '$auditedMachineCount',
+                valueColor: _accent,
+              ),
+            ),
           ],
         ),
       ],
     );
   }
 
-  Widget _locationValue(String label, String value) {
+  Widget _locationValue(String label, String value, {Color? valueColor}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
@@ -273,8 +279,8 @@ class FixedAssetLocationSection extends StatelessWidget {
           value.isEmpty ? '-' : value,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
-            color: Colors.white,
+          style: TextStyle(
+            color: valueColor ?? Colors.white,
             fontSize: 14,
             fontWeight: FontWeight.w700,
           ),

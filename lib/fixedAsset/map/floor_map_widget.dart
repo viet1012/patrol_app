@@ -217,19 +217,34 @@ class FloorMapWidget extends StatefulWidget {
 }
 
 class _FloorMapWidgetState extends State<FloorMapWidget>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late final TransformationController _transformationController;
 
-  /// Traveling edge highlight: repeats one linear trip around the selected
-  /// parent polygon every [_highlightLoopDuration] while a parent is
-  /// selected and visible.
+  /// Traveling edge highlight: repeats one linear trip around the highlight
+  /// target (selected child with a polygon, else the selected parent) while
+  /// a parent is selected and visible. The trip duration follows the
+  /// target's on-screen perimeter (see [_applyHighlightDuration]).
   late final AnimationController _highlightController;
 
-  static const Duration _highlightLoopDuration = Duration(milliseconds: 3200);
+  /// Running segment opacity: 0 during pan/zoom, fades back in on release.
+  late final AnimationController _highlightVisibility;
 
-  /// `mapId|parent` the highlight belongs to. Only a change here restarts
-  /// it from the start; child changes, rebuilds, pan/zoom and collapse never
-  /// do.
+  static const Duration _highlightFadeIn = Duration(milliseconds: 150);
+
+  /// On-screen speed of the running segment and the trip-duration bounds.
+  static const double _highlightScreenSpeed = 120;
+  static const double _highlightMinSeconds = 2;
+  static const double _highlightMaxSeconds = 6;
+
+  /// Viewer-scale step at which the trip duration is recomputed.
+  static const double _durationScaleStep = 0.25;
+  double _durationScaleBucket = 1;
+
+  /// Target perimeter in logical pixels (updated when target or size change).
+  double _highlightPerimeter = 0;
+
+  /// `mapId|target` the highlight belongs to. Only a change here restarts
+  /// it from the start; rebuilds, pan/zoom and collapse never do.
   String? _highlightKey;
 
   // Focused-mode filter cache: reused while the source map instance and
@@ -291,6 +306,45 @@ class _FloorMapWidgetState extends State<FloorMapWidget>
       _badgeScaleStep,
       (scale / _badgeScaleStep + 1e-6).floorToDouble() * _badgeScaleStep,
     );
+    final bucket = _durationBucketFor(scale);
+    if (bucket != _durationScaleBucket) {
+      _durationScaleBucket = bucket;
+      _applyHighlightDuration();
+    }
+  }
+
+  static double _durationBucketFor(double scale) {
+    return math.max(
+      _durationScaleStep,
+      (scale / _durationScaleStep + 1e-6).floorToDouble() * _durationScaleStep,
+    );
+  }
+
+  /// One trip = on-screen perimeter / [_highlightScreenSpeed], clamped to
+  /// 2–6 s. Recomputed only on target/size change or per 0.25 scale step,
+  /// never per frame; a running loop restarts from its current position.
+  void _applyHighlightDuration() {
+    if (_highlightPerimeter <= 0) return;
+    final seconds =
+        (_highlightPerimeter * _durationScaleBucket / _highlightScreenSpeed)
+            .clamp(_highlightMinSeconds, _highlightMaxSeconds);
+    final duration = Duration(microseconds: (seconds * 1e6).round());
+    if (duration == _highlightController.duration) return;
+    _highlightController.duration = duration;
+    if (_highlightController.isAnimating) _highlightController.repeat();
+  }
+
+  /// Selected child with its own (visible) polygon: the highlight target
+  /// instead of its parent. Same instance as in the cached child list.
+  MapArea? get _targetChildArea {
+    final child = widget.selectedChildZone;
+    if (child == null) return null;
+    final focus = widget.focusParentZone;
+    if (focus != null && !isFocusRelatedZoneCode(child, focus)) return null;
+    for (final area in childAreasFor(widget.data)) {
+      if (area.code == child) return area;
+    }
+    return null;
   }
 
   @override
@@ -300,8 +354,14 @@ class _FloorMapWidgetState extends State<FloorMapWidget>
       ..addListener(_onTransformChanged);
     _highlightController = AnimationController(
       vsync: this,
-      // Linear: constant perimeter speed, no corner easing.
-      duration: _highlightLoopDuration,
+      // Linear: constant perimeter speed, no corner easing. Replaced by the
+      // perimeter-based duration once the target is laid out.
+      duration: const Duration(milliseconds: 3200),
+    );
+    _highlightVisibility = AnimationController(
+      vsync: this,
+      duration: _highlightFadeIn,
+      value: 1,
     );
   }
 
@@ -324,7 +384,8 @@ class _FloorMapWidgetState extends State<FloorMapWidget>
   /// setting. Otherwise repeats continuously, holding still during pan/zoom
   /// and resuming from the same point.
   void _syncHighlight() {
-    final key = '${widget.data.id}|${widget.selectedParentZone}';
+    final target = _targetChildArea?.code ?? widget.selectedParentZone;
+    final key = '${widget.data.id}|$target';
     if (key != _highlightKey) {
       _highlightKey = key;
       _highlightController.reset();
@@ -344,16 +405,19 @@ class _FloorMapWidgetState extends State<FloorMapWidget>
     }
   }
 
-  // Gesture pause only toggles the ticker; no rebuild, the segment freezes
-  // in place and resumes from the same point.
+  // Gesture pause: no rebuild. The running segment is hidden (static
+  // outline + glow stay), then fades back in over 150 ms on release and
+  // continues from the same point.
   void _onInteractionStart(ScaleStartDetails _) {
     _interacting = true;
+    _highlightVisibility.value = 0;
     _syncHighlight();
   }
 
   void _onInteractionEnd(ScaleEndDetails _) {
     _interacting = false;
     _syncHighlight();
+    _highlightVisibility.forward(from: 0);
   }
 
   @override
@@ -371,6 +435,7 @@ class _FloorMapWidgetState extends State<FloorMapWidget>
   @override
   void dispose() {
     _highlightController.dispose();
+    _highlightVisibility.dispose();
     _transformationController
       ..removeListener(_onTransformChanged)
       ..dispose();
@@ -527,6 +592,9 @@ class _FloorMapWidgetState extends State<FloorMapWidget>
     return _highlightPainter = SelectedAreaHighlightPainter(
       area: area,
       progress: _highlightController,
+      // Constant on-screen width/length; repaints (no rebuild) per step.
+      viewerScale: _viewerScale,
+      visibility: _highlightVisibility,
     );
   }
 
@@ -582,13 +650,27 @@ class _FloorMapWidgetState extends State<FloorMapWidget>
     final zones = _visibleZones;
     final focusZone = _visibleFocusZone;
     final childAreas = _visibleChildAreas;
-    MapArea? highlightArea;
-    if (_highlightActive) {
+    // Highlight target: the selected child when it has a polygon, else the
+    // selected parent.
+    final targetChild = _targetChildArea;
+    MapArea? targetArea = targetChild;
+    if (targetArea == null) {
       for (final area in areas) {
         if (isSelectedMapArea(area, widget.selectedParentZone)) {
-          highlightArea = area;
+          targetArea = area;
           break;
         }
+      }
+    }
+    final highlightArea = _highlightActive ? targetArea : null;
+    if (highlightArea != null) {
+      final perimeter = SelectedAreaHighlightPainter.perimeterFor(
+        highlightArea,
+        logicalSize,
+      );
+      if ((perimeter - _highlightPerimeter).abs() > 0.5) {
+        _highlightPerimeter = perimeter;
+        _applyHighlightDuration();
       }
     }
     final imageFade = widget.imageFade.clamp(0.0, 0.8).toDouble();
@@ -648,6 +730,7 @@ class _FloorMapWidgetState extends State<FloorMapWidget>
                   selectedChildZone: widget.selectedChildZone,
                   // Full floor: unselected parents as raised cards.
                   raised: !focused,
+                  childTargeted: targetChild != null,
                 ),
               ),
             ),
@@ -662,7 +745,7 @@ class _FloorMapWidgetState extends State<FloorMapWidget>
                     areas: childAreas,
                     selectedChildZone: widget.selectedChildZone,
                     selectedParentZone: widget.selectedParentZone,
-                    dashUnselected: !focused,
+                    raised: !focused,
                   ),
                 ),
               ),
@@ -828,25 +911,26 @@ class _FadePainter extends CustomPainter {
   }
 }
 
-/// Child sub-area outlines, drawn above the parent layer. Children of the
-/// selected parent are purple (the selected child filled, 2.4px); with
-/// [dashUnselected] (full floor) the other parents' children are thin
-/// dashed blue lines. Repaints only when an input changes.
+/// Child sub-area outlines, drawn above the parent layer. The selected
+/// child is the highlight target (glow + 3px select-blue outline, faint
+/// fill when [raised]); the selected parent's other children are purple;
+/// with [raised] (full floor) other parents' children are thin dashed grey
+/// lines. Repaints only when an input changes.
 class _ChildAreaPainter extends CustomPainter {
   final List<MapArea> areas;
   final String? selectedChildZone;
   final String? selectedParentZone;
-  final bool dashUnselected;
+  final bool raised;
 
   const _ChildAreaPainter({
     required this.areas,
     this.selectedChildZone,
     this.selectedParentZone,
-    this.dashUnselected = false,
+    this.raised = false,
   });
 
   static const Color _childPurple = Color(0xFFD63AF9);
-  static const Color _dashBlue = Color(0xFF60A5FA);
+  static const Color _dashGrey = Color(0xFF94A3B8);
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -856,7 +940,7 @@ class _ChildAreaPainter extends CustomPainter {
       ..strokeWidth = 1.4
       ..strokeJoin = StrokeJoin.round;
     final dash = Paint()
-      ..color = _dashBlue
+      ..color = _dashGrey
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1;
 
@@ -870,7 +954,7 @@ class _ChildAreaPainter extends CustomPainter {
       }
       final path = mapAreaPath(area, size);
       final parent = area.code.substring(0, area.code.lastIndexOf('-'));
-      if (dashUnselected && parent != selectedParentZone) {
+      if (raised && parent != selectedParentZone) {
         canvas.drawPath(dashedPath(path), dash);
       } else {
         canvas.drawPath(path, stroke);
@@ -878,14 +962,7 @@ class _ChildAreaPainter extends CustomPainter {
     }
 
     if (selected == null) return;
-    final path = mapAreaPath(selected, size);
-    canvas.drawPath(
-      path,
-      Paint()
-        ..color = _childPurple.withValues(alpha: 0.16)
-        ..style = PaintingStyle.fill,
-    );
-    canvas.drawPath(path, stroke..strokeWidth = 2.4);
+    paintSelectedTarget(canvas, mapAreaPath(selected, size), fill: raised);
   }
 
   @override
@@ -893,19 +970,20 @@ class _ChildAreaPainter extends CustomPainter {
     return !identical(oldDelegate.areas, areas) ||
         oldDelegate.selectedChildZone != selectedChildZone ||
         oldDelegate.selectedParentZone != selectedParentZone ||
-        oldDelegate.dashUnselected != dashUnselected;
+        oldDelegate.raised != raised;
   }
 }
 
-/// Zone code on a compact badge: red for the selected parent (solid unless
-/// a child is selected), blue for other parents, purple for children
-/// (matching their outlines); the selected label turns solid.
+/// Zone code on a compact badge. Selected (the highlight target): solid
+/// select-blue with a white border and a 1px outer ring. The selected
+/// parent while one of its children is selected: white with select-blue
+/// text/border. Other parents: neutral grey. Children: purple.
 class _MapZoneLabel extends StatelessWidget {
   final MapZone zone;
   final bool isMajor;
   final bool isActive;
 
-  /// A parent other than the selected one: blue passive style.
+  /// A parent other than the selected one: neutral grey style.
   final bool isOtherParent;
   final ValueChanged<MapZone>? onTap;
 
@@ -921,9 +999,8 @@ class _MapZoneLabel extends StatelessWidget {
     this.scale = 1,
   });
 
-  static const Color _parentRed = Color(0xFFE53935);
-  static const Color _otherParentText = Color(0xFF1D4ED8);
-  static const Color _otherParentBorder = Color(0xFF60A5FA);
+  static const Color _otherParentText = Color(0xFF334155);
+  static const Color _otherParentBorder = Color(0xFFCBD5E1);
   static const Color _childBorder = Color(0xFFD63AF9);
   static const Color _childText = Color(0xFFC026D3);
 
@@ -936,10 +1013,22 @@ class _MapZoneLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final passiveBlue = isOtherParent && !isActive;
-    final accent = passiveBlue
+    final otherParent = isOtherParent && !isActive;
+    final textColor = isActive
+        ? Colors.white
+        : otherParent
         ? _otherParentText
-        : (isMajor ? _parentRed : _childText);
+        : (isMajor ? mapSelectColor : _childText);
+    final borderColor = isActive
+        ? Colors.white
+        : otherParent
+        ? _otherParentBorder
+        : (isMajor ? mapSelectColor : _childBorder);
+    final fillColor = isActive
+        ? mapSelectColor
+        : Colors.white.withValues(
+            alpha: otherParent ? 0.95 : (isMajor ? 0.92 : 0.90),
+          );
     final borderWidth = isActive ? _activeBorderWidth : (isMajor ? 1.2 : 1.0);
     // Base padding minus the extra border width, so the badge's outer size
     // (and its centred anchor) stays the same when it becomes active.
@@ -949,16 +1038,6 @@ class _MapZoneLabel extends StatelessWidget {
       horizontal: (isMajor ? 6.0 : 4.0) * scale - borderDelta,
       vertical: (isMajor ? 2.5 : 1.5) * scale - borderDelta,
     );
-    final fillColor = isActive
-        ? accent
-        : Colors.white.withValues(
-            alpha: passiveBlue ? 0.95 : (isMajor ? 0.92 : 0.90),
-          );
-    final borderColor = isActive
-        ? Colors.white
-        : passiveBlue
-        ? _otherParentBorder
-        : (isMajor ? _parentRed : _childBorder);
 
     final badge = AnimatedContainer(
       duration: _transition,
@@ -968,13 +1047,15 @@ class _MapZoneLabel extends StatelessWidget {
         borderRadius: BorderRadius.circular(isMajor ? 4 : 3),
         border: Border.all(color: borderColor, width: borderWidth),
         boxShadow: <BoxShadow>[
-          // Selected: 1px outer ring in the fill colour, drawn outside the
+          // Selected: 1px outer ring in the select colour, drawn outside the
           // box so layout is unchanged; separates the white border from the
           // drawing underneath.
-          // BoxShadow(
-          //   color: isActive ? accent : accent.withValues(alpha: 0),
-          //   spreadRadius: 1,
-          // ),
+          BoxShadow(
+            color: isActive
+                ? mapSelectColor
+                : mapSelectColor.withValues(alpha: 0),
+            spreadRadius: 1,
+          ),
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.18),
             blurRadius: 2,
@@ -986,7 +1067,7 @@ class _MapZoneLabel extends StatelessWidget {
         duration: _transition,
         style: DefaultTextStyle.of(context).style.merge(
           TextStyle(
-            color: isActive ? Colors.white : accent,
+            color: textColor,
             fontSize: (isMajor ? 10.5 : 9.5) * scale,
             fontWeight: isActive
                 ? FontWeight.w900

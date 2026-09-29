@@ -1,5 +1,7 @@
+import 'dart:math' as math;
 import 'dart:ui' show PathMetric;
 
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 
 import 'floor_map_models.dart';
@@ -37,30 +39,72 @@ Path dashedPath(Path source, {double dash = 4, double gap = 3}) {
   return dashed;
 }
 
+/// Selection colours: [mapSelectColor] for outlines and the solid badge,
+/// [mapSelectLightColor] for the running highlight and glows.
+const Color mapSelectColor = Color(0xFF0284C7);
+const Color mapSelectLightColor = Color(0xFF0EA5E9);
+
+/// Glow + outline (+ optional faint fill) of the highlight target — the
+/// selected child if it has a polygon, otherwise the selected parent.
+void paintSelectedTarget(Canvas canvas, Path path, {required bool fill}) {
+  canvas.drawPath(
+    path,
+    Paint()
+      ..color = mapSelectLightColor.withValues(alpha: 0.40)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 7
+      ..strokeJoin = StrokeJoin.round
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3),
+  );
+  if (fill) {
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = mapSelectColor.withValues(alpha: 0.06)
+        ..style = PaintingStyle.fill,
+    );
+  }
+  canvas.drawPath(
+    path,
+    Paint()
+      ..color = mapSelectColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3
+      ..strokeJoin = StrokeJoin.round
+      ..strokeCap = StrokeCap.round,
+  );
+}
+
 /// Static polygon layer (fills + outlines). Repaints only when its inputs
 /// change, never per animation frame.
 ///
-/// [raised] (full-floor view): unselected parents are drawn as raised cards
-/// (drop shadow, light fill, blue outline) in three passes, so every
-/// shadow sits under every card. The selected parent always gets a red
-/// glow + 3px red outline, drawn last (plus a faint red fill when raised).
+/// [raised] (full-floor view): unselected parents are drawn as grey raised
+/// cards (drop shadow, light fill, slate outline) in three passes, so every
+/// shadow sits under every card. The selected parent is drawn last: as the
+/// highlight target (glow + 3px outline, faint fill when raised), or with a
+/// plain 2px outline when [childTargeted] (a child of it is the target).
 class FloorMapPainter extends CustomPainter {
   final List<MapArea> areas;
   final String? selectedParentZone;
   final String? selectedChildZone;
   final bool raised;
 
+  /// The selected child (with its own polygon) is the highlight target.
+  final bool childTargeted;
+
   const FloorMapPainter({
     required this.areas,
     this.selectedParentZone,
     this.selectedChildZone,
     this.raised = false,
+    this.childTargeted = false,
   });
 
   static const Color _normalBlue = Color(0xFF2563EB);
   static const Color _parentRed = Color(0xFFE53935);
-  static const Color _cardShadow = Color(0xFF1E3A8A);
-  static const Color _cardFill = Color(0xFFEFF6FF);
+  static const Color _cardShadow = Color(0xFF0F172A);
+  static const Color _cardFill = Color(0xFFF8FAFC);
+  static const Color _cardOutline = Color(0xFF64748B);
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -79,16 +123,16 @@ class FloorMapPainter extends CustomPainter {
 
     if (raised) {
       final shadow = Paint()
-        ..color = _cardShadow.withValues(alpha: 0.30)
+        ..color = _cardShadow.withValues(alpha: 0.22)
         ..style = PaintingStyle.fill
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1.8);
       final fill = Paint()
         ..color = _cardFill.withValues(alpha: 0.55)
         ..style = PaintingStyle.fill;
       final stroke = Paint()
-        ..color = _normalBlue
+        ..color = _cardOutline
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.8
+        ..strokeWidth = 1.6
         ..strokeJoin = StrokeJoin.round;
       for (final path in paths) {
         canvas.drawPath(path.shift(const Offset(0, 1.5)), shadow);
@@ -100,6 +144,8 @@ class FloorMapPainter extends CustomPainter {
         canvas.drawPath(path, stroke);
       }
     } else {
+      // Focus view: unselected parents keep the plain red outline (not a
+      // selection state).
       final fill = Paint()
         ..color = _normalBlue.withValues(alpha: 0.02)
         ..style = PaintingStyle.fill;
@@ -115,32 +161,18 @@ class FloorMapPainter extends CustomPainter {
     }
 
     if (selectedPath == null) return;
-    canvas.drawPath(
-      selectedPath,
-      Paint()
-        ..color = _parentRed.withValues(alpha: 0.45)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 7
-        ..strokeJoin = StrokeJoin.round
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3),
-    );
-    if (raised) {
+    if (childTargeted) {
       canvas.drawPath(
         selectedPath,
         Paint()
-          ..color = _parentRed.withValues(alpha: 0.05)
-          ..style = PaintingStyle.fill,
+          ..color = mapSelectColor
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2
+          ..strokeJoin = StrokeJoin.round,
       );
+    } else {
+      paintSelectedTarget(canvas, selectedPath, fill: raised);
     }
-    canvas.drawPath(
-      selectedPath,
-      Paint()
-        ..color = _parentRed
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 3
-        ..strokeJoin = StrokeJoin.round
-        ..strokeCap = StrokeCap.round,
-    );
   }
 
   @override
@@ -148,15 +180,22 @@ class FloorMapPainter extends CustomPainter {
     return oldDelegate.areas != areas ||
         oldDelegate.selectedParentZone != selectedParentZone ||
         oldDelegate.selectedChildZone != selectedChildZone ||
-        oldDelegate.raised != raised;
+        oldDelegate.raised != raised ||
+        oldDelegate.childTargeted != childTargeted;
   }
 }
 
-/// Traveling edge highlight for the selected polygon, repainted by
-/// [progress] (a repeating linear 0..1 cycle, [loops] trips per cycle)
-/// without rebuilding any widget.
+/// Running highlight around the highlight target, repainted by [progress]
+/// (a repeating linear 0..1 cycle, [loops] trips per cycle) without
+/// rebuilding any widget.
 ///
-/// Per frame: one `extractPath` and two `drawPath` calls. The contour
+/// With [viewerScale] (the InteractiveViewer scale) every stroke width and
+/// the segment length are divided by the scale, so on screen the segment
+/// is always [segmentScreenLength] px long and [coreScreenWidth] px thick,
+/// at any zoom and for any polygon size. [visibility] (0..1) fades the
+/// segment in and out, e.g. hidden during pan/zoom.
+///
+/// Per frame: two `extractPath` and four `drawPath` calls. The contour
 /// (traced twice, so a segment crossing the start corner stays one
 /// continuous stroke) and its metric are cached until the size changes.
 class SelectedAreaHighlightPainter extends CustomPainter {
@@ -166,34 +205,53 @@ class SelectedAreaHighlightPainter extends CustomPainter {
   /// Trips around the perimeter over one 0..1 run of [progress].
   final int loops;
 
+  final ValueListenable<double>? viewerScale;
+  final Animation<double>? visibility;
+
   SelectedAreaHighlightPainter({
     required this.area,
     required this.progress,
     this.loops = 1,
-  }) : super(repaint: progress);
+    this.viewerScale,
+    this.visibility,
+  }) : super(
+         repaint: Listenable.merge(<Listenable?>[
+           progress,
+           viewerScale,
+           visibility,
+         ]),
+       );
 
-  /// Fraction of the perimeter covered by the moving segment.
+  /// Segment length as a fraction of the perimeter, used only without
+  /// [viewerScale].
   static const double segmentFraction = 0.2;
 
-  static const Color _highlightCyan = Color(0xFF38BDF8);
+  /// On-screen length of the running segment and of the faint trail
+  /// behind it.
+  static const double segmentScreenLength = 90;
+  static const double trailScreenLength = 60;
 
-  // Wide, low-opacity stroke instead of a Gaussian blur: cheap halo.
-  static final Paint _glow = Paint()
-    ..color = _highlightCyan.withValues(alpha: 0.22)
-    ..style = PaintingStyle.stroke
-    ..strokeWidth = 6
-    ..strokeCap = StrokeCap.round
-    ..strokeJoin = StrokeJoin.round;
-  static final Paint _core = Paint()
-    ..color = _highlightCyan.withValues(alpha: 0.95)
-    ..style = PaintingStyle.stroke
-    ..strokeWidth = 2
-    ..strokeCap = StrokeCap.round
-    ..strokeJoin = StrokeJoin.round;
+  /// On-screen width of the segment core (the white underlay is +2 px).
+  static const double coreScreenWidth = 3;
 
   Size? _cachedSize;
   PathMetric? _loopMetric;
   double _perimeter = 0;
+
+  /// Perimeter of [area] in logical pixels at [size].
+  static double perimeterFor(MapArea area, Size size) {
+    if (area.points.length < 2) return 0;
+    var length = 0.0;
+    for (var i = 0; i < area.points.length; i++) {
+      final a = mapPointToOffset(area.points[i], size);
+      final b = mapPointToOffset(
+        area.points[(i + 1) % area.points.length],
+        size,
+      );
+      length += (b - a).distance;
+    }
+    return length;
+  }
 
   PathMetric? _metricFor(Size size) {
     if (size == _cachedSize) return _loopMetric;
@@ -219,25 +277,67 @@ class SelectedAreaHighlightPainter extends CustomPainter {
     return _loopMetric;
   }
 
+  static Paint _stroke(Color color, double width) => Paint()
+    ..color = color
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = width
+    ..strokeCap = StrokeCap.round
+    ..strokeJoin = StrokeJoin.round;
+
   @override
   void paint(Canvas canvas, Size size) {
+    final opacity = (visibility?.value ?? 1).clamp(0.0, 1.0);
+    if (opacity <= 0) return;
     final metric = _metricFor(size);
     if (metric == null) return;
-    // start ∈ [0, perimeter), end ≤ 2·perimeter: never needs wrapping, so
-    // progress 1.0 → 0.0 lands on the identical segment (seamless loop).
-    final start = ((progress.value * loops) % 1.0) * _perimeter;
-    final segment = metric.extractPath(
-      start,
-      start + _perimeter * segmentFraction,
+
+    final scale = viewerScale?.value ?? 1;
+    final px = 1 / (scale <= 0 ? 1 : scale); // one screen pixel, logical
+    final segment = viewerScale == null
+        ? _perimeter * segmentFraction
+        : math.min(segmentScreenLength * px, _perimeter);
+    final trail = math.min(trailScreenLength * px, _perimeter - segment);
+    final width = coreScreenWidth * px;
+
+    // Head position; the trail and segment sit behind it. Offsetting by one
+    // perimeter keeps every extract range inside [0, 2·perimeter].
+    final head =
+        ((progress.value * loops) % 1.0) * _perimeter + _perimeter;
+    final segmentStart = head - segment;
+
+    if (trail > 0) {
+      canvas.drawPath(
+        metric.extractPath(segmentStart - trail, segmentStart),
+        _stroke(
+          mapSelectLightColor.withValues(alpha: 0.25 * opacity),
+          width,
+        ),
+      );
+    }
+    final path = metric.extractPath(segmentStart, head);
+    canvas.drawPath(
+      path,
+      _stroke(
+        mapSelectLightColor.withValues(alpha: 0.18 * opacity),
+        width + 6 * px,
+      ),
     );
-    canvas.drawPath(segment, _glow);
-    canvas.drawPath(segment, _core);
+    canvas.drawPath(
+      path,
+      _stroke(Colors.white.withValues(alpha: opacity), width + 2 * px),
+    );
+    canvas.drawPath(
+      path,
+      _stroke(mapSelectLightColor.withValues(alpha: opacity), width),
+    );
   }
 
   @override
   bool shouldRepaint(covariant SelectedAreaHighlightPainter oldDelegate) {
     return oldDelegate.area != area ||
         oldDelegate.progress != progress ||
-        oldDelegate.loops != loops;
+        oldDelegate.loops != loops ||
+        oldDelegate.viewerScale != viewerScale ||
+        oldDelegate.visibility != visibility;
   }
 }
