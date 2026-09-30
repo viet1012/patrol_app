@@ -40,6 +40,7 @@ class FixedAssetController extends ChangeNotifier {
       onChanged: _notify,
       onError: showError,
       isDisposed: () => _disposed,
+      api: api,
     );
   }
 
@@ -148,6 +149,32 @@ class FixedAssetController extends ChangeNotifier {
 
   /// Tăng mỗi lần đổi mode.
   int _modeGeneration = 0;
+
+  /// A mismatch dialog is open: other scans are ignored (not queued).
+  bool _confirmOpen = false;
+  String? _confirmCode;
+
+  /// QR the user just dismissed in a MANUAL mismatch dialog: its repeat
+  /// window is [_cancelRepeatWindow] instead of [_repeatScanWindow], so
+  /// scanning it again (after it left the frame) asks again quickly.
+  String? _shortRepeatQr;
+  static const Duration _cancelRepeatWindow = Duration(milliseconds: 1200);
+
+  /// Location [_machines] was loaded for (null while loading / on error /
+  /// cleared): the MANUAL local check only trusts a list of this location.
+  FixedAssetAuditLocation? _machinesLocation;
+
+  /// [FA-UX] timing log (debug only): ms since the scan was received.
+  final Stopwatch _uxClock = Stopwatch()..start();
+  Duration _uxScanStart = Duration.zero;
+
+  /// Debug timing log for the MANUAL scan UX (also used by the screen for
+  /// camera / dialog events).
+  void uxLog(String event) {
+    if (!kDebugMode) return;
+    final ms = (_uxClock.elapsed - _uxScanStart).inMilliseconds;
+    debugPrint('[FA-UX] +${ms}ms $event');
+  }
 
   /// "AUTO" / "MANUAL" của từng pipeline (theo mode lúc bắt đầu), dùng cho
   /// mọi POST /audit của pipeline đó, kể cả re-POST sau xác nhận.
@@ -292,6 +319,7 @@ class FixedAssetController extends ChangeNotifier {
     }
     _machineReq++;
     _machines = const <FixedAssetMachine>[];
+    _machinesLocation = null;
     _machineError = null;
     _loadMachines(
       location.fac,
@@ -627,6 +655,7 @@ class FixedAssetController extends ChangeNotifier {
 
     _machineReq++;
     _machines = const <FixedAssetMachine>[];
+    _machinesLocation = null;
     _machineError = null;
     _clearMachineSearch();
     // Also loads zone-progress for this floor (cached).
@@ -682,7 +711,263 @@ class FixedAssetController extends ChangeNotifier {
     _lastAuditedUserName = null;
     _mismatchMaster = null;
     if (_lastSeenQr != null) _lastSeenAt = DateTime.now();
+    _scanChipText = null;
+    _pendingLocationQr = null;
+    _qrLocationUnresolved = false;
     resetQr();
+  }
+
+  // ============================================================
+  // SCAN FEEDBACK: camera chip + MANUAL without location
+  // ============================================================
+
+  /// Parsed text of the last received scan ("{code} · {floor}/{AA}") for
+  /// the chip over the camera; null = hidden (mode / location change).
+  String? _scanChipText;
+  String? get scanChipText => _scanChipText;
+
+  /// Bumped on every received scan (also ignored repeats): the chip shows /
+  /// flashes again, so no scan goes without visible feedback.
+  int _scanChipTick = 0;
+  int get scanChipTick => _scanChipTick;
+
+  /// The chip may fade out: the scan has a final result (not processing,
+  /// no dialog open, not resolving a location).
+  bool get isScanSettled =>
+      _scanStatus != FixedAssetScanStatus.checking &&
+      _scanStatus != FixedAssetScanStatus.saving &&
+      !_confirmOpen &&
+      !_resolvingQrLocation;
+
+  static String scanChipLabel(String rawQr) {
+    final data = parseFixedAssetQr(rawQr);
+    final code = data.machineCode.isNotEmpty ? data.machineCode : rawQr.trim();
+    return data.hasLocation ? '$code · ${data.floor}/${data.positionAA}' : code;
+  }
+
+  void _setScanChip(String rawQr) {
+    _scanChipText = scanChipLabel(rawQr);
+    _scanChipTick++;
+    _notify();
+  }
+
+  void _flashScanChip() {
+    if (_scanChipText == null) return;
+    _scanChipTick++;
+    _notify();
+  }
+
+  /// Bumped on entering MANUAL: empty dropdowns pulse once.
+  int _manualPromptTick = 0;
+  int get manualPromptTick => _manualPromptTick;
+
+  /// First empty dropdown after a scan without location (red + shake);
+  /// [manualMissingTick] re-triggers the shake.
+  FixedAssetManualField? _manualMissingField;
+  int _manualMissingTick = 0;
+  FixedAssetManualField? get manualMissingField =>
+      _scanStatus == FixedAssetScanStatus.needsLocation
+      ? _manualMissingField
+      : null;
+  int get manualMissingTick => _manualMissingTick;
+
+  FixedAssetManualField? get _firstMissingManualField {
+    if (manual.selectedFac == null) return FixedAssetManualField.fac;
+    if (manual.selectedFloor == null) return FixedAssetManualField.floor;
+    if (manual.selectedPositionA == null) {
+      return FixedAssetManualField.positionA;
+    }
+    if (manual.selectedPositionAA == null) {
+      return FixedAssetManualField.positionAA;
+    }
+    return null;
+  }
+
+  /// Raw QR of the last scan without location that carries Floor +
+  /// PositionAA ("Dùng vị trí từ QR").
+  String? _pendingLocationQr;
+  bool _qrLocationUnresolved = false;
+  bool _resolvingQrLocation = false;
+  bool get isResolvingQrLocation => _resolvingQrLocation;
+
+  /// "{floor} / {positionAA}" for the "Dùng vị trí …" button; null when not
+  /// offered (no QR location, or it could not be resolved).
+  String? get pendingQrLocationLabel {
+    final raw = _pendingLocationQr;
+    if (raw == null ||
+        _qrLocationUnresolved ||
+        _scanStatus != FixedAssetScanStatus.needsLocation) {
+      return null;
+    }
+    final data = parseFixedAssetQr(raw);
+    return '${data.floor} / ${data.positionAA}';
+  }
+
+  /// Awaited by [useLocationFromQr] before re-processing the QR.
+  Future<void>? _manualMachineLoad;
+
+  /// MANUAL scan while the location is incomplete: no API, amber status,
+  /// first empty dropdown marked. Repeated detections of the same code
+  /// only flash the chip (no re-shake).
+  void _handleScanWithoutLocation(String qr, DateTime now) {
+    final data = parseFixedAssetQr(qr);
+    if (data.machineCode.isEmpty) {
+      _setScanChip(qr);
+      _scanStatus = FixedAssetScanStatus.failed;
+      _scannedCode = '';
+      _statusMessage = 'Invalid machine QR';
+      _notify();
+      return;
+    }
+    final same =
+        _scanStatus == FixedAssetScanStatus.needsLocation &&
+        _scannedCode == data.machineCode &&
+        _lastSeenQr == qr;
+    // Keep the repeat window running: once a location is chosen, the QR
+    // still in frame is not saved there by itself.
+    _lastSeenQr = qr;
+    _lastSeenAt = now;
+    _isResumedFromLock = false;
+    _setScanChip(qr);
+    if (same) return;
+
+    _scanGeneration++;
+    _scannedCode = data.machineCode;
+    _scannedFaName = data.displayName;
+    _mismatchMaster = null;
+    _lastAuditedAt = null;
+    _lastAuditedUserId = null;
+    _lastAuditedUserName = null;
+    _pendingLocationQr = data.hasLocation ? qr : null;
+    _qrLocationUnresolved = false;
+    _scanStatus = FixedAssetScanStatus.needsLocation;
+    _statusMessage = data.hasLocation
+        ? 'Chưa chọn vị trí. Máy ${data.machineCode} · '
+              'QR: ${data.floor}/${data.positionAA}'
+        : 'Chưa chọn vị trí. Máy ${data.machineCode}';
+    _manualMissingField = _firstMissingManualField;
+    _manualMissingTick++;
+    _scanLog('no location: ${data.machineCode} (missing $_manualMissingField)');
+    _notify();
+  }
+
+  /// "Dùng vị trí từ QR": resolve Fac + PositionA from the QR's Floor +
+  /// PositionAA through the MAP endpoints, fill the cascade, load the
+  /// machines, then process that same QR again (no re-scan). Exactly one
+  /// match is required; otherwise the user picks by hand.
+  Future<void> useLocationFromQr() async {
+    final raw = _pendingLocationQr;
+    if (raw == null || isAutoMode || _resolvingQrLocation || _disposed) return;
+    final data = parseFixedAssetQr(raw);
+    final modeGeneration = _modeGeneration;
+
+    _resolvingQrLocation = true;
+    _scanStatus = FixedAssetScanStatus.checking;
+    _statusMessage = 'Đang tìm vị trí ${data.floor}/${data.positionAA}…';
+    _notify();
+
+    bool stillHere() =>
+        !_disposed && !isAutoMode && modeGeneration == _modeGeneration;
+
+    try {
+      final matches = await _resolveLocationFromMap(data.floor, data.positionAA);
+      if (!stillHere()) return;
+      if (matches.length != 1) {
+        _scanLog('QR location ${data.floor}/${data.positionAA}: '
+            '${matches.length} matches');
+        _showQrLocationUnresolved(raw, data);
+        return;
+      }
+      final target = matches.single;
+      await onFacChanged(target.fac);
+      if (stillHere() && manual.selectedFloor != target.floor) {
+        await onFloorChanged(target.floor);
+      }
+      if (stillHere() && manual.selectedPositionA != target.positionA) {
+        await onPositionAChanged(target.positionA);
+      }
+      if (stillHere() && manual.selectedPositionAA != target.positionAA) {
+        await onPositionAAChanged(target.positionAA);
+      }
+      if (!stillHere()) return;
+      if (manual.selectedLocation != target) {
+        _showQrLocationUnresolved(raw, data);
+        return;
+      }
+      await _manualMachineLoad;
+      if (!stillHere() || manual.selectedLocation != target) return;
+
+      // Same QR again, straight away: the cascade refreshed its repeat
+      // window, which must not swallow this deliberate retry.
+      _resolvingQrLocation = false;
+      _lastSeenQr = null;
+      _lastSeenAt = null;
+      await processScannedQr(raw);
+    } catch (error) {
+      if (!stillHere()) return;
+      _scanLog('QR location lookup failed: ${fixedAssetErrorText(error)}');
+      _showQrLocationUnresolved(raw, data);
+    } finally {
+      _resolvingQrLocation = false;
+    }
+  }
+
+  void _showQrLocationUnresolved(String raw, FixedAssetQrData data) {
+    _pendingLocationQr = raw;
+    _qrLocationUnresolved = true;
+    _scannedCode = data.machineCode;
+    _scanStatus = FixedAssetScanStatus.needsLocation;
+    _statusMessage = 'Không xác định được vị trí từ QR';
+    _manualMissingField = _firstMissingManualField;
+    _manualMissingTick++;
+    _notify();
+  }
+
+  /// Every MAP location whose Floor + PositionAA equal the QR's (trimmed,
+  /// case-insensitive). Candidate PositionAs are those the code belongs to
+  /// ("A35" for "A35-1", or itself); all PositionAs if none fits.
+  Future<List<FixedAssetAuditLocation>> _resolveLocationFromMap(
+    String floor,
+    String positionAA,
+  ) async {
+    String norm(String v) => v.trim().toLowerCase();
+    final wantFloor = norm(floor);
+    final wantAA = norm(positionAA);
+    final facs = manual.facs.isNotEmpty ? manual.facs : await api.fetchFacs();
+    final found = <FixedAssetAuditLocation>[];
+
+    await Future.wait(
+      facs.map((fac) async {
+        final floors = await api.fetchFloors(fac: fac);
+        for (final f in floors.where((f) => norm(f) == wantFloor)) {
+          final positionAs = await api.fetchPositionA(fac: fac, floor: f);
+          final likely = positionAs.where((a) {
+            final pa = norm(a);
+            return wantAA == pa || wantAA.startsWith('$pa-');
+          }).toList();
+          await Future.wait(
+            (likely.isNotEmpty ? likely : positionAs).map((pa) async {
+              final aas = await api.fetchPositionAA(
+                fac: fac,
+                floor: f,
+                positionA: pa,
+              );
+              for (final aa in aas.where((aa) => norm(aa) == wantAA)) {
+                found.add(
+                  FixedAssetAuditLocation(
+                    fac: fac,
+                    floor: f,
+                    positionA: pa,
+                    positionAA: aa,
+                  ),
+                );
+              }
+            }),
+          );
+        }
+      }),
+    );
+    return found;
   }
 
   void _failScan(int generation, String message) {
@@ -702,6 +987,15 @@ class FixedAssetController extends ChangeNotifier {
 
     final now = DateTime.now();
 
+    // A confirmation dialog is open: ignore other scans (no queue) and the
+    // camera's repeated detections of the same code (the chip still
+    // flashes: the scan was received).
+    if (_confirmOpen) {
+      uxLog('skip "$qr": waiting confirmation of $_confirmCode');
+      _flashScanChip();
+      return;
+    }
+
     if (_pipelineBusy) {
       // Giữ QR đang xử lý ở trạng thái "cũ" để không xử lý lại sau khi xong.
       // QR khác không được ghi nhận, để lần detect sau vẫn là scan mới.
@@ -710,6 +1004,15 @@ class FixedAssetController extends ChangeNotifier {
         _lastSeenAt = now;
       }
       _scanLog('skip: pipeline busy (processing "$_processingRawQr")');
+      _flashScanChip();
+      return;
+    }
+
+    // MANUAL without a full location: never saved, so no repeat window
+    // applies — every scan shows "choose a location" (and can offer the
+    // QR's own location).
+    if (!isAutoMode && manual.selectedLocation == null) {
+      _handleScanWithoutLocation(qr, now);
       return;
     }
 
@@ -717,21 +1020,28 @@ class FixedAssetController extends ChangeNotifier {
     // Mỗi lần detect lặp sẽ gia hạn cửa sổ, nên chỉ khi QR rời khung
     // quá _repeatScanWindow mới được scan lại (không blacklist vĩnh viễn).
     final lastAt = _lastSeenAt;
+    final repeatWindow = qr == _shortRepeatQr
+        ? _cancelRepeatWindow
+        : _repeatScanWindow;
     final isRepeat =
-        qr == _lastSeenQr &&
-        lastAt != null &&
-        now.difference(lastAt) < _repeatScanWindow;
+        qr == _lastSeenQr && lastAt != null && now.difference(lastAt) < repeatWindow;
 
     _lastSeenQr = qr;
     _lastSeenAt = now;
 
     if (isRepeat) {
       _scanLog('skip: repeat within ${_repeatScanWindow.inSeconds}s');
+      // Status kept; the chip flashes so the user sees it was received.
+      _setScanChip(qr);
       return;
     }
 
     final generation = ++_scanGeneration;
     _isResumedFromLock = false;
+    _shortRepeatQr = null;
+    _uxScanStart = _uxClock.elapsed;
+    uxLog('received "$qr" (${_locationMode.name}) #$generation');
+    _setScanChip(qr);
     final qrData = parseFixedAssetQr(qr);
     final machineCode = qrData.machineCode;
 
@@ -794,10 +1104,11 @@ class FixedAssetController extends ChangeNotifier {
     _lastAuditedUserId = null;
     _lastAuditedUserName = null;
     _mismatchMaster = null;
-    _scanStatus = isAutoMode
-        ? FixedAssetScanStatus.checking
-        : FixedAssetScanStatus.saving;
+    // Immediate feedback in both modes; MANUAL shows its own text.
+    _scanStatus = FixedAssetScanStatus.checking;
+    if (!isAutoMode) _statusMessage = 'Đang kiểm tra $machineCode…';
     _notify();
+    uxLog('accepted (start pipeline) $machineCode');
 
     try {
       if (isAutoMode) {
@@ -841,16 +1152,114 @@ class FixedAssetController extends ChangeNotifier {
   }) async {
     final location = manual.selectedLocation;
     if (location == null) {
-      _failScan(generation, 'Select Fac, Floor, PositionA and PositionAA first');
+      // Normally handled before the pipeline (_handleScanWithoutLocation).
+      _failScan(generation, 'Chưa chọn vị trí');
       return;
     }
 
     _notifyScanAccepted(rawQr, machineCode);
+
+    // Local check first when the selected location's list is loaded: a
+    // machine that is not in it is asked about right away (no POST first).
+    if (_machinesReadyFor(location)) {
+      final code = machineCode.trim().toLowerCase();
+      final inList = _machines.any(
+        (machine) => machine.machineCode.trim().toLowerCase() == code,
+      );
+      uxLog('local check: ${inList ? 'in list' : 'NOT in list'}');
+      if (!inList) {
+        await _confirmManualLocalMismatch(machineCode, location, generation);
+        return;
+      }
+    } else {
+      uxLog('local check skipped: list not ready (server check)');
+    }
+
     await _saveAudit(
       machineCode,
       FixedAssetSaveTarget.mapped(location),
       generation,
     );
+  }
+
+  bool _machinesReadyFor(FixedAssetAuditLocation location) =>
+      !_loadingMachines && _machineError == null && _machinesLocation == location;
+
+  /// MANUAL: machine not in the selected location's list. The dialog opens
+  /// at once; MASTER is looked up in parallel and filled in when it
+  /// arrives. "Vẫn lưu" -> one POST with confirmLocationMismatch = true.
+  Future<void> _confirmManualLocalMismatch(
+    String machineCode,
+    FixedAssetAuditLocation location,
+    int generation,
+  ) async {
+    final master = ValueNotifier<FixedAssetAuditLocation?>(null);
+    _scanStatus = FixedAssetScanStatus.locationMismatch;
+    _mismatchMaster = null;
+    _notify();
+
+    uxLog('scan-info lookup start');
+    api
+        .fetchScanInfo(machineCode)
+        .then((info) {
+          uxLog('scan-info done (existsInMaster=${info.existsInMaster})');
+          if (!info.hasFullLocation) return;
+          final value = FixedAssetAuditLocation(
+            fac: info.fac,
+            floor: info.floor,
+            positionA: info.positionA,
+            positionAA: info.positionAA,
+          );
+          master.value = value;
+          if (_isCurrentScan(generation)) {
+            _mismatchMaster = value;
+            _notify();
+          }
+        })
+        .catchError((Object error) {
+          uxLog('scan-info failed: ${fixedAssetErrorText(error)}');
+        });
+
+    final confirmed = await _confirmLocationMismatch(
+      generation,
+      FixedAssetMismatchPrompt(
+        machineCode: machineCode,
+        faName: _scannedFaName,
+        master: null,
+        actual: location,
+        masterUpdates: master,
+        manual: true,
+      ),
+    );
+
+    if (!_isCurrentScan(generation)) {
+      _reportDropped(machineCode, 'đã đổi khu vực/chế độ');
+      return;
+    }
+    if (!confirmed) {
+      _markMismatchCancelled(generation);
+      _shortRepeatQr = _processingRawQr;
+      return;
+    }
+    await _saveAudit(
+      machineCode,
+      FixedAssetSaveTarget.mapped(location),
+      generation,
+      confirmLocationMismatch: true,
+    );
+  }
+
+  /// A scan dropped because location/mode changed meanwhile: never silent.
+  /// Shown only if nothing newer is on the status card.
+  void _reportDropped(String machineCode, String reason) {
+    uxLog('dropped $machineCode: $reason');
+    if (_disposed || _scanStatus != FixedAssetScanStatus.idle) return;
+    _scannedCode = machineCode;
+    _scannedFaName = '';
+    _mismatchMaster = null;
+    _scanStatus = FixedAssetScanStatus.failed;
+    _statusMessage = 'Đã bỏ qua $machineCode: $reason';
+    _notify();
   }
 
   // ------------------------------------------------------------
@@ -1076,6 +1485,7 @@ class FixedAssetController extends ChangeNotifier {
 
     if (reloadMachines) {
       _machines = const <FixedAssetMachine>[];
+    _machinesLocation = null;
       _machineError = null;
       if (!sameLocation) _clearMachineSearch();
     }
@@ -1124,6 +1534,7 @@ class FixedAssetController extends ChangeNotifier {
     _autoLocationMismatch = true;
 
     _machines = const <FixedAssetMachine>[];
+    _machinesLocation = null;
     _loadingMachines = false;
     _machineError = null;
     _clearMachineSearch();
@@ -1137,8 +1548,25 @@ class FixedAssetController extends ChangeNotifier {
     FixedAssetMismatchPrompt prompt,
   ) async {
     if (!_isCurrentScan(generation)) return false;
+    // Only one dialog at a time (a pipeline of the previous mode may still
+    // be waiting on one).
+    if (_confirmOpen) return false;
 
-    final confirmed = await confirmMismatch(prompt);
+    _confirmOpen = true;
+    _confirmCode = prompt.machineCode;
+    if (prompt.manual) {
+      _statusMessage = 'Xác nhận máy ${prompt.machineCode} trước';
+      _notify();
+    }
+    uxLog('confirmMismatch called');
+    bool confirmed;
+    try {
+      confirmed = await confirmMismatch(prompt);
+    } finally {
+      _confirmOpen = false;
+      _confirmCode = null;
+    }
+    uxLog('user chose ${confirmed ? 'SAVE' : 'SKIP'}');
 
     return confirmed && _isCurrentScan(generation);
   }
@@ -1169,6 +1597,8 @@ class FixedAssetController extends ChangeNotifier {
     FixedAssetAuditSaveResponse? response;
     Object? saveError;
 
+    uxLog('POST /audit start (confirm=$confirmLocationMismatch)');
+    final postStart = _uxClock.elapsed;
     _scanLog('saveAudit → $machineCode #$generation '
         '(confirm=$confirmLocationMismatch)');
     try {
@@ -1191,6 +1621,10 @@ class FixedAssetController extends ChangeNotifier {
 
     final result = response;
     final errorText = saveError == null ? '' : fixedAssetErrorText(saveError);
+    uxLog(
+      'POST /audit end in ${(_uxClock.elapsed - postStart).inMilliseconds}ms '
+      '(saved=${result?.saved} requiresConfirmation=${result?.requiresConfirmation})',
+    );
     _scanLog('saveAudit #$generation → '
         '${result == null ? 'error: $errorText' : 'saved=${result.saved} '
             'alreadyAudited=${result.alreadyAudited}'}');
@@ -1206,8 +1640,17 @@ class FixedAssetController extends ChangeNotifier {
     }
 
     // Location/mode đã đổi trong lúc save: không cập nhật status card /
-    // audited set của màn hình hiện tại.
-    if (!_isCurrentScan(generation)) return;
+    // audited set của màn hình hiện tại (nhưng báo lý do, không im lặng).
+    if (!_isCurrentScan(generation)) {
+      _reportDropped(machineCode, 'đã đổi khu vực/chế độ trong lúc lưu');
+      return;
+    }
+    if (result != null && fixedAssetSaveNeedsConfirmation(
+          result,
+          confirmLocationMismatch: confirmLocationMismatch,
+        )) {
+      uxLog('response requiresConfirmation');
+    }
 
     // Backend phát hiện sai vị trí (chủ yếu MANUAL): hỏi rồi POST lại cùng
     // target với confirmLocationMismatch = true.
@@ -1267,13 +1710,20 @@ class FixedAssetController extends ChangeNotifier {
         master: master,
         actual: actual,
         unmappedActual: rawActual,
+        manual: _auditModeByScan[generation] == 'MANUAL',
       ),
     );
 
-    if (!_isCurrentScan(generation)) return;
+    if (!_isCurrentScan(generation)) {
+      _reportDropped(machineCode, 'đã đổi khu vực/chế độ');
+      return;
+    }
 
     if (!confirmed) {
       _markMismatchCancelled(generation);
+      if (_auditModeByScan[generation] == 'MANUAL') {
+        _shortRepeatQr = _processingRawQr;
+      }
       return;
     }
 
@@ -1338,6 +1788,7 @@ class FixedAssetController extends ChangeNotifier {
     _autoLocationMismatch = false;
 
     _machines = const <FixedAssetMachine>[];
+    _machinesLocation = null;
     _loadingMachines = false;
     _machineError = null;
     _clearMachineSearch();
@@ -1364,6 +1815,7 @@ class FixedAssetController extends ChangeNotifier {
     if (mode == FixedAssetLocationMode.auto) loadZoneLock();
 
     // Lazy-load Fac lần đầu vào MANUAL, sau đó dùng lại cache.
+    if (mode == FixedAssetLocationMode.manual) _manualPromptTick++;
     if (mode == FixedAssetLocationMode.manual && manual.needsFacs) {
       _loadManualFacs();
     } else if (mode == FixedAssetLocationMode.manual &&
@@ -1380,6 +1832,7 @@ class FixedAssetController extends ChangeNotifier {
   void _resetForManualSelection() {
     _machineReq++;
     _machines = const <FixedAssetMachine>[];
+    _machinesLocation = null;
     _loadingMachines = false;
     _machineError = null;
     _clearMachineSearch();
@@ -1449,7 +1902,7 @@ class FixedAssetController extends ChangeNotifier {
     final floor = manual.selectedFloor;
     final positionA = manual.selectedPositionA;
     if (fac != null && floor != null && positionA != null && value != null) {
-      _loadMachines(fac, floor, positionA, value);
+      _manualMachineLoad = _loadMachines(fac, floor, positionA, value);
     }
   }
 
@@ -1553,6 +2006,12 @@ class FixedAssetController extends ChangeNotifier {
       );
       if (_disposed || req != _machineReq) return;
       _machines = result;
+      _machinesLocation = FixedAssetAuditLocation(
+        fac: fac,
+        floor: floor,
+        positionA: positionA,
+        positionAA: positionAA,
+      );
       // Gộp nguồn theo kỳ (backend) với mã đã audit trong phiên; không xóa
       // mã nào đã có.
       _mergeAuditedInPeriod(result);
@@ -1560,6 +2019,7 @@ class FixedAssetController extends ChangeNotifier {
     } catch (error) {
       if (_disposed || req != _machineReq) return;
       _machines = const <FixedAssetMachine>[];
+    _machinesLocation = null;
       _machineError = fixedAssetErrorText(error);
       _notify();
     } finally {

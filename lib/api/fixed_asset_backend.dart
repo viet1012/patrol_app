@@ -2,6 +2,7 @@ import '../model/fixed_asset_audit_check_response.dart';
 import '../model/fixed_asset_audit_save_response.dart';
 import '../model/fixed_asset_audit_summary.dart';
 import '../model/fixed_asset_machine.dart';
+import '../model/fixed_asset_scan_info.dart';
 import '../model/fixed_asset_zone_lock.dart';
 import '../model/fixed_asset_zone_progress.dart';
 import 'fixed_asset_api.dart';
@@ -10,6 +11,27 @@ import 'fixed_asset_api.dart';
 /// test có thể thay bằng bản giả. Bản mặc định gọi thẳng [FixedAssetApi].
 class FixedAssetBackend {
   const FixedAssetBackend();
+
+  // MAP hierarchy (MANUAL cascade + "use the QR's location").
+  Future<List<String>> fetchFacs() => FixedAssetApi.fetchFacs();
+
+  Future<List<String>> fetchFloors({required String fac}) =>
+      FixedAssetApi.fetchFloors(fac: fac);
+
+  Future<List<String>> fetchPositionA({
+    required String fac,
+    required String floor,
+  }) => FixedAssetApi.fetchPositionA(fac: fac, floor: floor);
+
+  Future<List<String>> fetchPositionAA({
+    required String fac,
+    required String floor,
+    required String positionA,
+  }) => FixedAssetApi.fetchPositionAA(
+    fac: fac,
+    floor: floor,
+    positionA: positionA,
+  );
 
   Future<FixedAssetAuditSummary> fetchAuditSummary() =>
       FixedAssetApi.fetchAuditSummary();
@@ -21,6 +43,10 @@ class FixedAssetBackend {
 
   Future<FixedAssetZoneLock> fetchZoneLock({required String userId}) =>
       FixedAssetApi.fetchZoneLock(userId: userId);
+
+  /// MASTER location + period status of one machine (no retry).
+  Future<FixedAssetScanInfo> fetchScanInfo(String machineCode) =>
+      FixedAssetApi.fetchScanInfo(machineCode);
 
   Future<FixedAssetAuditCheckResponse> checkAudit({
     required String machineCode,

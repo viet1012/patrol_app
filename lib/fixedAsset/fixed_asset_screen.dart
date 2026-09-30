@@ -14,6 +14,7 @@ import 'widgets/fixed_asset_machine_section.dart';
 import 'widgets/fixed_asset_manual_selectors.dart';
 import 'widgets/fixed_asset_mismatch_dialog.dart';
 import 'widgets/fixed_asset_selector.dart';
+import 'widgets/fixed_asset_scan_chip.dart';
 import 'widgets/fixed_asset_status_card.dart';
 
 export 'fixed_asset_audit_flow.dart' show FixedAssetLocationMode;
@@ -98,6 +99,7 @@ class _FixedAssetScreenState extends State<FixedAssetScreen>
   // ============================================================
 
   void _onQrDetected(String qr) {
+    _controller.uxLog('camera detect "$qr"');
     _controller.processScannedQr(qr);
   }
 
@@ -108,20 +110,35 @@ class _FixedAssetScreenState extends State<FixedAssetScreen>
   /// Dialog xác nhận sai vị trí (mapped mismatch / unmapped ACTUAL).
   /// true = "Vẫn lưu".
   Future<bool> _showMismatchDialog(FixedAssetMismatchPrompt prompt) async {
-    if (!mounted) return false;
+    if (!mounted) {
+      _controller.uxLog('dialog NOT shown: screen unmounted');
+      return false;
+    }
 
+    var shown = false;
     final result = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
-      builder: (_) => FixedAssetMismatchDialog(
-        machineCode: prompt.machineCode,
-        faName: prompt.faName,
-        master: prompt.master,
-        actual: prompt.actual,
-        unmappedActual: prompt.unmappedActual,
-      ),
+      builder: (_) {
+        if (!shown) {
+          shown = true;
+          WidgetsBinding.instance.addPostFrameCallback(
+            (_) => _controller.uxLog('dialog visible'),
+          );
+        }
+        return FixedAssetMismatchDialog(
+          machineCode: prompt.machineCode,
+          faName: prompt.faName,
+          master: prompt.master,
+          actual: prompt.actual,
+          unmappedActual: prompt.unmappedActual,
+          masterUpdates: prompt.masterUpdates,
+          manual: prompt.manual,
+        );
+      },
     );
 
+    // null = closed without a choice (e.g. system back): treated as skip.
     return result == true;
   }
 
@@ -218,6 +235,7 @@ class _FixedAssetScreenState extends State<FixedAssetScreen>
         lastAuditedUserId: c.lastAuditedUserId,
         lastAuditedUserName: c.lastAuditedUserName,
         mismatchMaster: c.mismatchMaster,
+        qrLocationLabel: c.pendingQrLocationLabel,
       ),
       builder: (context, v) => FixedAssetStatusCard(
         status: v.status,
@@ -230,6 +248,9 @@ class _FixedAssetScreenState extends State<FixedAssetScreen>
         mismatchMaster: v.mismatchMaster,
         onSwitchManual: () =>
             c.setLocationMode(FixedAssetLocationMode.manual),
+        qrLocationLabel: v.qrLocationLabel,
+        onUseQrLocation: c.useLocationFromQr,
+        onSwitchAuto: () => c.setLocationMode(FixedAssetLocationMode.auto),
       ),
     );
   }
@@ -291,6 +312,9 @@ class _FixedAssetScreenState extends State<FixedAssetScreen>
             onFloorChanged: c.onFloorChanged,
             onPositionAChanged: c.onPositionAChanged,
             onPositionAAChanged: c.onPositionAAChanged,
+            promptTick: c.manualPromptTick,
+            missingField: c.manualMissingField,
+            missingTick: c.manualMissingTick,
           ),
         );
       },
@@ -418,8 +442,92 @@ class _FixedAssetScreenState extends State<FixedAssetScreen>
           enablePowerControl: true,
           useSwitchPowerControl: true,
           showQrNumber: false,
+          // Fixed Asset draws its own parsed, colour-coded chip.
+          showQrBadge: false,
         ),
       ),
+    );
+  }
+
+  /// Overlays above the (never rebuilt) camera: the parsed scan chip and,
+  /// in MANUAL without a full location, a light "choose a location" veil.
+  /// Pointer events pass through to the camera controls.
+  Widget _buildCameraOverlays() {
+    final c = _controller;
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: FixedAssetSelector(
+            listenable: c,
+            select: () => !c.isAutoMode && c.manual.selectedLocation == null,
+            builder: (context, needsLocation) => IgnorePointer(
+              child: AnimatedOpacity(
+                opacity: needsLocation ? 1 : 0,
+                duration: const Duration(milliseconds: 200),
+                child: Container(
+                  color: Colors.black.withValues(alpha: 0.35),
+                  alignment: Alignment.center,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xCC111827),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: const Color(0xFFF59E0B).withValues(alpha: .7),
+                      ),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.edit_location_alt_rounded,
+                          color: Color(0xFFF59E0B),
+                          size: 18,
+                        ),
+                        SizedBox(width: 6),
+                        Text(
+                          'Chọn vị trí trước khi quét',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+        Positioned(
+          top: 12,
+          left: 12,
+          right: 70, // keep clear of the power switch
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: FixedAssetSelector(
+              listenable: c,
+              select: () => (
+                text: c.scanChipText,
+                tick: c.scanChipTick,
+                status: c.scanStatus,
+                settled: c.isScanSettled,
+              ),
+              builder: (context, v) => FixedAssetScanChip(
+                text: v.text,
+                tick: v.tick,
+                status: v.status,
+                settled: v.settled,
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -427,7 +535,19 @@ class _FixedAssetScreenState extends State<FixedAssetScreen>
     final displaySize = isMobile ? 260.0 : 340.0;
     return SizedBox.square(
       dimension: displaySize,
-      child: FittedBox(fit: BoxFit.contain, child: _cameraSection),
+      child: FittedBox(
+        fit: BoxFit.contain,
+        // Same camera instance (built once); only the overlays rebuild.
+        child: SizedBox.square(
+          dimension: 340,
+          child: Stack(
+            children: [
+              _cameraSection,
+              Positioned.fill(child: _buildCameraOverlays()),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

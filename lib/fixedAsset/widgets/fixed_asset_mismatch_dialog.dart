@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 
 import '../fixed_asset_location.dart';
@@ -16,6 +17,12 @@ class FixedAssetMismatchDialog extends StatelessWidget {
   final FixedAssetAuditLocation? actual;
   final FixedAssetUnmappedActual? unmappedActual;
 
+  /// MASTER that arrives while the dialog is open (overrides [master]).
+  final ValueListenable<FixedAssetAuditLocation?>? masterUpdates;
+
+  /// MANUAL: "Bỏ qua" + taller buttons; AUTO keeps "Hủy".
+  final bool manual;
+
   const FixedAssetMismatchDialog({
     super.key,
     required this.machineCode,
@@ -23,6 +30,8 @@ class FixedAssetMismatchDialog extends StatelessWidget {
     required this.master,
     required this.actual,
     this.unmappedActual,
+    this.masterUpdates,
+    this.manual = false,
   });
 
   bool get _isUnmapped => actual == null && unmappedActual != null;
@@ -86,18 +95,7 @@ class FixedAssetMismatchDialog extends StatelessWidget {
                   ),
                 ),
               const SizedBox(height: 12),
-              _locationBlock(
-                title: 'MASTER',
-                line1: master == null
-                    ? '-'
-                    : '${fixedAssetDash(master!.fac)} · ${fixedAssetDash(master!.floor)}',
-                line2: master == null
-                    ? ''
-                    : '${fixedAssetDash(master!.positionA)} / '
-                          '${fixedAssetDash(master!.positionAA)}',
-                color: Colors.white.withOpacity(.55),
-                background: Colors.white.withOpacity(.05),
-              ),
+              _masterBlock(),
               const SizedBox(height: 8),
               if (_isUnmapped)
                 _locationBlock(
@@ -143,14 +141,14 @@ class FixedAssetMismatchDialog extends StatelessWidget {
                       style: OutlinedButton.styleFrom(
                         foregroundColor: Colors.white,
                         side: BorderSide(color: Colors.white.withOpacity(.3)),
-                        minimumSize: const Size.fromHeight(44),
+                        minimumSize: Size.fromHeight(manual ? 52 : 44),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                      child: const Text(
-                        'Hủy',
-                        style: TextStyle(fontWeight: FontWeight.w700),
+                      child: Text(
+                        manual ? 'Bỏ qua' : 'Hủy',
+                        style: const TextStyle(fontWeight: FontWeight.w700),
                       ),
                     ),
                   ),
@@ -161,7 +159,7 @@ class FixedAssetMismatchDialog extends StatelessWidget {
                       style: FilledButton.styleFrom(
                         backgroundColor: _amber,
                         foregroundColor: Colors.black,
-                        minimumSize: const Size.fromHeight(44),
+                        minimumSize: Size.fromHeight(manual ? 52 : 44),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -178,6 +176,31 @@ class FixedAssetMismatchDialog extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _masterBlock() {
+    Widget block(FixedAssetAuditLocation? master, {bool lookingUp = false}) {
+      return _locationBlock(
+        title: 'MASTER',
+        line1: master == null
+            ? (lookingUp ? 'Đang tra MASTER…' : '-')
+            : '${fixedAssetDash(master.fac)} · ${fixedAssetDash(master.floor)}',
+        line2: master == null
+            ? ''
+            : '${fixedAssetDash(master.positionA)} / '
+                  '${fixedAssetDash(master.positionAA)}',
+        color: Colors.white.withOpacity(.55),
+        background: Colors.white.withOpacity(.05),
+      );
+    }
+
+    final updates = masterUpdates;
+    if (updates == null) return block(master);
+    return ValueListenableBuilder<FixedAssetAuditLocation?>(
+      valueListenable: updates,
+      builder: (context, value, _) =>
+          block(value ?? master, lookingUp: value == null && master == null),
     );
   }
 

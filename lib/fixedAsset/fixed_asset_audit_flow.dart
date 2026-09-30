@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart' show ValueListenable;
+
 import '../model/fixed_asset_audit_check_response.dart';
 import '../model/fixed_asset_audit_save_response.dart';
 import 'fixed_asset_location.dart';
@@ -30,7 +32,13 @@ enum FixedAssetScanStatus {
   /// AUTO đang khóa một khu vực chưa xong: QR khu vực khác bị chặn (không
   /// check / không lưu).
   zoneLocked,
+  /// MANUAL: quét khi chưa chọn đủ Fac/Floor/PositionA/PositionAA (không
+  /// gọi API; có thể đề nghị dùng vị trí trong QR).
+  needsLocation,
 }
+
+/// Dropdown của cascade MANUAL (đánh dấu ô còn trống đầu tiên).
+enum FixedAssetManualField { fac, floor, positionA, positionAA }
 
 /// Phân loại kết quả /audit-check trong AUTO.
 enum FixedAssetAutoCheckOutcome {
@@ -52,12 +60,21 @@ class FixedAssetMismatchPrompt {
   final FixedAssetAuditLocation? actual;
   final FixedAssetUnmappedActual? unmappedActual;
 
+  /// MASTER looked up while the dialog is already open (MANUAL local
+  /// check); overrides [master] once it has a value.
+  final ValueListenable<FixedAssetAuditLocation?>? masterUpdates;
+
+  /// MANUAL flow: large "Vẫn lưu" / "Bỏ qua" buttons.
+  final bool manual;
+
   const FixedAssetMismatchPrompt({
     required this.machineCode,
     required this.faName,
     required this.master,
     required this.actual,
     this.unmappedActual,
+    this.masterUpdates,
+    this.manual = false,
   });
 }
 

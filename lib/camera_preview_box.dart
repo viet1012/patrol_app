@@ -83,6 +83,9 @@ class CameraPreviewBox extends StatefulWidget {
   /// và cho badge QR dùng hết chiều ngang. true (mặc định): giữ nguyên hành
   /// vi cũ của mọi màn hình khác.
   final bool showQrNumber;
+
+  /// false: the host draws its own QR chip (the raw-QR badge is hidden).
+  final bool showQrBadge;
   final bool enableQrLockAnimation;
   final bool enablePowerControl;
   final bool useSwitchPowerControl;
@@ -102,6 +105,7 @@ class CameraPreviewBox extends StatefulWidget {
     this.qrOnly = false,
     this.enableZoomControls = false,
     this.showQrNumber = true,
+    this.showQrBadge = true,
     this.enableQrLockAnimation = false,
     this.enablePowerControl = false,
     this.useSwitchPowerControl = false,
@@ -2298,6 +2302,7 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
             ],
 
             // Chỉ badge QR rebuild khi QR Patrol thay đổi.
+            if (widget.showQrBadge)
             Positioned(
               top: 12,
               left: 12,

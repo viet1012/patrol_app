@@ -21,6 +21,12 @@ class FixedAssetStatusCard extends StatelessWidget {
   /// [FixedAssetScanStatus.zoneLocked]: "Chuyển Manual" button.
   final VoidCallback? onSwitchManual;
 
+  /// [FixedAssetScanStatus.needsLocation]: primary "Dùng vị trí {label}"
+  /// (null label = not offered) and secondary "Chuyển Auto".
+  final String? qrLocationLabel;
+  final VoidCallback? onUseQrLocation;
+  final VoidCallback? onSwitchAuto;
+
   const FixedAssetStatusCard({
     super.key,
     required this.status,
@@ -32,6 +38,9 @@ class FixedAssetStatusCard extends StatelessWidget {
     this.lastAuditedUserName,
     required this.mismatchMaster,
     this.onSwitchManual,
+    this.qrLocationLabel,
+    this.onUseQrLocation,
+    this.onSwitchAuto,
   });
 
   /// "Việt (KVH_IT_Mem_Viet)" / "Việt" / "KVH_IT_Mem_Viet".
@@ -72,7 +81,10 @@ class FixedAssetStatusCard extends StatelessWidget {
         color = Colors.white54;
       case FixedAssetScanStatus.checking:
         primary = machineCode;
-        details.add('Checking audit status...');
+        // MANUAL passes "Đang kiểm tra {code}…"; AUTO keeps the default.
+        details.add(
+          (message ?? '').isNotEmpty ? message! : 'Checking audit status...',
+        );
         color = _accent;
         indicator = _spinner();
       case FixedAssetScanStatus.saving:
@@ -152,6 +164,17 @@ class FixedAssetStatusCard extends StatelessWidget {
         label = 'Khóa khu vực';
         color = _amber;
         indicator = const Icon(Icons.lock_rounded, color: _amber, size: 20);
+      case FixedAssetScanStatus.needsLocation:
+        // MANUAL, location not chosen yet: nothing was saved.
+        primary = hasCode ? machineCode : 'Chưa chọn vị trí';
+        if ((message ?? '').isNotEmpty) details.add(message!);
+        label = 'Chọn vị trí';
+        color = _amber;
+        indicator = const Icon(
+          Icons.edit_location_alt_rounded,
+          color: _amber,
+          size: 20,
+        );
       case FixedAssetScanStatus.failed:
         // Invalid QR: không có MachineCode, message là dòng chính.
         primary = hasCode ? machineCode : (message ?? 'Scan failed');
@@ -169,6 +192,7 @@ class FixedAssetStatusCard extends StatelessWidget {
     final idle = status == FixedAssetScanStatus.idle;
     final failed = status == FixedAssetScanStatus.failed;
     final zoneLocked = status == FixedAssetScanStatus.zoneLocked;
+    final needsLocation = status == FixedAssetScanStatus.needsLocation;
     final statusIndicator = _statusIndicator(
       label: label,
       color: color,
@@ -222,7 +246,7 @@ class FixedAssetStatusCard extends StatelessWidget {
                     padding: const EdgeInsets.only(top: 1),
                     child: Text(
                       detail,
-                      maxLines: failed || zoneLocked ? 2 : 1,
+                      maxLines: failed || zoneLocked || needsLocation ? 2 : 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: failed
@@ -230,6 +254,45 @@ class FixedAssetStatusCard extends StatelessWidget {
                             : Colors.white.withOpacity(.65),
                         fontSize: 12,
                       ),
+                    ),
+                  ),
+                if (needsLocation)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 6,
+                      alignment: WrapAlignment.end,
+                      children: [
+                        if (qrLocationLabel != null && onUseQrLocation != null)
+                          FilledButton.icon(
+                            onPressed: onUseQrLocation,
+                            icon: const Icon(Icons.my_location_rounded, size: 16),
+                            label: Text('Dùng vị trí $qrLocationLabel'),
+                            style: FilledButton.styleFrom(
+                              backgroundColor: _amber,
+                              foregroundColor: Colors.black,
+                              visualDensity: VisualDensity.compact,
+                              textStyle: const TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                        if (onSwitchAuto != null)
+                          TextButton(
+                            onPressed: onSwitchAuto,
+                            style: TextButton.styleFrom(
+                              foregroundColor: _amber,
+                              visualDensity: VisualDensity.compact,
+                              textStyle: const TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            child: const Text('Chuyển Auto'),
+                          ),
+                      ],
                     ),
                   ),
                 if (zoneLocked && onSwitchManual != null)

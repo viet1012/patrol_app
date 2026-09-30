@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 
-import '../api/fixed_asset_api.dart';
+import '../api/fixed_asset_backend.dart';
 import 'fixed_asset_audit_flow.dart';
 import 'fixed_asset_location.dart';
 
@@ -13,7 +13,11 @@ class FixedAssetManualCascade {
     required this.onChanged,
     required this.onError,
     required this.isDisposed,
+    this.api = const FixedAssetBackend(),
   });
+
+  /// MAP endpoints (replaceable in tests).
+  final FixedAssetBackend api;
 
   /// Báo UI rebuild (tương đương setState).
   final VoidCallback onChanged;
@@ -165,7 +169,7 @@ class FixedAssetManualCascade {
     onChanged();
 
     try {
-      final result = await FixedAssetApi.fetchFacs();
+      final result = await api.fetchFacs();
       if (isDisposed() || req != _facReq) return null;
       facs = result;
       return result;
@@ -189,7 +193,7 @@ class FixedAssetManualCascade {
     onChanged();
 
     try {
-      final result = await FixedAssetApi.fetchFloors(fac: fac);
+      final result = await api.fetchFloors(fac: fac);
       if (isDisposed() || req != _floorReq) return null;
       floors = result;
       return result;
@@ -213,7 +217,7 @@ class FixedAssetManualCascade {
     onChanged();
 
     try {
-      final result = await FixedAssetApi.fetchPositionA(
+      final result = await api.fetchPositionA(
         fac: fac,
         floor: floor,
       );
@@ -244,7 +248,7 @@ class FixedAssetManualCascade {
     onChanged();
 
     try {
-      final result = await FixedAssetApi.fetchPositionAA(
+      final result = await api.fetchPositionAA(
         fac: fac,
         floor: floor,
         positionA: positionA,
