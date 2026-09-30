@@ -1,5 +1,6 @@
 import 'package:chuphinh/camera_preview_box.dart';
 import 'package:chuphinh/widget/glass_action_button.dart';
+import 'package:chuphinh/widget/required_field_flash.dart';
 import 'package:flutter/material.dart';
 
 import '../common/common_ui_helper.dart';
@@ -46,6 +47,11 @@ class _FixedAssetScreenState extends State<FixedAssetScreen>
       GlobalKey<CameraPreviewBoxState>();
 
   late final FixedAssetController _controller;
+
+  final _facFlashKey = GlobalKey<RequiredFieldFlashState>();
+  final _floorFlashKey = GlobalKey<RequiredFieldFlashState>();
+  final _positionAFlashKey = GlobalKey<RequiredFieldFlashState>();
+  final _positionAAFlashKey = GlobalKey<RequiredFieldFlashState>();
   QrDetectionGeometry? _latestQrDetection;
 
   /// Camera chỉ build một lần: rebuild của màn hình (search, check,
@@ -63,6 +69,8 @@ class _FixedAssetScreenState extends State<FixedAssetScreen>
       showError: _showError,
       resetQr: () => _cameraKey.currentState?.resetQr(),
       onZoneUnlocked: _showZoneUnlocked,
+      onManualFieldMissing: (field) =>
+          _flashKeyFor(field).currentState?.flash(scrollTo: true),
       onScanAccepted: (rawQr, machineCode) {
         final detailedMatches = _latestQrDetection?.value == rawQr;
         if (!detailedMatches) _latestQrDetection = null;
@@ -97,6 +105,27 @@ class _FixedAssetScreenState extends State<FixedAssetScreen>
   // ============================================================
   // UI CALLBACKS CHO CONTROLLER (cần BuildContext)
   // ============================================================
+
+  GlobalKey<RequiredFieldFlashState> _flashKeyFor(
+    FixedAssetManualField field,
+  ) => switch (field) {
+    FixedAssetManualField.fac => _facFlashKey,
+    FixedAssetManualField.floor => _floorFlashKey,
+    FixedAssetManualField.positionA => _positionAFlashKey,
+    FixedAssetManualField.positionAA => _positionAAFlashKey,
+  };
+
+  /// Vào MANUAL: ô trống đầu tiên nhấp nháy một lần (không cuộn). Đợi frame
+  /// sau vì dropdown MANUAL chỉ được build sau khi đổi mode.
+  void _onModeChanged(FixedAssetLocationMode mode) {
+    _controller.setLocationMode(mode);
+    if (_controller.isAutoMode) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _controller.isAutoMode) return;
+      final field = _controller.firstMissingManualField;
+      if (field != null) _flashKeyFor(field).currentState?.flash();
+    });
+  }
 
   void _onQrDetected(String qr) {
     _controller.uxLog('camera detect "$qr"');
@@ -290,7 +319,7 @@ class _FixedAssetScreenState extends State<FixedAssetScreen>
           // Số theo kỳ từ zone-progress; chưa có thì số cũ.
           machineCount: c.displayMachineCount,
           auditedMachineCount: c.displayAuditedCount,
-          onModeChanged: c.setLocationMode,
+          onModeChanged: _onModeChanged,
           lockedZone: c.lockedZone,
           lockedZoneProgress: c.lockedZoneProgress,
           zoneLockUnverified: c.isZoneLockUnverified,
@@ -312,7 +341,10 @@ class _FixedAssetScreenState extends State<FixedAssetScreen>
             onFloorChanged: c.onFloorChanged,
             onPositionAChanged: c.onPositionAChanged,
             onPositionAAChanged: c.onPositionAAChanged,
-            promptTick: c.manualPromptTick,
+            facFlashKey: _facFlashKey,
+            floorFlashKey: _floorFlashKey,
+            positionAFlashKey: _positionAFlashKey,
+            positionAAFlashKey: _positionAAFlashKey,
             missingField: c.manualMissingField,
             missingTick: c.manualMissingTick,
           ),

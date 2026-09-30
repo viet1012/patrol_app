@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../../common/common_searchable_dropdown.dart';
+import '../../widget/required_field_flash.dart';
 import '../fixed_asset_audit_flow.dart';
 
 /// 4 dropdown MANUAL (Fac / Floor / PositionA / PositionAA), bố cục 2x2.
@@ -28,12 +29,14 @@ class FixedAssetManualSelectors extends StatelessWidget {
   final ValueChanged<String?> onPositionAChanged;
   final ValueChanged<String?> onPositionAAChanged;
 
-  /// New value (entering MANUAL): empty dropdowns pulse an accent border
-  /// once.
-  final int promptTick;
+  /// Keys held by the screen: flash (+ scroll to) one dropdown.
+  final GlobalKey<RequiredFieldFlashState> facFlashKey;
+  final GlobalKey<RequiredFieldFlashState> floorFlashKey;
+  final GlobalKey<RequiredFieldFlashState> positionAFlashKey;
+  final GlobalKey<RequiredFieldFlashState> positionAAFlashKey;
 
   /// First empty dropdown after a scan without location: red border, and a
-  /// ~300 ms shake (+ scrolled into view) on each new [missingTick].
+  /// ~300 ms shake on each new [missingTick].
   final FixedAssetManualField? missingField;
   final int missingTick;
 
@@ -55,7 +58,10 @@ class FixedAssetManualSelectors extends StatelessWidget {
     required this.onFloorChanged,
     required this.onPositionAChanged,
     required this.onPositionAAChanged,
-    this.promptTick = 0,
+    required this.facFlashKey,
+    required this.floorFlashKey,
+    required this.positionAFlashKey,
+    required this.positionAAFlashKey,
     this.missingField,
     this.missingTick = 0,
   });
@@ -71,6 +77,7 @@ class FixedAssetManualSelectors extends StatelessWidget {
             Expanded(
               child: _selector(
                 field: FixedAssetManualField.fac,
+                flashKey: facFlashKey,
                 label: 'Fac',
                 value: selectedFac,
                 items: facs,
@@ -83,6 +90,7 @@ class FixedAssetManualSelectors extends StatelessWidget {
             Expanded(
               child: _selector(
                 field: FixedAssetManualField.floor,
+                flashKey: floorFlashKey,
                 label: 'Floor',
                 value: selectedFloor,
                 items: floors,
@@ -99,6 +107,7 @@ class FixedAssetManualSelectors extends StatelessWidget {
             Expanded(
               child: _selector(
                 field: FixedAssetManualField.positionA,
+                flashKey: positionAFlashKey,
                 label: 'PositionA',
                 value: selectedPositionA,
                 items: positionAs,
@@ -111,6 +120,7 @@ class FixedAssetManualSelectors extends StatelessWidget {
             Expanded(
               child: _selector(
                 field: FixedAssetManualField.positionAA,
+                flashKey: positionAAFlashKey,
                 label: 'PositionAA',
                 value: selectedPositionAA,
                 items: positionAAs,
@@ -127,6 +137,7 @@ class FixedAssetManualSelectors extends StatelessWidget {
 
   Widget _selector({
     required FixedAssetManualField field,
+    required GlobalKey<RequiredFieldFlashState> flashKey,
     required String label,
     required String? value,
     required List<String> items,
@@ -136,19 +147,21 @@ class FixedAssetManualSelectors extends StatelessWidget {
   }) {
     final active = enabled && !loading;
 
-    return _AttentionField(
-      isEmpty: value == null,
-      promptTick: promptTick,
-      isMissing: missingField == field,
-      missingTick: missingTick,
-      child: _dropdown(
-        label: label,
-        value: value,
-        items: items,
-        enabled: enabled,
-        active: active,
-        loading: loading,
-        onChanged: onChanged,
+    return RequiredFieldFlash(
+      key: flashKey,
+      radius: 14,
+      child: _AttentionField(
+        isMissing: missingField == field,
+        missingTick: missingTick,
+        child: _dropdown(
+          label: label,
+          value: value,
+          items: items,
+          enabled: enabled,
+          active: active,
+          loading: loading,
+          onChanged: onChanged,
+        ),
       ),
     );
   }
@@ -192,20 +205,15 @@ class FixedAssetManualSelectors extends StatelessWidget {
   }
 }
 
-/// Attention decoration around one dropdown: a one-off accent pulse when
-/// [promptTick] changes while empty, and — while [isMissing] — a red border
-/// plus a ~300 ms shake (scrolled into view) on each new [missingTick].
+/// While [isMissing]: a red border plus a ~300 ms shake on each new
+/// [missingTick]. Flash / scroll-into-view is [RequiredFieldFlash]'s job.
 class _AttentionField extends StatefulWidget {
   final Widget child;
-  final bool isEmpty;
-  final int promptTick;
   final bool isMissing;
   final int missingTick;
 
   const _AttentionField({
     required this.child,
-    required this.isEmpty,
-    required this.promptTick,
     required this.isMissing,
     required this.missingTick,
   });
@@ -215,49 +223,24 @@ class _AttentionField extends StatefulWidget {
 }
 
 class _AttentionFieldState extends State<_AttentionField>
-    with TickerProviderStateMixin {
-  static const Color _accent = Color(0xFF4DD0E1);
+    with SingleTickerProviderStateMixin {
   static const Color _error = Colors.redAccent;
 
-  late final AnimationController _pulse = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 900),
-  );
   late final AnimationController _shake = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 300),
   );
 
   @override
-  void initState() {
-    super.initState();
-    // Built when MANUAL opens: empty fields pulse once.
-    if (widget.isEmpty && widget.promptTick > 0) _pulse.forward();
-  }
-
-  @override
   void didUpdateWidget(covariant _AttentionField oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.promptTick != oldWidget.promptTick && widget.isEmpty) {
-      _pulse.forward(from: 0);
-    }
     if (widget.isMissing && widget.missingTick != oldWidget.missingTick) {
       _shake.forward(from: 0);
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        Scrollable.ensureVisible(
-          context,
-          alignment: 0.3,
-          duration: const Duration(milliseconds: 250),
-          alignmentPolicy: ScrollPositionAlignmentPolicy.keepVisibleAtEnd,
-        );
-      });
     }
   }
 
   @override
   void dispose() {
-    _pulse.dispose();
     _shake.dispose();
     super.dispose();
   }
@@ -265,19 +248,14 @@ class _AttentionFieldState extends State<_AttentionField>
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: Listenable.merge([_pulse, _shake]),
+      animation: _shake,
       builder: (context, child) {
-        // Pulse: 0 -> 1 -> 0 over the run; shake: damped sine, ±4 px.
-        final pulse = _pulse.isAnimating
-            ? 1 - (2 * _pulse.value - 1).abs()
-            : 0.0;
+        // Shake: damped sine, ±4 px.
         final s = _shake.value;
         final dx = _shake.isAnimating
             ? 4 * (1 - s) * math.sin(s * math.pi * 6)
             : 0.0;
-        final Color? border = widget.isMissing
-            ? _error
-            : (pulse > 0 ? _accent.withValues(alpha: pulse) : null);
+        final Color? border = widget.isMissing ? _error : null;
         return Transform.translate(
           offset: Offset(dx, 0),
           child: Stack(

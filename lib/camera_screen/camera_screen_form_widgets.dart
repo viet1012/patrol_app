@@ -54,20 +54,28 @@ extension _CameraScreenFormWidgets on _CameraScreenState {
         Row(
           children: [
             Expanded(
-              child: _buildRiskDropdown(
-                labelKey: "label_freq",
-                valueKey: _freq,
-                items: frequencyOptions,
-                onChanged: (v) => setState(() => _freq = v),
+              child: RequiredFieldFlash(
+                key: _freqFlashKey,
+                radius: 14,
+                child: _buildRiskDropdown(
+                  labelKey: "label_freq",
+                  valueKey: _freq,
+                  items: frequencyOptions,
+                  onChanged: (v) => setState(() => _freq = v),
+                ),
               ),
             ),
             const SizedBox(width: 8),
             Expanded(
-              child: _buildRiskDropdown(
-                labelKey: "label_prob",
-                valueKey: _prob,
-                items: probabilityOptions,
-                onChanged: (v) => setState(() => _prob = v),
+              child: RequiredFieldFlash(
+                key: _probFlashKey,
+                radius: 14,
+                child: _buildRiskDropdown(
+                  labelKey: "label_prob",
+                  valueKey: _prob,
+                  items: probabilityOptions,
+                  onChanged: (v) => setState(() => _prob = v),
+                ),
               ),
             ),
           ],
@@ -77,11 +85,15 @@ extension _CameraScreenFormWidgets on _CameraScreenState {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(
-              child: _buildRiskDropdown(
-                labelKey: "label_sev",
-                valueKey: _sev,
-                items: severityOptions,
-                onChanged: (v) => setState(() => _sev = v),
+              child: RequiredFieldFlash(
+                key: _sevFlashKey,
+                radius: 14,
+                child: _buildRiskDropdown(
+                  labelKey: "label_sev",
+                  valueKey: _sev,
+                  items: severityOptions,
+                  onChanged: (v) => setState(() => _sev = v),
+                ),
               ),
             ),
             const SizedBox(width: 8),

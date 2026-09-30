@@ -53,25 +53,55 @@ extension _CameraScreenReport on _CameraScreenState {
     }
 
     // ============================================================
-    // PATROL MASTER DATA REQUIRED
+    // REQUIRED FIELDS (Patrol: master + risk, tất cả: comment)
     // ============================================================
+    // Thứ tự theo màn hình; ô thiếu sẽ nhấp nháy viền, ô đầu tiên được cuộn tới.
 
-    if (isPatrol &&
-        (_isBlank(_selectedPlant) ||
-            _isBlank(_selectedFac) ||
-            _isBlank(_selectedArea) ||
-            _isBlank(_selectedMachine))) {
-      CommonUI.showWarning(
+    final latestComment = _commentController.text.trim();
+
+    final latestCounterMeasure = _counterController.text.trim();
+
+    final commentLabel = 'commentHint'
+        .tr(context)
+        .replaceAll(RegExp(r'[.…\s]+$'), '');
+
+    final missing = <(String, GlobalKey<RequiredFieldFlashState>?)>[
+      if (isPatrol && _isBlank(_selectedPlant)) ('plant'.tr(context), null),
+      if (isPatrol && _isBlank(_selectedFac)) ('fac'.tr(context), _facFlashKey),
+      if (isPatrol && _isBlank(_selectedArea))
+        ('area'.tr(context), _areaFlashKey),
+      if (isPatrol && _isBlank(_selectedMachine))
+        ('machine'.tr(context), _machineFlashKey),
+      if (isPatrol && _isBlank(_freq))
+        ('label_freq'.tr(context), _freqFlashKey),
+      if (isPatrol && _isBlank(_prob))
+        ('label_prob'.tr(context), _probFlashKey),
+      if (isPatrol && _isBlank(_sev)) ('label_sev'.tr(context), _sevFlashKey),
+      if (latestComment.isEmpty) (commentLabel, _commentFlashKey),
+    ];
+
+    if (missing.isNotEmpty) {
+      var scrolled = false;
+
+      for (final (_, key) in missing) {
+        final state = key?.currentState;
+        if (state == null) continue;
+
+        state.flash(scrollTo: !scrolled);
+        scrolled = true;
+      }
+
+      CommonUI.showSnackBar(
         context: context,
-        title: 'Information Required',
-        message: 'Please select Plant, Fac, Area and Machine.',
+        message: 'Vui lòng nhập: ${missing.map((e) => e.$1).join(', ')}',
+        color: Colors.orange.shade800,
       );
 
       return;
     }
 
     // ============================================================
-    // PATROL RISK REQUIRED
+    // PATROL RISK SCORE
     // ============================================================
 
     String riskTotal = '';
@@ -79,11 +109,13 @@ extension _CameraScreenReport on _CameraScreenState {
     if (isPatrol) {
       riskTotal = getScoreSymbol();
 
-      final hasValidRisk =
-          !_isBlank(_freq) &&
-          !_isBlank(_prob) &&
-          !_isBlank(_sev) &&
-          const {'I', 'II', 'III', 'IV', 'V'}.contains(riskTotal);
+      final hasValidRisk = const {
+        'I',
+        'II',
+        'III',
+        'IV',
+        'V',
+      }.contains(riskTotal);
 
       if (!hasValidRisk) {
         CommonUI.showWarning(
@@ -96,24 +128,6 @@ extension _CameraScreenReport on _CameraScreenState {
 
         return;
       }
-    }
-
-    // ============================================================
-    // COMMENT REQUIRED
-    // ============================================================
-
-    final latestComment = _commentController.text.trim();
-
-    final latestCounterMeasure = _counterController.text.trim();
-
-    if (latestComment.isEmpty) {
-      CommonUI.showWarning(
-        context: context,
-        title: 'Comment Required',
-        message: 'Please enter a comment.',
-      );
-
-      return;
     }
 
     // ============================================================
@@ -559,5 +573,4 @@ extension _CameraScreenReport on _CameraScreenState {
         );
     }
   }
-
 }

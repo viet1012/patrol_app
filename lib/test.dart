@@ -7,6 +7,7 @@ import 'package:auto_size_text/auto_size_text.dart';
 import 'package:chuphinh/camera_preview_box.dart';
 import 'package:chuphinh/translator.dart';
 import 'package:chuphinh/widget/glass_action_button.dart';
+import 'package:chuphinh/widget/required_field_flash.dart';
 import 'package:dio/dio.dart';
 import 'package:dropdown_search/dropdown_search.dart';
 import 'package:flutter/material.dart';
@@ -255,6 +256,15 @@ class _CameraScreenState extends State<CameraScreen> {
 
   final GlobalKey<CameraPreviewBoxState> _cameraKey =
       GlobalKey<CameraPreviewBoxState>();
+
+  // Nhấp nháy viền các ô bắt buộc còn thiếu khi bấm Send.
+  final _facFlashKey = GlobalKey<RequiredFieldFlashState>();
+  final _areaFlashKey = GlobalKey<RequiredFieldFlashState>();
+  final _machineFlashKey = GlobalKey<RequiredFieldFlashState>();
+  final _freqFlashKey = GlobalKey<RequiredFieldFlashState>();
+  final _probFlashKey = GlobalKey<RequiredFieldFlashState>();
+  final _sevFlashKey = GlobalKey<RequiredFieldFlashState>();
+  final _commentFlashKey = GlobalKey<RequiredFieldFlashState>();
 
   List<String> get groupList =>
       List<String>.generate(numbersGroup, (index) => 'Group ${index + 1}');

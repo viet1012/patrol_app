@@ -24,6 +24,7 @@ import 'fixed_asset_qr_parser.dart';
 /// - [showError]: snackbar lỗi load dropdown
 /// - [resetQr]: re-arm QR scanner của CameraPreviewBox
 /// - [onZoneUnlocked]: snackbar "Hoàn thành {AA} ✓" (khu vực khóa đã xong)
+/// - [onManualFieldMissing]: nhấp nháy + cuộn tới ô MANUAL trống đầu tiên
 class FixedAssetController extends ChangeNotifier {
   FixedAssetController({
     required this.accountCode,
@@ -33,6 +34,7 @@ class FixedAssetController extends ChangeNotifier {
     required this.resetQr,
     this.onScanAccepted,
     this.onZoneUnlocked,
+    this.onManualFieldMissing,
     this.api = const FixedAssetBackend(),
     this.zoneLockEnabled = FixedAssetFeatures.zoneLock,
   }) {
@@ -53,6 +55,10 @@ class FixedAssetController extends ChangeNotifier {
 
   /// Khu vực AUTO đang khóa vừa audit xong (PositionAA): báo đúng một lần.
   final ValueChanged<String>? onZoneUnlocked;
+
+  /// Quét ở MANUAL khi chưa chọn đủ vị trí: ô trống đầu tiên
+  /// (Fac → Floor → PositionA → PositionAA).
+  final ValueChanged<FixedAssetManualField>? onManualFieldMissing;
 
   /// Endpoint Fixed Asset (thay được trong test).
   final FixedAssetBackend api;
@@ -757,10 +763,6 @@ class FixedAssetController extends ChangeNotifier {
     _notify();
   }
 
-  /// Bumped on entering MANUAL: empty dropdowns pulse once.
-  int _manualPromptTick = 0;
-  int get manualPromptTick => _manualPromptTick;
-
   /// First empty dropdown after a scan without location (red + shake);
   /// [manualMissingTick] re-triggers the shake.
   FixedAssetManualField? _manualMissingField;
@@ -770,6 +772,14 @@ class FixedAssetController extends ChangeNotifier {
       ? _manualMissingField
       : null;
   int get manualMissingTick => _manualMissingTick;
+
+  FixedAssetManualField? get firstMissingManualField =>
+      _firstMissingManualField;
+
+  void _reportManualFieldMissing() {
+    final field = _manualMissingField;
+    if (field != null && !_disposed) onManualFieldMissing?.call(field);
+  }
 
   FixedAssetManualField? get _firstMissingManualField {
     if (manual.selectedFac == null) return FixedAssetManualField.fac;
@@ -849,6 +859,7 @@ class FixedAssetController extends ChangeNotifier {
     _manualMissingTick++;
     _scanLog('no location: ${data.machineCode} (missing $_manualMissingField)');
     _notify();
+    _reportManualFieldMissing();
   }
 
   /// "Dùng vị trí từ QR": resolve Fac + PositionA from the QR's Floor +
@@ -921,6 +932,7 @@ class FixedAssetController extends ChangeNotifier {
     _manualMissingField = _firstMissingManualField;
     _manualMissingTick++;
     _notify();
+    _reportManualFieldMissing();
   }
 
   /// Every MAP location whose Floor + PositionAA equal the QR's (trimmed,
@@ -1815,7 +1827,6 @@ class FixedAssetController extends ChangeNotifier {
     if (mode == FixedAssetLocationMode.auto) loadZoneLock();
 
     // Lazy-load Fac lần đầu vào MANUAL, sau đó dùng lại cache.
-    if (mode == FixedAssetLocationMode.manual) _manualPromptTick++;
     if (mode == FixedAssetLocationMode.manual && manual.needsFacs) {
       _loadManualFacs();
     } else if (mode == FixedAssetLocationMode.manual &&

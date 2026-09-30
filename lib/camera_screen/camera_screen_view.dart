@@ -1,7 +1,6 @@
 part of '../test.dart';
 
 extension _CameraScreenView on _CameraScreenState {
-
   Widget _buildCameraScreen(BuildContext context) {
     final groupList = getGroupsByPlant();
 
@@ -206,79 +205,19 @@ extension _CameraScreenView on _CameraScreenState {
 
                     const SizedBox(width: 8),
                     Expanded(
-                      child: _buildSearchableDropdown(
-                        label: "fac".tr(context),
-                        selectedValue: _selectedFac,
-                        items: _selectedPlant == null
-                            ? <String>[]
-                            : facList.cast<String>(),
-                        onChanged: (v) {
-                          setState(() {
-                            _selectedFac = v;
-                            _selectedArea = null;
-
-                            final isFallbackMachine =
-                                _qrFallbackMachine != null &&
-                                _norm(_qrFallbackMachine!.macId) ==
-                                    _norm(_selectedMachine);
-
-                            if (!isFallbackMachine) {
-                              _selectedMachine = null;
-                            }
-
-                            if (isFallbackMachine) {
-                              _qrFallbackMachine = HseMachineInfo(
-                                plant:
-                                    _selectedPlant ??
-                                    widget.selectedPlant ??
-                                    '',
-                                fac: v ?? '',
-                                area: _selectedArea ?? '',
-                                macId:
-                                    _selectedMachine ??
-                                    _qrFallbackMachine!.macId,
-                              );
-                            }
-
-                            final areas = getAreaByFac(_selectedPlant!, v!);
-                            if (!isFallbackMachine && areas.length == 1) {
-                              _selectedArea = areas.first;
-
-                              final machines = getMachineByArea(
-                                _selectedPlant!,
-                                v,
-                                areas.first,
-                              );
-
-                              if (machines.length == 1) {
-                                _selectedMachine = machines.first;
-                              }
-                            }
-                          });
-                        },
-                        isRequired: true,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-
-                Row(
-                  children: [
-                    if (widget.patrolGroup != PatrolGroup.AssetUpdate)
-                      Expanded(
+                      child: RequiredFieldFlash(
+                        key: _facFlashKey,
+                        radius: 14,
                         child: _buildSearchableDropdown(
-                          label: "area".tr(context),
-                          selectedValue: _selectedArea,
-                          items:
-                              (_selectedPlant == null || _selectedFac == null)
+                          label: "fac".tr(context),
+                          selectedValue: _selectedFac,
+                          items: _selectedPlant == null
                               ? <String>[]
-                              : areaList.cast<String>(),
+                              : facList.cast<String>(),
                           onChanged: (v) {
-                            String? autoMachine;
-
                             setState(() {
-                              _selectedArea = v;
+                              _selectedFac = v;
+                              _selectedArea = null;
 
                               final isFallbackMachine =
                                   _qrFallbackMachine != null &&
@@ -295,46 +234,119 @@ extension _CameraScreenView on _CameraScreenState {
                                       _selectedPlant ??
                                       widget.selectedPlant ??
                                       '',
-                                  fac: _selectedFac ?? '',
-                                  area: v ?? '',
+                                  fac: v ?? '',
+                                  area: _selectedArea ?? '',
                                   macId:
                                       _selectedMachine ??
                                       _qrFallbackMachine!.macId,
                                 );
                               }
 
-                              final machines = getMachineByArea(
-                                _selectedPlant!,
-                                _selectedFac!,
-                                v!,
-                              );
+                              final areas = getAreaByFac(_selectedPlant!, v!);
+                              if (!isFallbackMachine && areas.length == 1) {
+                                _selectedArea = areas.first;
 
-                              if (!isFallbackMachine && machines.length == 1) {
-                                autoMachine = machines.first;
-                                _selectedMachine = autoMachine;
+                                final machines = getMachineByArea(
+                                  _selectedPlant!,
+                                  v,
+                                  areas.first,
+                                );
+
+                                if (machines.length == 1) {
+                                  _selectedMachine = machines.first;
+                                }
                               }
                             });
-
-                            if (_aiEnabled && autoMachine != null) {
-                              _loadMachineAiSummary(autoMachine);
-                            }
                           },
                           isRequired: true,
                         ),
                       ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+
+                Row(
+                  children: [
+                    if (widget.patrolGroup != PatrolGroup.AssetUpdate)
+                      Expanded(
+                        child: RequiredFieldFlash(
+                          key: _areaFlashKey,
+                          radius: 14,
+                          child: _buildSearchableDropdown(
+                            label: "area".tr(context),
+                            selectedValue: _selectedArea,
+                            items:
+                                (_selectedPlant == null || _selectedFac == null)
+                                ? <String>[]
+                                : areaList.cast<String>(),
+                            onChanged: (v) {
+                              String? autoMachine;
+
+                              setState(() {
+                                _selectedArea = v;
+
+                                final isFallbackMachine =
+                                    _qrFallbackMachine != null &&
+                                    _norm(_qrFallbackMachine!.macId) ==
+                                        _norm(_selectedMachine);
+
+                                if (!isFallbackMachine) {
+                                  _selectedMachine = null;
+                                }
+
+                                if (isFallbackMachine) {
+                                  _qrFallbackMachine = HseMachineInfo(
+                                    plant:
+                                        _selectedPlant ??
+                                        widget.selectedPlant ??
+                                        '',
+                                    fac: _selectedFac ?? '',
+                                    area: v ?? '',
+                                    macId:
+                                        _selectedMachine ??
+                                        _qrFallbackMachine!.macId,
+                                  );
+                                }
+
+                                final machines = getMachineByArea(
+                                  _selectedPlant!,
+                                  _selectedFac!,
+                                  v!,
+                                );
+
+                                if (!isFallbackMachine &&
+                                    machines.length == 1) {
+                                  autoMachine = machines.first;
+                                  _selectedMachine = autoMachine;
+                                }
+                              });
+
+                              if (_aiEnabled && autoMachine != null) {
+                                _loadMachineAiSummary(autoMachine);
+                              }
+                            },
+                            isRequired: true,
+                          ),
+                        ),
+                      ),
                     const SizedBox(width: 8),
                     Expanded(
-                      child: _buildSearchableDropdown(
-                        label: "machine".tr(context),
-                        selectedValue: _selectedMachine,
-                        items:
-                            (_selectedPlant == null ||
-                                _selectedFac == null ||
-                                _selectedArea == null)
-                            ? <String>[]
-                            : machineList.cast<String>(),
-                        onChanged: _onMachineChanged,
-                        isRequired: true,
+                      child: RequiredFieldFlash(
+                        key: _machineFlashKey,
+                        radius: 14,
+                        child: _buildSearchableDropdown(
+                          label: "machine".tr(context),
+                          selectedValue: _selectedMachine,
+                          items:
+                              (_selectedPlant == null ||
+                                  _selectedFac == null ||
+                                  _selectedArea == null)
+                              ? <String>[]
+                              : machineList.cast<String>(),
+                          onChanged: _onMachineChanged,
+                          isRequired: true,
+                        ),
                       ),
                     ),
                   ],
@@ -389,225 +401,234 @@ extension _CameraScreenView on _CameraScreenState {
                 children: [
                   // Ô 1: COMMENT
                   Expanded(
-                    child: LayoutBuilder(
-                      builder: (context, constraints) {
-                        return RawAutocomplete<AutoCmp>(
-                          textEditingController: _commentController,
-                          focusNode: _commentFocusNode,
-                          optionsViewOpenDirection: OptionsViewOpenDirection.up,
-                          displayStringForOption: (option) => option.inputText,
+                    child: RequiredFieldFlash(
+                      key: _commentFlashKey,
+                      radius: 14,
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          return RawAutocomplete<AutoCmp>(
+                            textEditingController: _commentController,
+                            focusNode: _commentFocusNode,
+                            optionsViewOpenDirection:
+                                OptionsViewOpenDirection.up,
+                            displayStringForOption: (option) =>
+                                option.inputText,
 
-                          optionsBuilder: (TextEditingValue value) {
-                            final keyword = value.text.trim().toLowerCase();
+                            optionsBuilder: (TextEditingValue value) {
+                              final keyword = value.text.trim().toLowerCase();
 
-                            if (keyword.length < minLength || isLoading) {
-                              return const Iterable<AutoCmp>.empty();
-                            }
+                              if (keyword.length < minLength || isLoading) {
+                                return const Iterable<AutoCmp>.empty();
+                              }
 
-                            return allOptionsComment
-                                .where(
-                                  (option) => option.inputText
-                                      .toLowerCase()
-                                      .contains(keyword),
-                                )
-                                .take(5);
-                          },
+                              return allOptionsComment
+                                  .where(
+                                    (option) => option.inputText
+                                        .toLowerCase()
+                                        .contains(keyword),
+                                  )
+                                  .take(5);
+                            },
 
-                          onSelected: (AutoCmp selection) {
-                            final comment = selection.inputText.trim();
+                            onSelected: (AutoCmp selection) {
+                              final comment = selection.inputText.trim();
 
-                            _commentController.value = TextEditingValue(
-                              text: comment,
-                              selection: TextSelection.collapsed(
-                                offset: comment.length,
-                              ),
-                            );
-
-                            final countermeasure = selection.countermeasure
-                                .trim();
-
-                            _counterController.value = TextEditingValue(
-                              text: countermeasure,
-                              selection: TextSelection.collapsed(
-                                offset: countermeasure.length,
-                              ),
-                            );
-
-                            setState(() {
-                              _comment = comment;
-                              _counterMeasure = countermeasure;
-                              _commentFontSizeNotifier.value = _resolveFontSize(
-                                comment,
+                              _commentController.value = TextEditingValue(
+                                text: comment,
+                                selection: TextSelection.collapsed(
+                                  offset: comment.length,
+                                ),
                               );
-                              _counterFontSizeNotifier.value = _resolveFontSize(
-                                countermeasure,
-                              );
-                            });
-                          },
 
-                          fieldViewBuilder:
-                              (
-                                context,
-                                controller,
-                                focusNode,
-                                onFieldSubmitted,
-                              ) {
-                                // Không gán lại _commentController = controller.
-                                // RawAutocomplete đang dùng chính _commentController.
-                                return ValueListenableBuilder<double>(
-                                  valueListenable: _commentFontSizeNotifier,
-                                  builder: (context, fontSize, _) {
-                                    return TextField(
-                                      controller: controller,
-                                      focusNode: focusNode,
-                                      enabled: !_isSubmitting,
-                                      maxLines: 3,
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: fontSize,
-                                      ),
-                                      decoration: InputDecoration(
-                                        filled: true,
-                                        hint: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Text(
-                                              'commentHint'.tr(context),
-                                              style: TextStyle(
+                              final countermeasure = selection.countermeasure
+                                  .trim();
+
+                              _counterController.value = TextEditingValue(
+                                text: countermeasure,
+                                selection: TextSelection.collapsed(
+                                  offset: countermeasure.length,
+                                ),
+                              );
+
+                              setState(() {
+                                _comment = comment;
+                                _counterMeasure = countermeasure;
+                                _commentFontSizeNotifier.value =
+                                    _resolveFontSize(comment);
+                                _counterFontSizeNotifier.value =
+                                    _resolveFontSize(countermeasure);
+                              });
+                            },
+
+                            fieldViewBuilder:
+                                (
+                                  context,
+                                  controller,
+                                  focusNode,
+                                  onFieldSubmitted,
+                                ) {
+                                  // Không gán lại _commentController = controller.
+                                  // RawAutocomplete đang dùng chính _commentController.
+                                  return ValueListenableBuilder<double>(
+                                    valueListenable: _commentFontSizeNotifier,
+                                    builder: (context, fontSize, _) {
+                                      return TextField(
+                                        controller: controller,
+                                        focusNode: focusNode,
+                                        enabled: !_isSubmitting,
+                                        maxLines: 3,
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: fontSize,
+                                        ),
+                                        decoration: InputDecoration(
+                                          filled: true,
+                                          hint: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Text(
+                                                'commentHint'.tr(context),
+                                                style: TextStyle(
+                                                  color: Colors.red.withOpacity(
+                                                    .6,
+                                                  ),
+                                                  fontSize: 14,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 4),
+                                              Icon(
+                                                Icons.star_rounded,
+                                                size: 14,
                                                 color: Colors.red.withOpacity(
                                                   .6,
                                                 ),
-                                                fontSize: 14,
-                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ],
+                                          ),
+                                          fillColor: Colors.green.withOpacity(
+                                            .08,
+                                          ),
+                                          border: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              14,
+                                            ),
+                                            borderSide: BorderSide(
+                                              color: Colors.white.withOpacity(
+                                                .35,
                                               ),
                                             ),
-                                            const SizedBox(width: 4),
-                                            Icon(
-                                              Icons.star_rounded,
-                                              size: 14,
-                                              color: Colors.red.withOpacity(.6),
-                                            ),
-                                          ],
-                                        ),
-                                        fillColor: Colors.green.withOpacity(
-                                          .08,
-                                        ),
-                                        border: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            14,
                                           ),
-                                          borderSide: BorderSide(
-                                            color: Colors.white.withOpacity(
-                                              .35,
+                                          enabledBorder: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              14,
+                                            ),
+                                            borderSide: BorderSide(
+                                              color: const Color(
+                                                0xFF90E14D,
+                                              ).withOpacity(.25),
                                             ),
                                           ),
-                                        ),
-                                        enabledBorder: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            14,
+                                          focusedBorder: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              14,
+                                            ),
+                                            borderSide: BorderSide(
+                                              color: const Color(
+                                                0xFF90E14D,
+                                              ).withOpacity(.45),
+                                            ),
                                           ),
-                                          borderSide: BorderSide(
-                                            color: const Color(
-                                              0xFF90E14D,
-                                            ).withOpacity(.25),
-                                          ),
-                                        ),
-                                        focusedBorder: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            14,
-                                          ),
-                                          borderSide: BorderSide(
-                                            color: const Color(
-                                              0xFF90E14D,
-                                            ).withOpacity(.45),
+                                          contentPadding: const EdgeInsets.all(
+                                            12,
                                           ),
                                         ),
-                                        contentPadding: const EdgeInsets.all(
-                                          12,
-                                        ),
+                                        onChanged: (value) {
+                                          _commentFontSizeNotifier.value =
+                                              _resolveFontSize(value);
+
+                                          if (value.trim().isEmpty) {
+                                            _counterController.clear();
+                                            _counterFontSizeNotifier.value = 14;
+                                          }
+
+                                          _commentDebounce?.cancel();
+                                          _commentDebounce = Timer(
+                                            const Duration(milliseconds: 250),
+                                            () {
+                                              _comment = value;
+
+                                              if (value.trim().isEmpty) {
+                                                _counterMeasure = '';
+                                              }
+                                            },
+                                          );
+                                        },
+                                      );
+                                    },
+                                  );
+                                },
+
+                            optionsViewBuilder: (context, onSelected, options) {
+                              final optionList = options.toList(
+                                growable: false,
+                              );
+
+                              return Align(
+                                alignment: Alignment.topLeft,
+                                child: Transform.translate(
+                                  offset: const Offset(0, 8),
+                                  child: Material(
+                                    elevation: 8,
+                                    borderRadius: BorderRadius.circular(12),
+                                    color: Colors.black.withOpacity(.5),
+                                    child: ConstrainedBox(
+                                      constraints: BoxConstraints(
+                                        maxWidth: constraints.maxWidth,
+                                        maxHeight: 250,
                                       ),
-                                      onChanged: (value) {
-                                        _commentFontSizeNotifier.value =
-                                            _resolveFontSize(value);
-
-                                        if (value.trim().isEmpty) {
-                                          _counterController.clear();
-                                          _counterFontSizeNotifier.value = 14;
-                                        }
-
-                                        _commentDebounce?.cancel();
-                                        _commentDebounce = Timer(
-                                          const Duration(milliseconds: 250),
-                                          () {
-                                            _comment = value;
-
-                                            if (value.trim().isEmpty) {
-                                              _counterMeasure = '';
-                                            }
-                                          },
-                                        );
-                                      },
-                                    );
-                                  },
-                                );
-                              },
-
-                          optionsViewBuilder: (context, onSelected, options) {
-                            final optionList = options.toList(growable: false);
-
-                            return Align(
-                              alignment: Alignment.topLeft,
-                              child: Transform.translate(
-                                offset: const Offset(0, 8),
-                                child: Material(
-                                  elevation: 8,
-                                  borderRadius: BorderRadius.circular(12),
-                                  color: Colors.black.withOpacity(.5),
-                                  child: ConstrainedBox(
-                                    constraints: BoxConstraints(
-                                      maxWidth: constraints.maxWidth,
-                                      maxHeight: 250,
-                                    ),
-                                    child: ListView.separated(
-                                      padding: EdgeInsets.zero,
-                                      shrinkWrap: true,
-                                      itemCount: optionList.length,
-                                      separatorBuilder: (_, __) =>
-                                          const Divider(
-                                            height: 1,
-                                            thickness: .5,
-                                          ),
-                                      itemBuilder: (context, index) {
-                                        final option = optionList[index];
-
-                                        return InkWell(
-                                          onTap: () => onSelected(option),
-                                          child: Padding(
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 16,
-                                              vertical: 14,
+                                      child: ListView.separated(
+                                        padding: EdgeInsets.zero,
+                                        shrinkWrap: true,
+                                        itemCount: optionList.length,
+                                        separatorBuilder: (_, __) =>
+                                            const Divider(
+                                              height: 1,
+                                              thickness: .5,
                                             ),
-                                            child: Text(
-                                              option.inputText,
-                                              maxLines: 3,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: const TextStyle(
-                                                color: Colors.white,
-                                                fontSize: 14,
-                                                fontWeight: FontWeight.w600,
+                                        itemBuilder: (context, index) {
+                                          final option = optionList[index];
+
+                                          return InkWell(
+                                            onTap: () => onSelected(option),
+                                            child: Padding(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 16,
+                                                    vertical: 14,
+                                                  ),
+                                              child: Text(
+                                                option.inputText,
+                                                maxLines: 3,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 14,
+                                                  fontWeight: FontWeight.w600,
+                                                ),
                                               ),
                                             ),
-                                          ),
-                                        );
-                                      },
+                                          );
+                                        },
+                                      ),
                                     ),
                                   ),
                                 ),
-                              ),
-                            );
-                          },
-                        );
-                      },
+                              );
+                            },
+                          );
+                        },
+                      ),
                     ),
                   ),
 
@@ -871,5 +892,4 @@ extension _CameraScreenView on _CameraScreenState {
       ),
     );
   }
-
 }
