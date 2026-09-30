@@ -838,7 +838,7 @@ class _FloorMapWidgetState extends State<FloorMapWidget>
     final labelReference = quarterTurn
         ? displaySize.longestSide
         : displaySize.width;
-    final labelScale = (labelReference / 900).clamp(0.8, 1.0).toDouble();
+    final labelScale = (labelReference / 900).clamp(0.92, 1.0).toDouble();
     if (kDebugMode &&
         (_loggedDisplaySize == null ||
             !_sameSize(_loggedDisplaySize!, displaySize))) {
@@ -1403,13 +1403,13 @@ class _MapZoneLabel extends StatelessWidget {
   static const Color _childBorder = Color(0xFFD63AF9);
   static const Color _childText = Color(0xFFC026D3);
   static const Color _doneGreen = Color(0xFF16A34A);
-  static const Color _countText = Color(0xFF64748B);
+  static const Color _countText = Color(0xFF334155);
   static const Color _barTrack = Color(0xFFE2E8F0);
   static const Color _barFill = Color(0xFFF59E0B);
 
   static const double _activeBorderWidth = 1.5;
   static const double _minTouchHeight = 24;
-  static const double _barHeight = 2.2;
+  static const double _barHeight = 3;
   static const Duration _transition = Duration(milliseconds: 120);
 
   /// Invisible horizontal touch padding on each side of the badge.
@@ -1456,7 +1456,7 @@ class _MapZoneLabel extends StatelessWidget {
       // The progress bar sits close to the bottom edge.
       hasProgress ? math.max(1.0, verticalPadding - 1) : verticalPadding,
     );
-    final codeSize = (isMajor ? 11.5 : 10.5) * scale;
+    final codeSize = (isMajor ? 12.5 : 11.5) * scale;
 
     Widget content = Text(
       done ? '✓ ${zone.code}' : zone.code,
@@ -1473,17 +1473,15 @@ class _MapZoneLabel extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
                 content,
-                const SizedBox(width: 4),
+                const SizedBox(width: 5),
                 Text(
                   '${progress.audited}/${progress.total}',
                   maxLines: 1,
                   softWrap: false,
                   style: TextStyle(
-                    color: solid
-                        ? Colors.white.withValues(alpha: 0.9)
-                        : _countText,
-                    fontSize: codeSize * 0.9,
-                    fontWeight: FontWeight.w600,
+                    color: solid ? Colors.white : _countText,
+                    fontSize: codeSize,
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
               ],

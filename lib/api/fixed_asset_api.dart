@@ -6,6 +6,7 @@ import '../model/fixed_asset_audit_summary.dart';
 import '../model/fixed_asset_machine.dart';
 import '../model/fixed_asset_machine_location.dart';
 import '../model/fixed_asset_scan_info.dart';
+import '../model/fixed_asset_zone_lock.dart';
 import '../model/fixed_asset_zone_progress.dart';
 import '../network/dio_error_handler.dart';
 import 'dio_client.dart';
@@ -76,6 +77,18 @@ class FixedAssetApi {
   static Future<FixedAssetAuditSummary> fetchAuditSummary() async {
     final data = await _getMapOnce('$_base/audit-summary');
     return FixedAssetAuditSummary.fromJson(data);
+  }
+
+  /// Khóa khu vực AUTO của [userId] (bản ghi AUTO mới nhất trong kỳ).
+  /// userId rỗng: backend trả lỗi.
+  static Future<FixedAssetZoneLock> fetchZoneLock({
+    required String userId,
+  }) async {
+    final data = await _getMapOnce(
+      '$_base/zone-lock',
+      queryParameters: {'userId': userId},
+    );
+    return FixedAssetZoneLock.fromJson(data);
   }
 
   /// Tiến độ kiểm kê theo vùng của (fac, floor), kỳ 3 tháng hiện tại. Chỉ
@@ -272,6 +285,8 @@ class FixedAssetApi {
     required String userName,
     String note = '',
     bool confirmLocationMismatch = false,
+    // "AUTO" | "MANUAL"; bỏ qua khi null.
+    String? mode,
   }) async {
     try {
       // Dùng DioClient.dio trực tiếp (không qua _retry): POST này INSERT
@@ -288,6 +303,7 @@ class FixedAssetApi {
           'userName': userName,
           'note': note,
           'confirmLocationMismatch': confirmLocationMismatch,
+          if (mode != null) 'mode': mode,
         },
       );
 

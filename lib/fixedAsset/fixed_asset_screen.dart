@@ -61,6 +61,7 @@ class _FixedAssetScreenState extends State<FixedAssetScreen>
       confirmMismatch: _showMismatchDialog,
       showError: _showError,
       resetQr: () => _cameraKey.currentState?.resetQr(),
+      onZoneUnlocked: _showZoneUnlocked,
       onScanAccepted: (rawQr, machineCode) {
         final detailedMatches = _latestQrDetection?.value == rawQr;
         if (!detailedMatches) _latestQrDetection = null;
@@ -71,6 +72,7 @@ class _FixedAssetScreenState extends State<FixedAssetScreen>
     // AUTO là mặc định: Fac chỉ load khi chuyển sang MANUAL.
     // Summary chạy độc lập, không chặn camera.
     _controller.loadAuditSummary();
+    _controller.loadZoneLock();
 
     WidgetsBinding.instance.addObserver(this);
   }
@@ -88,6 +90,7 @@ class _FixedAssetScreenState extends State<FixedAssetScreen>
     if (state != AppLifecycleState.resumed) return;
     _controller.refreshZoneProgress();
     _controller.loadAuditSummary();
+    _controller.loadZoneLock();
   }
 
   // ============================================================
@@ -120,6 +123,16 @@ class _FixedAssetScreenState extends State<FixedAssetScreen>
     );
 
     return result == true;
+  }
+
+  /// Khu vực AUTO đang khóa vừa xong (controller báo đúng một lần).
+  void _showZoneUnlocked(String positionAA) {
+    if (!mounted) return;
+    CommonUI.showSnackBar(
+      context: context,
+      message: 'Hoàn thành $positionAA ✓, có thể quét khu vực khác.',
+      color: const Color(0xFF16A34A),
+    );
   }
 
   void _showError(String message) {
@@ -215,6 +228,8 @@ class _FixedAssetScreenState extends State<FixedAssetScreen>
         lastAuditedUserId: v.lastAuditedUserId,
         lastAuditedUserName: v.lastAuditedUserName,
         mismatchMaster: v.mismatchMaster,
+        onSwitchManual: () =>
+            c.setLocationMode(FixedAssetLocationMode.manual),
       ),
     );
   }
@@ -255,6 +270,10 @@ class _FixedAssetScreenState extends State<FixedAssetScreen>
           machineCount: c.displayMachineCount,
           auditedMachineCount: c.displayAuditedCount,
           onModeChanged: c.setLocationMode,
+          lockedZone: c.lockedZone,
+          lockedZoneProgress: c.lockedZoneProgress,
+          zoneLockUnverified: c.isZoneLockUnverified,
+          resumedFromLock: c.isResumedFromLock,
           manualSelectors: FixedAssetManualSelectors(
             selectedFac: manual.selectedFac,
             selectedFloor: manual.selectedFloor,

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../model/fixed_asset_zone_progress.dart';
 import '../fixed_asset_audit_flow.dart';
 import '../fixed_asset_location.dart';
 
@@ -17,6 +18,15 @@ class FixedAssetLocationSection extends StatelessWidget {
   final Widget manualSelectors;
   final ValueChanged<FixedAssetLocationMode> onModeChanged;
 
+  /// AUTO zone lock: the zone the user must finish first, its progress
+  /// (all users), and whether the lock could not be verified.
+  final FixedAssetAuditLocation? lockedZone;
+  final ZoneProgress? lockedZoneProgress;
+  final bool zoneLockUnverified;
+
+  /// AUTO location restored from an unfinished zone (until the first scan).
+  final bool resumedFromLock;
+
   const FixedAssetLocationSection({
     super.key,
     required this.locationMode,
@@ -27,6 +37,10 @@ class FixedAssetLocationSection extends StatelessWidget {
     required this.auditedMachineCount,
     required this.manualSelectors,
     required this.onModeChanged,
+    this.lockedZone,
+    this.lockedZoneProgress,
+    this.zoneLockUnverified = false,
+    this.resumedFromLock = false,
   });
 
   static const Color _accent = Color(0xFF4DD0E1);
@@ -104,10 +118,17 @@ class FixedAssetLocationSection extends StatelessWidget {
               _buildModeToggle(),
             ],
           ),
+          if (_isAuto && resumedFromLock)
+            Text(
+              'Tiếp tục khu vực đang kiểm kê dở',
+              style: TextStyle(color: _accent.withOpacity(.85), fontSize: 11),
+            ),
           const SizedBox(height: 8),
-          if (_isAuto)
-            _buildMasterLocation()
-          else
+          if (_isAuto) ...[
+            _buildMasterLocation(),
+            if (lockedZone != null) _buildLockStrip(lockedZone!),
+            if (zoneLockUnverified) _buildLockWarning(),
+          ] else
             Padding(
               padding: const EdgeInsets.only(right: 4),
               child: manualSelectors,
@@ -261,6 +282,82 @@ class FixedAssetLocationSection extends StatelessWidget {
           ],
         ),
       ],
+    );
+  }
+
+  /// "Đang kiểm kê {AA} · audited/total" + 3px bar + hint (AUTO only).
+  Widget _buildLockStrip(FixedAssetAuditLocation zone) {
+    final progress = lockedZoneProgress;
+    final counts = progress == null
+        ? ''
+        : ' · ${progress.audited}/${progress.total}';
+    return Container(
+      margin: const EdgeInsets.only(top: 8, right: 4),
+      padding: const EdgeInsets.fromLTRB(10, 7, 10, 7),
+      decoration: BoxDecoration(
+        color: _accent.withOpacity(.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: _accent.withOpacity(.35)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.lock_rounded, color: _accent, size: 15),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  'Đang kiểm kê ${zone.positionAA}$counts',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: _accent,
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(2),
+            child: LinearProgressIndicator(
+              value: progress?.ratio ?? 0,
+              minHeight: 3,
+              color: _accent,
+              backgroundColor: Colors.white.withOpacity(.12),
+            ),
+          ),
+          const SizedBox(height: 5),
+          Text(
+            'Hoàn thành để chuyển khu vực khác',
+            style: TextStyle(color: Colors.white.withOpacity(.55), fontSize: 11),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLockWarning() {
+    return const Padding(
+      padding: EdgeInsets.only(top: 6),
+      child: Row(
+        children: [
+          Icon(Icons.info_outline_rounded, color: _amber, size: 14),
+          SizedBox(width: 4),
+          Expanded(
+            child: Text(
+              'Không kiểm tra được tiến độ khu vực',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: _amber, fontSize: 11.5),
+            ),
+          ),
+        ],
+      ),
     );
   }
 

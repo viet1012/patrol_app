@@ -26,6 +26,10 @@ enum FixedAssetScanStatus {
   mismatchSaved,
   unknownSaved,
   failed,
+
+  /// AUTO đang khóa một khu vực chưa xong: QR khu vực khác bị chặn (không
+  /// check / không lưu).
+  zoneLocked,
 }
 
 /// Phân loại kết quả /audit-check trong AUTO.

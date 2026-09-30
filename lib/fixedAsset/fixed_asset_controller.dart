@@ -3,13 +3,15 @@ import 'dart:async';
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/widgets.dart';
 
-import '../api/fixed_asset_api.dart';
+import '../api/fixed_asset_backend.dart';
 import '../model/fixed_asset_audit_check_response.dart';
 import '../model/fixed_asset_audit_save_response.dart';
 import '../model/fixed_asset_audit_summary.dart';
 import '../model/fixed_asset_machine.dart';
+import '../model/fixed_asset_zone_lock.dart';
 import '../model/fixed_asset_zone_progress.dart';
 import 'fixed_asset_audit_flow.dart';
+import 'fixed_asset_features.dart';
 import 'fixed_asset_location.dart';
 import 'fixed_asset_manual_cascade.dart';
 import 'fixed_asset_qr_parser.dart';
@@ -21,6 +23,7 @@ import 'fixed_asset_qr_parser.dart';
 /// - [confirmMismatch]: dialog "Vẫn lưu / Hủy"
 /// - [showError]: snackbar lỗi load dropdown
 /// - [resetQr]: re-arm QR scanner của CameraPreviewBox
+/// - [onZoneUnlocked]: snackbar "Hoàn thành {AA} ✓" (khu vực khóa đã xong)
 class FixedAssetController extends ChangeNotifier {
   FixedAssetController({
     required this.accountCode,
@@ -29,6 +32,9 @@ class FixedAssetController extends ChangeNotifier {
     required this.showError,
     required this.resetQr,
     this.onScanAccepted,
+    this.onZoneUnlocked,
+    this.api = const FixedAssetBackend(),
+    this.zoneLockEnabled = FixedAssetFeatures.zoneLock,
   }) {
     manual = FixedAssetManualCascade(
       onChanged: _notify,
@@ -43,6 +49,17 @@ class FixedAssetController extends ChangeNotifier {
   final ValueChanged<String> showError;
   final VoidCallback resetQr;
   final void Function(String rawQr, String machineCode)? onScanAccepted;
+
+  /// Khu vực AUTO đang khóa vừa audit xong (PositionAA): báo đúng một lần.
+  final ValueChanged<String>? onZoneUnlocked;
+
+  /// Endpoint Fixed Asset (thay được trong test).
+  final FixedAssetBackend api;
+
+  /// Chế độ khóa khu vực AUTO ([FixedAssetFeatures.zoneLock]; test ghi đè
+  /// được). false: không zone-lock, không chặn, không tự hiện khu vực dang
+  /// dở. saveAudit vẫn gửi mode.
+  final bool zoneLockEnabled;
 
   late final FixedAssetManualCascade manual;
 
@@ -131,6 +148,10 @@ class FixedAssetController extends ChangeNotifier {
 
   /// Tăng mỗi lần đổi mode.
   int _modeGeneration = 0;
+
+  /// "AUTO" / "MANUAL" của từng pipeline (theo mode lúc bắt đầu), dùng cho
+  /// mọi POST /audit của pipeline đó, kể cả re-POST sau xác nhận.
+  final Map<int, String> _auditModeByScan = <int, String>{};
 
   bool get _pipelineBusy =>
       _activeScan != null && _activeScanMode == _modeGeneration;
@@ -238,7 +259,7 @@ class FixedAssetController extends ChangeNotifier {
     _notify();
 
     try {
-      final result = await FixedAssetApi.fetchAuditSummary();
+      final result = await api.fetchAuditSummary();
       if (_disposed || req != _summaryReq) return;
       final previous = _auditSummary;
       final periodChanged =
@@ -362,11 +383,14 @@ class FixedAssetController extends ChangeNotifier {
     _zoneReqByKey[key] = req;
 
     try {
-      final rows = await FixedAssetApi.fetchZoneProgress(fac: f, floor: fl);
+      final rows = await api.fetchZoneProgress(fac: f, floor: fl);
       if (_disposed || _zoneReqByKey[key] != req) return;
       _zoneProgressCache[key] = buildZoneProgressMap(rows);
       _staleZoneKeys.remove(key);
       _zoneLog('loaded $key: ${rows.length} rows');
+      // The locked zone may just have reached 100% (anyone's audits):
+      // unlock now, then let the server confirm.
+      if (_checkLockTransition()) loadZoneLock();
       _notify();
       if (checkMachines) _refreshMachinesIfBehind(key);
     } catch (error) {
@@ -418,8 +442,225 @@ class FixedAssetController extends ChangeNotifier {
     _staleZoneKeys.addAll(_zoneProgressCache.keys);
     _zoneRefreshTimer?.cancel();
     _zoneRefreshTimer = Timer(_zoneRefreshDelay, () {
-      if (!_disposed) refreshZoneProgress();
+      if (_disposed) return;
+      refreshZoneProgress();
+      loadZoneLock();
     });
+  }
+
+  // ============================================================
+  // ZONE LOCK (AUTO khóa ở một khu vực tới khi audit xong)
+  // ============================================================
+
+  /// Kết quả zone-lock thành công gần nhất (null = chưa tải được lần nào).
+  FixedAssetZoneLock? _serverLock;
+
+  /// Lần tải zone-lock gần nhất bị lỗi: chỉ [_optimisticLock] còn chặn.
+  bool _zoneLockFailed = false;
+
+  /// Khóa đặt ngay sau lần lưu AUTO, trước khi server xác nhận.
+  FixedAssetAuditLocation? _optimisticLock;
+
+  int _zoneLockReq = 0;
+
+  /// [lockedZone] ở lần kiểm tra chuyển trạng thái trước (null lúc mở màn
+  /// hình, nên lần tải đầu đã COMPLETED / NO_AUTO_AUDIT không báo gì).
+  FixedAssetAuditLocation? _lastLockedZone;
+
+  void _lockLog(String message) {
+    if (kDebugMode) debugPrint('[FA-LOCK] $message');
+  }
+
+  /// Mã vùng của [location]: vùng cha không con (PositionAA rỗng hoặc =
+  /// PositionA) dùng PositionA.
+  static String _zoneCodeOf(FixedAssetAuditLocation location) {
+    final positionA = location.positionA.trim();
+    final positionAA = location.positionAA.trim();
+    return positionAA.isEmpty || positionAA == positionA
+        ? positionA
+        : positionAA;
+  }
+
+  ZoneProgress? _zoneProgressOf(FixedAssetAuditLocation location) =>
+      zoneProgressFor(location.fac, location.floor)?[_zoneCodeOf(location)];
+
+  static bool _qrInZone(FixedAssetQrData qr, FixedAssetAuditLocation zone) {
+    String norm(String v) => v.trim().toLowerCase();
+    return norm(qr.floor) == norm(zone.floor) &&
+        norm(qr.positionAA) == norm(zone.positionAA);
+  }
+
+  FixedAssetAuditLocation? get _serverLockedZone {
+    final lock = _serverLock;
+    if (_zoneLockFailed ||
+        lock == null ||
+        !lock.locked ||
+        lock.reason == FixedAssetZoneLockReason.unresolved ||
+        !lock.hasLocation) {
+      return null;
+    }
+    return FixedAssetAuditLocation(
+      fac: lock.fac!,
+      floor: lock.floor!,
+      positionA: lock.positionA!,
+      positionAA: lock.positionAA!,
+    );
+  }
+
+  /// Khu vực AUTO đang khóa: khóa lạc quan của phiên, hoặc khóa server (khi
+  /// lần tải gần nhất thành công). Zone-progress báo đã xong -> không khóa.
+  FixedAssetAuditLocation? get lockedZone {
+    if (!zoneLockEnabled) return null;
+    final candidate = _optimisticLock ?? _serverLockedZone;
+    if (candidate == null) return null;
+    if (_zoneProgressOf(candidate)?.isDone ?? false) return null;
+    return candidate;
+  }
+
+  /// Tiến độ khu vực khóa (mọi user): zone-progress trước, không có thì số
+  /// của zone-lock.
+  ZoneProgress? get lockedZoneProgress {
+    final zone = lockedZone;
+    if (zone == null) return null;
+    final fromZones = _zoneProgressOf(zone);
+    if (fromZones != null) return fromZones;
+    final lock = _serverLock;
+    final total = lock?.total;
+    if (lock == null || total == null || _serverLockedZone != zone) {
+      return null;
+    }
+    return ZoneProgress(
+      audited: (lock.audited ?? 0).clamp(0, total < 0 ? 0 : total),
+      total: total,
+    );
+  }
+
+  /// Không kiểm tra được khóa: lần tải gần nhất lỗi, hoặc UNRESOLVED.
+  /// (NO_AUTO_AUDIT không phải lỗi.)
+  bool get isZoneLockUnverified =>
+      zoneLockEnabled &&
+      (_zoneLockFailed ||
+      _serverLock?.reason == FixedAssetZoneLockReason.unresolved);
+
+  /// Khóa lạc quan sau lần lưu AUTO ở [location] (mapped), nếu zone-progress
+  /// của nó có và chưa xong. Server xác nhận ở lần tải kế tiếp.
+  void _setOptimisticLock(FixedAssetAuditLocation? location) {
+    if (!zoneLockEnabled || location == null) return;
+    final progress = _zoneProgressOf(location);
+    if (progress == null || progress.isDone) return;
+    _optimisticLock = location;
+    _lockLog('optimistic lock ${location.floor}/${location.positionAA}');
+    _checkLockTransition();
+    _notify();
+  }
+
+  /// Tải khóa của user từ server. Kết quả cũ trả về muộn bị bỏ. Lỗi: giữ
+  /// khóa lạc quan, bỏ khóa server, đánh dấu "không kiểm tra được".
+  Future<void> loadZoneLock() async {
+    if (!zoneLockEnabled || _disposed) return;
+    final userId = accountCode.trim();
+    if (userId.isEmpty) {
+      _lockLog('skip: empty accountCode');
+      return;
+    }
+    final req = ++_zoneLockReq;
+    // A scan or a mode switch after this point wins over this result.
+    final scanGeneration = _scanGeneration;
+    final modeGeneration = _modeGeneration;
+    try {
+      final lock = await api.fetchZoneLock(userId: userId);
+      if (_disposed || req != _zoneLockReq) return;
+      _serverLock = lock;
+      _zoneLockFailed = false;
+      // Server is authoritative: it confirms or replaces the optimistic lock.
+      _optimisticLock = null;
+      _lockLog(
+        'loaded: locked=${lock.locked} reason=${lock.reason.name} '
+        '${lock.floor}/${lock.positionAA} ${lock.audited}/${lock.total}',
+      );
+      if (lock.reason == FixedAssetZoneLockReason.unresolved) {
+        _lockLog('unresolved: not blocking scans');
+      }
+      if (scanGeneration == _scanGeneration &&
+          modeGeneration == _modeGeneration) {
+        _resumeLockedZone(lock);
+      }
+    } catch (error) {
+      if (_disposed || req != _zoneLockReq) return;
+      _zoneLockFailed = true;
+      _lockLog('load failed: ${fixedAssetErrorText(error)}');
+    }
+    _checkLockTransition();
+    _notify();
+  }
+
+  /// AUTO location restored from the unfinished zone (no scan yet): the
+  /// location card shows "Tiếp tục khu vực đang kiểm kê dở" until the first
+  /// scan.
+  bool _isResumedFromLock = false;
+  bool get isResumedFromLock => _isResumedFromLock;
+
+  /// Opening AUTO with an unfinished zone (INCOMPLETE with a full location)
+  /// and nothing scanned yet in this session: show that zone right away —
+  /// location card, map, machine list — as after a scan, without check/save
+  /// and without touching the scan status.
+  void _resumeLockedZone(FixedAssetZoneLock lock) {
+    if (!isAutoMode ||
+        _autoLocation != null ||
+        _autoUnmappedActual != null ||
+        !lock.locked ||
+        lock.reason != FixedAssetZoneLockReason.incomplete ||
+        !lock.hasLocation) {
+      return;
+    }
+    final location = FixedAssetAuditLocation(
+      fac: lock.fac!,
+      floor: lock.floor!,
+      positionA: lock.positionA!,
+      positionAA: lock.positionAA!,
+    );
+    _lockLog('resume ${location.floor}/${location.positionAA}');
+    _autoLocation = location;
+    _autoUnmappedActual = null;
+    _autoLocationMismatch = false;
+    _isResumedFromLock = true;
+
+    _machineReq++;
+    _machines = const <FixedAssetMachine>[];
+    _machineError = null;
+    _clearMachineSearch();
+    // Also loads zone-progress for this floor (cached).
+    _loadMachines(
+      location.fac,
+      location.floor,
+      location.positionA,
+      location.positionAA,
+    );
+  }
+
+  /// So [lockedZone] với lần trước. Khi khu vực đang khóa được thả vì đã
+  /// xong (zone-progress isDone, hoặc server COMPLETED cho cùng khu vực):
+  /// báo [onZoneUnlocked] đúng một lần. true = vừa thả do đã xong.
+  bool _checkLockTransition() {
+    if (!zoneLockEnabled) return false;
+    final previous = _lastLockedZone;
+    final current = lockedZone;
+    _lastLockedZone = current;
+    if (previous == null || current == previous) return false;
+
+    final server = _serverLock;
+    final done =
+        (_zoneProgressOf(previous)?.isDone ?? false) ||
+        (server != null &&
+            server.reason == FixedAssetZoneLockReason.completed &&
+            server.floor == previous.floor &&
+            server.positionAA == previous.positionAA);
+    if (!done) return false;
+
+    if (_optimisticLock == previous) _optimisticLock = null;
+    _lockLog('unlocked ${previous.floor}/${previous.positionAA} (done)');
+    onZoneUnlocked?.call(previous.positionAA);
+    return true;
   }
 
   // ============================================================
@@ -490,6 +731,7 @@ class FixedAssetController extends ChangeNotifier {
     }
 
     final generation = ++_scanGeneration;
+    _isResumedFromLock = false;
     final qrData = parseFixedAssetQr(qr);
     final machineCode = qrData.machineCode;
 
@@ -512,7 +754,34 @@ class FixedAssetController extends ChangeNotifier {
       return;
     }
 
+    // AUTO đang khóa một khu vực: QR của khu vực khác không được check/lưu.
+    final lock = isAutoMode && qrData.hasLocation ? lockedZone : null;
+    if (lock != null && !_qrInZone(qrData, lock)) {
+      final progress = lockedZoneProgress;
+      final counts = progress == null
+          ? ''
+          : ' (${progress.audited}/${progress.total})';
+      _scanLog(
+        'skip: zone locked to ${lock.floor}/${lock.positionAA}, '
+        'QR is ${qrData.floor}/${qrData.positionAA}',
+      );
+      _scannedCode = machineCode;
+      _scannedFaName = qrData.displayName;
+      _mismatchMaster = null;
+      _lastAuditedAt = null;
+      _lastAuditedUserId = null;
+      _lastAuditedUserName = null;
+      _scanStatus = FixedAssetScanStatus.zoneLocked;
+      _statusMessage =
+          'Khu vực ${lock.positionAA} chưa hoàn thành$counts. '
+          'Hoàn thành khu vực này hoặc chuyển sang Manual.';
+      _notify();
+      resetQr();
+      return;
+    }
+
     // Một pipeline duy nhất cho toàn bộ CHECK -> (CONFIRM) -> SAVE.
+    _auditModeByScan[generation] = isAutoMode ? 'AUTO' : 'MANUAL';
     _activeScan = generation;
     _activeScanMode = _modeGeneration;
     _processingRawQr = qr;
@@ -540,6 +809,7 @@ class FixedAssetController extends ChangeNotifier {
     } finally {
       // Chỉ pipeline này tự trả cờ: pipeline cũ (mode trước) kết thúc muộn
       // không được xóa cờ của pipeline mới.
+      _auditModeByScan.remove(generation);
       if (_activeScan == generation) {
         _activeScan = null;
         _processingRawQr = null;
@@ -596,7 +866,7 @@ class FixedAssetController extends ChangeNotifier {
 
     _scanLog('checkAudit → $machineCode ${qrData.floor}/${qrData.positionAA}');
     try {
-      check = await FixedAssetApi.checkAudit(
+      check = await api.checkAudit(
         machineCode: machineCode,
         floor: qrData.floor,
         positionAA: qrData.positionAA,
@@ -888,6 +1158,7 @@ class FixedAssetController extends ChangeNotifier {
     final userId = accountCode.trim();
     final name = userName.trim();
     final saveUserName = name.isEmpty ? userId : name;
+    final mode = _auditModeByScan[generation] ?? (isAutoMode ? 'AUTO' : 'MANUAL');
 
     if (_scanStatus != FixedAssetScanStatus.saving) {
       _scanStatus = FixedAssetScanStatus.saving;
@@ -901,7 +1172,7 @@ class FixedAssetController extends ChangeNotifier {
     _scanLog('saveAudit → $machineCode #$generation '
         '(confirm=$confirmLocationMismatch)');
     try {
-      response = await FixedAssetApi.saveAudit(
+      response = await api.saveAudit(
         fac: target.fac,
         floor: target.floor,
         positionA: target.positionA,
@@ -910,6 +1181,7 @@ class FixedAssetController extends ChangeNotifier {
         userId: userId,
         userName: saveUserName,
         confirmLocationMismatch: confirmLocationMismatch,
+        mode: mode,
       );
     } catch (error) {
       saveError = error;
@@ -926,8 +1198,10 @@ class FixedAssetController extends ChangeNotifier {
     // Tiến độ MASTER đổi khi có insert mới cho machine MASTER (kể cả
     // mismatch đã xác nhận). Vẫn refresh khi scan đã stale vì record đã
     // vào backend.
-    if (isNewFixedAssetMasterAudit(result)) {
-      loadAuditSummary();
+    if (isNewFixedAssetMasterAudit(result)) loadAuditSummary();
+    if (result != null && result.saved) {
+      if (mode == 'AUTO') _setOptimisticLock(target.location);
+      // Zone progress + zone lock reload (shared 800 ms debounce).
       _scheduleZoneProgressRefresh();
     }
 
@@ -1058,6 +1332,7 @@ class FixedAssetController extends ChangeNotifier {
 
     _locationMode = mode;
     _modeGeneration++;
+    _isResumedFromLock = false;
     _autoLocation = null;
     _autoUnmappedActual = null;
     _autoLocationMismatch = false;
@@ -1083,6 +1358,10 @@ class FixedAssetController extends ChangeNotifier {
     }
     _scanLog('mode switched');
     _notify();
+
+    // The lock is kept across modes (MANUAL ignores it); refresh it on the
+    // way back to AUTO.
+    if (mode == FixedAssetLocationMode.auto) loadZoneLock();
 
     // Lazy-load Fac lần đầu vào MANUAL, sau đó dùng lại cache.
     if (mode == FixedAssetLocationMode.manual && manual.needsFacs) {
@@ -1226,7 +1505,7 @@ class FixedAssetController extends ChangeNotifier {
     final req = _machineReq;
     _silentMachineRefreshInFlight = true;
     try {
-      final result = await FixedAssetApi.fetchMachines(
+      final result = await api.fetchMachines(
         fac: location.fac,
         floor: location.floor,
         positionA: location.positionA,
@@ -1266,7 +1545,7 @@ class FixedAssetController extends ChangeNotifier {
     _notify();
 
     try {
-      final result = await FixedAssetApi.fetchMachines(
+      final result = await api.fetchMachines(
         fac: fac,
         floor: floor,
         positionA: positionA,

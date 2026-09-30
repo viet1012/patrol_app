@@ -18,6 +18,9 @@ class FixedAssetStatusCard extends StatelessWidget {
   final String? lastAuditedUserName;
   final FixedAssetAuditLocation? mismatchMaster;
 
+  /// [FixedAssetScanStatus.zoneLocked]: "Chuyển Manual" button.
+  final VoidCallback? onSwitchManual;
+
   const FixedAssetStatusCard({
     super.key,
     required this.status,
@@ -28,6 +31,7 @@ class FixedAssetStatusCard extends StatelessWidget {
     this.lastAuditedUserId,
     this.lastAuditedUserName,
     required this.mismatchMaster,
+    this.onSwitchManual,
   });
 
   /// "Việt (KVH_IT_Mem_Viet)" / "Việt" / "KVH_IT_Mem_Viet".
@@ -141,6 +145,13 @@ class FixedAssetStatusCard extends StatelessWidget {
           color: _amber,
           size: 20,
         );
+      case FixedAssetScanStatus.zoneLocked:
+        // AUTO khóa ở khu vực khác: QR này không được check / lưu.
+        primary = hasCode ? machineCode : 'Khu vực đang khóa';
+        if ((message ?? '').isNotEmpty) details.add(message!);
+        label = 'Khóa khu vực';
+        color = _amber;
+        indicator = const Icon(Icons.lock_rounded, color: _amber, size: 20);
       case FixedAssetScanStatus.failed:
         // Invalid QR: không có MachineCode, message là dòng chính.
         primary = hasCode ? machineCode : (message ?? 'Scan failed');
@@ -157,6 +168,7 @@ class FixedAssetStatusCard extends StatelessWidget {
 
     final idle = status == FixedAssetScanStatus.idle;
     final failed = status == FixedAssetScanStatus.failed;
+    final zoneLocked = status == FixedAssetScanStatus.zoneLocked;
     final statusIndicator = _statusIndicator(
       label: label,
       color: color,
@@ -210,13 +222,30 @@ class FixedAssetStatusCard extends StatelessWidget {
                     padding: const EdgeInsets.only(top: 1),
                     child: Text(
                       detail,
-                      maxLines: failed ? 2 : 1,
+                      maxLines: failed || zoneLocked ? 2 : 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: failed
                             ? Colors.redAccent.shade100
                             : Colors.white.withOpacity(.65),
                         fontSize: 12,
+                      ),
+                    ),
+                  ),
+                if (zoneLocked && onSwitchManual != null)
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton.icon(
+                      onPressed: onSwitchManual,
+                      icon: const Icon(Icons.touch_app_rounded, size: 16),
+                      label: const Text('Chuyển Manual'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: _amber,
+                        visualDensity: VisualDensity.compact,
+                        textStyle: const TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
                     ),
                   ),

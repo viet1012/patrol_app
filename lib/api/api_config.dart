@@ -9,7 +9,6 @@ class ApiConfig {
 
   // static const String domain = 'spcspatrol-misumig.msappproxy.net';
 
-
   static String get baseUrl => 'http://$domain';
 
   static String get wsBaseUrl => 'ws://$domain';
