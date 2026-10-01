@@ -477,10 +477,10 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
         );
       case PatrolGroup.AssetUpdate:
         return const _GroupConfig(
-          title: 'MA Asset Patrol',
+          title: 'MA Machine Patrol',
           icon: Icons.inventory_rounded,
-          prefix: 'Asset Patrol',
-          titleScreen: 'MA Asset Patrol',
+          prefix: 'Machine Patrol',
+          titleScreen: 'MA Machine Patrol',
         );
       case PatrolGroup.FixedAsset:
         return const _GroupConfig(
@@ -550,9 +550,9 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
       case PatrolGroup.QualityPatrol:
         return Colors.purpleAccent.shade100;
       case PatrolGroup.AssetUpdate:
-        return Colors.yellow.shade700;
+        return Colors.amber.shade600; // vàng máy móc
       case PatrolGroup.FixedAsset:
-        return Colors.orangeAccent.shade200;
+        return const Color.fromARGB(255, 247, 115, 104); // coral
     }
   }
 
