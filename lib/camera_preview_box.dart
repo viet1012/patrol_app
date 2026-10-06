@@ -2424,7 +2424,9 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
               right: 12,
               // Không có toolbar ở dưới khi qrOnly nên banner hạ xuống sát đáy
               // (nhường chỗ cho zoom control nếu đang hiện).
-              bottom: widget.qrOnly ? (_hwZoomVisible ? 52 : 12) : 78,
+              bottom: widget.qrOnly
+                  ? (_hwZoomVisible ? 52 : 12)
+                  : (_hwZoomVisible ? 116 : 78),
               child: IgnorePointer(
                 child: RepaintBoundary(
                   child: ValueListenableBuilder<_QrWarningState>(
@@ -2449,7 +2451,8 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
               Positioned(
                 left: 0,
                 right: 0,
-                bottom: 10,
+                // Chế độ chụp ảnh: đặt trên nút chụp để không che nút.
+                bottom: widget.qrOnly ? 10 : 72,
                 child: Center(child: _buildHardwareZoomControl()),
               ),
 

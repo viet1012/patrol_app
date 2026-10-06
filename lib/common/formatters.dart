@@ -9,3 +9,10 @@ String fmtPct(double v) {
 
   return '${v.toStringAsFixed(1)}%';
 }
+
+/// Tỉ lệ 0..1 -> '72%'; null -> '--'.
+String fmtRate(double? v) {
+  if (v == null) return '--';
+
+  return '${(v * 100).round()}%';
+}

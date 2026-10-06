@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../api/summary_api.dart';
 import '../../../model/division_summary.dart';
 import '../../../widget/glass_action_button.dart';
-import '../tables/patrol_facility_summary_table.dart';
+import '../tables/pic_summary_view.dart';
 import '../widgets/division_summary_table.dart';
 
 class BeforeAfterSummaryDialog extends StatefulWidget {
@@ -174,7 +174,7 @@ class _BeforeAfterSummaryDialogState extends State<BeforeAfterSummaryDialog> {
             },
           ),
           const SizedBox(height: 8),
-          PatrolFacilitySummaryTable(
+          PicSummaryView(
             fromD: widget.fromD,
             toD: widget.toD,
             plant: widget.fac,

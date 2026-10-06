@@ -21,6 +21,7 @@ extension _CameraScreenCamera on _CameraScreenState {
               },
               onQrDetected: _handleQrDetected,
               enablePowerControl: true,
+              enableZoomControls: true,
             ),
           ),
           if (_isCheckingQr)
