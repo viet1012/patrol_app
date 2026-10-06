@@ -90,6 +90,10 @@ class CameraPreviewBox extends StatefulWidget {
   final bool enablePowerControl;
   final bool useSwitchPowerControl;
 
+  /// false: không load STT / không mở socket STT (vd. dialog quét QR không
+  /// gắn với plant). true (mặc định): giữ nguyên hành vi cũ.
+  final bool enableStt;
+
   const CameraPreviewBox({
     super.key,
     this.size = 320,
@@ -109,6 +113,7 @@ class CameraPreviewBox extends StatefulWidget {
     this.enableQrLockAnimation = false,
     this.enablePowerControl = false,
     this.useSwitchPowerControl = false,
+    this.enableStt = true,
   });
 
   @override
@@ -338,8 +343,10 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
     } else {
       _setCameraSleeping(true, notifyParent: false);
     }
-    _loadStt();
-    _connectSocket();
+    if (widget.enableStt) {
+      _loadStt();
+      _connectSocket();
+    }
   }
 
   @override
@@ -2328,7 +2335,8 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
               ),
             ),
 
-            if (widget.showQrNumber)
+            // Badge STT "No. x": không build khi tắt STT (enableStt == false).
+            if (widget.showQrNumber && widget.enableStt)
             Positioned(
               top: widget.enablePowerControl ? 50 : 12,
               right: 12,

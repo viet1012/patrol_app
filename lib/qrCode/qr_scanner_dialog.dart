@@ -1,4 +1,5 @@
-import 'package:chuphinh/qrCode/qr_code_camera.dart';
+import 'package:chuphinh/camera_preview_box.dart';
+import 'package:chuphinh/homeScreen/patrol_home_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -12,7 +13,7 @@ class QrScannerDialog extends StatefulWidget {
 }
 
 class QrScannerDialogState extends State<QrScannerDialog> {
-  final _camKey = GlobalKey<QrCodeCameraState>();
+  final _camKey = GlobalKey<CameraPreviewBoxState>();
 
   final _manualCtrl = TextEditingController();
   final _manualFocus = FocusNode();
@@ -21,7 +22,20 @@ class QrScannerDialogState extends State<QrScannerDialog> {
 
   // ✅ expose cho page gọi
   Future<void> stopCamera() async {
-    await _camKey.currentState?.stopCamera();
+    await _camKey.currentState?.sleepCamera();
+  }
+
+  /// Dialog chưa đóng sau onDetected: bật lại camera và cho phép quét lại.
+  Future<void> _resumeScanning() async {
+    // onDetected bên ngoài thường pop sau một await: chờ 1 frame rồi bỏ qua
+    // nếu dialog đã/đang đóng (route không còn là current).
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted || ModalRoute.of(context)?.isCurrent == false) return;
+    final cam = _camKey.currentState;
+    if (cam == null) return;
+    await cam.wakeCamera();
+    if (!mounted) return;
+    cam.resetQr();
   }
 
   Future<void> _close() async {
@@ -32,7 +46,7 @@ class QrScannerDialogState extends State<QrScannerDialog> {
 
   @override
   void dispose() {
-    _camKey.currentState?.stopCamera();
+    _camKey.currentState?.sleepCamera();
     _manualCtrl.dispose();
     _manualFocus.dispose();
     super.dispose();
@@ -188,9 +202,14 @@ class QrScannerDialogState extends State<QrScannerDialog> {
           const SizedBox(height: 12),
 
           // Camera
-          QrCodeCamera(
+          CameraPreviewBox(
             key: _camKey,
             size: 340,
+            type: PatrolGroup.Patrol.name,
+            patrolGroup: PatrolGroup.Patrol,
+            qrOnly: true,
+            enableZoomControls: true,
+            enableStt: false,
             onQrDetected: (qr) async {
               final t = qr.trim();
               if (t.isEmpty) return;
@@ -203,7 +222,9 @@ class QrScannerDialogState extends State<QrScannerDialog> {
 
               widget.onDetected(t);
 
-              if (mounted) setState(() => _submitting = false);
+              if (!mounted) return;
+              setState(() => _submitting = false);
+              await _resumeScanning();
             },
           ),
 
