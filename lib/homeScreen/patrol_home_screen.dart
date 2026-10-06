@@ -14,6 +14,7 @@ import '../api/hse_master_service.dart';
 import '../common/animated_glass_action_button.dart';
 import '../common/app_version_text.dart';
 import '../common/common_ui_helper.dart';
+import '../common/plant_constants.dart';
 import '../fixedAsset/fixed_asset_screen.dart';
 import '../model/auth_me.dart';
 import '../model/hse_patrol_team_model.dart';
@@ -245,6 +246,9 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
       if (plant.isNotEmpty) values.add(plant);
     }
 
+    // SPC luôn đứng đầu, không trùng nếu master có sẵn.
+    values.remove(kAllPlantCode);
+
     final result = values.toList(growable: false);
 
     result.sort((a, b) {
@@ -257,7 +261,7 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
       return a.compareTo(b);
     });
 
-    return result;
+    return [kAllPlantCode, ...result];
   }
 
   int _extractTrailingNumber(String value) {
@@ -410,6 +414,11 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
       selectedFactory = value;
       _autoTeam = null;
       _needManualSelect = true;
+
+      // Group đang mở bị ẩn ở chế độ SPC -> quay về Patrol.
+      if (expandedGroup != null && !_visibleGroups.contains(expandedGroup)) {
+        expandedGroup = PatrolGroup.Patrol;
+      }
     });
 
     if (value != null && value.isNotEmpty) {
@@ -417,10 +426,18 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
     }
   }
 
+  bool get _isAllPlant => isAllPlant(selectedFactory);
+
+  // SPC chỉ xem Data Table của Patrol, các group khác ẩn.
+  List<PatrolGroup> get _visibleGroups =>
+      _isAllPlant ? const [PatrolGroup.Patrol] : PatrolGroup.values;
+
   Widget _buildGroupList() {
     if (selectedFactory == null) {
       return const SizedBox.shrink();
     }
+
+    final groups = _visibleGroups;
 
     /*
      * ListView.builder chỉ build card cần hiển thị.
@@ -430,9 +447,9 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
       key: ValueKey(selectedFactory),
       cacheExtent: 200,
       physics: const BouncingScrollPhysics(),
-      itemCount: PatrolGroup.values.length,
+      itemCount: groups.length,
       itemBuilder: (context, index) {
-        final group = PatrolGroup.values[index];
+        final group = groups[index];
         final config = _groupConfig(group);
 
         return RepaintBoundary(
@@ -682,10 +699,25 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
       );
     }
 
+    final canTable = _authMe?.can(group, PatrolAction.summary) ?? false;
+
+    // SPC (tất cả nhà máy): chỉ xem Data Table.
+    if (_isAllPlant) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
+        child: _patrolButton(
+          number: '1)',
+          title: 'Data Table',
+          color: color,
+          enabled: canTable,
+          onTap: () => _openSummary(group),
+        ),
+      );
+    }
+
     final canBefore = _authMe?.can(group, PatrolAction.before) ?? false;
     final canAfter = _authMe?.can(group, PatrolAction.after) ?? false;
     final canRecheck = _authMe?.can(group, PatrolAction.recheck) ?? false;
-    final canTable = _authMe?.can(group, PatrolAction.summary) ?? false;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),

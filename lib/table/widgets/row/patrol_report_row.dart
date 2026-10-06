@@ -8,6 +8,9 @@ import '../cells/patrol_report_cells.dart';
 import 'patrol_report_hoverable_row.dart';
 
 class PatrolReportRow extends StatelessWidget {
+  static const double defaultRowHeight = 100;
+  static const double mobileRowHeight = 60;
+
   final PatrolReportModel report;
   final int pageIndex;
   final bool selected;
@@ -16,6 +19,7 @@ class PatrolReportRow extends StatelessWidget {
   final VoidCallback onShowBeforeImages;
   final VoidCallback onShowAfterImages;
   final VoidCallback onShowHseImages;
+  final double rowHeight;
 
   const PatrolReportRow({
     super.key,
@@ -27,6 +31,7 @@ class PatrolReportRow extends StatelessWidget {
     required this.onShowBeforeImages,
     required this.onShowAfterImages,
     required this.onShowHseImages,
+    this.rowHeight = defaultRowHeight,
   });
 
   double _width(String label) => PatrolReportTableQuery.widthOf(columns, label);
@@ -35,7 +40,7 @@ class PatrolReportRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final baseColor = pageIndex.isEven ? Colors.white : Colors.grey.shade50;
     return PatrolReportHoverableRow(
-      height: 100,
+      height: rowHeight,
       background: selected ? Colors.lightBlue.shade50 : baseColor,
       onDoubleTap: onEdit,
       child: Row(
@@ -45,7 +50,11 @@ class PatrolReportRow extends StatelessWidget {
             _width('STT'),
             align: TextAlign.center,
           ),
-          PatrolReportCells.qr(report.qr_key?.toString(), _width('QR')),
+          PatrolReportCells.qr(
+            report.qr_key?.toString(),
+            _width('QR'),
+            compact: rowHeight < defaultRowHeight,
+          ),
           PatrolReportCells.text(report.grp, _width('Group'), tooltip: true),
           PatrolReportCells.text(report.plant, _width('Plant'), tooltip: true),
           PatrolReportCells.text(

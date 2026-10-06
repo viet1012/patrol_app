@@ -185,8 +185,18 @@ class PatrolReportGroupBar extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Wrap(spacing: 6, runSpacing: 6, children: chips),
-            const SizedBox(height: 8),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  for (var i = 0; i < chips.length; i++) ...[
+                    if (i > 0) const SizedBox(width: 6),
+                    chips[i],
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 6),
             Row(
               children: [
                 Expanded(child: fromChip),

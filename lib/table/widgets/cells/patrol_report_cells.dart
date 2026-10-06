@@ -35,17 +35,18 @@ class PatrolReportCells {
     );
   }
 
-  static Widget qr(String? qr, double width) {
+  static Widget qr(String? qr, double width, {bool compact = false}) {
     final value = (qr ?? '').trim();
     final hasQr = value.isNotEmpty;
+    final box = compact ? 40.0 : 50.0;
     return _boxed(
       width: width,
       align: TextAlign.center,
       child: hasQr
           ? Container(
-              margin: const EdgeInsets.only(bottom: 6),
-              width: 50,
-              height: 50,
+              margin: EdgeInsets.only(bottom: compact ? 0 : 6),
+              width: box,
+              height: box,
               decoration: BoxDecoration(
                 color: Colors.blueGrey.shade50,
                 borderRadius: BorderRadius.circular(8),
@@ -54,9 +55,9 @@ class PatrolReportCells {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.qr_code_2_rounded,
-                    size: 24,
+                    size: compact ? 18 : 24,
                     color: Colors.blueGrey,
                   ),
                   const SizedBox(height: 2),
@@ -65,7 +66,7 @@ class PatrolReportCells {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      fontSize: 13,
+                      fontSize: compact ? 11 : 13,
                       color: Colors.grey.shade800,
                       height: 1,
                     ),

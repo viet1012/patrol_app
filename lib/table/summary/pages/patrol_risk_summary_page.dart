@@ -3,6 +3,7 @@ import 'package:syncfusion_flutter_charts/charts.dart';
 
 import '../../../api/patrol_risk_summary_api.dart';
 import '../../../common/common_ui_helper.dart';
+import '../../../common/plant_constants.dart';
 import '../../../model/risk_summary.dart';
 
 class PatrolRiskSummaryPage extends StatefulWidget {
@@ -13,7 +14,7 @@ class PatrolRiskSummaryPage extends StatefulWidget {
   final DateTime? fromD;
   final DateTime? toD;
 
-  final void Function(String grp, String division)? onSelect;
+  final void Function(String grp, String division, String plant)? onSelect;
 
   /// ✅ báo ngược lên parent khi user đổi ngày trong Summary
   final void Function(DateTime from, DateTime to)? onDateChanged;
@@ -304,6 +305,7 @@ class _PatrolRiskSummaryPageState extends State<PatrolRiskSummaryPage> {
         child: Padding(
           padding: EdgeInsets.all(_isMobile ? 6 : 8),
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               _isMobile
@@ -411,6 +413,7 @@ class _PatrolRiskSummaryPageState extends State<PatrolRiskSummaryPage> {
                       : chartItems.length * 20 + 80,
                   child: _RiskStackedBarChart(
                     items: chartItems,
+                    showPlant: isAllPlant(widget.plant),
                     onSelect: widget.onSelect,
                   ),
                 ),
@@ -424,9 +427,15 @@ class _PatrolRiskSummaryPageState extends State<PatrolRiskSummaryPage> {
 
 class _RiskStackedBarChart extends StatelessWidget {
   final List<RiskSummary> items;
-  final void Function(String grp, String division)? onSelect;
+  final bool showPlant;
+  final void Function(String grp, String division, String plant)? onSelect;
 
-  const _RiskStackedBarChart({super.key, required this.items, this.onSelect});
+  const _RiskStackedBarChart({
+    super.key,
+    required this.items,
+    this.showPlant = false,
+    this.onSelect,
+  });
 
   static const Color cMinus = Color(0xFFE5E7EB);
   static const Color cI = Color(0xFFD1FAE5);
@@ -488,7 +497,9 @@ class _RiskStackedBarChart extends StatelessWidget {
       name: name,
       dataSource: items,
       // animationDuration: 0,
-      xValueMapper: (e, _) => e.shortLabel,
+      // SPC: thêm plant để division trùng tên ở các Fac không bị gộp 1 cột.
+      xValueMapper: (e, _) =>
+          showPlant ? '${e.plant} · ${e.shortLabel}' : e.shortLabel,
       yValueMapper: (e, _) => v(e),
       dataLabelMapper: (e, _) {
         final value = v(e);
@@ -501,7 +512,7 @@ class _RiskStackedBarChart extends StatelessWidget {
 
         final e = items[idx];
 
-        onSelect?.call(e.grp, e.division); // 🔥 callback ngược lên
+        onSelect?.call(e.grp, e.division, e.plant); // 🔥 callback ngược lên
       },
 
       color: color,

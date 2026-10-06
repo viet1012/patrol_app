@@ -13,6 +13,9 @@ class PatrolReportTableToolbar extends StatelessWidget {
   final VoidCallback onDownload;
   final VoidCallback onClear;
 
+  /// Mobile: nút 36x36, bỏ ô đếm (hiển thị ở pagination).
+  final bool compact;
+
   const PatrolReportTableToolbar({
     super.key,
     required this.searchController,
@@ -24,10 +27,13 @@ class PatrolReportTableToolbar extends StatelessWidget {
     required this.onReload,
     required this.onDownload,
     required this.onClear,
+    this.compact = false,
   });
 
   @override
   Widget build(BuildContext context) {
+    if (compact) return _buildCompact();
+
     return Row(
       children: [
         GlassActionButton(icon: Icons.arrow_back_rounded, onTap: onBack),
@@ -71,6 +77,77 @@ class PatrolReportTableToolbar extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildCompact() {
+    const glassPadding = EdgeInsets.symmetric(horizontal: 2);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+      child: Row(
+        children: [
+          GlassActionButton(
+            icon: Icons.arrow_back_rounded,
+            onTap: onBack,
+            size: 18,
+            padding: glassPadding,
+          ),
+          GlassActionButton(
+            icon: Icons.refresh,
+            onTap: onReload,
+            size: 18,
+            padding: glassPadding,
+          ),
+          _compactIconButton(
+            tooltip: 'Download Excel',
+            icon: Icons.download_rounded,
+            onPressed: downloading ? null : onDownload,
+          ),
+          const SizedBox(width: 4),
+          Expanded(
+            child: TextField(
+              controller: searchController,
+              style: const TextStyle(fontSize: 13),
+              decoration: InputDecoration(
+                hintText: 'Search (stt, type, group, comment, PIC...)',
+                hintStyle: const TextStyle(fontSize: 13),
+                prefixIcon: const Icon(Icons.search, size: 18),
+                prefixIconConstraints: const BoxConstraints(
+                  minWidth: 32,
+                  minHeight: 36,
+                ),
+                isDense: true,
+                contentPadding: const EdgeInsets.symmetric(vertical: 9),
+                filled: true,
+                fillColor: Colors.white,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+            ),
+          ),
+          _compactIconButton(
+            tooltip: 'Clear filters',
+            icon: Icons.cleaning_services,
+            onPressed: canClear ? onClear : null,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _compactIconButton({
+    required String tooltip,
+    required IconData icon,
+    required VoidCallback? onPressed,
+  }) {
+    return IconButton(
+      tooltip: tooltip,
+      onPressed: onPressed,
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints.tightFor(width: 36, height: 36),
+      icon: Icon(icon, size: 20, color: Colors.greenAccent),
     );
   }
 }

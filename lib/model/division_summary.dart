@@ -1,4 +1,5 @@
 class DivisionSummary {
+  final String plant;
   final String division;
 
   final double allTtl, allI, allII, allIII, allIV, allV;
@@ -11,7 +12,11 @@ class DivisionSummary {
   final double threeDaysAgo;
   final double late;
 
+  bool get isSumRow => division == 'SUM';
+  bool get isPctRow => division == '%';
+
   DivisionSummary({
+    this.plant = '',
     required this.division,
     required this.allTtl,
     required this.allI,
@@ -43,6 +48,7 @@ class DivisionSummary {
   });
 
   factory DivisionSummary.fromJson(Map<String, dynamic> j) => DivisionSummary(
+    plant: (j['plant'] ?? '').toString(),
     division: (j['division'] ?? '').toString(),
     allTtl: (j['allTtl'] ?? 0) as double,
     allI: (j['allI'] ?? 0) as double,

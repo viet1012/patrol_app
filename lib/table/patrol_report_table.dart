@@ -1,10 +1,12 @@
+import 'dart:math' as math;
+
 import 'package:chuphinh/common/common_ui_helper.dart';
 import 'package:chuphinh/table/core/patrol_report_table_columns.dart';
 import 'package:chuphinh/table/core/patrol_report_table_query.dart';
 import 'package:chuphinh/table/core/patrol_report_table_state.dart';
 import 'package:chuphinh/table/dialogs/edit_report_dialog.dart';
 import 'package:chuphinh/table/dialogs/patrol_images_dialog.dart';
-import 'package:chuphinh/table/summary/pages/before_after_summary_page.dart';
+import 'package:chuphinh/table/summary/pages/before_after_summary_dialog.dart';
 import 'package:chuphinh/table/summary/pages/patrol_risk_summary_page.dart';
 import 'package:chuphinh/table/widgets/group/patrol_report_group_bar.dart';
 import 'package:chuphinh/table/widgets/header/patrol_report_table_header.dart';
@@ -20,6 +22,7 @@ import '../api/api_config.dart';
 import '../api/hse_master_service.dart';
 import '../api/patrol_report_api.dart';
 import '../api/patrol_report_download_api.dart';
+import '../common/plant_constants.dart';
 import '../model/auth_me.dart';
 import '../model/patrol_report_model.dart';
 
@@ -67,6 +70,7 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
   bool _editingReport = false;
 
   final ScrollController _pageScrollCtrl = ScrollController();
+  final ScrollController _summaryScrollCtrl = ScrollController();
 
   int? _selectedFy;
 
@@ -143,6 +147,7 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
     _reportLoadGeneration++;
     _employeeLoadGeneration++;
     _pageScrollCtrl.dispose();
+    _summaryScrollCtrl.dispose();
     _horizontalScrollCtrl.dispose();
     _verticalScrollCtrl.dispose();
     _filterListScrollCtrl.dispose();
@@ -354,10 +359,16 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
     return null;
   }
 
-  void _applySummaryFilter(String group, String division) {
+  void _applySummaryFilter(String group, String division, String plant) {
     final nextFilters = Map<String, Set<String>>.from(_viewState.filterValues)
       ..['Group'] = {group}
       ..['Division'] = {division};
+
+    // SPC: cùng tên division có thể ở nhiều Fac -> lọc thêm theo Plant của dòng.
+    final byPlant = isAllPlant(widget.plant) && plant.isNotEmpty;
+    if (byPlant) {
+      nextFilters['Plant'] = {plant};
+    }
 
     setState(() {
       _viewState = _viewState.copyWith(filterValues: nextFilters, page: 0);
@@ -367,7 +378,9 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
 
     CommonUI.showSuccessSnack(
       context,
-      message: 'Filtered by $group / $division',
+      message: byPlant
+          ? 'Filtered by $plant / $group / $division'
+          : 'Filtered by $group / $division',
     );
   }
 
@@ -600,13 +613,27 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
                                         padding: const EdgeInsets.only(
                                           bottom: 8,
                                         ),
-                                        child: PatrolRiskSummaryPage(
-                                          onSelect: _applySummaryFilter,
-                                          onDateChanged: _applySummaryDates,
-                                          fromD: _viewState.fromDate,
-                                          toD: _viewState.toDate,
-                                          plant: widget.plant,
-                                          patrolGroup: widget.patrolGroup,
+                                        // Giới hạn chiều cao: SPC nhiều division làm summary quá cao.
+                                        child: ConstrainedBox(
+                                          constraints: BoxConstraints(
+                                            maxHeight:
+                                                constraints.maxHeight * 0.45,
+                                          ),
+                                          child: Scrollbar(
+                                            controller: _summaryScrollCtrl,
+                                            child: SingleChildScrollView(
+                                              controller: _summaryScrollCtrl,
+                                              child: PatrolRiskSummaryPage(
+                                                onSelect: _applySummaryFilter,
+                                                onDateChanged:
+                                                    _applySummaryDates,
+                                                fromD: _viewState.fromDate,
+                                                toD: _viewState.toDate,
+                                                plant: widget.plant,
+                                                patrolGroup: widget.patrolGroup,
+                                              ),
+                                            ),
+                                          ),
                                         ),
                                       )
                                     : const SizedBox(
@@ -675,6 +702,42 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
                   );
                 }
 
+                final mobileToolbar = PatrolReportTableToolbar(
+                  searchController: _searchCtrl,
+                  total: _reports.length,
+                  shown: filtered.length,
+                  canClear:
+                      _viewState.searchQuery.isNotEmpty ||
+                      _viewState.filterValues.isNotEmpty,
+                  downloading: _viewState.downloading,
+                  onBack: () => context.go('/home'),
+                  onReload: _reload,
+                  onDownload: _downloadExcel,
+                  onClear: _clearAll,
+                  compact: true,
+                );
+
+                final mobileTable = PatrolReportTableViewport(
+                  horizontalController: _horizontalScrollCtrl,
+                  verticalController: _verticalScrollCtrl,
+                  totalWidth: tableWidth,
+                  header: _buildHeader(),
+                  itemCount: currentItems.length,
+                  rowBuilder: (_, index) => _buildRow(
+                    currentItems[index],
+                    index,
+                    rowHeight: PatrolReportRow.mobileRowHeight,
+                  ),
+                );
+
+                final exportBanner = _viewState.downloading
+                    ? CommonUI.exportLoadingBanner(
+                        accentColor: Colors.amber,
+                        title: 'Exporting Excel',
+                        subtitle: 'Large dataset detected, please waitâ€¦',
+                      )
+                    : null;
+
                 return Column(
                   children: [
                     Expanded(
@@ -695,83 +758,54 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
                           trackVisibility: WidgetStateProperty.all(true),
                         ),
 
-                        child: Scrollbar(
-                          controller: _pageScrollCtrl,
-                          thumbVisibility: true,
-                          trackVisibility: true,
-                          thickness: 10,
-                          radius: const Radius.circular(999),
-
-                          child: SingleChildScrollView(
-                            controller: _pageScrollCtrl,
-                            padding: const EdgeInsets.only(bottom: 8),
-
-                            child: Column(
-                              children: [
-                                _buildSummaryToggle(),
-
-                                AnimatedSwitcher(
-                                  duration: const Duration(milliseconds: 250),
-                                  switchInCurve: Curves.easeOut,
-                                  switchOutCurve: Curves.easeIn,
-                                  child: _viewState.showSummary
-                                      ? Padding(
-                                          key: const ValueKey('summary'),
-                                          padding: const EdgeInsets.only(
-                                            bottom: 8,
-                                          ),
-                                          child: PatrolRiskSummaryPage(
-                                            onSelect: _applySummaryFilter,
-                                            onDateChanged: _applySummaryDates,
-                                            fromD: _viewState.fromDate,
-                                            toD: _viewState.toDate,
-                                            plant: widget.plant,
-                                            patrolGroup: widget.patrolGroup,
-                                          ),
-                                        )
-                                      : const SizedBox(
-                                          key: ValueKey('summary_empty'),
+                        child: _viewState.showSummary
+                            ? Scrollbar(
+                                controller: _pageScrollCtrl,
+                                thumbVisibility: true,
+                                trackVisibility: true,
+                                thickness: 10,
+                                radius: const Radius.circular(999),
+                                child: SingleChildScrollView(
+                                  controller: _pageScrollCtrl,
+                                  padding: const EdgeInsets.only(bottom: 8),
+                                  child: Column(
+                                    children: [
+                                      _buildSummaryToggle(),
+                                      Padding(
+                                        padding: const EdgeInsets.only(
+                                          bottom: 8,
                                         ),
-                                ),
-
-                                PatrolReportTableToolbar(
-                                  searchController: _searchCtrl,
-                                  total: _reports.length,
-                                  shown: filtered.length,
-                                  canClear:
-                                      _viewState.searchQuery.isNotEmpty ||
-                                      _viewState.filterValues.isNotEmpty,
-                                  downloading: _viewState.downloading,
-                                  onBack: () => context.go('/home'),
-                                  onReload: _reload,
-                                  onDownload: _downloadExcel,
-                                  onClear: _clearAll,
-                                ),
-
-                                if (_viewState.downloading)
-                                  CommonUI.exportLoadingBanner(
-                                    accentColor: Colors.amber,
-                                    title: 'Exporting Excel',
-                                    subtitle:
-                                        'Large dataset detected, please waitâ€¦',
-                                  ),
-
-                                SizedBox(
-                                  height: constraints.maxHeight * 0.62,
-                                  child: PatrolReportTableViewport(
-                                    horizontalController: _horizontalScrollCtrl,
-                                    verticalController: _verticalScrollCtrl,
-                                    totalWidth: tableWidth,
-                                    header: _buildHeader(),
-                                    itemCount: currentItems.length,
-                                    rowBuilder: (_, index) =>
-                                        _buildRow(currentItems[index], index),
+                                        child: PatrolRiskSummaryPage(
+                                          onSelect: _applySummaryFilter,
+                                          onDateChanged: _applySummaryDates,
+                                          fromD: _viewState.fromDate,
+                                          toD: _viewState.toDate,
+                                          plant: widget.plant,
+                                          patrolGroup: widget.patrolGroup,
+                                        ),
+                                      ),
+                                      mobileToolbar,
+                                      if (exportBanner != null) exportBanner,
+                                      SizedBox(
+                                        height: math.max(
+                                          constraints.maxHeight * 0.62,
+                                          320,
+                                        ),
+                                        child: mobileTable,
+                                      ),
+                                    ],
                                   ),
                                 ),
-                              ],
-                            ),
-                          ),
-                        ),
+                              )
+                            // Summary đóng: bảng lấp hết phần còn lại.
+                            : Column(
+                                children: [
+                                  _buildSummaryToggle(),
+                                  mobileToolbar,
+                                  if (exportBanner != null) exportBanner,
+                                  Expanded(child: mobileTable),
+                                ],
+                              ),
                       ),
                     ),
 
@@ -794,6 +828,8 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
                           );
                         });
                       },
+                      compact: true,
+                      grandTotal: _reports.length,
                     ),
                   ],
                 );
@@ -948,10 +984,15 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
     );
   }
 
-  Widget _buildRow(PatrolReportModel report, int pageIndex) {
+  Widget _buildRow(
+    PatrolReportModel report,
+    int pageIndex, {
+    double rowHeight = PatrolReportRow.defaultRowHeight,
+  }) {
     return PatrolReportRow(
       report: report,
       pageIndex: pageIndex,
+      rowHeight: rowHeight,
       selected: _viewState.selectedReportId == report.id,
       columns: _columns,
       onEdit: () => _editReport(report),

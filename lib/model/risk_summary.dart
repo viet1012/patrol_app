@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/cupertino.dart';
 
 class RiskSummary {
+  final String plant;
   final String grp;
   final String division;
   final int minus;
@@ -12,6 +13,7 @@ class RiskSummary {
   final int v;
 
   RiskSummary({
+    this.plant = '',
     required this.grp,
     required this.division,
     required this.minus,
@@ -28,6 +30,7 @@ class RiskSummary {
     int _int(dynamic x) => (x is num) ? x.toInt() : int.tryParse('$x') ?? 0;
 
     return RiskSummary(
+      plant: (j['plant'] ?? '').toString(),
       grp: (j['grp'] ?? '').toString(),
       division: (j['division'] ?? '').toString(),
       minus: _int(j['minus']),

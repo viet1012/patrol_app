@@ -1,3 +1,4 @@
+import '../../common/plant_constants.dart';
 import '../../model/patrol_export_query.dart';
 import '../../model/patrol_report_model.dart';
 import 'patrol_report_table_columns.dart';
@@ -166,7 +167,14 @@ class PatrolReportTableQuery {
       params['type'] = patrolType;
     }
 
-    params['plant'] = plantValue;
+    // SPC: nếu đang lọc cột Plant đúng 1 nhà máy thì giữ để Excel khớp bảng.
+    final filteredPlants = filterValues['Plant'];
+    final keepColumnPlant =
+        isAllPlant(plantValue) && filteredPlants?.length == 1;
+
+    if (!keepColumnPlant) {
+      params['plant'] = plantValue;
+    }
     params['from'] = fmtDate(from);
     params['to'] = fmtDate(to);
 
