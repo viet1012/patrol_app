@@ -1,6 +1,6 @@
-import 'package:chuphinh/fixedAsset/map/fixed_asset_detected_map.dart';
-import 'package:chuphinh/fixedAsset/map/floor_map_widget.dart';
-import 'package:chuphinh/model/fixed_asset_zone_progress.dart';
+import 'package:chuphinh/features/fixed_asset/map/fixed_asset_detected_map.dart';
+import 'package:chuphinh/features/fixed_asset/map/floor_map_widget.dart';
+import 'package:chuphinh/core/models/fixed_asset_zone_progress.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 

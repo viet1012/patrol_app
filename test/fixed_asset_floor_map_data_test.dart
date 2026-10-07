@@ -1,4 +1,4 @@
-import 'package:chuphinh/fixedAsset/map/floor_map_data.dart';
+import 'package:chuphinh/features/fixed_asset/map/floor_map_data.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

@@ -1,5 +1,5 @@
-import 'package:chuphinh/fixedAsset/widgets/fixed_asset_machine_section.dart';
-import 'package:chuphinh/model/fixed_asset_machine.dart';
+import 'package:chuphinh/features/fixed_asset/widgets/fixed_asset_machine_section.dart';
+import 'package:chuphinh/core/models/fixed_asset_machine.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 

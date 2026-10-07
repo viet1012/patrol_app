@@ -1,0 +1,699 @@
+import 'package:flutter/material.dart';
+import 'package:syncfusion_flutter_charts/charts.dart';
+
+import 'package:chuphinh/core/api/patrol_risk_summary_api.dart';
+import 'package:chuphinh/shared/widgets/common_ui_helper.dart';
+import 'package:chuphinh/shared/utils/plant_constants.dart';
+import 'package:chuphinh/core/models/risk_summary.dart';
+
+class PatrolRiskSummaryPage extends StatefulWidget {
+  final String plant;
+  final String patrolGroup;
+
+  /// ✅ range từ parent (PatrolReportTable)
+  final DateTime? fromD;
+  final DateTime? toD;
+
+  final void Function(String grp, String division, String plant)? onSelect;
+
+  /// ✅ báo ngược lên parent khi user đổi ngày trong Summary
+  final void Function(DateTime from, DateTime to)? onDateChanged;
+
+  const PatrolRiskSummaryPage({
+    super.key,
+    this.onSelect,
+    this.onDateChanged,
+    required this.plant,
+    required this.patrolGroup,
+    this.fromD,
+    this.toD,
+  });
+
+  @override
+  State<PatrolRiskSummaryPage> createState() => _PatrolRiskSummaryPageState();
+}
+
+class _PatrolRiskSummaryPageState extends State<PatrolRiskSummaryPage> {
+  late final PatrolRiskSummaryApi api;
+
+  late TextEditingController _fromCtrl;
+  late TextEditingController _toCtrl;
+
+  late DateTime _fromDate;
+  late DateTime _toDate;
+
+  String _fmt(DateTime d) =>
+      '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
+  // last good
+  List<RiskSummary> _lastGoodItems = const [];
+  DateTime? _lastGoodFrom;
+  DateTime? _lastGoodTo;
+
+  bool _noData = false;
+  String _noDataMsg = '';
+
+  bool _loading = true;
+  String? _error;
+  List<RiskSummary> _items = const [];
+  late final DateTime _initialFrom;
+  late final DateTime _initialTo;
+
+  bool get _isMobile => MediaQuery.of(context).size.width < 600;
+
+  @override
+  void initState() {
+    super.initState();
+
+    api = const PatrolRiskSummaryApi();
+
+    // ✅ 1) init range ưu tiên từ parent, nếu null thì default
+    final now = DateTime.now();
+    final defaultTo = DateTime(now.year, now.month, now.day);
+    final defaultFrom = DateTime(now.year, now.month, 1);
+
+    _fromDate = _normalize(widget.fromD) ?? defaultFrom;
+    _toDate = _normalize(widget.toD) ?? defaultTo;
+    _initialFrom = _fromDate;
+    _initialTo = _toDate;
+    // ✅ đảm bảo from <= to
+    if (_fromDate.isAfter(_toDate)) {
+      _fromDate = defaultFrom;
+      _toDate = defaultTo;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        widget.onDateChanged?.call(_fromDate, _toDate);
+      });
+    }
+
+    _fromCtrl = TextEditingController(text: _fmt(_fromDate));
+    _toCtrl = TextEditingController(text: _fmt(_toDate));
+
+    _fetch();
+  }
+
+  /// ✅ 2) parent đổi from/to => child sync lại + gọi API
+  @override
+  void didUpdateWidget(covariant PatrolRiskSummaryPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    final newFrom = _normalize(widget.fromD);
+    final newTo = _normalize(widget.toD);
+
+    final oldFrom = _normalize(oldWidget.fromD);
+    final oldTo = _normalize(oldWidget.toD);
+
+    final changed =
+        (newFrom != null && !_sameDay(newFrom, oldFrom)) ||
+        (newTo != null && !_sameDay(newTo, oldTo));
+
+    if (changed) {
+      final now = DateTime.now();
+      final fallbackTo = DateTime(now.year, now.month, now.day);
+      final fallbackFrom = DateTime(now.year, now.month, 1);
+
+      final from = newFrom ?? fallbackFrom;
+      final to = newTo ?? fallbackTo;
+
+      if (from.isAfter(to)) return; // parent truyền sai thì bỏ qua
+
+      setState(() {
+        _fromDate = from;
+        _toDate = to;
+        _fromCtrl.text = _fmt(_fromDate);
+        _toCtrl.text = _fmt(_toDate);
+      });
+
+      _fetch();
+    }
+  }
+
+  DateTime? _normalize(DateTime? d) {
+    if (d == null) return null;
+    return DateTime(d.year, d.month, d.day);
+  }
+
+  bool _sameDay(DateTime? a, DateTime? b) {
+    if (a == null && b == null) return true;
+    if (a == null || b == null) return false;
+    return a.year == b.year && a.month == b.month && a.day == b.day;
+  }
+
+  @override
+  void dispose() {
+    _fromCtrl.dispose();
+    _toCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _fetch() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+      _noData = false;
+      _noDataMsg = '';
+    });
+
+    try {
+      final res = await api.fetchRiskSummary(
+        fromD: _fmt(_fromDate),
+        toD: _fmt(_toDate),
+        fac: widget.plant,
+        type: widget.patrolGroup,
+      );
+
+      if (!mounted) return;
+
+      if (res.isEmpty) {
+        setState(() {
+          _loading = false;
+          _noData = true;
+          _noDataMsg = 'No data for the selected date range';
+          _items = const [];
+        });
+        return;
+      }
+
+      setState(() {
+        _loading = false;
+        _items = res;
+
+        _lastGoodItems = res;
+        _lastGoodFrom = _fromDate;
+        _lastGoodTo = _toDate;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = e.toString();
+      });
+    }
+  }
+
+  void _reload() => _fetch();
+
+  Future<void> _pickDate({required bool isFrom}) async {
+    final initial = isFrom ? _fromDate : _toDate;
+
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime(2020, 1, 1),
+      lastDate: DateTime(2100, 12, 31),
+    );
+
+    if (picked == null) return;
+
+    DateTime newFrom = _fromDate;
+    DateTime newTo = _toDate;
+
+    final p = DateTime(picked.year, picked.month, picked.day);
+
+    if (isFrom) {
+      newFrom = p;
+    } else {
+      newTo = p;
+    }
+
+    if (newFrom.isAfter(newTo)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('From date must be <= To date')),
+      );
+      return;
+    }
+
+    setState(() {
+      _fromDate = newFrom;
+      _toDate = newTo;
+      _fromCtrl.text = _fmt(_fromDate);
+      _toCtrl.text = _fmt(_toDate);
+    });
+
+    // ✅ báo cho parent biết (để Dialog Open dùng chung)
+    widget.onDateChanged?.call(_fromDate, _toDate);
+
+    _fetch();
+  }
+
+  void _revertToInitial() {
+    setState(() {
+      _fromDate = _initialFrom;
+      _toDate = _initialTo;
+      _fromCtrl.text = _fmt(_fromDate);
+      _toCtrl.text = _fmt(_toDate);
+
+      _noData = false;
+      _noDataMsg = '';
+      _error = null;
+    });
+
+    widget.onDateChanged?.call(_fromDate, _toDate);
+    _fetch(); // ✅ quan trọng
+  }
+
+  void _revertToLastGood() {
+    if (_lastGoodFrom == null ||
+        _lastGoodTo == null ||
+        _lastGoodItems.isEmpty) {
+      return;
+    }
+
+    setState(() {
+      _fromDate = _lastGoodFrom!;
+      _toDate = _lastGoodTo!;
+      _fromCtrl.text = _fmt(_fromDate);
+      _toCtrl.text = _fmt(_toDate);
+
+      _items = _lastGoodItems;
+      _noData = false;
+      _noDataMsg = '';
+      _error = null;
+    });
+
+    // ✅ sync parent lại theo lastGood
+    widget.onDateChanged?.call(_fromDate, _toDate);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_error != null) {
+      return _ErrorView(message: _error!, onRetry: _reload);
+    }
+
+    // final shownItems = _items.isNotEmpty ? _items : _lastGoodItems;
+    final shownItems = _items;
+
+    final totalItem = shownItems.cast<RiskSummary?>().firstWhere(
+      (e) => e?.grp == 'TOTAL',
+      orElse: () => null,
+    );
+
+    final chartItems = shownItems.where((e) => e.grp != 'TOTAL').toList();
+
+    // if (shownItems.isEmpty) {
+    //   return _EmptyView(onRetry: _reload);
+    // }
+
+    return Padding(
+      padding: EdgeInsets.all(_isMobile ? 6 : 12),
+      child: Card(
+        elevation: 1.5,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        child: Padding(
+          padding: EdgeInsets.all(_isMobile ? 6 : 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _isMobile
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Row(
+                          children: [
+                            Icon(Icons.stacked_bar_chart_rounded, size: 18),
+                            SizedBox(width: 8),
+                            Text(
+                              'Patrol Summary',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _DateField(
+                                ctrl: _fromCtrl,
+                                label: 'From',
+                                onTap: () => _pickDate(isFrom: true),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: _DateField(
+                                ctrl: _toCtrl,
+                                label: 'To',
+                                onTap: () => _pickDate(isFrom: false),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    )
+                  : Row(
+                      children: [
+                        const Icon(Icons.stacked_bar_chart_rounded, size: 18),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'Patrol Summary',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const Spacer(),
+                        _DateField(
+                          ctrl: _fromCtrl,
+                          label: 'From',
+                          onTap: () => _pickDate(isFrom: true),
+                        ),
+                        const SizedBox(width: 8),
+                        _DateField(
+                          ctrl: _toCtrl,
+                          label: 'To',
+                          onTap: () => _pickDate(isFrom: false),
+                        ),
+                      ],
+                    ),
+
+              if (totalItem != null) ...[
+                const SizedBox(height: 10),
+                _TotalRiskBar(totalItem),
+              ],
+
+              if (_noData) ...[
+                const SizedBox(height: 10),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.orange.withOpacity(0.4)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.info_outline, color: Colors.orange),
+                      const SizedBox(width: 8),
+                      Expanded(child: Text(_noDataMsg)),
+                      TextButton.icon(
+                        onPressed: _revertToInitial,
+                        icon: const Icon(Icons.history),
+                        label: const Text('Back'),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+
+              const SizedBox(height: 8),
+
+              if (!_noData && chartItems.isNotEmpty)
+                SizedBox(
+                  height: _isMobile
+                      ? (chartItems.length * 26 + 110)
+                            .clamp(220, 420)
+                            .toDouble()
+                      : chartItems.length * 20 + 80,
+                  child: _RiskStackedBarChart(
+                    items: chartItems,
+                    showPlant: isAllPlant(widget.plant),
+                    onSelect: widget.onSelect,
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _RiskStackedBarChart extends StatelessWidget {
+  final List<RiskSummary> items;
+  final bool showPlant;
+  final void Function(String grp, String division, String plant)? onSelect;
+
+  const _RiskStackedBarChart({
+    super.key,
+    required this.items,
+    this.showPlant = false,
+    this.onSelect,
+  });
+
+  static const Color cMinus = Color(0xFFE5E7EB);
+  static const Color cI = Color(0xFFD1FAE5);
+  static const Color cII = Color(0xFF86EFAC);
+  static const Color cIII = Color(0xFF22C55E);
+  static const Color cIV = Color(0xFFFACC15);
+  static const Color cV = Color(0xFFEF4444);
+
+  @override
+  Widget build(BuildContext context) {
+    return SfCartesianChart(
+      tooltipBehavior: TooltipBehavior(enable: true),
+      plotAreaBorderWidth: 0,
+      margin: const EdgeInsets.fromLTRB(6, 8, 8, 6),
+      legend: const Legend(
+        isVisible: true,
+        position: LegendPosition.bottom,
+        overflowMode: LegendItemOverflowMode.wrap,
+        itemPadding: 10,
+      ),
+
+      // ✅ X là category (Group/Division)
+      primaryXAxis: CategoryAxis(
+        labelPlacement: LabelPlacement.betweenTicks,
+        axisLine: const AxisLine(width: 0),
+        majorTickLines: const MajorTickLines(size: 0),
+        labelStyle: const TextStyle(fontSize: 11, height: 1.1),
+      ),
+
+      // ✅ Y là số (0..)
+      primaryYAxis: NumericAxis(
+        minimum: 0,
+        interval: 5,
+        majorGridLines: const MajorGridLines(
+          width: 1,
+          color: Color(0x22000000),
+        ),
+        axisLine: const AxisLine(width: 0),
+        labelStyle: const TextStyle(fontSize: 11, color: Colors.black54),
+      ),
+
+      series: <StackedBarSeries<RiskSummary, String>>[
+        _stack(name: '-', color: cMinus, v: (e) => e.minus),
+        _stack(name: 'I', color: cI, v: (e) => e.i),
+        _stack(name: 'II', color: cII, v: (e) => e.ii),
+        _stack(name: 'III', color: cIII, v: (e) => e.iii),
+        _stack(name: 'IV', color: cIV, v: (e) => e.iv),
+        _stack(name: 'V', color: cV, v: (e) => e.v),
+      ],
+    );
+  }
+
+  StackedBarSeries<RiskSummary, String> _stack({
+    required String name,
+    required Color color,
+    required int Function(RiskSummary e) v,
+  }) {
+    return StackedBarSeries<RiskSummary, String>(
+      name: name,
+      dataSource: items,
+      // animationDuration: 0,
+      // SPC: thêm plant để division trùng tên ở các Fac không bị gộp 1 cột.
+      xValueMapper: (e, _) =>
+          showPlant ? '${e.plant} · ${e.shortLabel}' : e.shortLabel,
+      yValueMapper: (e, _) => v(e),
+      dataLabelMapper: (e, _) {
+        final value = v(e);
+        return value == 0 ? '' : value.toString();
+      },
+
+      onPointTap: (ChartPointDetails details) {
+        final idx = details.pointIndex;
+        if (idx == null) return;
+
+        final e = items[idx];
+
+        onSelect?.call(e.grp, e.division, e.plant); // 🔥 callback ngược lên
+      },
+
+      color: color,
+      enableTooltip: true,
+      width: 0.5,
+
+      dataLabelSettings: const DataLabelSettings(
+        isVisible: true,
+        labelAlignment: ChartDataLabelAlignment.middle,
+        textStyle: TextStyle(fontSize: 11, fontWeight: FontWeight.w800),
+      ),
+    );
+  }
+}
+
+// ====== UI helpers nhỏ gọn ======
+
+class _ErrorView extends StatelessWidget {
+  final String message;
+  final VoidCallback onRetry;
+
+  const _ErrorView({required this.message, required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.error_outline_rounded,
+              size: 44,
+              color: Colors.redAccent,
+            ),
+            const SizedBox(height: 10),
+            const Text(
+              'API error',
+              style: TextStyle(fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 8),
+            Text(message, textAlign: TextAlign.center),
+            const SizedBox(height: 12),
+            ElevatedButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Retry'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DateField extends StatelessWidget {
+  final TextEditingController ctrl;
+  final String label;
+  final VoidCallback onTap;
+
+  const _DateField({
+    required this.ctrl,
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isMobile = MediaQuery.of(context).size.width < 600;
+
+    return SizedBox(
+      width: isMobile ? null : 130,
+      height: 38,
+      child: TextField(
+        controller: ctrl,
+        readOnly: true,
+        onTap: onTap,
+        style: TextStyle(fontSize: isMobile ? 11 : 12),
+        decoration: InputDecoration(
+          labelText: label,
+          isDense: true,
+          suffixIcon: const Icon(Icons.calendar_month, size: 18),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 10,
+            vertical: 8,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TotalRiskBar extends StatelessWidget {
+  final RiskSummary t;
+
+  const _TotalRiskBar(this.t);
+
+  int get total => (t.minus) + t.i + t.ii + t.iii + t.iv + t.v;
+
+  @override
+  Widget build(BuildContext context) {
+    final isMobile = MediaQuery.of(context).size.width < 600;
+
+    Widget chip(String label, int v) => Container(
+      padding: EdgeInsets.symmetric(horizontal: isMobile ? 6 : 8, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.06),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: CommonUI.riskColor(label)),
+      ),
+      child: Text(
+        '$label: $v',
+        style: TextStyle(
+          fontSize: isMobile ? 11 : 13,
+          fontWeight: FontWeight.w700,
+          color: CommonUI.riskColor(label),
+        ),
+      ),
+    );
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.blueGrey.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.blueGrey.withOpacity(0.25)),
+      ),
+      child: isMobile
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.summarize_rounded, size: 18),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Total Risk: $total',
+                      style: const TextStyle(fontWeight: FontWeight.w900),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    chip('-', t.minus),
+                    chip('I', t.i),
+                    chip('II', t.ii),
+                    chip('III', t.iii),
+                    chip('IV', t.iv),
+                    chip('V', t.v),
+                  ],
+                ),
+              ],
+            )
+          : Row(
+              children: [
+                const Icon(Icons.summarize_rounded, size: 18),
+                const SizedBox(width: 8),
+                Text(
+                  'Total Risk: $total',
+                  style: const TextStyle(fontWeight: FontWeight.w900),
+                ),
+                const Spacer(),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    chip('-', t.minus),
+                    chip('I', t.i),
+                    chip('II', t.ii),
+                    chip('III', t.iii),
+                    chip('IV', t.iv),
+                    chip('V', t.v),
+                  ],
+                ),
+              ],
+            ),
+    );
+  }
+}

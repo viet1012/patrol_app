@@ -2,10 +2,10 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart' hide Canvas, Offset, Size;
 
-import 'package:chuphinh/fixedAsset/map/floor_map_data.dart';
-import 'package:chuphinh/fixedAsset/map/floor_map_models.dart';
-import 'package:chuphinh/fixedAsset/map/floor_map_painter.dart';
-import 'package:chuphinh/fixedAsset/map/floor_map_widget.dart';
+import 'package:chuphinh/features/fixed_asset/map/floor_map_data.dart';
+import 'package:chuphinh/features/fixed_asset/map/floor_map_models.dart';
+import 'package:chuphinh/features/fixed_asset/map/floor_map_painter.dart';
+import 'package:chuphinh/features/fixed_asset/map/floor_map_widget.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

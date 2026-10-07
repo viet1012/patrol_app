@@ -1,15 +1,15 @@
 import 'dart:async';
 
-import 'package:chuphinh/api/fixed_asset_backend.dart';
-import 'package:chuphinh/fixedAsset/fixed_asset_audit_flow.dart';
-import 'package:chuphinh/fixedAsset/fixed_asset_controller.dart';
-import 'package:chuphinh/fixedAsset/fixed_asset_location.dart';
-import 'package:chuphinh/model/fixed_asset_audit_check_response.dart';
-import 'package:chuphinh/model/fixed_asset_audit_save_response.dart';
-import 'package:chuphinh/model/fixed_asset_audit_summary.dart';
-import 'package:chuphinh/model/fixed_asset_machine.dart';
-import 'package:chuphinh/model/fixed_asset_zone_lock.dart';
-import 'package:chuphinh/model/fixed_asset_zone_progress.dart';
+import 'package:chuphinh/core/api/fixed_asset_backend.dart';
+import 'package:chuphinh/features/fixed_asset/fixed_asset_audit_flow.dart';
+import 'package:chuphinh/features/fixed_asset/fixed_asset_controller.dart';
+import 'package:chuphinh/features/fixed_asset/fixed_asset_location.dart';
+import 'package:chuphinh/core/models/fixed_asset_audit_check_response.dart';
+import 'package:chuphinh/core/models/fixed_asset_audit_save_response.dart';
+import 'package:chuphinh/core/models/fixed_asset_audit_summary.dart';
+import 'package:chuphinh/core/models/fixed_asset_machine.dart';
+import 'package:chuphinh/core/models/fixed_asset_zone_lock.dart';
+import 'package:chuphinh/core/models/fixed_asset_zone_progress.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 const _a351 = FixedAssetAuditLocation(

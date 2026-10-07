@@ -1,14 +1,14 @@
 // ignore: avoid_web_libraries_in_flutter
 import 'dart:html' as html;
 
-import 'package:chuphinh/routes/router.dart';
+import 'package:chuphinh/app/routes/router.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import 'app_idle_detector.dart';
-import 'l10n/app_localizations.dart';
+import 'package:chuphinh/app/app_idle_detector.dart';
+import 'package:chuphinh/l10n/app_localizations.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();

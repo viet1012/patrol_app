@@ -1,4 +1,4 @@
-import 'package:chuphinh/model/fixed_asset_machine.dart';
+import 'package:chuphinh/core/models/fixed_asset_machine.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

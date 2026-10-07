@@ -1,4 +1,4 @@
-import 'package:chuphinh/model/fixed_asset_zone_progress.dart';
+import 'package:chuphinh/core/models/fixed_asset_zone_progress.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 FixedAssetZoneProgressRow row(String a, String aa, int audited, int total) =>

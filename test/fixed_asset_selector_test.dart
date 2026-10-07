@@ -1,4 +1,4 @@
-import 'package:chuphinh/fixedAsset/widgets/fixed_asset_selector.dart';
+import 'package:chuphinh/features/fixed_asset/widgets/fixed_asset_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
