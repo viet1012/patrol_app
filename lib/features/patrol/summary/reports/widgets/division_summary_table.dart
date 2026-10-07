@@ -1,8 +1,12 @@
+import 'dart:math' as math;
+import 'dart:ui' show PointerDeviceKind;
+
 import 'package:flutter/material.dart';
 
 import 'package:chuphinh/shared/utils/formatters.dart';
 import 'package:chuphinh/core/models/division_summary.dart';
 import 'package:chuphinh/features/patrol/summary/reports/widgets/summary_cells.dart';
+import 'package:chuphinh/features/patrol/summary/reports/widgets/summary_grid_style.dart';
 
 class SummaryTableStyle {
   SummaryTableStyle._();
@@ -22,6 +26,44 @@ class SummaryTableStyle {
   static const double facDividerWidth = 1.5;
   static const Color facDividerColor = Color(0x40000000); // black ~25%
 
+  // Hàng header cha (Before / After / HSE Recheck): nền nhạt + viền dưới.
+  static const Color parentBg = Color(0x1FFFFFFF);
+  static const Color parentBorder = Color(0x80FFFFFF);
+
+  // Phân cách dọc giữa 2 nhóm cha: rõ hơn viền ô thường (black12), thấy được
+  // cả trên nền tối (header) lẫn nền pastel (ô dữ liệu).
+  static const double parentDividerWidth = 2;
+  static const Color parentDividerColor = Color(0xFF64748B);
+
+  // Chiều cao cố định cho các hàng phía trên dữ liệu: cột Fac/Area (đứng yên)
+  // và phần số (cuộn ngang) phải thẳng hàng.
+  static const double parentRowHeight = 32;
+  static const double groupRowHeight = 40;
+  static const double headerGap = 6;
+
+  // Thanh cuộn ngang: dày, bo tròn, tương phản trên nền tối.
+  static const double scrollbarThickness = 10;
+  static const double scrollbarGap = 8; // cách dòng % phía trên
+  static const Color scrollbarThumb = Color(0xCCFFFFFF);
+  static const Color scrollbarTrack = Color(0x26FFFFFF);
+  static const Color scrollbarTrackBorder = Color(0x40FFFFFF);
+
+  /// Khoảng trống dưới dòng cuối: chỗ cho thanh cuộn, không đè lên dòng %.
+  static const double bottomGap = scrollbarGap + scrollbarThickness;
+
+  // Card: đồng bộ với card PIC (FacPicSummaryCard / SummaryGridTable).
+  static const double bodyPadding = 8;
+
+  // Dòng SUM (bắt đầu khối SUM / %): viền trên đậm hơn phân cách nhà máy.
+  static const double totalDividerWidth = 2;
+  static const Color totalDividerColor = Color(0x80000000); // black ~50%
+
+  /// Giá trị "-" (0): xám nhạt để số thật nổi bật.
+  static const Color zeroText = Color(0x52000000);
+
+  /// Hover dòng (desktop).
+  static const Color hoverTint = Color(0x1A1E88E5);
+
   // Color
   static const Color tableTitle = Color(0xFFD8F5C7);
   static const Color sumBg = Color(0xFFDDD6FE);
@@ -40,6 +82,9 @@ class SummaryTableStyle {
 }
 
 class SummarySection {
+  /// Nhóm cha (hàng header trên cùng). Các section liên tiếp cùng [parent]
+  /// được gom thành 1 ô cha.
+  final String parent;
   final String title;
   final Color titleColor;
 
@@ -53,7 +98,13 @@ class SummarySection {
   /// Section dạng TTL + I..V: ô TTL hiện % ở dòng '%'.
   final bool hasPctTtl;
 
+  /// Chỉ số trên header card ("Finished 27.6%"), lấy từ ô TTL của dòng '%'.
+  /// null: section không có chỉ số.
+  final String? metricLabel;
+  final Color? metricColor;
+
   const SummarySection({
+    required this.parent,
     required this.title,
     required this.titleColor,
     this.desktopTitleColor,
@@ -62,9 +113,25 @@ class SummarySection {
     required this.headers,
     required this.values,
     required this.hasPctTtl,
+    this.metricLabel,
+    this.metricColor,
   });
 
   Color get groupColorDesktop => desktopTitleColor ?? titleColor;
+
+  /// % TTL ở dòng '%' sẵn có; null nếu section không có chỉ số / không có
+  /// dòng '%'.
+  double? metricValue(List<DivisionSummary> rows) {
+    if (metricLabel == null || !hasPctTtl) return null;
+    for (final r in rows) {
+      if (r.isPctRow) return values(r).first;
+    }
+    return null;
+  }
+
+  /// Tiêu đề bảng mobile: kèm parent ("After · Remain"); bỏ parent khi trùng
+  /// title ("Before").
+  String get mobileTitle => parent == title ? title : '$parent · $title';
 
   double get desktopWidth => headers.length * SummaryTableStyle.wNum;
 
@@ -103,23 +170,46 @@ class SummarySection {
       cells: [
         for (var i = 0; i < v.length; i++)
           if (hasPctTtl && i == 0)
-            SummaryCellSpec(
+            _valueCell(
               isPct ? fmtPct(v[i]) : fmtNum(v[i]),
               w: width(i),
               bold: true,
               bg: isPct ? SummaryTableStyle.pctTtlBg : null,
             )
           else
-            SummaryCellSpec(isPct ? '' : fmtNum(v[i]), w: width(i)),
+            _valueCell(isPct ? '' : fmtNum(v[i]), w: width(i)),
       ],
     );
   }
 }
 
+/// Ô số: "-" (giá trị 0) xám nhạt.
+SummaryCellSpec _valueCell(
+  String text, {
+  required double w,
+  bool bold = false,
+  Color? bg,
+}) {
+  return SummaryCellSpec(
+    text,
+    w: w,
+    bold: bold,
+    bg: bg,
+    textColor: text == '-' ? SummaryTableStyle.zeroText : null,
+  );
+}
+
 const _metricHeaders = ['TTL', 'I', 'II', 'III', 'IV', 'V'];
 
+const _parentBefore = 'Before';
+const _parentAfter = 'After';
+const _parentHse = 'HSE Recheck';
+
+/// Mọi section theo thứ tự hiển thị. Desktop: 1 bảng SUMMARY (hàng cha
+/// Before | After | HSE Recheck). Mobile: mỗi section 1 card.
 final List<SummarySection> summarySections = [
   SummarySection(
+    parent: _parentBefore,
     title: 'Before',
     titleColor: Colors.yellow,
     headerColor: SummaryTableStyle.beforeHeader,
@@ -129,8 +219,11 @@ final List<SummarySection> summarySections = [
     values: (r) => [r.allTtl, r.allI, r.allII, r.allIII, r.allIV, r.allV],
   ),
   SummarySection(
+    parent: _parentAfter,
     title: 'Finished (Pro)',
     titleColor: Colors.greenAccent,
+    metricLabel: 'Finished',
+    metricColor: Colors.green,
     headerColor: SummaryTableStyle.proHeader,
     bodyColor: SummaryTableStyle.proBody,
     headers: _metricHeaders,
@@ -145,8 +238,11 @@ final List<SummarySection> summarySections = [
     ],
   ),
   SummarySection(
+    parent: _parentAfter,
     title: 'Remain',
     titleColor: Colors.redAccent,
+    metricLabel: 'Remain',
+    metricColor: Colors.redAccent,
     headerColor: SummaryTableStyle.remainHeader,
     bodyColor: SummaryTableStyle.remainBody,
     headers: _metricHeaders,
@@ -161,6 +257,7 @@ final List<SummarySection> summarySections = [
     ],
   ),
   SummarySection(
+    parent: _parentAfter,
     title: 'Deadline',
     titleColor: Colors.orangeAccent,
     desktopTitleColor: Colors.orange,
@@ -171,8 +268,11 @@ final List<SummarySection> summarySections = [
     values: (r) => [r.stillTime, r.threeDaysAgo, r.late],
   ),
   SummarySection(
-    title: 'Finished (HSE recheck)',
+    parent: _parentHse,
+    title: 'Finished',
     titleColor: Colors.blueAccent,
+    metricLabel: 'HSE',
+    metricColor: Colors.blueAccent,
     headerColor: SummaryTableStyle.hseHeader,
     bodyColor: SummaryTableStyle.hseBody,
     headers: _metricHeaders,
@@ -188,9 +288,13 @@ final List<SummarySection> summarySections = [
   ),
 ];
 
-/// Bảng SUMMARY theo division: desktop 1 bảng ngang, mobile mỗi section 1 bảng.
+/// Bảng SUMMARY theo division trong card (đồng bộ card PIC).
+/// Desktop: 1 card SUMMARY gồm Before | After | HSE Recheck. Mobile: mỗi
+/// section 1 card.
 class DivisionSummaryTable extends StatelessWidget {
   final List<DivisionSummary> rows;
+
+  /// Scroll ngang của card SUMMARY (desktop).
   final ScrollController controller;
 
   const DivisionSummaryTable({
@@ -203,153 +307,648 @@ class DivisionSummaryTable extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final isMobile =
-            constraints.maxWidth < SummaryTableStyle.mobileBreakpoint;
+        final maxWidth = constraints.maxWidth;
+        final isMobile = maxWidth < SummaryTableStyle.mobileBreakpoint;
 
-        return SummaryGlass(
-          child: isMobile
-              ? _MobileTables(rows: rows)
-              : _DesktopTable(rows: rows, controller: controller),
+        if (isMobile) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (var i = 0; i < summarySections.length; i++) ...[
+                if (i > 0) const SizedBox(height: 10),
+                _SummaryTableCard(
+                  title: summarySections[i].mobileTitle,
+                  sections: [summarySections[i]],
+                  rows: rows,
+                  mobile: true,
+                  maxWidth: maxWidth,
+                ),
+              ],
+            ],
+          );
+        }
+
+        return _SummaryTableCard(
+          title: 'SUMMARY',
+          sections: summarySections,
+          rows: rows,
+          showParentRow: true,
+          hover: true,
+          maxWidth: maxWidth,
+          controller: controller,
         );
       },
     );
   }
 }
 
-class _DesktopTable extends StatelessWidget {
-  final List<DivisionSummary> rows;
-  final ScrollController controller;
+/// Thông tin vẽ của 1 dòng dữ liệu, dùng chung cho cột Fac/Area và phần số.
+typedef _RowDeco = ({String plant, bool isFirst, BorderSide? top});
 
-  const _DesktopTable({required this.rows, required this.controller});
+/// [isFirst]: dòng đầu nhóm plant liên tiếp (cột Fac gộp từ dòng này).
+/// [top]: phân cách nhẹ giữa 2 nhà máy; dòng SUM (đầu khối SUM / %) kẻ đậm
+/// hơn. Dòng SUM / % không thuộc plant nào ([plant] rỗng).
+List<_RowDeco> _rowDecos(List<DivisionSummary> rows) {
+  final out = <_RowDeco>[];
+  String? prev;
+  var prevTotal = false;
+
+  for (final r in rows) {
+    final isTotal = r.isSumRow || r.isPctRow;
+    final plant = isTotal ? '' : r.plant;
+    final isFirst = plant != prev;
+
+    BorderSide? top;
+    if (prev != null && isTotal && !prevTotal) {
+      top = const BorderSide(
+        color: SummaryTableStyle.totalDividerColor,
+        width: SummaryTableStyle.totalDividerWidth,
+      );
+    } else if (prev != null && isFirst) {
+      top = const BorderSide(
+        color: SummaryTableStyle.facDividerColor,
+        width: SummaryTableStyle.facDividerWidth,
+      );
+    }
+
+    out.add((plant: plant, isFirst: isFirst, top: top));
+    prev = plant;
+    prevTotal = isTotal;
+  }
+
+  return out;
+}
+
+/// 1 card bảng: header (tiêu đề + chỉ số), cột Fac/Area cố định, phần số cuộn
+/// ngang. Desktop và mobile dùng chung; [mobile] chỉ đổi độ rộng ô / màu
+/// tiêu đề nhóm.
+class _SummaryTableCard extends StatefulWidget {
+  final String title;
+  final List<SummarySection> sections;
+  final List<DivisionSummary> rows;
+  final bool mobile;
+
+  /// Hàng cha gom section cùng parent (Before | After).
+  final bool showParentRow;
+
+  /// Hover dòng (desktop).
+  final bool hover;
+
+  /// Card co theo bảng nhưng không vượt quá chỗ có.
+  final double maxWidth;
+
+  /// null: scroll view tự tạo controller riêng, không có Scrollbar.
+  final ScrollController? controller;
+
+  const _SummaryTableCard({
+    required this.title,
+    required this.sections,
+    required this.rows,
+    required this.maxWidth,
+    this.mobile = false,
+    this.showParentRow = false,
+    this.hover = false,
+    this.controller,
+  });
+
+  @override
+  State<_SummaryTableCard> createState() => _SummaryTableCardState();
+}
+
+class _SummaryTableCardState extends State<_SummaryTableCard> {
+  /// Index dòng đang hover; cột cố định và phần số cùng lắng nghe.
+  final ValueNotifier<int?> _hovered = ValueNotifier<int?>(null);
+
+  @override
+  void dispose() {
+    _hovered.dispose();
+    super.dispose();
+  }
+
+  double _cellWidth(SummarySection s, int i) =>
+      widget.mobile ? s.mobileCellWidth(i) : s.desktopCellWidth(i);
+
+  double _sectionWidth(SummarySection s) =>
+      widget.mobile ? s.mobileWidth : s.desktopWidth;
+
+  Color _groupColor(SummarySection s) =>
+      widget.mobile ? s.titleColor : s.groupColorDesktop;
 
   @override
   Widget build(BuildContext context) {
-    final width =
-        SummaryTableStyle.leadWidth +
-        summarySections.fold<double>(0, (sum, s) => sum + s.desktopWidth);
+    final sections = widget.sections;
+    final rows = widget.rows;
+    final decos = _rowDecos(rows);
+    final numbersWidth = sections.fold<double>(
+      0,
+      (sum, s) => sum + _sectionWidth(s),
+    );
 
-    return Scrollbar(
-      controller: controller,
-      thumbVisibility: true,
-      child: SingleChildScrollView(
-        controller: controller,
-        scrollDirection: Axis.horizontal,
-        child: SizedBox(
-          width: width,
+    // Card vừa khít bảng (không chừa khoảng trống), tối đa bằng chỗ có.
+    const chrome = SummaryTableStyle.bodyPadding * 2 + 2; // padding + viền
+    final cardWidth = math.min(
+      SummaryTableStyle.leadWidth + numbersWidth + chrome,
+      widget.maxWidth,
+    );
+
+    final metrics = [
+      for (final s in sections)
+        if (s.metricLabel != null)
+          (
+            label: s.metricLabel!,
+            value: s.metricValue(rows),
+            color: s.metricColor ?? Colors.black87,
+          ),
+    ];
+
+    return SizedBox(
+      width: cardWidth,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(SummaryGridStyle.borderRadius),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.5)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.08),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          // Trừ viền 1px để nội dung nằm trong góc bo.
+          borderRadius: BorderRadius.circular(
+            SummaryGridStyle.borderRadius - 1,
+          ),
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              SummaryTitleBar(
-                text: 'SUMMARY',
-                color: SummaryTableStyle.tableTitle,
-                width: width,
+              _CardHeader(title: widget.title, metrics: metrics),
+              Padding(
+                padding: const EdgeInsets.all(SummaryTableStyle.bodyPadding),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildLead(rows, decos),
+                    Expanded(child: _buildNumbers(rows, decos, numbersWidth)),
+                  ],
+                ),
               ),
-              const SizedBox(height: 6),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Cột Fac/Area: đứng yên khi phần số cuộn ngang.
+  /// Các dòng liên tiếp cùng plant: 1 ô Fac gộp cao bằng tổng các dòng.
+  /// Dòng SUM / %: Fac + Area gộp 1 ô ghi "SUM" / "%".
+  Widget _buildLead(List<DivisionSummary> rows, List<_RowDeco> decos) {
+    final children = <Widget>[];
+    var i = 0;
+    while (i < rows.length) {
+      final r = rows[i];
+      if (r.isSumRow || r.isPctRow) {
+        children.add(
+          _row(
+            i,
+            decos[i],
+            SummaryCellRow(
+              cells: [
+                SummaryCellSpec(
+                  r.division,
+                  w: SummaryTableStyle.leadWidth,
+                  align: TextAlign.left,
+                  bold: true,
+                ),
+              ],
+            ),
+          ),
+        );
+        i++;
+        continue;
+      }
+
+      // Nhóm plant: từ dòng isFirst tới trước dòng isFirst kế tiếp / SUM.
+      final start = i;
+      i++;
+      while (i < rows.length &&
+          !rows[i].isSumRow &&
+          !rows[i].isPctRow &&
+          !decos[i].isFirst) {
+        i++;
+      }
+
+      final block = Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _MergedFacCell(text: decos[start].plant, rowCount: i - start),
+          Column(
+            children: [
+              for (var k = start; k < i; k++)
+                _row(
+                  k,
+                  // Phân cách nằm ở cả khối (ô gộp + Area), không ở từng dòng.
+                  (plant: decos[k].plant, isFirst: decos[k].isFirst, top: null),
+                  SummaryCellRow(
+                    cells: [
+                      SummaryCellSpec(
+                        rows[k].division,
+                        w: SummaryTableStyle.wDiv,
+                        align: TextAlign.left,
+                        tooltip: true,
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ],
+      );
+
+      final top = decos[start].top;
+      children.add(
+        DecoratedBox(
+          position: DecorationPosition.foreground,
+          decoration: BoxDecoration(
+            border: top == null ? null : Border(top: top),
+          ),
+          child: block,
+        ),
+      );
+    }
+
+    return SizedBox(
+      width: SummaryTableStyle.leadWidth,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (widget.showParentRow)
+            const SizedBox(height: SummaryTableStyle.parentRowHeight),
+          const SizedBox(height: SummaryTableStyle.groupRowHeight),
+          _leadHeader,
+          const SizedBox(height: SummaryTableStyle.headerGap),
+          ...children,
+          const SizedBox(height: SummaryTableStyle.bottomGap),
+        ],
+      ),
+    );
+  }
+
+  /// Phần số: hàng cha / tiêu đề nhóm / header cột / dữ liệu, cuộn ngang.
+  Widget _buildNumbers(
+    List<DivisionSummary> rows,
+    List<_RowDeco> decos,
+    double numbersWidth,
+  ) {
+    final sections = widget.sections;
+    final groups = widget.showParentRow
+        ? _parentGroups(sections, _sectionWidth)
+        : const <({String parent, double width})>[];
+
+    // Vị trí x (trong phần số) của phân cách giữa 2 nhóm cha.
+    final dividerXs = <double>[];
+    var x = 0.0;
+    for (var g = 0; g < groups.length - 1; g++) {
+      x += groups[g].width;
+      dividerXs.add(x);
+    }
+
+    final content = SizedBox(
+      width: numbersWidth,
+      child: Stack(
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (widget.showParentRow)
+                Row(
+                  children: [
+                    for (final g in groups) _parentHeader(g.parent, g.width),
+                  ],
+                ),
               Row(
                 children: [
-                  const SizedBox(width: SummaryTableStyle.leadWidth),
-                  for (final s in summarySections)
-                    summaryGroupHeader(
-                      s.title,
-                      s.groupColorDesktop,
-                      s.desktopWidth,
+                  for (final s in sections)
+                    SizedBox(
+                      height: SummaryTableStyle.groupRowHeight,
+                      child: summaryGroupHeader(
+                        s.title,
+                        _groupColor(s),
+                        _sectionWidth(s),
+                      ),
                     ),
                 ],
               ),
               Row(
                 children: [
-                  _leadHeader,
-                  for (final s in summarySections)
-                    s.headerRow(s.desktopCellWidth),
+                  for (final s in sections)
+                    s.headerRow((i) => _cellWidth(s, i)),
                 ],
               ),
-              const SizedBox(height: 6),
-              ..._facGroupedRows(
-                rows,
-                (r) => [
-                  for (final s in summarySections)
-                    s.dataRow(r, s.desktopCellWidth),
-                ],
-              ),
-              const SizedBox(height: 10),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _MobileTables extends StatelessWidget {
-  final List<DivisionSummary> rows;
-
-  const _MobileTables({required this.rows});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        for (var i = 0; i < summarySections.length; i++) ...[
-          if (i > 0) const SizedBox(height: 10),
-          _MobileSectionTable(section: summarySections[i], rows: rows),
-        ],
-      ],
-    );
-  }
-}
-
-class _MobileSectionTable extends StatelessWidget {
-  final SummarySection section;
-  final List<DivisionSummary> rows;
-
-  const _MobileSectionTable({required this.section, required this.rows});
-
-  @override
-  Widget build(BuildContext context) {
-    final width = SummaryTableStyle.leadWidth + section.mobileWidth;
-
-    return ClipRect(
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: SizedBox(
-          width: width,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SummaryTitleBar(
-                text: section.title,
-                color: section.titleColor,
-                width: width,
-              ),
-              const SizedBox(height: 6),
-              Row(
-                children: [
-                  const SizedBox(width: SummaryTableStyle.leadWidth),
-                  summaryGroupHeader(
-                    section.title,
-                    section.titleColor,
-                    section.mobileWidth,
+              const SizedBox(height: SummaryTableStyle.headerGap),
+              for (var i = 0; i < rows.length; i++)
+                _row(
+                  i,
+                  decos[i],
+                  Row(
+                    children: [
+                      for (final s in sections)
+                        s.dataRow(rows[i], (c) => _cellWidth(s, c)),
+                    ],
                   ),
-                ],
-              ),
-              Row(
-                children: [
-                  _leadHeader,
-                  section.headerRow(section.mobileCellWidth),
-                ],
-              ),
-              const SizedBox(height: 6),
-              ..._facGroupedRows(
-                rows,
-                (r) => [section.dataRow(r, section.mobileCellWidth)],
-              ),
-              const SizedBox(height: 10),
+                ),
+              const SizedBox(height: SummaryTableStyle.bottomGap),
             ],
           ),
+          for (final dx in dividerXs)
+            Positioned(
+              left: dx - SummaryTableStyle.parentDividerWidth / 2,
+              top: 0,
+              bottom: SummaryTableStyle.bottomGap,
+              width: SummaryTableStyle.parentDividerWidth,
+              child: const IgnorePointer(
+                child: ColoredBox(color: SummaryTableStyle.parentDividerColor),
+              ),
+            ),
+        ],
+      ),
+    );
+
+    final ctrl = widget.controller;
+    // Kéo bằng chuột / trackpad (web mặc định không kéo bằng chuột).
+    // Shift + wheel: Scrollable tự đảo trục (pointerAxisModifiers).
+    final scroll = ScrollConfiguration(
+      behavior: ScrollConfiguration.of(context).copyWith(
+        // Thanh cuộn do _TableScrollbar vẽ; tắt scrollbar tự động.
+        scrollbars: false,
+        dragDevices: const {
+          PointerDeviceKind.touch,
+          PointerDeviceKind.mouse,
+          PointerDeviceKind.trackpad,
+          PointerDeviceKind.stylus,
+        },
+      ),
+      child: SingleChildScrollView(
+        controller: ctrl,
+        scrollDirection: Axis.horizontal,
+        child: content,
+      ),
+    );
+    if (ctrl == null) return scroll;
+    return _TableScrollbar(controller: ctrl, child: scroll);
+  }
+
+  /// Phân cách trên (nhà máy / SUM) + hover. Cấu trúc cây cố định để hover
+  /// không mount lại ô.
+  Widget _row(int index, _RowDeco deco, Widget child) {
+    final top = deco.top;
+    Widget row = DecoratedBox(
+      position: DecorationPosition.foreground,
+      decoration: BoxDecoration(
+        border: top == null ? null : Border(top: top),
+      ),
+      child: child,
+    );
+
+    if (!widget.hover) return row;
+
+    row = ValueListenableBuilder<int?>(
+      valueListenable: _hovered,
+      child: row,
+      builder: (context, hovered, child) => DecoratedBox(
+        position: DecorationPosition.foreground,
+        decoration: BoxDecoration(
+          color: hovered == index ? SummaryTableStyle.hoverTint : null,
+        ),
+        child: child,
+      ),
+    );
+
+    return MouseRegion(
+      onEnter: (_) => _hovered.value = index,
+      onExit: (_) {
+        if (_hovered.value == index) _hovered.value = null;
+      },
+      child: row,
+    );
+  }
+}
+
+/// Ô Fac gộp cho [rowCount] dòng liên tiếp cùng plant: cao đúng bằng tổng
+/// chiều cao các dòng, chữ căn giữa theo chiều dọc. Style như ô thường.
+class _MergedFacCell extends StatelessWidget {
+  final String text;
+  final int rowCount;
+
+  const _MergedFacCell({required this.text, required this.rowCount});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: SummaryTableStyle.wFac,
+      height: kSummaryCellHeight * rowCount,
+      alignment: Alignment.centerLeft,
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEFEFEF),
+        border: Border.all(color: Colors.black12, width: 1),
+      ),
+      child: Text(
+        text,
+        overflow: TextOverflow.ellipsis,
+        maxLines: rowCount,
+        style: const TextStyle(
+          color: Colors.black87,
+          fontSize: 14,
+          fontWeight: FontWeight.w800,
         ),
       ),
     );
   }
+}
+
+/// Thanh cuộn ngang của bảng: dày, bo tròn, luôn hiện track + thumb, kéo
+/// được. Click vào track: nhảy tới đúng vị trí đó (mặc định chỉ cuộn 1 trang).
+class _TableScrollbar extends RawScrollbar {
+  const _TableScrollbar({required ScrollController super.controller, required super.child})
+    : super(
+        thumbVisibility: true,
+        trackVisibility: true,
+        interactive: true,
+        thickness: SummaryTableStyle.scrollbarThickness,
+        radius: const Radius.circular(SummaryTableStyle.scrollbarThickness / 2),
+        trackRadius: const Radius.circular(
+          SummaryTableStyle.scrollbarThickness / 2,
+        ),
+        thumbColor: SummaryTableStyle.scrollbarThumb,
+        trackColor: SummaryTableStyle.scrollbarTrack,
+        trackBorderColor: SummaryTableStyle.scrollbarTrackBorder,
+        crossAxisMargin: 0,
+        mainAxisMargin: 0,
+        // Chỉ scroll ngang của bảng (không ăn notification của dialog).
+        notificationPredicate: _horizontalOnly,
+      );
+
+  static bool _horizontalOnly(ScrollNotification n) =>
+      n.metrics.axis == Axis.horizontal;
+
+  @override
+  RawScrollbarState<_TableScrollbar> createState() => _TableScrollbarState();
+}
+
+class _TableScrollbarState extends RawScrollbarState<_TableScrollbar> {
+  @override
+  void handleTrackTapDown(TapDownDetails details) {
+    final controller = widget.controller;
+    final box = context.findRenderObject();
+    if (controller == null || !controller.hasClients || box is! RenderBox) {
+      super.handleTrackTapDown(details);
+      return;
+    }
+
+    final position = controller.position;
+    final trackLength = box.size.width;
+    final viewport = position.viewportDimension;
+    final content = position.maxScrollExtent + viewport;
+    if (trackLength <= 0 || content <= 0 || position.maxScrollExtent <= 0) {
+      return;
+    }
+
+    // Đặt tâm thumb tại điểm click.
+    final thumbLength = trackLength * viewport / content;
+    final fraction =
+        ((details.localPosition.dx - thumbLength / 2) /
+                (trackLength - thumbLength))
+            .clamp(0.0, 1.0);
+    position.jumpTo(
+      position.minScrollExtent + fraction * position.maxScrollExtent,
+    );
+  }
+}
+
+/// Header card giống title bar của bảng PIC: tiêu đề trái, chỉ số phải.
+class _CardHeader extends StatelessWidget {
+  final String title;
+  final List<({String label, double? value, Color color})> metrics;
+
+  const _CardHeader({required this.title, required this.metrics});
+
+  static const _labelStyle = TextStyle(color: Colors.black54);
+
+  static String _fmt(double? v) =>
+      v == null ? '--' : '${v.toStringAsFixed(1)}%';
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: SummaryGridStyle.titleHeight,
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      decoration: const BoxDecoration(
+        color: SummaryGridStyle.headerBg,
+        border: Border(bottom: BorderSide(color: SummaryGridStyle.borderColor)),
+      ),
+      child: Row(
+        children: [
+          Flexible(
+            child: Text(
+              title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Colors.redAccent,
+                fontWeight: FontWeight.w800,
+                fontSize: 14,
+              ),
+            ),
+          ),
+          if (metrics.isNotEmpty) ...[
+            const SizedBox(width: 12),
+            const Spacer(),
+            Flexible(
+              flex: 3,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerRight,
+                child: RichText(
+                  maxLines: 1,
+                  text: TextSpan(
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    children: [
+                      for (var i = 0; i < metrics.length; i++) ...[
+                        if (i > 0)
+                          const TextSpan(
+                            text: '   •   ',
+                            style: TextStyle(color: Colors.black38),
+                          ),
+                        TextSpan(
+                          text: '${metrics[i].label} ',
+                          style: _labelStyle,
+                        ),
+                        TextSpan(
+                          text: _fmt(metrics[i].value),
+                          style: TextStyle(
+                            color: metrics[i].color,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Gom các section liên tiếp cùng parent: (parent, tổng width).
+List<({String parent, double width})> _parentGroups(
+  List<SummarySection> sections,
+  double Function(SummarySection s) width,
+) {
+  final groups = <({String parent, double width})>[];
+  for (final s in sections) {
+    if (groups.isNotEmpty && groups.last.parent == s.parent) {
+      final last = groups.removeLast();
+      groups.add((parent: last.parent, width: last.width + width(s)));
+    } else {
+      groups.add((parent: s.parent, width: width(s)));
+    }
+  }
+  return groups;
+}
+
+Widget _parentHeader(String text, double width) {
+  return Container(
+    width: width,
+    height: SummaryTableStyle.parentRowHeight,
+    alignment: Alignment.center,
+    decoration: const BoxDecoration(
+      color: SummaryTableStyle.parentBg,
+      border: Border(
+        bottom: BorderSide(color: SummaryTableStyle.parentBorder, width: 1.5),
+      ),
+    ),
+    child: Text(
+      text,
+      style: const TextStyle(
+        color: Colors.white,
+        fontSize: 15,
+        fontWeight: FontWeight.w900,
+        letterSpacing: 0.5,
+      ),
+    ),
+  );
 }
 
 const _leadHeader = SummaryCellRow(
@@ -359,63 +958,3 @@ const _leadHeader = SummaryCellRow(
     SummaryCellSpec('Area', w: SummaryTableStyle.wDiv, align: TextAlign.left),
   ],
 );
-
-/// Fac chỉ hiện ở dòng đầu mỗi nhóm nhà máy liên tiếp (giả lập gộp ô),
-/// kẻ phân cách nhẹ giữa 2 nhà máy. Dòng SUM / % để trống.
-List<Widget> _facGroupedRows(
-  List<DivisionSummary> rows,
-  List<Widget> Function(DivisionSummary r) sectionRows,
-) {
-  final out = <Widget>[];
-  String? prev;
-
-  for (final r in rows) {
-    final isTotal = r.isSumRow || r.isPctRow;
-    final plant = isTotal ? '' : r.plant;
-    final isFirst = plant != prev;
-
-    final row = Row(
-      children: [
-        SummaryCellRow(
-          cells: [
-            SummaryCellSpec(
-              isFirst ? plant : '',
-              w: SummaryTableStyle.wFac,
-              align: TextAlign.left,
-              bold: true,
-            ),
-            SummaryCellSpec(
-              r.division,
-              w: SummaryTableStyle.wDiv,
-              align: TextAlign.left,
-              bold: isTotal,
-              tooltip: true,
-            ),
-          ],
-        ),
-        ...sectionRows(r),
-      ],
-    );
-
-    // Vẽ foreground để không đổi chiều cao dòng.
-    out.add(
-      isFirst && prev != null
-          ? DecoratedBox(
-              position: DecorationPosition.foreground,
-              decoration: const BoxDecoration(
-                border: Border(
-                  top: BorderSide(
-                    color: SummaryTableStyle.facDividerColor,
-                    width: SummaryTableStyle.facDividerWidth,
-                  ),
-                ),
-              ),
-              child: row,
-            )
-          : row,
-    );
-    prev = plant;
-  }
-
-  return out;
-}

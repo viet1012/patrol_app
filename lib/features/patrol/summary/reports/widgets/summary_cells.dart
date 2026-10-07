@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 
+/// Chiều cao cố định của ô (dùng chung để ô gộp / cột cố định khớp hàng).
+const double kSummaryHeaderCellHeight = 34;
+const double kSummaryCellHeight = 38;
+
 class SummaryCellSpec {
   final String text;
   final double w;
@@ -10,6 +14,9 @@ class SummaryCellSpec {
   /// Hiện tooltip khi text bị cắt.
   final bool tooltip;
 
+  /// Ghi đè màu chữ (vd. "-" xám nhạt); null = màu mặc định của ô.
+  final Color? textColor;
+
   const SummaryCellSpec(
     this.text, {
     required this.w,
@@ -17,6 +24,7 @@ class SummaryCellSpec {
     this.align = TextAlign.center,
     this.bg,
     this.tooltip = false,
+    this.textColor,
   });
 }
 
@@ -116,7 +124,7 @@ Widget _cell(SummaryCellSpec c, {bool header = false, Color? bg}) {
 
   return Container(
     width: c.w,
-    height: header ? 34 : 38,
+    height: header ? kSummaryHeaderCellHeight : kSummaryCellHeight,
     alignment: _resolveAlignment(c),
     padding: const EdgeInsets.symmetric(horizontal: 8),
     decoration: BoxDecoration(
@@ -126,7 +134,7 @@ Widget _cell(SummaryCellSpec c, {bool header = false, Color? bg}) {
     child: _cellText(
       c,
       TextStyle(
-        color: textColor,
+        color: c.textColor ?? textColor,
         fontSize: 14,
         fontWeight: c.bold ? FontWeight.w800 : FontWeight.w600,
       ),
