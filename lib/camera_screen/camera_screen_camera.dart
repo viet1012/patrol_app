@@ -21,6 +21,8 @@ extension _CameraScreenCamera on _CameraScreenState {
               },
               onQrDetected: _handleQrDetected,
               enablePowerControl: true,
+              // Cùng kiểu switch với FixedAssetScreen.
+              useSwitchPowerControl: true,
               enableZoomControls: true,
             ),
           ),

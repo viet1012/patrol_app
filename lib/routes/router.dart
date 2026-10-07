@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../after/after_report_screen.dart';
 import '../app_idle_detector.dart';
+import '../camera_preview_box.dart';
 import '../homeScreen/patrol_home_screen.dart';
 import '../login/login_page.dart';
 import '../model/auth_me.dart';
@@ -11,6 +12,8 @@ import '../table/patrol_report_table.dart';
 
 final router = GoRouter(
   navigatorKey: appNavigatorKey,
+  // CameraPreviewBox tự suspend khi route của nó bị page route khác che.
+  observers: [CameraPreviewRouteObserver.instance],
 
   // ============================================================
   // GLOBAL AUTH GUARD

@@ -17,31 +17,15 @@ import 'api/api_config.dart';
 import 'api/stt_api.dart';
 import 'homeScreen/patrol_home_screen.dart';
 
-// Giữ nguyên các import project hiện tại của bạn:
-// import 'package:chuphinh/socket/SttWebSocket.dart';
-// import 'package:chuphinh/widget/glass_circle_button.dart';
-// import 'package:chuphinh/widget/glass_zoom_control.dart';
-// import 'api/api_config.dart';
-// import 'api/stt_api.dart';
-// import 'homeScreen/patrol_home_screen.dart';
-
-enum _QrWarningState { hidden, reading, unreadable, error }
-
-enum CameraPowerState { starting, on, stopping, off, error }
-
-class QrDetectionGeometry {
-  final String value;
-  final List<Offset> corners;
-  final double sourceWidth;
-  final double sourceHeight;
-
-  const QrDetectionGeometry({
-    required this.value,
-    required this.corners,
-    required this.sourceWidth,
-    required this.sourceHeight,
-  });
-}
+part 'camera_preview_box/models.dart';
+part 'camera_preview_box/camera_stream.dart';
+part 'camera_preview_box/qr_scan.dart';
+part 'camera_preview_box/hw_zoom.dart';
+part 'camera_preview_box/power.dart';
+part 'camera_preview_box/stt.dart';
+part 'camera_preview_box/capture.dart';
+part 'camera_preview_box/overlays.dart';
+part 'camera_preview_box/route_observer.dart';
 
 @JS('startQrLoop')
 external void startQrLoop();
@@ -121,188 +105,33 @@ class CameraPreviewBox extends StatefulWidget {
 }
 
 class CameraPreviewBoxState extends State<CameraPreviewBox>
-    with TickerProviderStateMixin {
-  // =========================
-  // Config
-  // =========================
-  int get _maxImages {
-    if (widget.patrolGroup == PatrolGroup.AssetUpdate) {
-      return 10;
-    }
-
-    return 3;
-  }
-
-  static const int _maxCaptureEdge = 2048;
-  static const int _maxImportedEdge = 1600;
-
-  static const int _idealCameraFps = 20;
-  static const int _maxCameraFps = 24;
-
-  static const Duration _qrDedupe = Duration(milliseconds: 900);
-  static const Duration _qrWarmup = Duration(milliseconds: 250);
-
+    with
+        TickerProviderStateMixin,
+        _CameraStreamMixin,
+        _QrScanMixin,
+        _HwZoomMixin,
+        _PowerMixin,
+        _SttMixin,
+        _CaptureMixin {
   static const double _minZoom = 1.0;
   static const double _maxZoom = 10.0;
 
   // =========================
-  // Camera / View
+  // Animation (vsync = State)
   // =========================
-  html.MediaStream? _stream;
-  html.VideoElement? _video;
-  late String _viewType;
-  int _viewGeneration = 0;
-
-  bool _cameraSleeping = false;
-  bool _cameraStarting = false;
-  bool _cameraStopping = false;
-  bool _cameraStartFailed = false;
-
-  bool _userCameraEnabled = true;
-  bool _lifecycleSuspended = false;
-  bool _powerReconciling = false;
-  StreamSubscription<html.Event>? _visibilitySub;
-
-  /// Mỗi lần start/wake tạo một session mới.
-  /// Khi OFF, tăng session để vô hiệu hóa getUserMedia đang chạy dở.
-  int _cameraSession = 0;
-
-  double _zoom = 1.0;
-
-  // =========================
-  // Camera zoom thật (chỉ khi enableZoomControls)
-  // =========================
-
-  /// Trần zoom cho QR: zoom số quá lớn thường làm QR mờ hơn, không giúp đọc.
-  static const double _qrMaxZoom = 4.0;
-
-  /// Bỏ qua thay đổi pinch nhỏ hơn mức này (tránh gọi applyConstraints dày).
-  static const double _zoomUpdateThreshold = 0.05;
-
-  static const double _zoomButtonStep = 0.5;
-
-  bool _hwZoomSupported = false;
-  double _hwMinZoom = 1.0;
-  double _hwMaxZoom = 1.0;
-  double _hwZoom = 1.0;
-  double _desiredHwZoom = 1.0;
-  double _hwScaleStartZoom = 1.0;
-
-  /// Chỉ một applyConstraints chạy tại một thời điểm; giá trị mới nhất
-  /// được gộp vào [_hwPendingZoom].
-  bool _hwZoomApplying = false;
-  double? _hwPendingZoom;
-  int _zoomOperationGeneration = 0;
-
-  bool get _hwZoomVisible =>
-      widget.enableZoomControls &&
-      _hwZoomSupported &&
-      _video != null &&
-      !_cameraSleeping;
-
-  bool get isCameraSleeping => _cameraSleeping;
-
-  bool get isCameraStarting => _cameraStarting;
-
-  bool get _cameraShouldRun =>
-      !widget.enablePowerControl ||
-      (_userCameraEnabled && !_lifecycleSuspended);
-
-  CameraPowerState get cameraPowerState {
-    if (_cameraStarting) return CameraPowerState.starting;
-    if (_cameraStopping) return CameraPowerState.stopping;
-    if (_cameraStartFailed && _userCameraEnabled && !_lifecycleSuspended) {
-      return CameraPowerState.error;
-    }
-    if (!_cameraSleeping && _stream != null && _video != null) {
-      return CameraPowerState.on;
-    }
-    return CameraPowerState.off;
-  }
-
-  void _setCameraSleeping(bool value, {bool notifyParent = true}) {
-    final changed = _cameraSleeping != value;
-    _cameraSleeping = value;
-
-    if (changed && notifyParent) {
-      widget.onCameraSleepingChanged?.call(value);
-    }
-  }
-
-  // =========================
-  // QR scanning (JS ZXing)
-  // =========================
-  StreamSubscription? _qrSub;
-  StreamSubscription? _qrStatusSub;
-  bool _qrScanning = false;
-  bool _qrLoading = false;
-
-  /// QR Patrol dạng số đang hiển thị trên UI.
-  /// ValueNotifier giúp chỉ rebuild badge QR, không rebuild toàn camera.
-  final ValueNotifier<String?> _patrolQrNotifier = ValueNotifier<String?>(null);
-
-  /// true: hiện khung hướng dẫn căn QR.
-  /// false: đã đọc được QR bất kỳ nên ẩn khung.
-  final ValueNotifier<bool> _showQrGuideNotifier = ValueNotifier<bool>(true);
-
-  /// Chỉ hiện khi JS xác định có hình giống QR nhưng chưa đọc được,
-  /// hoặc scanner/camera gặp lỗi thật.
-  final ValueNotifier<_QrWarningState> _qrWarningStateNotifier =
-      ValueNotifier<_QrWarningState>(_QrWarningState.hidden);
-
-  final ValueNotifier<String> _qrWarningMessageNotifier = ValueNotifier<String>(
-    '',
-  );
-
-  /// QR raw gần nhất, dùng chống callback lặp liên tục.
-  String? _lastDetectedQr;
-  DateTime? _lastDetectedQrAt;
-  QrDetectionGeometry? _latestQrGeometry;
-  DateTime? _latestQrGeometryAt;
+  @override
   late final AnimationController _qrLockController;
-  final ValueNotifier<_QrLockData?> _qrLockNotifier =
-      ValueNotifier<_QrLockData?>(null);
 
-  // =========================
-  // Capture
-  // =========================
-  bool _isCapturing = false;
-  final List<Uint8List> _capturedImages = [];
+  @override
   late final AnimationController _flashController;
 
-  bool get canUpload => _capturedImages.length < _maxImages;
-
-  List<Uint8List> get images => List<Uint8List>.unmodifiable(_capturedImages);
-
-  void _notifyImagesChanged() {
-    widget.onImagesChanged?.call(List<Uint8List>.unmodifiable(_capturedImages));
-  }
-
-  // =========================
-  // STT / Socket
-  // =========================
-  late String _fac;
-  late String _group;
-  late String _wsUrl;
-
-  int stt = 0;
-  bool _sttLoading = true;
-  SttWebSocket? sttSocket;
-
-  void _setQrWarning(_QrWarningState state, [String message = '']) {
-    if (!mounted) return;
-
-    if (_qrWarningStateNotifier.value != state) {
-      _qrWarningStateNotifier.value = state;
-    }
-
-    if (_qrWarningMessageNotifier.value != message) {
-      _qrWarningMessageNotifier.value = message;
-    }
-  }
-
-  void _hideQrWarning() {
-    _setQrWarning(_QrWarningState.hidden);
+  /// Mọi setState (camera stream / power / ảnh) đều đồng bộ lại
+  /// [_powerStateNotifier], để power control và màn hình camera-off cập nhật
+  /// đúng như khi chúng còn đọc trực tiếp trong build.
+  @override
+  void setState(VoidCallback fn) {
+    super.setState(fn);
+    _syncPowerState();
   }
 
   // =========================
@@ -328,6 +157,9 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
     );
 
     _bindQrListeners();
+    // Lấy lựa chọn bật/tắt dùng chung trước khi quyết định start camera.
+    _bindSharedUserCameraEnabled();
+    _bindRouteObserver();
     if (widget.enablePowerControl) {
       _lifecycleSuspended = html.document.hidden == true;
       _visibilitySub = html.document.onVisibilityChange.listen((_) {
@@ -347,6 +179,13 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
       _loadStt();
       _connectSocket();
     }
+    _syncPowerState();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _updateRoute(ModalRoute.of(context));
   }
 
   @override
@@ -392,6 +231,8 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
       _visibilitySub?.cancel();
     } catch (_) {}
     _visibilitySub = null;
+    _unbindSharedUserCameraEnabled();
+    _unbindRouteObserver();
 
     _stopCamera();
 
@@ -406,1761 +247,28 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
     _showQrGuideNotifier.dispose();
     _qrWarningStateNotifier.dispose();
     _qrWarningMessageNotifier.dispose();
+    _sttNotifier.dispose();
+    _hwZoomNotifier.dispose();
+    _qrLoadingNotifier.dispose();
+    _capturingNotifier.dispose();
+    _powerStateNotifier.dispose();
 
     super.dispose();
   }
 
-  String _nextViewType() {
-    _viewGeneration++;
-    return 'camera_${DateTime.now().microsecondsSinceEpoch}_$_viewGeneration';
-  }
+  /// Nút chụp: trạng thái chụp + trạng thái camera (power notifier được đồng
+  /// bộ sau mỗi setState, kể cả instance không có power control).
+  late final Listenable _captureButtonListenable = Listenable.merge([
+    _capturingNotifier,
+    _powerStateNotifier,
+  ]);
 
-  void _bindQrListeners() {
-    _qrSub ??= html.window.on['qr-from-image'].listen(_onQrEvent);
-    _qrStatusSub ??= html.window.on['qr-scan-status'].listen(_onQrStatusEvent);
-  }
-
-  /// Tắt camera thật trên Web nhưng giữ state widget, ảnh đã chụp và QR Patrol.
-  void _invalidateActiveCameraSession() {
-    _cameraSession++;
-    _qrScanning = false;
-    _qrLoading = false;
-    try {
-      stopQrLoop();
-    } catch (_) {}
-  }
-
-  void _clearCameraSessionUi() {
-    _lastDetectedQr = null;
-    _lastDetectedQrAt = null;
-    _latestQrGeometry = null;
-    _latestQrGeometryAt = null;
-    _patrolQrNotifier.value = null;
-    _showQrGuideNotifier.value = true;
-    _qrLockController.stop();
-    _qrLockController.reset();
-    _qrLockNotifier.value = null;
-    _hideQrWarning();
-  }
-
-  Future<void> suspendCamera() async {
-    if (!widget.enablePowerControl) {
-      await sleepCamera();
-      return;
+  /// Khoảng chừa bên phải của badge QR; null = badge tự co theo nội dung.
+  double? get _qrBadgeRightInset {
+    if (widget.enablePowerControl) {
+      return widget.useSwitchPowerControl ? 70 : 86;
     }
-    _userCameraEnabled = false;
-    _cameraStartFailed = false;
-    _invalidateActiveCameraSession();
-    if (mounted) setState(() {});
-    await _reconcileCameraPower();
-  }
-
-  Future<bool> resumeCamera() async {
-    if (!widget.enablePowerControl) return wakeCamera();
-    _userCameraEnabled = true;
-    _cameraStartFailed = false;
-    if (mounted) setState(() {});
-    await _reconcileCameraPower();
-    return cameraPowerState == CameraPowerState.on;
-  }
-
-  Future<void> _toggleCameraPower() async {
-    if (_userCameraEnabled) {
-      await suspendCamera();
-    } else {
-      await resumeCamera();
-    }
-  }
-
-  Future<void> _reconcileCameraPower() async {
-    if (_powerReconciling || !mounted) return;
-    _powerReconciling = true;
-    try {
-      while (mounted) {
-        if (_cameraShouldRun) {
-          if (!_cameraSleeping && _stream != null && _video != null) break;
-          if (_cameraStarting || _cameraStopping) {
-            await Future.delayed(const Duration(milliseconds: 25));
-            continue;
-          }
-          await wakeCamera();
-          if (_cameraStartFailed) break;
-        } else {
-          if (_cameraStarting) _invalidateActiveCameraSession();
-          if (_cameraStopping) {
-            await Future.delayed(const Duration(milliseconds: 25));
-            continue;
-          }
-          if (_stream == null && _video == null && !_cameraStarting) {
-            _setCameraSleeping(true);
-            if (mounted) setState(() {});
-            break;
-          }
-          await sleepCamera();
-        }
-
-        final settledOn = !_cameraSleeping && _stream != null && _video != null;
-        final settledOff = _cameraSleeping && _stream == null && _video == null;
-        if ((_cameraShouldRun && settledOn) ||
-            (!_cameraShouldRun && settledOff)) {
-          break;
-        }
-      }
-    } finally {
-      _powerReconciling = false;
-      if (mounted) setState(() {});
-      final settledOn = !_cameraSleeping && _stream != null && _video != null;
-      final settledOff = _cameraSleeping && _stream == null && _video == null;
-      if (mounted &&
-          ((_cameraShouldRun && !settledOn && !_cameraStartFailed) ||
-              (!_cameraShouldRun && !settledOff))) {
-        _reconcileCameraPower();
-      }
-    }
-  }
-
-  Future<void> sleepCamera() async {
-    if (_cameraStopping) return;
-    if (_cameraSleeping && _stream == null && _video == null && !_cameraStarting) {
-      return;
-    }
-
-    // Vô hiệu hóa mọi request getUserMedia đang chạy dở.
-    _cameraSession++;
-    _cameraStopping = true;
-    _setCameraSleeping(true);
-
-    if (mounted) {
-      setState(() {
-        _cameraStarting = false;
-      });
-    }
-
-    try {
-      await _stopQrScan(updateUi: false);
-      _clearCameraSessionUi();
-
-      _hwZoomSupported = false;
-      _hwMinZoom = 1.0;
-      _hwMaxZoom = 1.0;
-      _hwPendingZoom = null;
-      _zoomOperationGeneration++;
-
-      final oldStream = _stream;
-      final oldVideo = _video;
-
-      // Bỏ reference trước để build không dùng Platform View cũ.
-      _stream = null;
-      _video = null;
-
-      _disposeVideoElement(oldVideo);
-      _stopStream(oldStream);
-
-      // Phòng trường hợp video cũ vẫn còn trong DOM.
-      final domVideo = html.document.getElementById('qr-video');
-      if (domVideo is html.VideoElement) {
-        final domStream = domVideo.srcObject;
-        if (domStream is html.MediaStream) {
-          _stopStream(domStream);
-        }
-        _disposeVideoElement(domVideo);
-      }
-
-      if (!mounted) return;
-
-      setState(() {
-        _qrScanning = false;
-        _qrLoading = false;
-        _cameraStarting = false;
-
-        // Buộc Flutter bỏ HtmlElementView cũ.
-        _viewType = _nextViewType();
-      });
-
-      debugPrint('Camera completely stopped.');
-    } finally {
-      _cameraStopping = false;
-    }
-  }
-
-  /// Khởi động lại camera sau khi sleep.
-  Future<bool> wakeCamera() async {
-    if (_cameraStarting || _cameraStopping) return false;
-
-    if (!_cameraSleeping && _stream != null && _video != null) {
-      return true;
-    }
-
-    /*
-     * QUAN TRỌNG:
-     * Phải chuyển sleeping=false trước khi gọi _startCamera().
-     * Nếu vẫn true, điều kiện bảo vệ trong _startCamera() sẽ stop
-     * stream mới ngay sau khi getUserMedia trả về.
-     */
-    _setCameraSleeping(false);
-    _clearCameraSessionUi();
-
-    if (mounted) {
-      setState(() {});
-    }
-
-    await _startCamera();
-
-    final started =
-        mounted && _stream != null && _video != null && !_cameraSleeping;
-
-    if (!started) {
-      _setCameraSleeping(true);
-      if (mounted) setState(() {});
-    }
-
-    debugPrint('Wake camera result: started=$started, qrScanning=$_qrScanning');
-
-    return started;
-  }
-
-  bool _isQrNumber(String value) {
-    return RegExp(r'^\d{1,5}$').hasMatch(value.trim());
-  }
-
-  bool _isDuplicateQr(String qr, DateTime now) {
-    return _lastDetectedQr == qr &&
-        _lastDetectedQrAt != null &&
-        now.difference(_lastDetectedQrAt!) < _qrDedupe;
-  }
-
-  /// Nhận QR từ camera, nhập tay hoặc ảnh upload.
-  /// Hàm này không gọi setState nên không rebuild toàn bộ camera.
-  void _acceptDetectedQr(
-    String rawQr, {
-    bool haptic = true,
-    QrDetectionGeometry? geometry,
-  }) {
-    if (!mounted) return;
-
-    final qr = rawQr.trim();
-
-    if (qr.isEmpty) return;
-
-    /*
-   * Chặn dữ liệu bất thường.
-   */
-    if (qr.length > 2048) {
-      debugPrint(
-        'QR rejected because content is too long: '
-        '${qr.length}',
-      );
-
-      return;
-    }
-
-    final now = DateTime.now();
-
-    if (_isDuplicateQr(qr, now)) {
-      return;
-    }
-
-    _lastDetectedQr = qr;
-    _lastDetectedQrAt = now;
-
-    _hideQrWarning();
-
-    if (_showQrGuideNotifier.value) {
-      _showQrGuideNotifier.value = false;
-    }
-
-    /*
-   * Chỉ QR Patrol dạng số mới hiện trên badge.
-   * QR máy không xóa QR Patrol trước đó.
-   */
-    // if (_isQrNumber(qr) && _patrolQrNotifier.value != qr) {
-    //   _patrolQrNotifier.value = qr;
-    // }
-
-    if (widget.patrolGroup == PatrolGroup.Patrol) {
-      // Patrol chỉ hiện QR dạng số
-      if (_isQrNumber(qr) && _patrolQrNotifier.value != qr) {
-        _patrolQrNotifier.value = qr;
-      }
-    } else {
-      // Asset / các loại khác:
-      // hiện nguyên nội dung QR
-      if (_patrolQrNotifier.value != qr) {
-        _patrolQrNotifier.value = qr;
-      }
-    }
-
-    if (haptic) {
-      try {
-        HapticFeedback.mediumImpact();
-      } catch (_) {}
-    }
-
-    try {
-      if (geometry != null) {
-        widget.onQrDetectedDetailed?.call(geometry);
-      }
-      widget.onQrDetected?.call(qr);
-    } catch (error, stackTrace) {
-      debugPrint('onQrDetected callback error: $error');
-
-      debugPrintStack(stackTrace: stackTrace);
-    }
-  }
-
-  /// Called by Fixed Asset only after its validation accepts this raw QR.
-  /// The backend pipeline is not awaited by this visual-only method.
-  void showAcceptedQrLock(String rawQr, String machineCode) {
-    if (!mounted || !widget.enableQrLockAnimation) return;
-    final normalized = rawQr.trim();
-    final geometry = _latestQrGeometry;
-    final isFreshMatch = geometry != null &&
-        geometry.value == normalized &&
-        _latestQrGeometryAt != null &&
-        DateTime.now().difference(_latestQrGeometryAt!) <
-            const Duration(seconds: 2);
-
-    _qrLockNotifier.value = _QrLockData(
-      label: machineCode.trim(),
-      geometry: isFreshMatch ? geometry : null,
-    );
-    _qrLockController.forward(from: 0);
-  }
-
-  // =========================
-  // Camera
-  // =========================
-
-  Future<void> _inputQrManually() async {
-    final controller = TextEditingController();
-
-    try {
-      final value = await showDialog<String>(
-        context: context,
-        builder: (dialogContext) {
-          return AlertDialog(
-            backgroundColor: const Color(0xFF1F2937),
-            title: const Text(
-              'Enter QR Code',
-              style: TextStyle(color: Colors.white),
-            ),
-            content: TextField(
-              controller: controller,
-              autofocus: true,
-              style: const TextStyle(color: Colors.white),
-
-              keyboardType: widget.patrolGroup == PatrolGroup.Patrol
-                  ? TextInputType.number
-                  : TextInputType.text,
-
-              inputFormatters: widget.patrolGroup == PatrolGroup.Patrol
-                  ? [
-                      FilteringTextInputFormatter.digitsOnly,
-                      LengthLimitingTextInputFormatter(5),
-                    ]
-                  : null,
-
-              decoration: const InputDecoration(
-                hintText: 'Input QR code manually',
-                hintStyle: TextStyle(color: Colors.white54),
-              ),
-
-              onSubmitted: (text) {
-                Navigator.pop(dialogContext, text.trim());
-              },
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(dialogContext),
-                child: const Text('Cancel'),
-              ),
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.pop(dialogContext, controller.text.trim());
-                },
-                child: const Text('OK'),
-              ),
-            ],
-          );
-        },
-      );
-
-      if (value == null || value.trim().isEmpty) return;
-
-      _acceptDetectedQr(value, haptic: false);
-    } finally {
-      controller.dispose();
-    }
-  }
-
-  Future<void> _startCamera() async {
-    if (_cameraStopping || _cameraStarting) return;
-    if (!_cameraShouldRun) return;
-
-    _cameraStarting = true;
-    _cameraStartFailed = false;
-    final session = ++_cameraSession;
-
-    _hideQrWarning();
-
-    if (mounted) setState(() {});
-
-    html.MediaStream? createdStream;
-    html.VideoElement? createdVideo;
-
-    try {
-      final mediaDevices = html.window.navigator.mediaDevices;
-      if (mediaDevices == null) {
-        throw StateError('Camera API is not available in this browser.');
-      }
-
-      createdStream = await mediaDevices.getUserMedia({
-        'video': {
-          'facingMode': {'ideal': 'environment'},
-          'width': {'ideal': 1920},
-          'height': {'ideal': 1080},
-          'frameRate': {'ideal': _idealCameraFps, 'max': _maxCameraFps},
-        },
-      });
-
-      if (!mounted ||
-          _cameraStopping ||
-          _cameraSleeping ||
-          session != _cameraSession) {
-        _stopStream(createdStream);
-        return;
-      }
-
-      final viewType = _nextViewType();
-
-      createdVideo = html.VideoElement()
-        // JS startQrLoop() tìm đúng phần tử này.
-        ..id = 'qr-video'
-        ..autoplay = true
-        ..muted = true
-        ..setAttribute('playsinline', 'true')
-        ..style.display = 'block'
-        ..style.visibility = 'visible'
-        ..style.opacity = '1'
-        ..style.objectFit = 'cover'
-        ..style.pointerEvents = 'none'
-        ..style.position = 'absolute'
-        ..style.top = '0'
-        ..style.right = '0'
-        ..style.bottom = '0'
-        ..style.left = '0'
-        ..style.width = '100%'
-        ..style.height = '100%'
-        ..style.zIndex = '0'
-        ..srcObject = createdStream;
-
-      ui_web.platformViewRegistry.registerViewFactory(
-        viewType,
-        (_) => createdVideo!,
-      );
-
-      if (!mounted ||
-          _cameraStopping ||
-          _cameraSleeping ||
-          session != _cameraSession) {
-        _disposeVideoElement(createdVideo);
-        _stopStream(createdStream);
-        return;
-      }
-
-      setState(() {
-        _viewType = viewType;
-        _stream = createdStream;
-        _video = createdVideo;
-      });
-
-      _setCameraSleeping(false);
-      _cameraStartFailed = false;
-
-      try {
-        await createdVideo.play();
-      } catch (error) {
-        debugPrint('Video play warning: $error');
-      }
-
-      final videoReady = await _waitVideoReady(
-        timeout: const Duration(seconds: 4),
-        session: session,
-      );
-
-      if (!videoReady) {
-        if (mounted && session == _cameraSession) {
-          _setQrWarning(
-            _QrWarningState.error,
-            'Camera started but no video frames became available.',
-          );
-        }
-        throw StateError('Camera video readiness timed out.');
-      }
-
-      if (!mounted ||
-          _cameraSleeping ||
-          session != _cameraSession ||
-          _stream == null ||
-          _video == null) {
-        return;
-      }
-
-      await Future.delayed(_qrWarmup);
-
-      if (!mounted ||
-          _cameraSleeping ||
-          session != _cameraSession ||
-          _stream == null ||
-          _video == null) {
-        return;
-      }
-
-      await _startAutoQrScan();
-
-      // Đọc khả năng zoom sau khi QR đã chạy; lỗi ở đây không ảnh hưởng camera.
-      _initHardwareZoom(session);
-    } catch (error, stackTrace) {
-      debugPrint('Camera start error: $error');
-      debugPrintStack(stackTrace: stackTrace);
-
-      _disposeVideoElement(createdVideo);
-      _stopStream(createdStream);
-
-      if (!mounted || session != _cameraSession) return;
-
-      _cameraStartFailed = true;
-
-      setState(() {
-        _stream = null;
-        _video = null;
-        _qrScanning = false;
-        _qrLoading = false;
-      });
-
-      _setCameraSleeping(true);
-
-      _setQrWarning(
-        _QrWarningState.error,
-        'Cannot start camera. Check camera permission and HTTPS.',
-      );
-    } finally {
-      if (session == _cameraSession) {
-        _cameraStarting = false;
-        if (mounted) setState(() {});
-      }
-    }
-  }
-
-  Future<bool> _waitVideoReady({
-    required Duration timeout,
-    required int session,
-  }) async {
-    final start = DateTime.now();
-    while (mounted && session == _cameraSession) {
-      final v = _video;
-      if (v != null &&
-          v.srcObject != null &&
-          v.readyState >= 2 &&
-          v.videoWidth > 0 &&
-          v.videoHeight > 0) {
-        return true;
-      }
-      if (DateTime.now().difference(start) > timeout) return false;
-      await Future.delayed(const Duration(milliseconds: 50));
-    }
-    return false;
-  }
-
-  void _stopStream(html.MediaStream? stream) {
-    if (stream == null) return;
-
-    try {
-      for (final track in stream.getTracks()) {
-        track.enabled = false;
-        track.stop();
-        debugPrint(
-          'Stopped camera track: kind=${track.kind}, readyState=${track.readyState}',
-        );
-      }
-    } catch (error) {
-      debugPrint('Stop stream error: $error');
-    }
-  }
-
-  void _disposeVideoElement(html.VideoElement? video) {
-    if (video == null) return;
-
-    try {
-      video.pause();
-      video.srcObject = null;
-      video.style.display = 'none';
-      video.style.visibility = 'hidden';
-      video.style.opacity = '0';
-      video.removeAttribute('src');
-      video.load();
-      video.remove();
-    } catch (error) {
-      debugPrint('Dispose video element error: $error');
-    }
-  }
-
-  void _stopCamera() {
-    _cameraSession++;
-    _zoomOperationGeneration++;
-    _hwPendingZoom = null;
-    _hwZoomSupported = false;
-
-    final oldStream = _stream;
-    final oldVideo = _video;
-
-    _stream = null;
-    _video = null;
-
-    _disposeVideoElement(oldVideo);
-    _stopStream(oldStream);
-
-    final domVideo = html.document.getElementById('qr-video');
-    if (domVideo is html.VideoElement) {
-      final domStream = domVideo.srcObject;
-      if (domStream is html.MediaStream) {
-        _stopStream(domStream);
-      }
-      _disposeVideoElement(domVideo);
-    }
-  }
-
-  // =========================
-  // QR (ZXing JS) start/stop
-  // =========================
-  Future<void> _startAutoQrScan() async {
-    if (_qrScanning) return;
-    if (_cameraSleeping) return;
-    if (_stream == null) return;
-    if (_video == null) return;
-
-    final video = _video!;
-
-    if (video.videoWidth <= 0 || video.videoHeight <= 0) {
-      debugPrint('QR scan not started: video is not ready.');
-
-      return;
-    }
-
-    if (!mounted) {
-      return;
-    }
-
-    setState(() {
-      _qrScanning = true;
-      _qrLoading = true;
-    });
-
-    _hideQrWarning();
-
-    try {
-      /*
-     * JS chỉ đọc video hiện có.
-     * JS không được gọi getUserMedia.
-     */
-      startQrLoop();
-
-      debugPrint(
-        'QR loop started: '
-        '${video.videoWidth}x${video.videoHeight}',
-      );
-
-      await Future.delayed(const Duration(milliseconds: 150));
-    } catch (error, stackTrace) {
-      debugPrint('startQrLoop error: $error');
-
-      debugPrintStack(stackTrace: stackTrace);
-
-      _qrScanning = false;
-      _setQrWarning(_QrWarningState.error, 'QR scanner could not start.');
-    } finally {
-      if (mounted) {
-        setState(() {
-          _qrLoading = false;
-        });
-      }
-    }
-  }
-
-  Future<void> _stopQrScan({bool updateUi = true}) async {
-    /*
-   * Đặt false trước để event đang bay về
-   * không còn được xử lý.
-   */
-    _qrScanning = false;
-    try {
-      stopQrLoop();
-    } catch (error) {
-      debugPrint('stopQrLoop warning: $error');
-    }
-
-    _hideQrWarning();
-
-    if (mounted && updateUi) {
-      setState(() {
-        _qrScanning = false;
-        _qrLoading = false;
-      });
-    } else {
-      _qrLoading = false;
-    }
-  }
-
-  Map<String, dynamic>? _parseJsEventDetail(html.CustomEvent event) {
-    try {
-      final rawDetail = event.detail;
-
-      if (rawDetail == null) {
-        return null;
-      }
-
-      /*
-     * Bản JS mới luôn gửi JSON string.
-     */
-      if (rawDetail is String) {
-        final decoded = jsonDecode(rawDetail);
-
-        if (decoded is Map<String, dynamic>) {
-          return decoded;
-        }
-
-        if (decoded is Map) {
-          return Map<String, dynamic>.from(decoded);
-        }
-
-        return null;
-      }
-
-      /*
-     * Fallback tạm thời nếu browser đang cache JS cũ.
-     */
-      if (rawDetail is Map) {
-        return Map<String, dynamic>.from(rawDetail);
-      }
-
-      debugPrint(
-        'Unsupported JS event detail type: '
-        '${rawDetail.runtimeType}',
-      );
-
-      return null;
-    } catch (error, stackTrace) {
-      debugPrint('Cannot parse JS event detail: $error');
-
-      debugPrintStack(stackTrace: stackTrace);
-
-      return null;
-    }
-  }
-
-  void _onQrStatusEvent(dynamic event) {
-    if (!mounted || _cameraSleeping || !_qrScanning) return;
-    if (event is! html.CustomEvent) return;
-
-    final detail = _parseJsEventDetail(event);
-    if (detail == null) return;
-
-    final status = detail['status']?.toString().trim().toLowerCase() ?? '';
-    final message = detail['message']?.toString().trim() ?? '';
-
-    switch (status) {
-      case 'reading':
-        /*
-         * Có hình giống QR nhưng chưa đủ lâu để coi là lỗi.
-         * Không hiện banner, giữ UI sạch.
-         */
-        _hideQrWarning();
-        break;
-
-      case 'unreadable':
-        _setQrWarning(
-          _QrWarningState.unreadable,
-          message.isEmpty
-              ? 'Cannot read QR. Move closer or hold steady.'
-              : message,
-        );
-        break;
-
-      case 'clear':
-        _hideQrWarning();
-        break;
-    }
-  }
-
-  void _onQrEvent(dynamic event) {
-    if (!mounted) return;
-    if (_cameraSleeping) return;
-    if (!_qrScanning) return;
-    if (event is! html.CustomEvent) return;
-
-    final detail = _parseJsEventDetail(event);
-
-    if (detail == null) {
-      return;
-    }
-
-    final error = detail['error']?.toString().trim() ?? '';
-
-    if (error.isNotEmpty) {
-      /*
-     * Not found trong một frame là bình thường,
-     * không nên hiển thị lỗi cho người dùng.
-     */
-      if (!error.toLowerCase().contains('not found')) {
-        debugPrint('QR scanner event error: $error');
-
-        _setQrWarning(
-          _QrWarningState.error,
-          'QR scanner error. Please restart the camera.',
-        );
-      }
-
-      return;
-    }
-
-    final text = detail['text']?.toString().trim() ?? '';
-
-    if (text.isEmpty) {
-      return;
-    }
-
-    debugPrint('QR detected from camera: $text');
-    final geometry = _geometryFromJsDetail(text, detail);
-    if (geometry != null) {
-      _latestQrGeometry = geometry;
-      _latestQrGeometryAt = DateTime.now();
-    }
-
-    _acceptDetectedQr(text, geometry: geometry);
-  }
-
-  QrDetectionGeometry? _geometryFromJsDetail(
-    String text,
-    Map<String, dynamic> detail,
-  ) {
-    double number(String key) =>
-        double.tryParse(detail[key]?.toString() ?? '') ?? 0;
-
-    final sourceWidth = number('sourceWidth');
-    final sourceHeight = number('sourceHeight');
-    final cropX = number('cropX');
-    final cropY = number('cropY');
-    final cropWidth = number('cropWidth');
-    final cropHeight = number('cropHeight');
-    final analysisWidth = number('analysisWidth');
-    final analysisHeight = number('analysisHeight');
-    final rawCorners = detail['corners'];
-
-    if (sourceWidth <= 0 ||
-        sourceHeight <= 0 ||
-        cropWidth <= 0 ||
-        cropHeight <= 0 ||
-        analysisWidth <= 0 ||
-        analysisHeight <= 0 ||
-        rawCorners is! List ||
-        rawCorners.length < 3) {
-      return null;
-    }
-
-    final corners = <Offset>[];
-    for (final raw in rawCorners.take(4)) {
-      if (raw is! Map) continue;
-      final x = double.tryParse(raw['x']?.toString() ?? '');
-      final y = double.tryParse(raw['y']?.toString() ?? '');
-      if (x == null || y == null) continue;
-      corners.add(Offset(
-        cropX + x * cropWidth / analysisWidth,
-        cropY + y * cropHeight / analysisHeight,
-      ));
-    }
-    if (corners.length < 3) return null;
-    if (corners.length == 3) {
-      // ZXing QRCodeReader commonly returns bottom-left, top-left, top-right.
-      corners.add(corners[0] + corners[2] - corners[1]);
-      final ordered = <Offset>[corners[1], corners[2], corners[3], corners[0]];
-      corners
-        ..clear()
-        ..addAll(ordered);
-    }
-
-    return QrDetectionGeometry(
-      value: text,
-      corners: List<Offset>.unmodifiable(corners),
-      sourceWidth: sourceWidth,
-      sourceHeight: sourceHeight,
-    );
-  }
-
-  // =========================
-  // STT / socket
-  // =========================
-  Future<void> _loadStt() async {
-    if (_fac.isEmpty) return;
-    try {
-      setState(() => _sttLoading = true);
-
-      final value = await SttApi.getCurrentStt(
-        fac: _fac,
-        type: widget.patrolGroup.name,
-      );
-
-      if (!mounted) return;
-      setState(() {
-        stt = value;
-        _sttLoading = false;
-      });
-    } catch (e) {
-      if (mounted) setState(() => _sttLoading = false);
-    }
-  }
-
-  void _connectSocket() {
-    sttSocket?.dispose();
-    sttSocket = SttWebSocket(
-      serverUrl: _wsUrl,
-      fac: _fac,
-      type: widget.patrolGroup.name,
-      onSttUpdate: (value) {
-        if (!mounted) return;
-        setState(() {
-          stt = value;
-          _sttLoading = false;
-        });
-      },
-    );
-    sttSocket!.connect();
-  }
-
-  // =========================
-  // Capture / Upload
-  // =========================
-  Future<String?> _decodeQrFromBytes(Uint8List bytes) async {
-    if (bytes.isEmpty) {
-      return null;
-    }
-
-    String? objectUrl;
-    StreamSubscription<html.Event>? subscription;
-
-    final completer = Completer<String?>();
-
-    try {
-      debugPrint('[QR-UPLOAD] start: ${bytes.length} bytes');
-
-      final blob = html.Blob(<dynamic>[bytes], 'image/jpeg');
-
-      objectUrl = html.Url.createObjectUrlFromBlob(blob);
-
-      subscription = html.window.on['qr-from-uploaded-image'].listen((event) {
-        if (event is! html.CustomEvent) {
-          return;
-        }
-
-        final detail = _parseJsEventDetail(event);
-
-        if (detail == null) {
-          if (!completer.isCompleted) {
-            completer.complete(null);
-          }
-
-          return;
-        }
-
-        final text = detail['text']?.toString().trim() ?? '';
-
-        final error = detail['error']?.toString().trim() ?? '';
-
-        if (error.isNotEmpty) {
-          debugPrint('[QR-UPLOAD] error: $error');
-        }
-
-        if (!completer.isCompleted) {
-          completer.complete(text.isEmpty ? null : text);
-        }
-      });
-
-      _decodeQrFromImageBytesJs(objectUrl);
-
-      final result = await completer.future.timeout(
-        const Duration(seconds: 8),
-        onTimeout: () {
-          debugPrint('[QR-UPLOAD] timeout after 8 seconds');
-
-          return null;
-        },
-      );
-
-      debugPrint('[QR-UPLOAD] result: $result');
-
-      return result;
-    } catch (error, stackTrace) {
-      debugPrint('[QR-UPLOAD] exception: $error');
-
-      debugPrintStack(stackTrace: stackTrace);
-
-      return null;
-    } finally {
-      try {
-        await subscription?.cancel();
-      } catch (_) {}
-
-      if (objectUrl != null) {
-        html.Url.revokeObjectUrl(objectUrl);
-      }
-    }
-  }
-
-  // Future<void> pickImagesFromDevice(BuildContext context) async {
-  //   final remain = _maxImages - _capturedImages.length;
-  //   if (remain <= 0) {
-  //     ScaffoldMessenger.of(context).showSnackBar(
-  //       const SnackBar(
-  //         content: Text("You can upload up to 3 images only."),
-  //         backgroundColor: Colors.redAccent,
-  //         behavior: SnackBarBehavior.floating,
-  //       ),
-  //     );
-  //     return;
-  //   }
-  //
-  //   final uploadInput = html.FileUploadInputElement()
-  //     ..accept = 'image/*'
-  //     ..multiple = true;
-  //
-  //   uploadInput.click();
-  //
-  //   uploadInput.onChange.listen((_) async {
-  //     final files = uploadInput.files;
-  //     if (files == null || files.isEmpty) return;
-  //
-  //     final selected = files.take(remain);
-  //
-  //     for (final file in selected) {
-  //       final reader = html.FileReader();
-  //       reader.readAsArrayBuffer(file);
-  //       await reader.onLoadEnd.first;
-  //
-  //       final bytes = reader.result as Uint8List;
-  //
-  //       // decode QR trong chính ảnh upload
-  //       final qrText = await _decodeQrFromBytes(bytes);
-  //
-  //       if (qrText != null && qrText.isNotEmpty) {
-  //         if (widget.type != 'Patrol' || RegExp(r'^\d{4}$').hasMatch(qrText)) {
-  //           setState(() {
-  //             _lastQr = qrText;
-  //             _lastQrAt = DateTime.now();
-  //           });
-  //
-  //           widget.onQrDetected?.call(qrText);
-  //           HapticFeedback.mediumImpact();
-  //           _playQrChangedFx();
-  //         }
-  //       }
-  //
-  //       // add ảnh sau khi đọc QR
-  //       setState(() {
-  //         _capturedImages.add(bytes);
-  //       });
-  //     }
-  //
-  //     widget.onImagesChanged?.call(_capturedImages);
-  //   });
-  // }
-  ({int width, int height}) _fitInsideMaxEdge({
-    required int sourceWidth,
-    required int sourceHeight,
-    required int maxEdge,
-  }) {
-    if (sourceWidth <= 0 || sourceHeight <= 0) {
-      return (width: 0, height: 0);
-    }
-
-    final longestEdge = math.max(sourceWidth, sourceHeight);
-
-    if (longestEdge <= maxEdge) {
-      return (width: sourceWidth, height: sourceHeight);
-    }
-
-    final scale = maxEdge / longestEdge;
-
-    return (
-      width: math.max(1, (sourceWidth * scale).round()),
-      height: math.max(1, (sourceHeight * scale).round()),
-    );
-  }
-
-  Future<Uint8List?> _canvasToJpegBytes(
-    html.CanvasElement canvas, {
-    double quality = 0.82,
-  }) async {
-    final blob = await canvas.toBlob('image/jpeg', quality);
-    if (blob == null) return null;
-
-    final reader = html.FileReader();
-    reader.readAsArrayBuffer(blob);
-    await reader.onLoadEnd.first;
-
-    final result = reader.result;
-
-    if (result is ByteBuffer) {
-      return Uint8List.view(result);
-    }
-
-    if (result is Uint8List) {
-      return result;
-    }
-
-    if (result is List<int>) {
-      return Uint8List.fromList(result);
-    }
-
-    return null;
-  }
-
-  Future<void> pickImagesFromDevice(BuildContext context) async {
-    final remain = _maxImages - _capturedImages.length;
-
-    if (remain <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('You can upload up to 3 images only.'),
-          backgroundColor: Colors.redAccent,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      return;
-    }
-
-    final uploadInput = html.FileUploadInputElement()
-      ..accept = 'image/*'
-      ..multiple = true;
-
-    uploadInput.click();
-
-    await uploadInput.onChange.first;
-
-    final files = uploadInput.files;
-    if (files == null || files.isEmpty) return;
-
-    for (final file in files.take(remain)) {
-      String? objectUrl;
-
-      try {
-        objectUrl = html.Url.createObjectUrl(file);
-
-        final image = html.ImageElement();
-        final imageReady = Completer<void>();
-
-        late final StreamSubscription<html.Event> loadSub;
-        late final StreamSubscription<html.Event> errorSub;
-
-        loadSub = image.onLoad.listen((_) {
-          if (!imageReady.isCompleted) imageReady.complete();
-        });
-
-        errorSub = image.onError.listen((_) {
-          if (!imageReady.isCompleted) {
-            imageReady.completeError(StateError('Failed to load image'));
-          }
-        });
-
-        image.src = objectUrl;
-
-        try {
-          await imageReady.future.timeout(const Duration(seconds: 10));
-        } finally {
-          await loadSub.cancel();
-          await errorSub.cancel();
-        }
-
-        final width = image.naturalWidth ?? image.width ?? 0;
-        final height = image.naturalHeight ?? image.height ?? 0;
-
-        if (width <= 0 || height <= 0) continue;
-
-        final target = _fitInsideMaxEdge(
-          sourceWidth: width,
-          sourceHeight: height,
-          maxEdge: _maxImportedEdge,
-        );
-
-        if (target.width <= 0 || target.height <= 0) continue;
-
-        final canvas = html.CanvasElement(
-          width: target.width,
-          height: target.height,
-        );
-
-        canvas.context2D.drawImageScaled(
-          image,
-          0,
-          0,
-          target.width.toDouble(),
-          target.height.toDouble(),
-        );
-
-        final bytes = await _canvasToJpegBytes(canvas, quality: 0.82);
-
-        if (bytes == null || bytes.isEmpty) continue;
-
-        final qrText = await _decodeQrFromBytes(bytes);
-        if (qrText != null && qrText.trim().isNotEmpty) {
-          _acceptDetectedQr(qrText, haptic: false);
-        }
-
-        if (!mounted) return;
-
-        setState(() {
-          _capturedImages.add(bytes);
-        });
-
-        _notifyImagesChanged();
-      } catch (error, stackTrace) {
-        debugPrint('pickImagesFromDevice error: $error');
-        debugPrintStack(stackTrace: stackTrace);
-      } finally {
-        if (objectUrl != null) {
-          html.Url.revokeObjectUrl(objectUrl);
-        }
-      }
-    }
-  }
-
-  void removeImage(int index) {
-    if (index < 0 || index >= _capturedImages.length) return;
-
-    setState(() {
-      _capturedImages.removeAt(index);
-    });
-
-    _notifyImagesChanged();
-  }
-
-  void clearAll() {
-    if (_capturedImages.isEmpty) return;
-
-    setState(() {
-      _capturedImages.clear();
-    });
-
-    _notifyImagesChanged();
-  }
-
-  void resetQr() {
-    _lastDetectedQr = null;
-    _lastDetectedQrAt = null;
-
-    _patrolQrNotifier.value = null;
-    _showQrGuideNotifier.value = true;
-
-    if (_qrScanning && !_cameraSleeping) {
-      _hideQrWarning();
-    }
-  }
-
-  Future<void> _takePhoto() async {
-    if (_cameraSleeping || _cameraStarting) return;
-    if (_isCapturing || _video == null) return;
-    if (_capturedImages.length >= _maxImages) return;
-
-    setState(() => _isCapturing = true);
-    _flashController.forward().then((_) => _flashController.reverse());
-
-    try {
-      final video = _video!;
-      final vw = video.videoWidth.toDouble();
-      final vh = video.videoHeight.toDouble();
-      if (vw == 0 || vh == 0) return;
-
-      final outputSize = math.min(math.max(vw, vh), _maxCaptureEdge).toInt();
-      final canvas = html.CanvasElement(width: outputSize, height: outputSize);
-      final ctx = canvas.context2D;
-
-      final srcSize = math.min(vw, vh) / _zoom;
-      final sx = (vw - srcSize) / 2;
-      final sy = (vh - srcSize) / 2;
-
-      ctx.drawImageScaledFromSource(
-        video,
-        sx,
-        sy,
-        srcSize,
-        srcSize,
-        0,
-        0,
-        outputSize.toDouble(),
-        outputSize.toDouble(),
-      );
-
-      final bytes = await _canvasToJpegBytes(canvas, quality: 0.88);
-
-      if (bytes == null || bytes.isEmpty || !mounted) return;
-
-      setState(() {
-        _capturedImages.add(bytes);
-      });
-
-      _notifyImagesChanged();
-    } finally {
-      if (mounted) setState(() => _isCapturing = false);
-    }
-  }
-
-  // =========================
-  // UI
-  // =========================
-  // =========================
-  // Camera zoom thật (MediaStreamTrack)
-  // =========================
-
-  /// Track video hiện tại: cùng stream với <video id="qr-video"> mà QR loop
-  /// đọc frame, nên zoom track = đổi chính input của decoder.
-  html.MediaStreamTrack? _currentVideoTrack() {
-    final stream = _stream;
-    if (stream == null) return null;
-    final tracks = stream.getVideoTracks();
-    return tracks.isEmpty ? null : tracks.first;
-  }
-
-  double? _jsNumber(Object? object, String name) {
-    if (object == null || !js_util.hasProperty(object, name)) return null;
-    final value = js_util.getProperty<Object?>(object, name);
-    return value is num ? value.toDouble() : null;
-  }
-
-  /// Đọc zoom capability của track (Chrome Android...). Không hỗ trợ /
-  /// lỗi -> ẩn control, camera và QR vẫn chạy bình thường.
-  void _initHardwareZoom(int session) {
-    if (!widget.enableZoomControls) return;
-
-    var supported = false;
-    var minZoom = 1.0;
-    var maxZoom = 1.0;
-    var currentZoom = 1.0;
-
-    try {
-      final track = _currentVideoTrack();
-      if (track != null && js_util.hasProperty(track, 'getCapabilities')) {
-        final capabilities =
-            js_util.callMethod<Object?>(track, 'getCapabilities', const []);
-        final zoom = capabilities == null
-            ? null
-            : js_util.getProperty<Object?>(capabilities, 'zoom');
-        final deviceMin = _jsNumber(zoom, 'min');
-        final deviceMax = _jsNumber(zoom, 'max');
-
-        if (deviceMin != null && deviceMax != null && deviceMax > deviceMin) {
-          minZoom = deviceMin;
-          // Trần QR: min(device max, 4x); không thấp hơn min của device.
-          maxZoom = math.max(minZoom, math.min(deviceMax, _qrMaxZoom));
-          supported = maxZoom > minZoom;
-
-          final settings =
-              js_util.hasProperty(track, 'getSettings')
-                  ? js_util.callMethod<Object?>(track, 'getSettings', const [])
-                  : null;
-          currentZoom = (_jsNumber(settings, 'zoom') ?? minZoom)
-              .clamp(minZoom, maxZoom)
-              .toDouble();
-        }
-      }
-    } catch (error) {
-      debugPrint('Camera zoom not available: $error');
-      supported = false;
-    }
-
-    if (!mounted || session != _cameraSession) return;
-
-    setState(() {
-      _hwZoomSupported = supported;
-      _hwMinZoom = minZoom;
-      _hwMaxZoom = maxZoom;
-      _hwZoom = currentZoom;
-      _hwPendingZoom = null;
-    });
-
-    if (!supported) return;
-
-    // Phiên camera mới bắt đầu ở 1x (hoặc giá trị hợp lệ gần nhất).
-    final initialZoom = _desiredHwZoom.clamp(minZoom, maxZoom).toDouble();
-    if ((initialZoom - currentZoom).abs() >= 0.001) {
-      _setHardwareZoom(initialZoom);
-    }
-  }
-
-  /// Áp zoom lên camera track (applyConstraints). Không restart camera,
-  /// không đổi resolution; lỗi chỉ log, scanner tiếp tục chạy.
-  Future<void> _setHardwareZoom(double requested) async {
-    if (!_hwZoomSupported) return;
-
-    final target = requested.clamp(_hwMinZoom, _hwMaxZoom).toDouble();
-    _desiredHwZoom = target;
-    if (mounted && (target - _hwZoom).abs() >= 0.001) {
-      setState(() => _hwZoom = target);
-    }
-
-    _hwPendingZoom = target;
-    if (_hwZoomApplying) return;
-
-    final operationGeneration = _zoomOperationGeneration;
-    _hwZoomApplying = true;
-    try {
-      while (_hwPendingZoom != null) {
-        if (operationGeneration != _zoomOperationGeneration) break;
-        final value = _hwPendingZoom!;
-        _hwPendingZoom = null;
-
-        final track = _currentVideoTrack();
-        if (!mounted || track == null || _cameraSleeping) break;
-
-        final constraints = js_util.jsify({
-          'advanced': [
-            {'zoom': value},
-          ],
-        });
-        await js_util.promiseToFuture<Object?>(
-          js_util.callMethod<Object>(track, 'applyConstraints', [constraints]),
-        );
-      }
-    } catch (error) {
-      debugPrint('Camera zoom apply failed: $error');
-    } finally {
-      final restartForNewTrack =
-          operationGeneration != _zoomOperationGeneration &&
-          mounted &&
-          _hwZoomSupported &&
-          !_cameraSleeping;
-      _hwZoomApplying = false;
-      _hwPendingZoom = null;
-      if (restartForNewTrack) {
-        unawaited(_setHardwareZoom(_desiredHwZoom));
-      }
-    }
-  }
-
-  /// Pinch 2 ngón trên preview -> zoom thật. 1 ngón không bị bắt (vẫn cuộn
-  /// trang bình thường). Không ảnh hưởng QR callback (QR đến từ JS event).
-  Widget _wrapPinchZoom(Widget child) {
-    if (!widget.enableZoomControls) return child;
-
-    return GestureDetector(
-      behavior: HitTestBehavior.translucent,
-      onScaleStart: (_) => _hwScaleStartZoom = _hwZoom,
-      onScaleUpdate: (details) {
-        if (!_hwZoomVisible || details.pointerCount < 2) return;
-
-        final next = (_hwScaleStartZoom * details.scale)
-            .clamp(_hwMinZoom, _hwMaxZoom)
-            .toDouble();
-        if ((next - _hwZoom).abs() < _zoomUpdateThreshold) return;
-
-        _setHardwareZoom(next);
-      },
-      child: child,
-    );
-  }
-
-  Widget _buildHardwareZoomControl() {
-    final quickValues = const [1.0, 2.0, 3.0]
-        .where((v) => v >= _hwMinZoom - 0.001 && v <= _hwMaxZoom + 0.001)
-        .toList();
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-      decoration: BoxDecoration(
-        color: const Color(0xCC111827),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Colors.white.withOpacity(.25)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _zoomIconButton(
-            Icons.remove_rounded,
-            _hwZoom > _hwMinZoom + 0.001
-                ? () => _setHardwareZoom(_hwZoom - _zoomButtonStep)
-                : null,
-          ),
-          SizedBox(
-            width: 42,
-            child: Text(
-              '${_hwZoom.toStringAsFixed(1)}x',
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ),
-          _zoomIconButton(
-            Icons.add_rounded,
-            _hwZoom < _hwMaxZoom - 0.001
-                ? () => _setHardwareZoom(_hwZoom + _zoomButtonStep)
-                : null,
-          ),
-          if (quickValues.length > 1) ...[
-            const SizedBox(width: 2),
-            for (final value in quickValues) _zoomQuickChip(value),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _zoomIconButton(IconData icon, VoidCallback? onTap) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(999),
-      onTap: onTap,
-      child: SizedBox(
-        width: 30,
-        height: 30,
-        child: Icon(
-          icon,
-          size: 18,
-          color: onTap == null ? Colors.white30 : Colors.white,
-        ),
-      ),
-    );
-  }
-
-  Widget _zoomQuickChip(double value) {
-    final selected = (_hwZoom - value).abs() < _zoomUpdateThreshold;
-
-    return InkWell(
-      borderRadius: BorderRadius.circular(999),
-      onTap: selected ? null : () => _setHardwareZoom(value),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
-        decoration: BoxDecoration(
-          color: selected
-              ? const Color(0xFF4DD0E1).withOpacity(.25)
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(999),
-        ),
-        child: Text(
-          '${value.toInt()}x',
-          style: TextStyle(
-            color: selected ? Colors.white : Colors.white70,
-            fontSize: 11,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCameraUnavailableView() {
-    final state = cameraPowerState;
-    if (state == CameraPowerState.starting || state == CameraPowerState.stopping) {
-      return Container(
-        color: const Color(0xFF111827),
-        alignment: Alignment.center,
-        child: const SizedBox(
-          width: 26,
-          height: 26,
-          child: CircularProgressIndicator(
-            strokeWidth: 2.4,
-            color: Color(0xFF4DD0E1),
-          ),
-        ),
-      );
-    }
-
-    if (!widget.enablePowerControl) {
-      return Container(
-        color: const Color(0xFF111827),
-        alignment: Alignment.center,
-        child: const Icon(
-          Icons.videocam_off_rounded,
-          color: Colors.white38,
-          size: 42,
-        ),
-      );
-    }
-
-    final failed = state == CameraPowerState.error;
-    return Container(
-      color: const Color(0xFF111827),
-      alignment: Alignment.center,
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            failed ? Icons.error_outline_rounded : Icons.videocam_off_rounded,
-            color: failed ? const Color(0xFFF59E0B) : Colors.white54,
-            size: 44,
-          ),
-          const SizedBox(height: 10),
-          Text(
-            failed ? 'Camera is unavailable' : 'Camera is off',
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 12),
-          OutlinedButton.icon(
-            onPressed: _lifecycleSuspended ? null : resumeCamera,
-            icon: Icon(
-              failed ? Icons.refresh_rounded : Icons.videocam_rounded,
-              size: 18,
-            ),
-            label: Text(failed ? 'TRY AGAIN' : 'TURN ON CAMERA'),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: const Color(0xFF67E8F9),
-              side: const BorderSide(color: Color(0x884DD0E1)),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-          ),
-          if (!failed) ...[
-            const SizedBox(height: 6),
-            const Text(
-              'Turn off the camera to save battery',
-              style: TextStyle(color: Colors.white38, fontSize: 10),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCameraPowerControl() {
-    if (widget.useSwitchPowerControl) {
-      return _buildCameraPowerSwitchControl();
-    }
-
-    final state = cameraPowerState;
-    final transitioning =
-        state == CameraPowerState.starting || state == CameraPowerState.stopping;
-    final enabled = _userCameraEnabled && state != CameraPowerState.error;
-    final color = enabled ? const Color(0xFF4DD0E1) : Colors.white54;
-
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: transitioning ? null : _toggleCameraPower,
-        borderRadius: BorderRadius.circular(999),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          decoration: BoxDecoration(
-            color: const Color(0xDD111827),
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: color.withOpacity(.55)),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (transitioning)
-                const SizedBox(
-                  width: 14,
-                  height: 14,
-                  child: CircularProgressIndicator(strokeWidth: 1.8),
-                )
-              else
-                Icon(
-                  enabled ? Icons.videocam_rounded : Icons.videocam_off_rounded,
-                  size: 16,
-                  color: color,
-                ),
-              const SizedBox(width: 5),
-              Text(
-                enabled ? 'ON' : 'OFF',
-                style: TextStyle(
-                  color: color,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCameraPowerSwitchControl() {
-    final state = cameraPowerState;
-    final transitioning =
-        state == CameraPowerState.starting || state == CameraPowerState.stopping;
-    final enabled = _userCameraEnabled && state != CameraPowerState.error;
-    final activeColor = const Color(0xFF22B8C7);
-
-    return Semantics(
-      button: true,
-      enabled: !transitioning,
-      toggled: enabled,
-      label: 'Camera power',
-      value: enabled ? 'On' : 'Off',
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: transitioning ? null : _toggleCameraPower,
-          borderRadius: BorderRadius.circular(999),
-          child: SizedBox(
-            width: 46,
-            height: 42,
-            child: Center(
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 140),
-                width: 38,
-                height: 22,
-                padding: const EdgeInsets.all(2),
-                decoration: BoxDecoration(
-                  color: enabled ? activeColor : const Color(0xFF4B5563),
-                  borderRadius: BorderRadius.circular(999),
-                  border: Border.all(color: Colors.white.withOpacity(.24)),
-                  boxShadow: enabled
-                      ? [
-                          BoxShadow(
-                            color: activeColor.withOpacity(.28),
-                            blurRadius: 8,
-                          ),
-                        ]
-                      : null,
-                ),
-                child: transitioning
-                    ? const Center(
-                        child: SizedBox(
-                          width: 12,
-                          height: 12,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 1.7,
-                            color: Colors.white,
-                          ),
-                        ),
-                      )
-                    : AnimatedAlign(
-                        duration: const Duration(milliseconds: 140),
-                        curve: Curves.easeOut,
-                        alignment: enabled
-                            ? Alignment.centerRight
-                            : Alignment.centerLeft,
-                        child: Container(
-                          width: 16,
-                          height: 16,
-                          decoration: const BoxDecoration(
-                            color: Colors.white,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                      ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
+    return widget.showQrNumber ? null : 12;
   }
 
   @override
@@ -2183,17 +291,20 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
                     Stack(
                     fit: StackFit.expand,
                     children: [
-                      _video != null && !_cameraSleeping
-                          ? Transform.scale(
-                              // Zoom thật đã nằm trong frame camera: không
-                              // phóng UI thêm (giữ _zoom cũ cho màn hình khác).
-                              scale: widget.enableZoomControls ? 1.0 : _zoom,
-                              child: HtmlElementView(
-                                key: ValueKey(_viewType),
-                                viewType: _viewType,
-                              ),
-                            )
-                          : _buildCameraUnavailableView(),
+                      _CameraLayer(
+                        viewType: _viewType,
+                        active: _video != null && !_cameraSleeping,
+                        scale: widget.enableZoomControls ? 1.0 : _zoom,
+                        inactive: ValueListenableBuilder<_PowerUi>(
+                          valueListenable: _powerStateNotifier,
+                          builder: (context, _, __) => _CameraUnavailableView(
+                            state: cameraPowerState,
+                            enablePowerControl: widget.enablePowerControl,
+                            lifecycleSuspended: _lifecycleSuspended,
+                            onResume: resumeCamera,
+                          ),
+                        ),
+                      ),
 
                       // Khung căn QR tĩnh: vẽ một lần, không chạy animation.
                       if (!_cameraSleeping) Positioned.fill(
@@ -2313,23 +424,22 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
             Positioned(
               top: 12,
               left: 12,
-              // Không có badge "No.": badge QR được dùng hết chiều ngang.
-              right: widget.showQrNumber
-                  ? null
-                  : (widget.useSwitchPowerControl
-                        ? 70
-                        : (widget.enablePowerControl ? 86 : 12)),
+              // Có power control: luôn chừa chỗ cho control (mọi màn cùng một
+              // công thức). Không có control và không có badge "No.": badge QR
+              // được dùng hết chiều ngang.
+              right: _qrBadgeRightInset,
               child: RepaintBoundary(
                 child: ValueListenableBuilder<String?>(
                   valueListenable: _patrolQrNotifier,
                   builder: (context, qr, _) {
+                    final constrained = _qrBadgeRightInset != null;
                     final badge = _QrStatusBadge(
                       qr: qr,
-                      ellipsize: !widget.showQrNumber,
+                      ellipsize: constrained,
                     );
-                    return widget.showQrNumber
-                        ? badge
-                        : Align(alignment: Alignment.centerLeft, child: badge);
+                    return constrained
+                        ? Align(alignment: Alignment.centerLeft, child: badge)
+                        : badge;
                   },
                 ),
               ),
@@ -2341,41 +451,12 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
               top: widget.enablePowerControl ? 50 : 12,
               right: 12,
               child: RepaintBoundary(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 5,
+                child: ValueListenableBuilder<_SttUi>(
+                  valueListenable: _sttNotifier,
+                  builder: (context, value, _) => _SttBadge(
+                    stt: value.value,
+                    loading: value.loading,
                   ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xCC111827),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.white.withOpacity(.30)),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(.18),
-                        blurRadius: 8,
-                        offset: const Offset(0, 3),
-                      ),
-                    ],
-                  ),
-                  child: _sttLoading
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : Text(
-                          'No. ${stt + 1}',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 0.6,
-                          ),
-                        ),
                 ),
               ),
             ),
@@ -2384,7 +465,15 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
               Positioned(
                 top: 12,
                 right: 12,
-                child: _buildCameraPowerControl(),
+                child: ValueListenableBuilder<_PowerUi>(
+                  valueListenable: _powerStateNotifier,
+                  builder: (context, _, __) => _CameraPowerControl(
+                    state: cameraPowerState,
+                    userCameraEnabled: _userCameraEnabled,
+                    useSwitch: widget.useSwitchPowerControl,
+                    onToggle: _toggleCameraPower,
+                  ),
+                ),
               ),
 
             if (!widget.qrOnly) ...[
@@ -2408,33 +497,54 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
               left: 0,
               right: 0,
               child: Center(
-                child: GestureDetector(
-                  onTap: (!_isCapturing && canUpload) ? _takePhoto : null,
-                  child: GlassCircleButton(
-                    size: 80,
-                    showProgress: _isCapturing,
-                    child: _isCapturing
-                        ? null
-                        : Icon(
-                            Icons.camera_alt_rounded,
-                            color: canUpload ? Colors.white : Colors.grey,
-                            size: 36,
-                          ),
-                  ),
+                // canUpload đổi qua setState (ảnh) nên builder chạy lại theo cha.
+                child: ListenableBuilder(
+                  listenable: _captureButtonListenable,
+                  builder: (context, _) {
+                    final capturing = _capturingNotifier.value;
+                    // Camera không chạy (tắt/đang khởi động/suspend/error):
+                    // mờ và không nhận tap.
+                    final cameraOn = cameraPowerState == CameraPowerState.on;
+                    return Opacity(
+                      opacity: cameraOn ? 1 : 0.4,
+                      child: GestureDetector(
+                        onTap: (cameraOn && !capturing && canUpload)
+                            ? _takePhoto
+                            : null,
+                        child: GlassCircleButton(
+                          size: 80,
+                          showProgress: capturing,
+                          child: capturing
+                              ? null
+                              : Icon(
+                                  Icons.camera_alt_rounded,
+                                  color: canUpload ? Colors.white : Colors.grey,
+                                  size: 36,
+                                ),
+                        ),
+                      ),
+                    );
+                  },
                 ),
               ),
             ),
             ],
 
             if (!widget.enablePowerControl || !_cameraSleeping)
-            Positioned(
-              left: 12,
-              right: 12,
-              // Không có toolbar ở dưới khi qrOnly nên banner hạ xuống sát đáy
-              // (nhường chỗ cho zoom control nếu đang hiện).
-              bottom: widget.qrOnly
-                  ? (_hwZoomVisible ? 52 : 12)
-                  : (_hwZoomVisible ? 116 : 78),
+            // bottom phụ thuộc _hwZoomVisible: zoom supported (notifier) +
+            // _video/_cameraSleeping (setState của cha chạy lại builder).
+            ValueListenableBuilder<_HwZoomUi>(
+              valueListenable: _hwZoomNotifier,
+              builder: (context, _, child) => Positioned(
+                left: 12,
+                right: 12,
+                // Không có toolbar ở dưới khi qrOnly nên banner hạ xuống sát đáy
+                // (nhường chỗ cho zoom control nếu đang hiện).
+                bottom: widget.qrOnly
+                    ? (_hwZoomVisible ? 52 : 12)
+                    : (_hwZoomVisible ? 116 : 78),
+                child: child!,
+              ),
               child: IgnorePointer(
                 child: RepaintBoundary(
                   child: ValueListenableBuilder<_QrWarningState>(
@@ -2455,25 +565,41 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
               ),
             ),
 
-            if (_hwZoomVisible)
-              Positioned(
+            // Ẩn = Positioned rỗng (0 chiều cao, không nhận hit test).
+            ValueListenableBuilder<_HwZoomUi>(
+              valueListenable: _hwZoomNotifier,
+              builder: (context, zoom, _) => Positioned(
                 left: 0,
                 right: 0,
                 // Chế độ chụp ảnh: đặt trên nút chụp để không che nút.
                 bottom: widget.qrOnly ? 10 : 72,
-                child: Center(child: _buildHardwareZoomControl()),
+                child: _hwZoomVisible
+                    ? Center(
+                        child: _HwZoomControl(
+                          zoom: zoom.zoom,
+                          minZoom: zoom.min,
+                          maxZoom: zoom.max,
+                          onChanged: _setHardwareZoom,
+                        ),
+                      )
+                    : const SizedBox.shrink(),
               ),
+            ),
 
-            if (_qrLoading)
-              const Positioned(
+            ValueListenableBuilder<bool>(
+              valueListenable: _qrLoadingNotifier,
+              builder: (context, loading, _) => Positioned(
                 top: 12,
                 left: 150,
-                child: SizedBox(
-                  width: 14,
-                  height: 14,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
+                child: loading
+                    ? const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const SizedBox.shrink(),
               ),
+            ),
           ],
         ),
       ],
@@ -2481,337 +607,3 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
   }
 }
 
-class _QrLockData {
-  final String label;
-  final QrDetectionGeometry? geometry;
-
-  const _QrLockData({required this.label, required this.geometry});
-}
-
-class _QrLockPainter extends CustomPainter {
-  final _QrLockData data;
-  final double progress;
-
-  const _QrLockPainter({required this.data, required this.progress});
-
-  double _ease(double value) =>
-      Curves.easeOutCubic.transform(value.clamp(0.0, 1.0).toDouble());
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final geometry = data.geometry;
-    List<Offset> points;
-    if (geometry != null) {
-      final coverScale = math.max(
-        size.width / geometry.sourceWidth,
-        size.height / geometry.sourceHeight,
-      );
-      final dx = (size.width - geometry.sourceWidth * coverScale) / 2;
-      final dy = (size.height - geometry.sourceHeight * coverScale) / 2;
-      points = geometry.corners
-          .map((p) => Offset(dx + p.dx * coverScale, dy + p.dy * coverScale))
-          .toList(growable: false);
-    } else {
-      final side = size.shortestSide * .48;
-      final rect = Rect.fromCenter(
-        center: size.center(Offset.zero),
-        width: side,
-        height: side,
-      );
-      points = [rect.topLeft, rect.topRight, rect.bottomRight, rect.bottomLeft];
-    }
-
-    final double scale;
-    if (progress < .15) {
-      scale = .92 + .08 * _ease(progress / .15);
-    } else if (progress < .35) {
-      scale = 1 + .06 * _ease((progress - .15) / .20);
-    } else if (progress < .58) {
-      scale = 1.06 - .06 * _ease((progress - .35) / .23);
-    } else {
-      scale = 1;
-    }
-    final opacity = progress < .15
-        ? _ease(progress / .15)
-        : progress < .75
-        ? 1.0
-        : 1 - _ease((progress - .75) / .25);
-    if (opacity <= 0) return;
-
-    final center = points.reduce((a, b) => a + b) / points.length.toDouble();
-    final animated = points.map((p) => center + (p - center) * scale).toList();
-    final color = Color.lerp(
-      const Color(0xFF4DD0E1),
-      const Color(0xFF4ADE80),
-      progress.clamp(.20, .62).toDouble(),
-    )!.withOpacity(opacity);
-    final glow = Paint()
-      ..color = color.withOpacity(.28 * opacity)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 7
-      ..strokeCap = StrokeCap.round
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6);
-    final stroke = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 3
-      ..strokeCap = StrokeCap.round;
-
-    for (var i = 0; i < animated.length; i++) {
-      final p = animated[i];
-      final previous = animated[(i - 1 + animated.length) % animated.length];
-      final next = animated[(i + 1) % animated.length];
-      final towardPrevious = (previous - p) / (previous - p).distance * 18;
-      final towardNext = (next - p) / (next - p).distance * 18;
-      canvas.drawLine(p, p + towardPrevious, glow);
-      canvas.drawLine(p, p + towardNext, glow);
-      canvas.drawLine(p, p + towardPrevious, stroke);
-      canvas.drawLine(p, p + towardNext, stroke);
-    }
-
-    if (data.label.isEmpty) return;
-    final painter = TextPainter(
-      text: TextSpan(
-        text: data.label,
-        style: TextStyle(
-          color: Colors.white.withOpacity(opacity),
-          fontSize: 12,
-          fontWeight: FontWeight.w700,
-          letterSpacing: .4,
-        ),
-      ),
-      textDirection: TextDirection.ltr,
-    )..layout();
-    final minX = animated.map((p) => p.dx).reduce(math.min);
-    final maxX = animated.map((p) => p.dx).reduce(math.max);
-    final minY = animated.map((p) => p.dy).reduce(math.min);
-    final maxY = animated.map((p) => p.dy).reduce(math.max);
-    final pill = Size(painter.width + 18, painter.height + 9);
-    final below = maxY + 9 + pill.height <= size.height - 5;
-    final left = ((minX + maxX - pill.width) / 2)
-        .clamp(5.0, size.width - pill.width - 5)
-        .toDouble();
-    final top = below ? maxY + 9 : minY - pill.height - 9;
-    final rect = Rect.fromLTWH(
-      left,
-      top.clamp(5.0, size.height - pill.height - 5).toDouble(),
-      pill.width,
-      pill.height,
-    );
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(rect, const Radius.circular(10)),
-      Paint()..color = const Color(0xDD111827).withOpacity(.86 * opacity),
-    );
-    painter.paint(canvas, Offset(rect.left + 9, rect.top + 4.5));
-  }
-
-  @override
-  bool shouldRepaint(covariant _QrLockPainter oldDelegate) =>
-      oldDelegate.progress != progress || oldDelegate.data != data;
-}
-
-class _QrWarningBanner extends StatelessWidget {
-  final _QrWarningState state;
-  final String message;
-
-  const _QrWarningBanner({required this.state, required this.message});
-
-  @override
-  Widget build(BuildContext context) {
-    if (state == _QrWarningState.hidden) {
-      return const SizedBox.shrink();
-    }
-
-    final isError = state == _QrWarningState.error;
-    final color = isError ? const Color(0xFFEF4444) : const Color(0xFFF59E0B);
-    final icon = isError
-        ? Icons.error_outline_rounded
-        : Icons.qr_code_scanner_rounded;
-
-    return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 180),
-      child: Container(
-        key: ValueKey('${state.name}-$message'),
-        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
-        decoration: BoxDecoration(
-          color: const Color(0xE6111827),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: color.withOpacity(0.82)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.22),
-              blurRadius: 9,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Icon(icon, color: color, size: 19),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                message,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  height: 1.25,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _QrStatusBadge extends StatelessWidget {
-  final String? qr;
-
-  /// true: text co theo chiều ngang được cấp, cắt "..." khi quá dài.
-  final bool ellipsize;
-
-  const _QrStatusBadge({required this.qr, this.ellipsize = false});
-
-  @override
-  Widget build(BuildContext context) {
-    final value = qr?.trim() ?? '';
-    final hasQr = value.isNotEmpty;
-    final text = Text(
-      hasQr ? value : 'Scan Patrol QR',
-      maxLines: ellipsize ? 1 : null,
-      overflow: ellipsize ? TextOverflow.ellipsis : null,
-      style: TextStyle(
-        color: Colors.white,
-        fontSize: 13,
-        fontWeight: hasQr ? FontWeight.w800 : FontWeight.w600,
-        letterSpacing: hasQr ? 0.8 : 0,
-      ),
-    );
-
-    return Container(
-      constraints: const BoxConstraints(minHeight: 34),
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
-      decoration: BoxDecoration(
-        color: const Color(0xD9111827),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: hasQr
-              ? const Color(0xFF22C55E).withOpacity(0.75)
-              : Colors.redAccent.withOpacity(0.50),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(.20),
-            blurRadius: 8,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            hasQr ? Icons.qr_code_2_rounded : Icons.qr_code_scanner_rounded,
-            size: 19,
-            color: hasQr ? const Color(0xFF22C55E) : Colors.redAccent,
-          ),
-          const SizedBox(width: 7),
-          if (ellipsize) Flexible(child: text) else text,
-        ],
-      ),
-    );
-  }
-}
-
-class _QrGuideOverlay extends StatelessWidget {
-  const _QrGuideOverlay();
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: SizedBox(
-        width: 205,
-        height: 205,
-        child: CustomPaint(
-          painter: const _QrGuidePainter(),
-          child: const Align(
-            alignment: Alignment.bottomCenter,
-            child: Padding(
-              padding: EdgeInsets.only(bottom: 12),
-              child: Text(
-                'Place QR inside frame',
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  shadows: [Shadow(color: Colors.black, blurRadius: 5)],
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _QrGuidePainter extends CustomPainter {
-  const _QrGuidePainter();
-
-  static const double _cornerLength = 38;
-  static const double _radius = 13;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final rect = Rect.fromLTWH(2, 2, size.width - 4, size.height - 4);
-
-    final paint = Paint()
-      ..color = const Color(0xFF22C55E)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 3
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round;
-
-    final path = Path()
-      // Top left
-      ..moveTo(rect.left, rect.top + _cornerLength)
-      ..lineTo(rect.left, rect.top + _radius)
-      ..quadraticBezierTo(rect.left, rect.top, rect.left + _radius, rect.top)
-      ..lineTo(rect.left + _cornerLength, rect.top)
-      // Top right
-      ..moveTo(rect.right - _cornerLength, rect.top)
-      ..lineTo(rect.right - _radius, rect.top)
-      ..quadraticBezierTo(rect.right, rect.top, rect.right, rect.top + _radius)
-      ..lineTo(rect.right, rect.top + _cornerLength)
-      // Bottom right
-      ..moveTo(rect.right, rect.bottom - _cornerLength)
-      ..lineTo(rect.right, rect.bottom - _radius)
-      ..quadraticBezierTo(
-        rect.right,
-        rect.bottom,
-        rect.right - _radius,
-        rect.bottom,
-      )
-      ..lineTo(rect.right - _cornerLength, rect.bottom)
-      // Bottom left
-      ..moveTo(rect.left + _cornerLength, rect.bottom)
-      ..lineTo(rect.left + _radius, rect.bottom)
-      ..quadraticBezierTo(
-        rect.left,
-        rect.bottom,
-        rect.left,
-        rect.bottom - _radius,
-      )
-      ..lineTo(rect.left, rect.bottom - _cornerLength);
-
-    canvas.drawPath(path, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant _QrGuidePainter oldDelegate) => false;
-}
