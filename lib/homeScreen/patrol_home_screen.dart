@@ -22,7 +22,7 @@ import '../model/machine_model.dart';
 import '../qrCode/qr_scanner_dialog.dart';
 import '../recheck/recheck_detail_screen.dart';
 import '../session/session_store.dart';
-import '../test.dart';
+import '../patrol_before_screen.dart';
 import '../translator.dart';
 
 enum PatrolGroup { Patrol, Audit, QualityPatrol, AssetUpdate, FixedAsset }
@@ -849,7 +849,7 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => CameraScreen(
+        builder: (_) => PatrolBeforeScreen(
           machines: machines,
           patrolTeams: teams,
           lang: currentLang,

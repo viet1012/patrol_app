@@ -1,6 +1,6 @@
-part of '../test.dart';
+part of '../patrol_before_screen.dart';
 
-extension _CameraScreenReport on _CameraScreenState {
+extension _PatrolBeforeScreenReport on _PatrolBeforeScreenState {
   Future<void> _sendReport() async {
     if (_isSubmitting) return;
 

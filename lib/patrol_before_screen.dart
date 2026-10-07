@@ -28,15 +28,18 @@ import 'model/machine_model.dart';
 import 'model/reason_model.dart';
 import 'model/risk_score_calculator.dart';
 
-part 'camera_screen/camera_screen_models.dart';
-part 'camera_screen/camera_screen_ai.dart';
-part 'camera_screen/camera_screen_qr.dart';
-part 'camera_screen/camera_screen_report.dart';
-part 'camera_screen/camera_screen_camera.dart';
-part 'camera_screen/camera_screen_view.dart';
-part 'camera_screen/camera_screen_form_widgets.dart';
+part 'patrol_before_screen/patrol_before_screen_models.dart';
+part 'patrol_before_screen/patrol_before_screen_ai.dart';
+part 'patrol_before_screen/patrol_before_screen_qr.dart';
+part 'patrol_before_screen/patrol_before_screen_report.dart';
+part 'patrol_before_screen/patrol_before_screen_camera.dart';
+part 'patrol_before_screen/patrol_before_screen_view.dart';
+part 'patrol_before_screen/patrol_before_screen_form_widgets.dart';
 
-class CameraScreen extends StatefulWidget {
+/// Màn "Before" dùng chung cho các nhóm Patrol / Audit / QualityPatrol /
+/// AssetUpdate ("Patrol" theo nghĩa chung, khớp [PatrolGroup]).
+/// AssetUpdate cho tối đa 10 ảnh, các nhóm khác tối đa 3 ảnh.
+class PatrolBeforeScreen extends StatefulWidget {
   final List<MachineModel> machines;
   final List<HsePatrolTeamModel> patrolTeams;
 
@@ -48,7 +51,7 @@ class CameraScreen extends StatefulWidget {
   final String accountCode;
   final HsePatrolTeamModel? autoTeam;
 
-  const CameraScreen({
+  const PatrolBeforeScreen({
     super.key,
     required this.machines,
     required this.patrolTeams,
@@ -61,10 +64,10 @@ class CameraScreen extends StatefulWidget {
   });
 
   @override
-  State<CameraScreen> createState() => _CameraScreenState();
+  State<PatrolBeforeScreen> createState() => _PatrolBeforeScreenState();
 }
 
-class _CameraScreenState extends State<CameraScreen> {
+class _PatrolBeforeScreenState extends State<PatrolBeforeScreen> {
   String? _selectedPlant;
   String? _selectedFac;
   String? _selectedArea;
@@ -120,7 +123,7 @@ class _CameraScreenState extends State<CameraScreen> {
   bool _isSubmitting = false;
 
   // Chỉ phần AppBar ảnh/nút Send lắng nghe notifier này.
-  // Thay đổi ảnh không còn rebuild toàn bộ CameraScreen.
+  // Thay đổi ảnh không còn rebuild toàn bộ PatrolBeforeScreen.
   final ValueNotifier<List<Uint8List>> _imagesNotifier =
       ValueNotifier<List<Uint8List>>(const <Uint8List>[]);
 
@@ -330,7 +333,7 @@ class _CameraScreenState extends State<CameraScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => _buildCameraScreen(context);
+  Widget build(BuildContext context) => _buildPatrolBeforeScreen(context);
 
   List<AutoCmp> allOptionsComment = []; // Biến lưu trữ dữ liệu
   List<AutoCmp> allOptionsCounter = []; // Biến lưu trữ dữ liệu

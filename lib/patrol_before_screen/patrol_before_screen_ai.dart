@@ -1,6 +1,6 @@
-part of '../test.dart';
+part of '../patrol_before_screen.dart';
 
-extension _CameraScreenAi on _CameraScreenState {
+extension _PatrolBeforeScreenAi on _PatrolBeforeScreenState {
   Future<void> _translateAiSummaryToJp() async {
     final vi = _machineAiSummary?.summaryVi?.trim();
 

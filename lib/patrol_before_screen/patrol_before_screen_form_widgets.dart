@@ -1,6 +1,6 @@
-part of '../test.dart';
+part of '../patrol_before_screen.dart';
 
-extension _CameraScreenFormWidgets on _CameraScreenState {
+extension _PatrolBeforeScreenFormWidgets on _PatrolBeforeScreenState {
   Future<void> _loadInitialDataComment() async {
     try {
       final data = await AutoCmpApi.getAllComment(widget.lang);

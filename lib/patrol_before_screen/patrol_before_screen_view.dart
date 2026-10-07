@@ -1,7 +1,7 @@
-part of '../test.dart';
+part of '../patrol_before_screen.dart';
 
-extension _CameraScreenView on _CameraScreenState {
-  Widget _buildCameraScreen(BuildContext context) {
+extension _PatrolBeforeScreenView on _PatrolBeforeScreenState {
+  Widget _buildPatrolBeforeScreen(BuildContext context) {
     final groupList = getGroupsByPlant();
 
     final facList = <String>{

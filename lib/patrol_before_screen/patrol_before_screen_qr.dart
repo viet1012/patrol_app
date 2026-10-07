@@ -1,6 +1,6 @@
-part of '../test.dart';
+part of '../patrol_before_screen.dart';
 
-extension _CameraScreenQr on _CameraScreenState {
+extension _PatrolBeforeScreenQr on _PatrolBeforeScreenState {
   String _cacheKey2(String first, String second) {
     return '${_norm(first)}|${_norm(second)}';
   }

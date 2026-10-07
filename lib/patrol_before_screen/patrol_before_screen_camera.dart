@@ -1,6 +1,6 @@
-part of '../test.dart';
+part of '../patrol_before_screen.dart';
 
-extension _CameraScreenCamera on _CameraScreenState {
+extension _PatrolBeforeScreenCamera on _PatrolBeforeScreenState {
   Widget _buildCameraSection() {
     return SizedBox(
       width: 340,
