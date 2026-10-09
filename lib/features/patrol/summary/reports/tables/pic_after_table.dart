@@ -58,8 +58,8 @@ class PicAfterTable extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SummaryGridTable(
-      titleLeft: 'AFTER TOTAL',
-      titleCenter: 'Pro action (All)',
+      titleLeft: SummaryGridStyle.groupAfter,
+      titleCenter: SummaryGridStyle.subtitleAfter,
       titleRight: RatePair(
         goodLabel: 'Finished',
         goodRate: fac.finishedRate,

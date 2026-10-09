@@ -1,30 +1,33 @@
-import 'dart:math' as math;
+import 'dart:async';
 
-import 'package:chuphinh/shared/widgets/common_ui_helper.dart';
+import 'package:chuphinh/core/models/auth_me.dart';
+import 'package:chuphinh/core/models/patrol_report_model.dart';
 import 'package:chuphinh/features/patrol/summary/core/patrol_report_table_columns.dart';
+import 'package:chuphinh/features/patrol/summary/core/patrol_report_table_controller.dart';
 import 'package:chuphinh/features/patrol/summary/core/patrol_report_table_query.dart';
-import 'package:chuphinh/features/patrol/summary/core/patrol_report_table_state.dart';
+import 'package:chuphinh/features/patrol/summary/core/patrol_report_table_url.dart';
 import 'package:chuphinh/features/patrol/summary/dialogs/edit_report_dialog.dart';
+import 'package:chuphinh/features/patrol/summary/dialogs/patrol_report_columns_dialog.dart';
 import 'package:chuphinh/features/patrol/summary/dialogs/patrol_images_dialog.dart';
 import 'package:chuphinh/features/patrol/summary/reports/pages/before_after_summary_dialog.dart';
 import 'package:chuphinh/features/patrol/summary/reports/pages/patrol_risk_summary_page.dart';
+import 'package:chuphinh/features/patrol/summary/widgets/filters/patrol_report_active_filters_bar.dart';
 import 'package:chuphinh/features/patrol/summary/widgets/group/patrol_report_group_bar.dart';
 import 'package:chuphinh/features/patrol/summary/widgets/header/patrol_report_table_header.dart';
+import 'package:chuphinh/features/patrol/summary/widgets/layout/patrol_report_desktop_layout.dart';
+import 'package:chuphinh/features/patrol/summary/widgets/layout/patrol_report_layout_parts.dart';
+import 'package:chuphinh/features/patrol/summary/widgets/layout/patrol_report_mobile_layout.dart';
 import 'package:chuphinh/features/patrol/summary/widgets/row/patrol_report_row.dart';
 import 'package:chuphinh/features/patrol/summary/widgets/shared/patrol_report_pagination.dart';
 import 'package:chuphinh/features/patrol/summary/widgets/shared/patrol_report_table_toolbar.dart';
 import 'package:chuphinh/features/patrol/summary/widgets/shared/patrol_report_table_viewport.dart';
-import 'package:dio/dio.dart';
+import 'package:chuphinh/features/patrol/summary/widgets/states/patrol_report_states.dart';
+import 'package:chuphinh/features/patrol/summary/widgets/theme/patrol_report_theme.dart';
+import 'package:chuphinh/shared/widgets/common_ui_helper.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
-
-import 'package:chuphinh/core/api/api_config.dart';
-import 'package:chuphinh/core/api/hse_master_service.dart';
-import 'package:chuphinh/core/api/patrol_report_api.dart';
-import 'package:chuphinh/core/api/patrol_report_download_api.dart';
-import 'package:chuphinh/shared/utils/plant_constants.dart';
-import 'package:chuphinh/core/models/auth_me.dart';
-import 'package:chuphinh/core/models/patrol_report_model.dart';
 
 class PatrolReportTable extends StatefulWidget {
   final String patrolGroup;
@@ -32,12 +35,16 @@ class PatrolReportTable extends StatefulWidget {
   final String accountCode;
   final AuthMe auth;
 
+  /// Query param của URL (bộ lọc khôi phục khi F5); xem PatrolReportTableUrl.
+  final Map<String, List<String>> queryParameters;
+
   const PatrolReportTable({
     super.key,
     required this.patrolGroup,
     required this.plant,
     required this.accountCode,
     required this.auth,
+    this.queryParameters = const {},
   });
 
   @override
@@ -45,292 +52,133 @@ class PatrolReportTable extends StatefulWidget {
 }
 
 class _PatrolReportTableState extends State<PatrolReportTable> {
-  static const _pageSizeOptions = [15, 30, 50, 100];
+  static const _searchDebounce = Duration(milliseconds: 300);
+
+  late final PatrolReportTableController _ctrl = PatrolReportTableController(
+    patrolGroup: widget.patrolGroup,
+    plant: widget.plant,
+    accountCode: widget.accountCode,
+    auth: widget.auth,
+    initialState: PatrolReportTableUrl.decode(
+      widget.queryParameters,
+      defaults: PatrolReportTableController.defaultViewState(),
+      columns: PatrolReportTableColumns.build(),
+      pageSizeOptions: PatrolReportTableController.pageSizeOptions,
+    ),
+  );
+
+  String? _lastUrl;
 
   final ScrollController _horizontalScrollCtrl = ScrollController();
   final ScrollController _verticalScrollCtrl = ScrollController();
   final ScrollController _filterListScrollCtrl = ScrollController();
-  final TextEditingController _searchCtrl = TextEditingController();
-
-  final OverlayPortalController _overlayCtrl = OverlayPortalController();
-  final Map<String, LayerLink> _filterLinks = {};
-
-  Future<List<PatrolReportModel>>? _futureReports;
-  late final List<PatrolReportColumnSpec> _columns =
-      PatrolReportTableColumns.build();
-
-  List<PatrolReportModel> _reports = [];
-
-  late PatrolReportTableViewState _viewState;
-
-  String? _employeeName;
-  String? _patrolUser;
-  int _reportLoadGeneration = 0;
-  int _employeeLoadGeneration = 0;
-  bool _editingReport = false;
-
   final ScrollController _pageScrollCtrl = ScrollController();
   final ScrollController _summaryScrollCtrl = ScrollController();
+  final TextEditingController _searchCtrl = TextEditingController();
+  final FocusNode _searchFocus = FocusNode(debugLabel: 'patrolSearch');
 
-  int? _selectedFy;
+  final OverlayPortalController _overlayCtrl = OverlayPortalController();
+  late final Map<String, LayerLink> _filterLinks = {
+    for (final col in _ctrl.columns) col.label: LayerLink(),
+  };
+
+  Timer? _searchTimer;
+
+  /// Dòng đang hover (dùng chung cho phần pinned và phần cuộn).
+  final ValueNotifier<int?> _hoverRow = ValueNotifier<int?>(null);
+  bool _editingReport = false;
 
   @override
   void initState() {
     super.initState();
-
-    final now = DateTime.now();
-    debugPrint("ACCOUNT CODE = ${widget.accountCode}");
-    _viewState = PatrolReportTableViewState(
-      toDate: now,
-      fromDate: DateTime(now.year, now.month - 1, 1),
-    );
-
-    _reload();
-
-    _loadPatrolUser();
-
-    for (final col in _columns) {
-      _filterLinks[col.label] = LayerLink();
-    }
-
+    _ctrl.reload();
+    _ctrl.loadPatrolUser();
+    _ctrl.loadColumnLayout();
+    _searchCtrl.text = PatrolReportTableUrl.searchText(widget.queryParameters);
     _searchCtrl.addListener(_onSearchChanged);
+    _ctrl.addListener(_syncUrl);
   }
 
-  void _reload() {
-    final generation = ++_reportLoadGeneration;
+  /// Ghi bộ lọc lên URL (thay entry hiện tại, không thêm history) để F5
+  /// giữ nguyên. Search đã debounce trước khi vào controller.
+  void _syncUrl() {
+    if (!kIsWeb || !mounted) return;
 
-    setState(() {
-      _futureReports = _loadReports(generation);
-    });
-  }
-
-  Future<void> _loadPatrolUser() async {
-    final code = widget.accountCode.trim();
-
-    if (code.isEmpty) return;
-    final generation = ++_employeeLoadGeneration;
-
-    try {
-      final name = await HseMasterService.fetchEmployeeName(code);
-
-      if (!mounted || generation != _employeeLoadGeneration) return;
-
-      final patrolUser = "${widget.accountCode}_$name";
-
-      setState(() {
-        _employeeName = name;
-        _patrolUser = patrolUser;
-      });
-
-      debugPrint("PATROL USER = $patrolUser");
-    } catch (e) {
-      debugPrint("LOAD USER ERROR: $e");
-    }
-  }
-
-  Future<List<PatrolReportModel>> _loadReports(int generation) async {
-    final data = await PatrolReportApi.fetchReports(
-      type: widget.patrolGroup,
+    final view = _ctrl.viewState;
+    final typed = _searchCtrl.text.trim();
+    final uri = PatrolReportTableUrl.encode(
+      group: widget.patrolGroup,
       plant: widget.plant,
+      state: view,
+      defaults: PatrolReportTableController.defaultViewState(),
+      // Giữ hoa/thường như người dùng gõ nếu khớp query đang áp dụng.
+      searchText: typed.toLowerCase() == view.searchQuery
+          ? typed
+          : view.searchQuery,
     );
 
-    if (!mounted || generation != _reportLoadGeneration) {
-      return data;
-    }
-
-    _reports = List<PatrolReportModel>.from(data);
-    return _reports;
+    final url = uri.toString();
+    if (url == _lastUrl) return;
+    _lastUrl = url;
+    SystemNavigator.routeInformationUpdated(uri: uri, replace: true);
   }
 
   @override
   void dispose() {
-    _reportLoadGeneration++;
-    _employeeLoadGeneration++;
+    _searchTimer?.cancel();
+    _ctrl.dispose();
     _pageScrollCtrl.dispose();
     _summaryScrollCtrl.dispose();
     _horizontalScrollCtrl.dispose();
     _verticalScrollCtrl.dispose();
     _filterListScrollCtrl.dispose();
     _searchCtrl.dispose();
+    _searchFocus.dispose();
+    _hoverRow.dispose();
     super.dispose();
   }
 
   void _onSearchChanged() {
-    setState(() {
-      _viewState = _viewState.copyWith(
-        searchQuery: _searchCtrl.text.trim().toLowerCase(),
-        page: 0,
-      );
+    _searchTimer?.cancel();
+    _searchTimer = Timer(_searchDebounce, () {
+      if (!mounted) return;
+      if (_ctrl.setSearch(_searchCtrl.text)) _jumpVerticalToTop();
     });
-
-    _jumpVerticalToTop();
-  }
-
-  List<PatrolReportModel> get _filteredReports {
-    final result = PatrolReportTableQuery.applyFilters(
-      source: _reports,
-      query: _viewState.searchQuery,
-      fromDate: _viewState.fromDate,
-      toDate: _viewState.toDate,
-      filterValues: _viewState.filterValues,
-      columns: _columns,
-      computedValueGetter: _computedFilterValue,
-    );
-
-    result.sort((a, b) {
-      final aLate = _isLate(a);
-      final bLate = _isLate(b);
-
-      if (aLate && !bLate) return -1;
-      if (!aLate && bLate) return 1;
-
-      return b.stt.compareTo(a.stt);
-    });
-
-    return result;
-  }
-
-  bool _isLate(PatrolReportModel report) {
-    final status = (report.atStatus ?? 'Doing').trim();
-
-    if (status != 'Doing' && status != 'Redo') {
-      return false;
-    }
-
-    final due = report.dueDateUpdatedAt ?? report.dueDate;
-
-    if (due == null) {
-      return false;
-    }
-
-    final today = DateTime.now();
-
-    final current = DateTime(today.year, today.month, today.day);
-
-    final target = DateTime(due.year, due.month, due.day);
-
-    return target.isBefore(current);
-  }
-
-  int _totalPagesFor(int itemCount) {
-    final total = (itemCount / _viewState.rowsPerPage).ceil();
-    return total <= 0 ? 1 : total;
-  }
-
-  List<PatrolReportModel> _pageItems(
-    List<PatrolReportModel> filtered,
-    int safePage,
-  ) {
-    if (filtered.isEmpty) return const [];
-
-    final start = safePage * _viewState.rowsPerPage;
-    final end = (start + _viewState.rowsPerPage).clamp(0, filtered.length);
-
-    return filtered.sublist(start, end);
-  }
-
-  Map<String, int> get _groupCaseCounts {
-    final base = PatrolReportTableQuery.applyFilters(
-      source: _reports,
-      query: _viewState.searchQuery,
-      fromDate: _viewState.fromDate,
-      toDate: _viewState.toDate,
-      filterValues: _viewState.filterValues,
-      columns: _columns,
-      excludeColumn: 'Group',
-      computedValueGetter: _computedFilterValue,
-    );
-
-    final counts = <String, int>{};
-
-    for (final row in base) {
-      final group = row.grp.trim();
-      if (group.isEmpty) continue;
-      counts[group] = (counts[group] ?? 0) + 1;
-    }
-
-    final sortedKeys = counts.keys.toList()..sort();
-
-    return {for (final key in sortedKeys) key: counts[key]!};
-  }
-
-  String? get _selectedGroup {
-    final values = _viewState.filterValues['Group'];
-    if (values == null || values.isEmpty) return null;
-    return values.first;
-  }
-
-  bool get isHse {
-    final roles = (widget.auth.role ?? '')
-        .split(',')
-        .map((e) => e.trim().toUpperCase())
-        .where((e) => e.isNotEmpty)
-        .toSet();
-
-    return roles.contains('HSE');
-  }
-
-  void _onTapGroup(String group) {
-    final nextFilters = Map<String, Set<String>>.from(_viewState.filterValues);
-    final current = _selectedGroup;
-
-    setState(() {
-      if (current == group) {
-        nextFilters.remove('Group');
-      } else {
-        nextFilters['Group'] = {group};
-      }
-
-      _viewState = _viewState.copyWith(filterValues: nextFilters, page: 0);
-    });
-
-    _jumpVerticalToTop();
   }
 
   void _jumpVerticalToTop() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_verticalScrollCtrl.hasClients) {
-        _verticalScrollCtrl.jumpTo(0);
-      }
+      if (_verticalScrollCtrl.hasClients) _verticalScrollCtrl.jumpTo(0);
     });
   }
 
   void _jumpBothScrollsToStart() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_verticalScrollCtrl.hasClients) {
-        _verticalScrollCtrl.jumpTo(0);
-      }
-      if (_horizontalScrollCtrl.hasClients) {
-        _horizontalScrollCtrl.jumpTo(0);
-      }
+      if (_verticalScrollCtrl.hasClients) _verticalScrollCtrl.jumpTo(0);
+      if (_horizontalScrollCtrl.hasClients) _horizontalScrollCtrl.jumpTo(0);
     });
   }
 
-  Future<void> _downloadExcel() async {
-    if (_viewState.downloading) return;
+  void _selectFac(String? fac) {
+    _ctrl.selectFac(fac);
+    _jumpVerticalToTop();
+  }
 
-    setState(() {
-      _viewState = _viewState.copyWith(downloading: true);
-    });
+  void _selectGroup(String? group, {String? fac}) {
+    _ctrl.selectGroup(group, fac: fac);
+    _jumpVerticalToTop();
+  }
+
+  void _pickFacGroup(String? fac, String? group) {
+    _ctrl.selectFacGroup(fac, group);
+    _jumpVerticalToTop();
+  }
+
+  Future<void> _downloadExcel() async {
+    if (_ctrl.viewState.downloading) return;
 
     try {
-      final downloader = PatrolReportDownloadService(
-        dio: Dio(),
-        baseUrl: ApiConfig.baseUrl,
-      );
-
-      await downloader.downloadExportExcel(
-        query: PatrolReportTableQuery.buildExportQuery(
-          filterValues: _viewState.filterValues,
-          columns: _columns,
-          fromDate: _viewState.fromDate,
-          toDate: _viewState.toDate,
-          patrolGroup: widget.patrolGroup,
-          plant: widget.plant,
-        ),
-        fileName: 'patrol_reports.xlsx',
-      );
-
+      await _ctrl.downloadExcel();
       if (!mounted) return;
       CommonUI.showSuccessSnack(
         context,
@@ -343,37 +191,11 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
         title: 'Warning',
         message: 'Download failed: $e',
       );
-    } finally {
-      if (!mounted) return;
-      setState(() {
-        _viewState = _viewState.copyWith(downloading: false);
-      });
     }
-  }
-
-  String? _computedFilterValue(PatrolReportModel row, String columnLabel) {
-    if (columnLabel == 'Due Status') {
-      return _isLate(row) ? 'Late' : 'Still Time';
-    }
-
-    return null;
   }
 
   void _applySummaryFilter(String group, String division, String plant) {
-    final nextFilters = Map<String, Set<String>>.from(_viewState.filterValues)
-      ..['Group'] = {group}
-      ..['Division'] = {division};
-
-    // SPC: cùng tên division có thể ở nhiều Fac -> lọc thêm theo Plant của dòng.
-    final byPlant = isAllPlant(widget.plant) && plant.isNotEmpty;
-    if (byPlant) {
-      nextFilters['Plant'] = {plant};
-    }
-
-    setState(() {
-      _viewState = _viewState.copyWith(filterValues: nextFilters, page: 0);
-    });
-
+    final byPlant = _ctrl.applySummaryFilter(group, division, plant);
     _jumpVerticalToTop();
 
     CommonUI.showSuccessSnack(
@@ -385,32 +207,75 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
   }
 
   void _applySummaryDates(DateTime from, DateTime to) {
-    setState(() {
-      _viewState = _viewState.copyWith(fromDate: from, toDate: to, page: 0);
-    });
+    _ctrl.setDateRange(from, to);
+    _jumpVerticalToTop();
   }
 
+  /// Clear (toolbar), "Clear all" (thanh chip), "Clear filters" (empty state):
+  /// chỉ xoá search + filter, GIỮ khoảng ngày (reset ngày có nút riêng).
   void _clearAll() {
-    setState(() {
-      _searchCtrl.clear();
-      _viewState = PatrolReportTableViewState(
-        fromDate: _viewState.fromDate,
-        toDate: _viewState.toDate,
-      );
-    });
-
+    _searchCtrl.clear();
+    _searchTimer?.cancel();
+    _ctrl.clearAll();
     _overlayCtrl.hide();
     _jumpBothScrollsToStart();
   }
 
-  Future<void> _openBeforeAfterSummary() async {
-    final now = DateTime.now();
-    final from = _viewState.fromDate ?? DateTime(now.year, now.month, 1);
-    final to = _viewState.toDate ?? DateTime(now.year, now.month, now.day);
+  void _resetDateRange() {
+    _ctrl.resetDateRange();
+    _jumpVerticalToTop();
+  }
 
-    setState(() {
-      _viewState = _viewState.copyWith(fromDate: from, toDate: to);
-    });
+  void _clearSearch() {
+    _searchCtrl.clear();
+    _searchTimer
+        ?.cancel(); // clear() đã kích hoạt debounce; huỷ để áp dụng ngay.
+    if (_ctrl.setSearch('')) _jumpVerticalToTop();
+  }
+
+  void _focusSearch() {
+    _searchFocus.requestFocus();
+    _searchCtrl.selection = TextSelection(
+      baseOffset: 0,
+      extentOffset: _searchCtrl.text.length,
+    );
+  }
+
+  /// Esc: đóng popup filter nếu đang mở, không thì xoá search.
+  void _onEscape() {
+    if (_ctrl.viewState.activeFilterColumn != null) {
+      _closeFilterPopup();
+    } else if (_searchCtrl.text.isNotEmpty) {
+      _clearSearch();
+    }
+  }
+
+  List<PatrolReportActiveFilter> _activeFilters() {
+    final view = _ctrl.viewState;
+    return [
+      if (view.searchQuery.isNotEmpty)
+        PatrolReportActiveFilter(
+          label: 'Search',
+          values: ['"${_searchCtrl.text.trim()}"'],
+          icon: Icons.search_rounded,
+          onRemove: _clearSearch,
+        ),
+      for (final entry in view.filterValues.entries)
+        if (entry.value.isNotEmpty)
+          PatrolReportActiveFilter(
+            label: entry.key,
+            values: entry.value.toList(),
+            onRemove: () {
+              _ctrl.clearColumnFilter(entry.key);
+              _jumpVerticalToTop();
+            },
+          ),
+      // Khoảng ngày không thành chip: đã hiện ở ô From/To (+ nút reset).
+    ];
+  }
+
+  Future<void> _openBeforeAfterSummary() async {
+    final (from, to) = _ctrl.ensureDateRange();
 
     await BeforeAfterSummaryDialog.show(
       context,
@@ -422,75 +287,50 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
   }
 
   void _openFilterPopup(String columnLabel) {
-    setState(() {
-      _viewState = _viewState.copyWith(
-        activeFilterColumn: columnLabel,
-        filterSearch: '',
-      );
-    });
+    _ctrl.openFilter(columnLabel);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_filterListScrollCtrl.hasClients) {
-        _filterListScrollCtrl.jumpTo(0);
-      }
+      if (_filterListScrollCtrl.hasClients) _filterListScrollCtrl.jumpTo(0);
     });
 
     _overlayCtrl.show();
   }
 
   void _closeFilterPopup() {
-    setState(() {
-      _viewState = _viewState.copyWith(clearActiveFilterColumn: true);
-    });
+    _ctrl.closeFilter();
     _overlayCtrl.hide();
   }
 
-  void _toggleFilterValue({
-    required String column,
-    required String value,
-    required bool checked,
-  }) {
-    final nextFilters = <String, Set<String>>{
-      for (final e in _viewState.filterValues.entries) e.key: {...e.value},
-    };
+  Future<void> _pickTableDate({required bool isFrom}) async {
+    final now = DateTime.now();
+    final view = _ctrl.viewState;
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: isFrom ? (view.fromDate ?? now) : (view.toDate ?? now),
+      firstDate: DateTime(2020, 1, 1),
+      lastDate: DateTime(2100, 12, 31),
+    );
+    if (picked == null || !mounted) return;
 
-    final selected = nextFilters.putIfAbsent(column, () => <String>{});
+    final normalized = DateTime(picked.year, picked.month, picked.day);
+    final newFrom = isFrom ? normalized : _ctrl.viewState.fromDate;
+    final newTo = isFrom ? _ctrl.viewState.toDate : normalized;
 
-    if (checked) {
-      selected.add(value);
-    } else {
-      selected.remove(value);
-      if (selected.isEmpty) {
-        nextFilters.remove(column);
-      }
+    if (newFrom != null && newTo != null && newFrom.isAfter(newTo)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('From date must be <= To date')),
+      );
+      return;
     }
 
-    setState(() {
-      _viewState = _viewState.copyWith(filterValues: nextFilters, page: 0);
-    });
-
-    _jumpVerticalToTop();
-  }
-
-  void _clearColumnFilter(String column) {
-    final nextFilters = Map<String, Set<String>>.from(_viewState.filterValues)
-      ..remove(column);
-
-    setState(() {
-      _viewState = _viewState.copyWith(filterValues: nextFilters, page: 0);
-    });
-
+    _ctrl.setDateRange(newFrom, newTo);
     _jumpVerticalToTop();
   }
 
   Future<void> _editReport(PatrolReportModel report) async {
     if (_editingReport) return;
 
-    final canEdit =
-        report.patrol_user?.trim() == _patrolUser?.trim() ||
-        report.atAssign?.trim() == _employeeName?.trim();
-
-    if (!canEdit && !isHse) {
+    if (!_ctrl.canEdit(report)) {
       CommonUI.showWarning(
         context: context,
         title: 'Permission denied',
@@ -501,14 +341,10 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
       return;
     }
 
-    setState(() {
-      _viewState = _viewState.copyWith(selectedReportId: report.id);
-    });
-
+    _ctrl.selectReport(report.id);
     _editingReport = true;
 
     PatrolReportModel? result;
-
     try {
       result = await EditReportDialog.show(
         context,
@@ -520,466 +356,233 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
     }
 
     if (!mounted || result == null) return;
-
-    final updatedReport = result;
-
-    setState(() {
-      final index = _reports.indexWhere((e) => e.id == updatedReport.id);
-
-      if (index != -1) {
-        _reports[index] = updatedReport;
-      }
-    });
+    _ctrl.replaceReport(result);
   }
 
   @override
   Widget build(BuildContext context) {
-    const pageBg = Color(0xFF0F2027);
-
     return Scaffold(
-      backgroundColor: pageBg,
+      backgroundColor: PatrolReportTokens.pageBg,
       body: SafeArea(
-        child: FutureBuilder<List<PatrolReportModel>>(
-          future: _futureReports!,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            }
-
-            if (snapshot.hasError) {
-              return CommonUI.errorPage(
-                message: snapshot.error.toString(),
-                context: context,
-              );
-            }
-
-            if (_reports.isEmpty) {
-              return CommonUI.emptyState(
-                context: context,
-                title: 'No reports',
-                message: 'There are no patrol reports yet.',
-                icon: Icons.assignment_outlined,
-              );
-            }
-
-            final filtered = _filteredReports;
-            final totalPages = _totalPagesFor(filtered.length);
-            final safePage = _viewState.page.clamp(0, totalPages - 1);
-            final currentItems = _pageItems(filtered, safePage);
-            final tableWidth = _columns.fold<double>(
-              0,
-              (sum, column) => sum + column.width,
-            );
-
-            return LayoutBuilder(
-              builder: (context, constraints) {
-                final isMobile = constraints.maxWidth < 700;
-
-                if (!isMobile) {
-                  return Column(
-                    children: [
-                      Expanded(
-                        child: ScrollbarTheme(
-                          data: ScrollbarThemeData(
-                            thumbColor: WidgetStateProperty.all(
-                              Colors.black.withOpacity(0.8),
-                            ),
-
-                            trackColor: WidgetStateProperty.all(Colors.grey),
-
-                            trackBorderColor: WidgetStateProperty.all(
-                              Colors.transparent,
-                            ),
-
-                            radius: const Radius.circular(999),
-
-                            thickness: WidgetStateProperty.all(10),
-
-                            thumbVisibility: WidgetStateProperty.all(true),
-
-                            trackVisibility: WidgetStateProperty.all(true),
-                          ),
-
-                          child: Column(
-                            children: [
-                              _buildSummaryToggle(),
-                              AnimatedSwitcher(
-                                duration: const Duration(milliseconds: 250),
-                                switchInCurve: Curves.easeOut,
-                                switchOutCurve: Curves.easeIn,
-                                child: _viewState.showSummary
-                                    ? Padding(
-                                        key: const ValueKey('summary'),
-                                        padding: const EdgeInsets.only(
-                                          bottom: 8,
-                                        ),
-                                        // Giới hạn chiều cao: SPC nhiều division làm summary quá cao.
-                                        child: ConstrainedBox(
-                                          constraints: BoxConstraints(
-                                            maxHeight:
-                                                constraints.maxHeight * 0.45,
-                                          ),
-                                          child: Scrollbar(
-                                            controller: _summaryScrollCtrl,
-                                            child: SingleChildScrollView(
-                                              controller: _summaryScrollCtrl,
-                                              child: PatrolRiskSummaryPage(
-                                                onSelect: _applySummaryFilter,
-                                                onDateChanged:
-                                                    _applySummaryDates,
-                                                fromD: _viewState.fromDate,
-                                                toD: _viewState.toDate,
-                                                plant: widget.plant,
-                                                patrolGroup: widget.patrolGroup,
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                      )
-                                    : const SizedBox(
-                                        key: ValueKey('summary_empty'),
-                                      ),
-                              ),
-
-                              PatrolReportTableToolbar(
-                                searchController: _searchCtrl,
-                                total: _reports.length,
-                                shown: filtered.length,
-                                canClear:
-                                    _viewState.searchQuery.isNotEmpty ||
-                                    _viewState.filterValues.isNotEmpty,
-                                downloading: _viewState.downloading,
-                                onBack: () => context.go('/home'),
-                                onReload: _reload,
-                                onDownload: _downloadExcel,
-                                onClear: _clearAll,
-                              ),
-
-                              if (_viewState.downloading)
-                                CommonUI.exportLoadingBanner(
-                                  accentColor: Colors.amber,
-                                  title: 'Exporting Excel',
-                                  subtitle:
-                                      'Large dataset detected, please waitâ€¦',
-                                ),
-
-                              Expanded(
-                                child: PatrolReportTableViewport(
-                                  horizontalController: _horizontalScrollCtrl,
-                                  verticalController: _verticalScrollCtrl,
-                                  totalWidth: tableWidth,
-                                  header: _buildHeader(),
-                                  itemCount: currentItems.length,
-                                  rowBuilder: (_, index) =>
-                                      _buildRow(currentItems[index], index),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      PatrolReportPagination(
-                        page: safePage,
-                        rowsPerPage: _viewState.rowsPerPage,
-                        totalItems: filtered.length,
-                        totalPages: totalPages,
-                        pageSizeOptions: _pageSizeOptions,
-                        onPageChanged: (page) {
-                          setState(() {
-                            _viewState = _viewState.copyWith(page: page);
-                          });
-                        },
-                        onRowsPerPageChanged: (rows) {
-                          setState(() {
-                            _viewState = _viewState.copyWith(
-                              rowsPerPage: rows,
-                              page: 0,
-                            );
-                          });
-                        },
-                      ),
-                    ],
-                  );
-                }
-
-                final mobileToolbar = PatrolReportTableToolbar(
-                  searchController: _searchCtrl,
-                  total: _reports.length,
-                  shown: filtered.length,
-                  canClear:
-                      _viewState.searchQuery.isNotEmpty ||
-                      _viewState.filterValues.isNotEmpty,
-                  downloading: _viewState.downloading,
-                  onBack: () => context.go('/home'),
-                  onReload: _reload,
-                  onDownload: _downloadExcel,
-                  onClear: _clearAll,
-                  compact: true,
-                );
-
-                final mobileTable = PatrolReportTableViewport(
-                  horizontalController: _horizontalScrollCtrl,
-                  verticalController: _verticalScrollCtrl,
-                  totalWidth: tableWidth,
-                  header: _buildHeader(),
-                  itemCount: currentItems.length,
-                  rowBuilder: (_, index) => _buildRow(
-                    currentItems[index],
-                    index,
-                    rowHeight: PatrolReportRow.mobileRowHeight,
-                  ),
-                );
-
-                final exportBanner = _viewState.downloading
-                    ? CommonUI.exportLoadingBanner(
-                        accentColor: Colors.amber,
-                        title: 'Exporting Excel',
-                        subtitle: 'Large dataset detected, please waitâ€¦',
-                      )
-                    : null;
-
-                return Column(
-                  children: [
-                    Expanded(
-                      child: ScrollbarTheme(
-                        data: ScrollbarThemeData(
-                          thumbColor: WidgetStateProperty.all(
-                            Colors.black.withOpacity(0.8),
-                          ),
-                          trackColor: WidgetStateProperty.all(
-                            Colors.grey.withOpacity(0.8),
-                          ),
-                          trackBorderColor: WidgetStateProperty.all(
-                            Colors.transparent,
-                          ),
-                          radius: const Radius.circular(999),
-                          thickness: WidgetStateProperty.all(10),
-                          thumbVisibility: WidgetStateProperty.all(true),
-                          trackVisibility: WidgetStateProperty.all(true),
-                        ),
-
-                        child: _viewState.showSummary
-                            ? Scrollbar(
-                                controller: _pageScrollCtrl,
-                                thumbVisibility: true,
-                                trackVisibility: true,
-                                thickness: 10,
-                                radius: const Radius.circular(999),
-                                child: SingleChildScrollView(
-                                  controller: _pageScrollCtrl,
-                                  padding: const EdgeInsets.only(bottom: 8),
-                                  child: Column(
-                                    children: [
-                                      _buildSummaryToggle(),
-                                      Padding(
-                                        padding: const EdgeInsets.only(
-                                          bottom: 8,
-                                        ),
-                                        child: PatrolRiskSummaryPage(
-                                          onSelect: _applySummaryFilter,
-                                          onDateChanged: _applySummaryDates,
-                                          fromD: _viewState.fromDate,
-                                          toD: _viewState.toDate,
-                                          plant: widget.plant,
-                                          patrolGroup: widget.patrolGroup,
-                                        ),
-                                      ),
-                                      mobileToolbar,
-                                      if (exportBanner != null) exportBanner,
-                                      SizedBox(
-                                        height: math.max(
-                                          constraints.maxHeight * 0.62,
-                                          320,
-                                        ),
-                                        child: mobileTable,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              )
-                            // Summary đóng: bảng lấp hết phần còn lại.
-                            : Column(
-                                children: [
-                                  _buildSummaryToggle(),
-                                  mobileToolbar,
-                                  if (exportBanner != null) exportBanner,
-                                  Expanded(child: mobileTable),
-                                ],
-                              ),
-                      ),
-                    ),
-
-                    PatrolReportPagination(
-                      page: safePage,
-                      rowsPerPage: _viewState.rowsPerPage,
-                      totalItems: filtered.length,
-                      totalPages: totalPages,
-                      pageSizeOptions: _pageSizeOptions,
-                      onPageChanged: (page) {
-                        setState(() {
-                          _viewState = _viewState.copyWith(page: page);
-                        });
-                      },
-                      onRowsPerPageChanged: (rows) {
-                        setState(() {
-                          _viewState = _viewState.copyWith(
-                            rowsPerPage: rows,
-                            page: 0,
-                          );
-                        });
-                      },
-                      compact: true,
-                      grandTotal: _reports.length,
-                    ),
-                  ],
-                );
-              },
-            );
+        child: CallbackShortcuts(
+          bindings: {
+            const SingleActivator(LogicalKeyboardKey.keyF, control: true):
+                _focusSearch,
+            const SingleActivator(LogicalKeyboardKey.keyF, meta: true):
+                _focusSearch,
+            const SingleActivator(LogicalKeyboardKey.escape): _onEscape,
           },
+          child: Focus(
+            autofocus: true,
+            child: ListenableBuilder(
+              listenable: _ctrl,
+              builder: (context, _) => _buildBody(),
+            ),
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildSummaryToggle() {
+  Widget _buildBody() {
+    final error = _ctrl.loadError;
+    if (error != null) {
+      return PatrolReportErrorView(
+        message: error.toString(),
+        onRetry: _ctrl.reload,
+        onBack: () => context.go('/home'),
+      );
+    }
+
+    // Lần tải đầu: skeleton. Reload sau đó giữ dữ liệu cũ + thanh tiến trình.
+    if (!_ctrl.hasLoaded) return const PatrolReportSkeleton();
+
+    if (_ctrl.reports.isEmpty) {
+      return CommonUI.emptyState(
+        context: context,
+        title: 'No reports',
+        message: 'There are no patrol reports yet.',
+        icon: Icons.assignment_outlined,
+      );
+    }
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final parts = _buildParts();
+
+        if (constraints.maxWidth < PatrolReportTokens.mobileBreakpoint) {
+          return PatrolReportMobileLayout(
+            parts: parts,
+            maxHeight: constraints.maxHeight,
+            pageScrollController: _pageScrollCtrl,
+          );
+        }
+
+        return PatrolReportDesktopLayout(
+          parts: parts,
+          maxHeight: constraints.maxHeight,
+          summaryScrollController: _summaryScrollCtrl,
+        );
+      },
+    );
+  }
+
+  PatrolReportLayoutParts _buildParts() {
+    final view = _ctrl.viewState;
+    final filtered = _ctrl.filteredReports;
+    final totalPages = _ctrl.totalPagesFor(filtered.length);
+    final safePage = view.page.clamp(0, totalPages - 1);
+    final currentItems = _ctrl.pageItems(filtered, safePage);
+
+    return PatrolReportLayoutParts(
+      showSummary: view.showSummary,
+      groupBar: _buildGroupBar(),
+      summaryPage: PatrolRiskSummaryPage(
+        onSelect: _applySummaryFilter,
+        onDateChanged: _applySummaryDates,
+        fromD: view.fromDate,
+        toD: view.toDate,
+        plant: widget.plant,
+        patrolGroup: widget.patrolGroup,
+      ),
+      exportBanner: view.downloading
+          ? CommonUI.exportLoadingBanner(
+              accentColor: Colors.amber,
+              title: 'Exporting Excel',
+              subtitle: 'Large dataset detected, please wait…',
+            )
+          : null,
+      reloadIndicator: _ctrl.isLoading
+          ? const LinearProgressIndicator(
+              minHeight: 2,
+              color: PatrolReportTokens.accent,
+              backgroundColor: Colors.transparent,
+            )
+          : null,
+      onRefresh: _ctrl.reload,
+      activeFilters: ({required compact}) => PatrolReportActiveFiltersBar(
+        filters: _activeFilters(),
+        onClearAll: _clearAll,
+        compact: compact,
+      ),
+      toolbar: ({required compact}) => PatrolReportTableToolbar(
+        searchController: _searchCtrl,
+        searchFocusNode: _searchFocus,
+        total: _ctrl.reports.length,
+        shown: filtered.length,
+        canClear: _ctrl.canClear,
+        downloading: view.downloading,
+        onBack: () => context.go('/home'),
+        onReload: _ctrl.reload,
+        onDownload: _downloadExcel,
+        onClear: _clearAll,
+        onColumns: () => PatrolReportColumnsDialog.show(context, _ctrl),
+        compact: compact,
+      ),
+      pagination: ({required compact}) => PatrolReportPagination(
+        page: safePage,
+        rowsPerPage: view.rowsPerPage,
+        totalItems: filtered.length,
+        totalPages: totalPages,
+        pageSizeOptions: PatrolReportTableController.pageSizeOptions,
+        onPageChanged: _ctrl.setPage,
+        onRowsPerPageChanged: _ctrl.setRowsPerPage,
+        compact: compact,
+        grandTotal: compact ? _ctrl.reports.length : null,
+      ),
+      table: ({required compact}) {
+        final (pinned, scrolling) = _ctrl.visibleColumns(compact: compact);
+        return PatrolReportTableViewport(
+          horizontalController: _horizontalScrollCtrl,
+          verticalController: _verticalScrollCtrl,
+          pinnedWidth: _sumWidth(pinned),
+          scrollWidth: _sumWidth(scrolling),
+          pinnedHeader: pinned.isEmpty
+              ? null
+              : _buildHeader(pinned, compact: compact, hostsOverlay: false),
+          header: _buildHeader(scrolling, compact: compact, hostsOverlay: true),
+          itemCount: currentItems.length,
+          pinnedRowBuilder: pinned.isEmpty
+              ? null
+              : (_, index) => _buildRow(
+                  currentItems[index],
+                  index,
+                  columns: pinned,
+                  compact: compact,
+                  isFirstPart: true,
+                ),
+          rowBuilder: (_, index) => _buildRow(
+            currentItems[index],
+            index,
+            columns: scrolling,
+            compact: compact,
+            isFirstPart: pinned.isEmpty,
+          ),
+          emptyPlaceholder: PatrolReportNoMatchView(onClearFilters: _clearAll),
+        );
+      },
+    );
+  }
+
+  static double _sumWidth(List<PatrolReportColumnSpec> cols) =>
+      cols.fold<double>(0, (sum, c) => sum + c.width);
+
+  Widget _buildGroupBar() {
+    final view = _ctrl.viewState;
     return PatrolReportGroupBar(
-      groupCounts: _groupCaseCounts,
-      selectedGroup: _selectedGroup,
-      fromDate: _viewState.fromDate,
-      toDate: _viewState.toDate,
-      selectedFy: _selectedFy,
-      fiscalYears: _fyList,
-      showSummary: _viewState.showSummary,
-      showGroups: _viewState.activeFilterColumn == null,
-      onGroupSelected: _onTapGroup,
+      facGroups: _ctrl.facGroups,
+      selectedFac: _ctrl.selectedFac,
+      selectedGroup: _ctrl.selectedGroup,
+      fromDate: view.fromDate,
+      toDate: view.toDate,
+      selectedFy: _ctrl.selectedFy,
+      fiscalYears: _ctrl.fyList,
+      showSummary: view.showSummary,
+      showGroups: view.activeFilterColumn == null,
+      onSelectFac: _selectFac,
+      onSelectGroup: _selectGroup,
+      onPickFacGroup: _pickFacGroup,
+      dateRangeChanged: !_ctrl.isDefaultDateRange,
+      onResetDateRange: _resetDateRange,
       onPickFromDate: () => _pickTableDate(isFrom: true),
       onPickToDate: () => _pickTableDate(isFrom: false),
-      onFySelected: (fy) {
-        setState(() {
-          _selectedFy = fy;
-          _viewState = _viewState.copyWith(
-            fromDate: _fyFromDate(fy),
-            toDate: _fyToDate(fy),
-          );
-        });
-      },
-      onToggleSummary: () {
-        setState(() {
-          _viewState = _viewState.copyWith(
-            showSummary: !_viewState.showSummary,
-          );
-        });
-      },
+      onFySelected: _ctrl.selectFy,
+      onToggleSummary: _ctrl.toggleSummary,
       onOpenReport: _openBeforeAfterSummary,
     );
   }
 
-  List<int> get _fyList {
-    final now = DateTime.now();
-    final currentFy = now.month >= 4 ? now.year % 100 : (now.year - 1) % 100;
-    const startFy = 25;
-    return List.generate(currentFy - startFy + 1, (i) => startFy + i);
-  }
-
-  DateTime _fyFromDate(int fy) => DateTime(2000 + fy, 4, 1);
-
-  DateTime _fyToDate(int fy) => DateTime(2000 + fy + 1, 3, 31);
-
-  Future<void> _pickTableDate({required bool isFrom}) async {
-    final now = DateTime.now();
-    final initial = isFrom
-        ? (_viewState.fromDate ?? now)
-        : (_viewState.toDate ?? now);
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: initial,
-      firstDate: DateTime(2020, 1, 1),
-      lastDate: DateTime(2100, 12, 31),
-    );
-    if (picked == null || !mounted) return;
-
-    DateTime? newFrom = _viewState.fromDate;
-    DateTime? newTo = _viewState.toDate;
-    final normalized = DateTime(picked.year, picked.month, picked.day);
-    if (isFrom) {
-      newFrom = normalized;
-    } else {
-      newTo = normalized;
-    }
-    if (newFrom != null && newTo != null && newFrom.isAfter(newTo)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('From date must be <= To date')),
-      );
-      return;
-    }
-    setState(() {
-      _viewState = _viewState.copyWith(
-        fromDate: newFrom,
-        toDate: newTo,
-        page: 0,
-      );
-    });
-    _jumpVerticalToTop();
-  }
-
-  Widget _buildHeader() {
-    final column = _viewState.activeFilterColumn;
-    var popupValues = const <String>[];
-    if (column != null) {
-      final base = PatrolReportTableQuery.applyFilters(
-        source: _reports,
-        query: _viewState.searchQuery,
-        fromDate: _viewState.fromDate,
-        toDate: _viewState.toDate,
-        filterValues: _viewState.filterValues,
-        columns: _columns,
-        excludeColumn: column,
-      );
-      final valuesInBase = PatrolReportTableQuery.distinctColumnValues(
-        columnLabel: column,
-        source: base,
-        columns: _columns,
-        computedValueGetter: _computedFilterValue,
-      );
-      final selected = _viewState.filterValues[column] ?? <String>{};
-      final merged = <String>[
-        ...selected.where((value) => !valuesInBase.contains(value)),
-        ...valuesInBase,
-      ];
-      final search = _viewState.filterSearch.toLowerCase();
-      popupValues = merged
-          .where((value) => value.toLowerCase().contains(search))
-          .toList();
-    }
-
+  Widget _buildHeader(
+    List<PatrolReportColumnSpec> columns, {
+    required bool compact,
+    required bool hostsOverlay,
+  }) {
     return PatrolReportTableHeader(
-      columns: _columns,
+      columns: columns,
       filterLinks: _filterLinks,
-      filterValues: _viewState.filterValues,
-      activeFilterColumn: column,
-      popupValues: popupValues,
+      filterValues: _ctrl.viewState.filterValues,
+      activeFilterColumn: _ctrl.viewState.activeFilterColumn,
+      popupValues: _ctrl.popupValues,
       popupScrollController: _filterListScrollCtrl,
-      overlayController: _overlayCtrl,
+      overlayController: hostsOverlay ? _overlayCtrl : null,
+      // Mobile: không resize.
+      onResize: compact ? null : _ctrl.resizeColumn,
+      onResizeEnd: compact ? null : _ctrl.commitColumnResize,
+      onResetWidth: compact ? null : _ctrl.resetColumnWidth,
       onOpenFilter: _openFilterPopup,
       onCloseFilter: _closeFilterPopup,
-      onFilterSearchChanged: (value) {
-        setState(() {
-          _viewState = _viewState.copyWith(filterSearch: value);
-        });
-      },
+      onFilterSearchChanged: _ctrl.setFilterSearch,
       onFilterValueChanged: (value, checked) {
-        final activeColumn = _viewState.activeFilterColumn;
-        if (activeColumn != null) {
-          _toggleFilterValue(
-            column: activeColumn,
-            value: value,
-            checked: checked,
-          );
-        }
+        final column = _ctrl.viewState.activeFilterColumn;
+        if (column == null) return;
+        _ctrl.toggleFilterValue(column: column, value: value, checked: checked);
+        _jumpVerticalToTop();
       },
       onClearFilter: () {
-        final activeColumn = _viewState.activeFilterColumn;
-        if (activeColumn != null) _clearColumnFilter(activeColumn);
+        final column = _ctrl.viewState.activeFilterColumn;
+        if (column == null) return;
+        _ctrl.clearColumnFilter(column);
+        _jumpVerticalToTop();
       },
     );
   }
@@ -987,33 +590,36 @@ class _PatrolReportTableState extends State<PatrolReportTable> {
   Widget _buildRow(
     PatrolReportModel report,
     int pageIndex, {
-    double rowHeight = PatrolReportRow.defaultRowHeight,
+    required List<PatrolReportColumnSpec> columns,
+    required bool compact,
+    required bool isFirstPart,
   }) {
     return PatrolReportRow(
       report: report,
       pageIndex: pageIndex,
-      rowHeight: rowHeight,
-      selected: _viewState.selectedReportId == report.id,
-      columns: _columns,
+      rowHeight: compact
+          ? PatrolReportRow.mobileRowHeight
+          : PatrolReportRow.defaultRowHeight,
+      hoverIndex: compact ? null : _hoverRow,
+      showLateMarker: isFirstPart && _ctrl.isLate(report),
+      selected: _ctrl.viewState.selectedReportId == report.id,
+      columns: columns,
       onEdit: () => _editReport(report),
-      onShowBeforeImages: () => PatrolImagesDialog.show(
-        context: context,
-        title: 'Before',
-        e: report,
-        names: report.imageNames,
-      ),
-      onShowAfterImages: () => PatrolImagesDialog.show(
-        context: context,
-        title: 'After',
-        e: report,
-        names: report.atImageNames,
-      ),
-      onShowHseImages: () => PatrolImagesDialog.show(
-        context: context,
-        title: 'HSE',
-        e: report,
-        names: report.hseImageNames,
-      ),
+      onShowBeforeImages: () =>
+          _openImages(report, 'Before', report.imageNames),
+      onShowAfterImages: () =>
+          _openImages(report, 'After', report.atImageNames),
+      onShowHseImages: () => _openImages(report, 'HSE', report.hseImageNames),
+    );
+  }
+
+  /// Dialog chi tiết: lưới ảnh + thông tin report.
+  void _openImages(PatrolReportModel report, String title, List<String> names) {
+    PatrolImagesDialog.show(
+      context: context,
+      title: title,
+      e: report,
+      names: names,
     );
   }
 }

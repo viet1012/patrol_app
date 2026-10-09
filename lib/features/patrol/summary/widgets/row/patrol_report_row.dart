@@ -3,12 +3,15 @@ import 'package:chuphinh/core/models/patrol_report_model.dart';
 import 'package:flutter/material.dart';
 
 import 'package:chuphinh/features/patrol/summary/core/patrol_report_table_columns.dart';
-import 'package:chuphinh/features/patrol/summary/core/patrol_report_table_query.dart';
 import 'package:chuphinh/features/patrol/summary/widgets/cells/patrol_report_cells.dart';
 import 'package:chuphinh/features/patrol/summary/widgets/row/patrol_report_hoverable_row.dart';
+import 'package:chuphinh/features/patrol/summary/widgets/theme/patrol_report_theme.dart';
 
+/// Một dòng (hoặc một phần dòng: pinned / cuộn) của bảng.
+/// Ô được dựng theo đúng thứ tự + width của `columns` (cùng nguồn với header).
 class PatrolReportRow extends StatelessWidget {
-  static const double defaultRowHeight = 100;
+  /// Đủ chứa thumbnail Img(B) (PatrolReportThumbSize.large) + lề.
+  static const double defaultRowHeight = PatrolReportThumbSize.largeHeight + 20;
   static const double mobileRowHeight = 60;
 
   final PatrolReportModel report;
@@ -21,6 +24,12 @@ class PatrolReportRow extends StatelessWidget {
   final VoidCallback onShowHseImages;
   final double rowHeight;
 
+  /// Vẽ viền trái đỏ nhạt (chỉ phần đầu dòng mới truyền true).
+  final bool showLateMarker;
+
+  /// Desktop: highlight khi hover; dùng chung giữa phần pinned và phần cuộn.
+  final ValueNotifier<int?>? hoverIndex;
+
   const PatrolReportRow({
     super.key,
     required this.report,
@@ -32,166 +41,135 @@ class PatrolReportRow extends StatelessWidget {
     required this.onShowAfterImages,
     required this.onShowHseImages,
     this.rowHeight = defaultRowHeight,
+    this.showLateMarker = false,
+    this.hoverIndex,
   });
 
-  double _width(String label) => PatrolReportTableQuery.widthOf(columns, label);
+  bool get _compact => rowHeight < defaultRowHeight;
+
+  Widget _cell(PatrolReportColumnSpec column) {
+    final w = column.width;
+    final r = report;
+
+    Widget text(String? v, {bool center = false}) => PatrolReportCells.text(
+      v ?? '-',
+      w,
+      align: center ? TextAlign.center : TextAlign.left,
+      tooltip: !center,
+    );
+
+    switch (column.label) {
+      case 'STT':
+        return PatrolReportCells.text(
+          r.stt.toString(),
+          w,
+          align: TextAlign.center,
+        );
+      case 'QR':
+        return PatrolReportCells.qr(r.qr_key?.toString(), w, compact: _compact);
+      case 'Group':
+        return text(r.grp);
+      case 'Plant':
+        return text(r.plant);
+      case 'Division':
+        return text(r.division);
+      case 'Area':
+        return text(r.area);
+      case 'Machine':
+        return text(r.machine);
+      case 'Patrol User':
+        return text(r.patrol_user);
+      case 'Img(B)':
+        return PatrolReportCells.image(
+          names: r.imageNames,
+          width: w,
+          size: _compact
+              ? PatrolReportThumbSize.compactLarge
+              : PatrolReportThumbSize.large,
+          onTap: onShowBeforeImages,
+        );
+      case 'Risk T':
+        return PatrolReportCells.riskBadge(r.riskTotal, w);
+      case 'Comment':
+        return text(r.comment);
+      case 'Countermeasure':
+        return text(r.countermeasure);
+      case 'Created':
+        return text(CommonUI.fmtDate(r.createdAt), center: true);
+      case 'Deadline':
+        return text(CommonUI.fmtDate(r.dueDate), center: true);
+      case 'Revise Deadline':
+        return text(CommonUI.fmtDate(r.dueDateUpdatedAt), center: true);
+      case 'Due Rev':
+        return PatrolReportCells.dueRevision(r.dueDateUpdateCount ?? 0, w);
+      case 'Due By':
+        return text(r.dueDateUpdatedBy);
+      case 'Due Status':
+        return PatrolReportCells.dueStatus(r, w);
+      case 'PIC':
+        return text(r.pic);
+      case 'Check Info':
+        return text(r.checkInfo);
+      case 'Risk F':
+        return text(r.riskFreq, center: true);
+      case 'Risk P':
+        return text(r.riskProb, center: true);
+      case 'Risk S':
+        return text(r.riskSev, center: true);
+      case 'AT Stt':
+        return PatrolReportCells.statusBadge(r.atStatus, w);
+      case 'AT PIC':
+        return text(r.atPic);
+      case 'AT Date':
+        return text(CommonUI.fmtDate(r.atDate), center: true);
+      case 'AT Cmt':
+        return text(r.atComment);
+      case 'Img(A)':
+        return PatrolReportCells.image(
+          names: r.atImageNames,
+          width: w,
+          size: _compact
+              ? PatrolReportThumbSize.compact
+              : PatrolReportThumbSize.regular,
+          onTap: onShowAfterImages,
+        );
+      case 'HSE User':
+        return text(r.hseUser);
+      case 'HSE Judge':
+        return text(r.hseJudge, center: true);
+      case 'HSE Updated':
+        return text(CommonUI.fmtDate(r.hseDate), center: true);
+      case 'HSE Comment':
+        return text(r.hseComment);
+      case 'Img(H)':
+        return PatrolReportCells.image(
+          names: r.hseImageNames,
+          width: w,
+          size: _compact
+              ? PatrolReportThumbSize.compact
+              : PatrolReportThumbSize.regular,
+          onTap: onShowHseImages,
+        );
+      case 'Load':
+        return text(r.loadStatus, center: true);
+      default:
+        return text(column.valueGetter(r));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final baseColor = pageIndex.isEven ? Colors.white : Colors.grey.shade50;
+    final baseColor = pageIndex.isEven
+        ? PatrolReportTokens.rowEven
+        : PatrolReportTokens.rowOdd;
     return PatrolReportHoverableRow(
+      index: pageIndex,
+      hoverIndex: hoverIndex,
       height: rowHeight,
-      background: selected ? Colors.lightBlue.shade50 : baseColor,
+      background: selected ? PatrolReportTokens.rowSelected : baseColor,
       onDoubleTap: onEdit,
-      child: Row(
-        children: [
-          PatrolReportCells.text(
-            report.stt.toString(),
-            _width('STT'),
-            align: TextAlign.center,
-          ),
-          PatrolReportCells.qr(
-            report.qr_key?.toString(),
-            _width('QR'),
-            compact: rowHeight < defaultRowHeight,
-          ),
-          PatrolReportCells.text(report.grp, _width('Group'), tooltip: true),
-          PatrolReportCells.text(report.plant, _width('Plant'), tooltip: true),
-          PatrolReportCells.text(
-            report.division,
-            _width('Division'),
-            tooltip: true,
-          ),
-          PatrolReportCells.text(report.area, _width('Area'), tooltip: true),
-          PatrolReportCells.text(
-            report.machine,
-            _width('Machine'),
-            tooltip: true,
-          ),
-          PatrolReportCells.text(
-            report.patrol_user ?? '-',
-            _width('Patrol User'),
-            tooltip: true,
-          ),
-          PatrolReportCells.image(
-            names: report.imageNames,
-            width: _width('Img(B)'),
-            onTap: onShowBeforeImages,
-          ),
-          PatrolReportCells.riskBadge(report.riskTotal, _width('Risk T')),
-          PatrolReportCells.text(
-            report.comment,
-            _width('Comment'),
-            tooltip: true,
-          ),
-          PatrolReportCells.text(
-            report.countermeasure,
-            _width('Countermeasure'),
-            tooltip: true,
-          ),
-          PatrolReportCells.text(
-            CommonUI.fmtDate(report.createdAt),
-            _width('Created'),
-            align: TextAlign.center,
-          ),
-          PatrolReportCells.text(
-            CommonUI.fmtDate(report.dueDate),
-            _width('Deadline'),
-            align: TextAlign.center,
-          ),
-          PatrolReportCells.text(
-            CommonUI.fmtDate(report.dueDateUpdatedAt),
-            _width('Revise Deadline'),
-            align: TextAlign.center,
-          ),
-          PatrolReportCells.dueRevision(
-            report.dueDateUpdateCount ?? 0,
-            _width('Due Rev'),
-          ),
-          PatrolReportCells.text(
-            report.dueDateUpdatedBy ?? '-',
-            _width('Due By'),
-            tooltip: true,
-          ),
-          PatrolReportCells.dueStatus(report, _width('Due Status')),
-          PatrolReportCells.text(
-            report.pic ?? '-',
-            _width('PIC'),
-            tooltip: true,
-          ),
-          PatrolReportCells.text(
-            report.checkInfo,
-            _width('Check Info'),
-            tooltip: true,
-          ),
-          PatrolReportCells.text(
-            report.riskFreq,
-            _width('Risk F'),
-            align: TextAlign.center,
-          ),
-          PatrolReportCells.text(
-            report.riskProb,
-            _width('Risk P'),
-            align: TextAlign.center,
-          ),
-          PatrolReportCells.text(
-            report.riskSev,
-            _width('Risk S'),
-            align: TextAlign.center,
-          ),
-          PatrolReportCells.statusBadge(report.atStatus, _width('AT Stt')),
-          PatrolReportCells.text(
-            report.atPic ?? '-',
-            _width('AT PIC'),
-            tooltip: true,
-          ),
-          PatrolReportCells.text(
-            CommonUI.fmtDate(report.atDate),
-            _width('AT Date'),
-            align: TextAlign.center,
-          ),
-          PatrolReportCells.text(
-            report.atComment ?? '-',
-            _width('AT Cmt'),
-            tooltip: true,
-          ),
-          PatrolReportCells.image(
-            names: report.atImageNames,
-            width: _width('Img(A)'),
-            onTap: onShowAfterImages,
-          ),
-          PatrolReportCells.text(
-            report.hseUser ?? '-',
-            _width('HSE User'),
-            tooltip: true,
-          ),
-          PatrolReportCells.text(
-            report.hseJudge ?? '-',
-            _width('HSE Judge'),
-            align: TextAlign.center,
-          ),
-          PatrolReportCells.text(
-            CommonUI.fmtDate(report.hseDate),
-            _width('HSE Updated'),
-            align: TextAlign.center,
-          ),
-          PatrolReportCells.text(
-            report.hseComment ?? '-',
-            _width('HSE Comment'),
-            tooltip: true,
-          ),
-          PatrolReportCells.image(
-            names: report.hseImageNames,
-            width: _width('Img(H)'),
-            onTap: onShowHseImages,
-          ),
-          PatrolReportCells.text(
-            report.loadStatus ?? '-',
-            _width('Load'),
-            align: TextAlign.center,
-          ),
-        ],
-      ),
+      leftMarker: showLateMarker ? PatrolReportTokens.rowLateMarker : null,
+      child: Row(children: [for (final c in columns) _cell(c)]),
     );
   }
 }

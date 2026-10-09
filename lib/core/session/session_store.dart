@@ -85,6 +85,32 @@ class SessionStore {
     }
   }
 
+  // ================= UI PREFS =================
+  /// Tuỳ chọn giao diện theo user (vd. layout cột bảng). Không lưu dữ liệu nhạy cảm.
+  static Future<void> saveUiPref(String key, String value) async {
+    final k = 'ui_pref_$key';
+    if (kIsWeb) {
+      html.window.localStorage[k] = value;
+    } else {
+      await _secureStorage.write(key: k, value: value);
+    }
+  }
+
+  static Future<String?> getUiPref(String key) async {
+    final k = 'ui_pref_$key';
+    if (kIsWeb) return html.window.localStorage[k];
+    return _secureStorage.read(key: k);
+  }
+
+  static Future<void> removeUiPref(String key) async {
+    final k = 'ui_pref_$key';
+    if (kIsWeb) {
+      html.window.localStorage.remove(k);
+    } else {
+      await _secureStorage.delete(key: k);
+    }
+  }
+
   // ================= CLEAR =================
   static Future<void> clear() async {
     clearAuthenticatedAccount();

@@ -20,6 +20,82 @@ class SummaryGridStyle {
   static const Color tableBg = Colors.white;
   static const Color firstColumnBg = Color(0xFFF7F8FA);
 
+  // ---- Nhãn dùng chung: bảng SUMMARY + bảng PIC ----
+  static const String groupBefore = 'BEFORE';
+  static const String groupAfter = 'AFTER';
+  static const String groupHseRecheck = 'HSE RECHECK';
+  static const String subtitleBefore = 'NG points';
+  static const String subtitleAfter = 'Pro Action';
+  static const String subtitleHseRecheck = 'HSE re-check';
+  static const String colTotal = 'TTL';
+
+  // ---- Typography dùng chung ----
+  /// Nhóm lớn: "BEFORE" / "AFTER" / "HSE RECHECK".
+  static const Color titleText = Colors.redAccent;
+
+  /// Tiêu đề phụ: "NG points" / "Pro action" / "HSE re-check".
+  static const Color subtitleText = Colors.blueAccent;
+
+  /// Chữ "SUMMARY" và chip tên fac.
+  static const Color summaryTitleText = Color(0xFFF59E0B);
+
+  /// Padding ngang của mọi ô (header + dữ liệu).
+  static const double cellPaddingH = 6;
+
+  /// Tiêu đề bảng (SUMMARY, BEFORE, AFTER, HSE RECHECK); màu đỏ mặc định.
+  static const TextStyle titleStyle = TextStyle(
+    color: titleText,
+    fontSize: 15,
+    fontWeight: FontWeight.w800,
+  );
+
+  static const TextStyle subtitleStyle = TextStyle(
+    color: subtitleText,
+    fontSize: 14,
+    fontWeight: FontWeight.w800,
+  );
+
+  /// Header nhóm + header cột.
+  static const TextStyle headerStyle = TextStyle(
+    color: Colors.black87,
+    fontSize: 14,
+    fontWeight: FontWeight.w800,
+  );
+
+  /// Ô số và tên (Area, PIC, Fac).
+  static const TextStyle cellStyle = TextStyle(
+    color: Colors.black87,
+    fontSize: 14,
+    fontWeight: FontWeight.w700,
+  );
+
+  /// Dòng SUM / TOTAL / %.
+  static const TextStyle totalCellStyle = TextStyle(
+    color: Colors.black87,
+    fontSize: 14,
+    fontWeight: FontWeight.w900,
+  );
+
+  /// Tỉ lệ trên title bar ("Finished x% • Remain x%", "OK x% • NG x%").
+  static const TextStyle rateLabelStyle = TextStyle(
+    color: Colors.black87,
+    fontSize: 14,
+    fontWeight: FontWeight.w800,
+  );
+  static const TextStyle rateValueStyle = TextStyle(
+    fontSize: 14,
+    fontWeight: FontWeight.w900,
+  );
+
+  /// Chiều cao vừa khít bảng [rowCount] dòng: title + group + header + dòng
+  /// + viền ngoài.
+  static double fittedTableHeight(int rowCount) =>
+      titleHeight +
+      groupHeaderHeight +
+      headerRowHeight +
+      rowCount * cellHeight +
+      2;
+
   static const Color finishedHeaderBg = Color(0xFF8FEFA0);
   static const Color okHeaderBg = Color(0xFF8FEFA0);
   static const Color remainHeaderBg = Color(0xFFF89292);
@@ -40,7 +116,7 @@ class SummaryGridStyle {
 
   static const List<String> beforeColumns = [
     'PIC',
-    'Total',
+    colTotal,
     'I',
     'II',
     'III',
@@ -52,10 +128,10 @@ class SummaryGridStyle {
     'PIC',
 
     // Finished
-    'Total', 'I', 'II', 'III', 'IV', 'V',
+    colTotal, 'I', 'II', 'III', 'IV', 'V',
 
     // Remain
-    'Total', 'I', 'II', 'III', 'IV', 'V',
+    colTotal, 'I', 'II', 'III', 'IV', 'V',
 
     // Deadline
     'Still',
@@ -66,13 +142,13 @@ class SummaryGridStyle {
   static const List<String> recheckColumns = [
     'PIC',
     'All',
-    'Total',
+    colTotal,
     'I',
     'II',
     'III',
     'IV',
     'V',
-    'Total',
+    colTotal,
     'I',
     'II',
     'III',
@@ -91,7 +167,7 @@ class SummaryGridStyle {
     switch (column) {
       case 'PIC':
         return 150;
-      case 'Total':
+      case colTotal:
       case 'All':
         return 54;
       case 'I':

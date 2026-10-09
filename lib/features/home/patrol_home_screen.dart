@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:ui';
 
+import 'package:chuphinh/core/api/auth_me_api.dart';
 import 'package:chuphinh/shared/widgets/glass_action_button.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -188,23 +189,8 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
     }
   }
 
-  Future<AuthMe?> _fetchAuthMe() async {
-    try {
-      final response = await DioClient.get(
-        '/api/hr/me',
-        queryParameters: {'code': widget.accountCode},
-      );
-
-      if (response.statusCode == 200 && response.data != null) {
-        return AuthMe.fromJson(Map<String, dynamic>.from(response.data));
-      }
-    } catch (error) {
-      // Auth permission lỗi không nên làm toàn màn hình fail.
-      debugPrint('Load auth me error: $error');
-    }
-
-    return null;
-  }
+  // Auth permission lỗi không nên làm toàn màn hình fail -> trả null.
+  Future<AuthMe?> _fetchAuthMe() => AuthMeApi.fetch(widget.accountCode);
 
   Future<String> _fetchEmployeeNameValue(String code) async {
     final employeeCode = code.trim();
@@ -891,9 +877,12 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
   }
 
   void _openSummary(PatrolGroup group) {
+    // Tham số nằm trong URL (không dùng extra) để F5 vẫn giữ trang.
     context.go(
-      '/home/summary?group=${group.name}&plant=$selectedFactory',
-      extra: {'accountCode': widget.accountCode, 'me': _authMe},
+      Uri(
+        path: '/home/summary',
+        queryParameters: {'group': group.name, 'plant': selectedFactory ?? ''},
+      ).toString(),
     );
   }
 
@@ -944,15 +933,11 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
               final rawQr = qr.trim();
               if (rawQr.isEmpty) return;
 
-              final safeQr = Uri.encodeComponent(rawQr);
-
               context.go(
-                '/after/$safeQr',
-                extra: {
-                  'accountCode': widget.accountCode,
-                  'qrCode': rawQr,
-                  'patrolGroup': PatrolGroup.Patrol,
-                },
+                Uri(
+                  path: '/after/${Uri.encodeComponent(rawQr)}',
+                  queryParameters: {'group': PatrolGroup.Patrol.name},
+                ).toString(),
               );
             },
           ),

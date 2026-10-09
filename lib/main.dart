@@ -2,6 +2,7 @@
 import 'dart:html' as html;
 
 import 'package:chuphinh/app/routes/router.dart';
+import 'package:chuphinh/core/session/auth_session.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -12,6 +13,8 @@ import 'package:chuphinh/l10n/app_localizations.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  // Khôi phục phiên (auto-login) trước; router hiện splash tới khi xong.
+  AuthSession.instance.restore();
   runApp(const MyApp());
 }
 

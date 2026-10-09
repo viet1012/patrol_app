@@ -229,14 +229,7 @@ class SummaryGridTable extends StatelessWidget {
           bottom: const BorderSide(color: SummaryGridStyle.borderColor),
         ),
       ),
-      child: Text(
-        header.label,
-        style: const TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w800,
-          color: Colors.black87,
-        ),
-      ),
+      child: Text(header.label, style: SummaryGridStyle.headerStyle),
     );
   }
 
@@ -260,15 +253,15 @@ class SummaryGridTable extends StatelessWidget {
                 color: _cellBackground(index) ?? SummaryGridStyle.headerBg,
                 border: _cellBorder(index),
               ),
-              child: Center(
-                child: Text(
-                  columns[index],
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.black87,
-                  ),
-                ),
+              padding: const EdgeInsets.symmetric(
+                horizontal: SummaryGridStyle.cellPaddingH,
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                columns[index],
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: SummaryGridStyle.headerStyle,
               ),
             );
           }),
@@ -304,23 +297,18 @@ class SummaryGridTable extends StatelessWidget {
                 : (_cellBackground(index) ?? Colors.white),
             border: _cellBorder(index),
           ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 6),
-            child: Align(
-              alignment: cell is num
-                  ? Alignment.centerRight
-                  : Alignment.centerLeft,
-              child: Text(
-                _displayValue(cell),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: row.isTotal ? FontWeight.w800 : FontWeight.w600,
-                  color: Colors.black87,
-                ),
-              ),
-            ),
+          padding: const EdgeInsets.symmetric(
+            horizontal: SummaryGridStyle.cellPaddingH,
+          ),
+          // Số căn phải, tên căn trái.
+          alignment: cell is num ? Alignment.centerRight : Alignment.centerLeft,
+          child: Text(
+            _displayValue(cell),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: row.isTotal
+                ? SummaryGridStyle.totalCellStyle
+                : SummaryGridStyle.cellStyle,
           ),
         );
       }),
@@ -351,12 +339,9 @@ class _GridTitleBar extends StatelessWidget {
               alignment: Alignment.centerLeft,
               child: Text(
                 titleLeft ?? '',
+                maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: Colors.redAccent,
-                  fontWeight: FontWeight.w800,
-                  fontSize: 14,
-                ),
+                style: SummaryGridStyle.titleStyle,
               ),
             ),
           ),
@@ -364,19 +349,21 @@ class _GridTitleBar extends StatelessWidget {
             child: Center(
               child: Text(
                 titleCenter ?? '',
+                maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: Colors.blueAccent,
-                  fontWeight: FontWeight.w800,
-                  fontSize: 14,
-                ),
+                style: SummaryGridStyle.subtitleStyle,
               ),
             ),
           ),
           Expanded(
             child: Align(
               alignment: Alignment.centerRight,
-              child: titleRight ?? const SizedBox.shrink(),
+              // Bảng hẹp (mobile): thu nhỏ tỉ lệ thay vì tràn.
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerRight,
+                child: titleRight ?? const SizedBox.shrink(),
+              ),
             ),
           ),
         ],

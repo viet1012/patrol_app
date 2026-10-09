@@ -1,3 +1,4 @@
+import 'package:chuphinh/shared/utils/natural_sort.dart';
 import 'package:chuphinh/shared/utils/plant_constants.dart';
 import 'package:chuphinh/core/models/patrol_export_query.dart';
 import 'package:chuphinh/core/models/patrol_report_model.dart';
@@ -133,7 +134,7 @@ class PatrolReportTableQuery {
       if (value.isNotEmpty) values.add(value);
     }
 
-    return values.toList()..sort();
+    return values.toList()..sort(naturalCompare);
   }
 
   static PatrolExportQuery buildExportQuery({

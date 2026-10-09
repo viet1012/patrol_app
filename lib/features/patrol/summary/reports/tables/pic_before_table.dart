@@ -12,8 +12,8 @@ class PicBeforeTable extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SummaryGridTable(
-      titleLeft: 'BEFORE',
-      titleCenter: 'NG points',
+      titleLeft: SummaryGridStyle.groupBefore,
+      titleCenter: SummaryGridStyle.subtitleBefore,
       columns: SummaryGridStyle.beforeColumns,
       rows: [
         for (final (:row, :isTotal) in fac.displayRows)

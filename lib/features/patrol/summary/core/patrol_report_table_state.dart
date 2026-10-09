@@ -9,6 +9,12 @@ class PatrolReportTableViewState {
   final bool showSummary;
   final bool downloading;
   final String? activeFilterColumn;
+
+  /// Filter theo cột: label cột -> các giá trị đang chọn.
+  ///
+  /// Bất biến theo quy ước: khi thay đổi LUÔN tạo Map/Set mới rồi `copyWith`,
+  /// không sửa trực tiếp Map/Set hiện có. Cache trong
+  /// `PatrolReportTableController` so sánh theo identity của Map này.
   final Map<String, Set<String>> filterValues;
 
   const PatrolReportTableViewState({

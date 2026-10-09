@@ -1,14 +1,23 @@
 import 'package:flutter/material.dart';
 
+import 'package:chuphinh/features/patrol/summary/widgets/theme/patrol_report_theme.dart';
+
 import 'package:chuphinh/shared/widgets/common_ui_helper.dart';
 import 'package:chuphinh/core/models/patrol_report_model.dart';
 
 class PatrolReportColumnSpec {
+  /// Giới hạn khi kéo đổi độ rộng cột.
+  static const double minWidth = 60;
+  static const double maxWidth = 600;
+
   final String label;
   final double width;
   final TextAlign align;
   final String? queryKey;
   final String Function(PatrolReportModel row) valueGetter;
+
+  /// Tên đầy đủ cho tooltip header (mặc định = label).
+  final String? title;
 
   const PatrolReportColumnSpec({
     required this.label,
@@ -16,15 +25,34 @@ class PatrolReportColumnSpec {
     required this.align,
     required this.valueGetter,
     this.queryKey,
+    this.title,
   });
+
+  String get tooltip => title ?? label;
+
+  PatrolReportColumnSpec withWidth(double width) => PatrolReportColumnSpec(
+    label: label,
+    width: width,
+    align: align,
+    valueGetter: valueGetter,
+    queryKey: queryKey,
+    title: title,
+  );
 }
 
 class PatrolReportTableColumns {
+  // Cột ảnh = thumbnail + lề 2 bên.
+  static const double _imgBWidth =
+      PatrolReportThumbSize.largeWidth + 2 * PatrolReportThumbSize.cellPadding;
+  static const double _imgWidth =
+      PatrolReportThumbSize.regularWidth +
+      2 * PatrolReportThumbSize.cellPadding;
+
   static List<PatrolReportColumnSpec> build() {
     return [
       PatrolReportColumnSpec(
         label: 'STT',
-        width: 70,
+        width: 72,
         align: TextAlign.center,
         valueGetter: (e) => e.stt.toString(),
       ),
@@ -44,14 +72,14 @@ class PatrolReportTableColumns {
       ),
       PatrolReportColumnSpec(
         label: 'Plant',
-        width: 100,
+        width: 88,
         align: TextAlign.left,
         queryKey: 'plant',
         valueGetter: (e) => e.plant,
       ),
       PatrolReportColumnSpec(
         label: 'Division',
-        width: 100,
+        width: 104,
         align: TextAlign.left,
         queryKey: 'division',
         valueGetter: (e) => e.division,
@@ -65,76 +93,76 @@ class PatrolReportTableColumns {
       ),
       PatrolReportColumnSpec(
         label: 'Machine',
-        width: 100,
+        width: 112,
         align: TextAlign.left,
         queryKey: 'machine',
         valueGetter: (e) => e.machine,
       ),
       PatrolReportColumnSpec(
         label: 'Patrol User',
-        width: 110,
+        width: 150,
         align: TextAlign.left,
         queryKey: 'patrolUser',
         valueGetter: (e) => e.patrol_user ?? '',
       ),
       PatrolReportColumnSpec(
         label: 'Img(B)',
-        width: 90,
+        width: _imgBWidth,
+        title: 'Before images',
         align: TextAlign.center,
         valueGetter: (_) => '',
       ),
       PatrolReportColumnSpec(
         label: 'Risk T',
-        width: 90,
+        width: 80,
+        title: 'Risk Total',
         align: TextAlign.center,
         valueGetter: (e) => e.riskTotal,
       ),
       PatrolReportColumnSpec(
         label: 'Comment',
-        width: 260,
+        width: 320,
         align: TextAlign.left,
         valueGetter: (e) => e.comment,
       ),
       PatrolReportColumnSpec(
         label: 'Countermeasure',
-        width: 260,
+        width: 320,
         align: TextAlign.left,
         valueGetter: (e) => e.countermeasure,
       ),
       PatrolReportColumnSpec(
         label: 'Created',
-        width: 100,
+        width: 104,
         align: TextAlign.center,
         valueGetter: (e) => CommonUI.fmtDate(e.createdAt),
       ),
       PatrolReportColumnSpec(
         label: 'Deadline',
-        width: 100,
+        width: 112,
         align: TextAlign.center,
         valueGetter: (e) => CommonUI.fmtDate(e.dueDate),
       ),
-
       PatrolReportColumnSpec(
         label: 'Revise Deadline',
-        width: 150,
+        width: 112,
         align: TextAlign.center,
         valueGetter: (e) => CommonUI.fmtDate(e.dueDateUpdatedAt),
       ),
-
       PatrolReportColumnSpec(
         label: 'Due Rev',
-        width: 120,
+        width: 90,
+        title: 'Due date revisions',
         align: TextAlign.center,
         valueGetter: (e) => '${e.dueDateUpdateCount}',
       ),
-
       PatrolReportColumnSpec(
         label: 'Due By',
         width: 120,
+        title: 'Due date updated by',
         align: TextAlign.left,
         valueGetter: (e) => e.dueDateUpdatedBy ?? '',
       ),
-
       PatrolReportColumnSpec(
         label: 'Due Status',
         width: 120,
@@ -154,7 +182,6 @@ class PatrolReportTableColumns {
           return 'Still Time';
         },
       ),
-
       PatrolReportColumnSpec(
         label: 'PIC',
         width: 90,
@@ -162,7 +189,6 @@ class PatrolReportTableColumns {
         queryKey: 'pic',
         valueGetter: (e) => e.pic ?? '',
       ),
-
       PatrolReportColumnSpec(
         label: 'Check Info',
         width: 120,
@@ -171,19 +197,22 @@ class PatrolReportTableColumns {
       ),
       PatrolReportColumnSpec(
         label: 'Risk F',
-        width: 120,
+        width: 90,
+        title: 'Risk Frequency',
         align: TextAlign.center,
         valueGetter: (e) => e.riskFreq,
       ),
       PatrolReportColumnSpec(
         label: 'Risk P',
-        width: 100,
+        width: 90,
+        title: 'Risk Probability',
         align: TextAlign.center,
         valueGetter: (e) => e.riskProb,
       ),
       PatrolReportColumnSpec(
         label: 'Risk S',
-        width: 100,
+        width: 90,
+        title: 'Risk Severity',
         align: TextAlign.center,
         valueGetter: (e) => e.riskSev,
       ),
@@ -214,7 +243,8 @@ class PatrolReportTableColumns {
       ),
       PatrolReportColumnSpec(
         label: 'Img(A)',
-        width: 100,
+        width: _imgWidth,
+        title: 'After images',
         align: TextAlign.center,
         valueGetter: (_) => '',
       ),
@@ -242,10 +272,10 @@ class PatrolReportTableColumns {
         align: TextAlign.left,
         valueGetter: (e) => e.hseComment ?? '',
       ),
-
       PatrolReportColumnSpec(
         label: 'Img(H)',
-        width: 100,
+        width: _imgWidth,
+        title: 'HSE images',
         align: TextAlign.center,
         valueGetter: (_) => '',
       ),

@@ -1,10 +1,15 @@
-import 'package:chuphinh/core/api/api_config.dart';
 import 'package:chuphinh/shared/widgets/common_ui_helper.dart';
 import 'package:chuphinh/core/models/patrol_report_model.dart';
+import 'package:chuphinh/features/patrol/summary/widgets/cells/patrol_report_image_thumb.dart';
+import 'package:chuphinh/features/patrol/summary/widgets/theme/patrol_report_theme.dart';
 import 'package:flutter/material.dart';
 
 class PatrolReportCells {
   const PatrolReportCells._();
+
+  /// Ô text: tối đa 3 dòng rồi ellipsis.
+  static const maxTextLines = 3;
+  static const _tooltipThreshold = 24;
 
   static Widget text(
     String text,
@@ -19,13 +24,18 @@ class PatrolReportCells {
         value,
         style: const TextStyle(fontSize: 13),
         textAlign: align,
+        maxLines: maxTextLines,
+        overflow: TextOverflow.ellipsis,
       ),
     );
+
+    // Nội dung dài có thể bị cắt (3 dòng) -> luôn có tooltip.
+    final showTooltip = tooltip || value.length > _tooltipThreshold;
 
     return _boxed(
       width: width,
       align: align,
-      child: tooltip
+      child: showTooltip
           ? Tooltip(
               message: value,
               waitDuration: const Duration(milliseconds: 350),
@@ -78,40 +88,20 @@ class PatrolReportCells {
     );
   }
 
+  /// Ô ảnh: thumbnail ảnh đầu + badge "+N"; bấm để xem ảnh lớn.
   static Widget image({
     required List<String> names,
     required double width,
+    required PatrolReportThumbSize size,
     VoidCallback? onTap,
   }) {
-    final count = names.length;
-    final first = count > 0 ? names.first : '';
     return _boxed(
       width: width,
       align: TextAlign.center,
-      child: InkWell(
-        onTap: count > 0 ? onTap : null,
-        borderRadius: BorderRadius.circular(8),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            if (count > 0)
-              Expanded(child: _imageThumb(first, size: 80))
-            else
-              const Icon(
-                Icons.image_not_supported,
-                size: 18,
-                color: Colors.grey,
-              ),
-            Text(
-              '$count',
-              style: TextStyle(
-                fontSize: 8,
-                fontWeight: FontWeight.w700,
-                color: count > 0 ? Colors.blueGrey.shade800 : Colors.grey,
-              ),
-            ),
-          ],
-        ),
+      child: PatrolReportImageThumb(
+        names: names,
+        size: size,
+        onTap: names.isEmpty ? null : onTap,
       ),
     );
   }
@@ -252,35 +242,6 @@ class PatrolReportCells {
             color: color,
           ),
         ),
-      ),
-    );
-  }
-
-  static Widget _imageThumb(String imageName, {double size = 40}) {
-    if (imageName.isEmpty) {
-      return const Icon(
-        Icons.image_not_supported,
-        size: 20,
-        color: Colors.grey,
-      );
-    }
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(4),
-      child: Image.network(
-        '${ApiConfig.baseUrl}/images/$imageName',
-        width: size,
-        height: size,
-        fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) =>
-            const Icon(Icons.broken_image, color: Colors.red),
-        loadingBuilder: (context, child, progress) {
-          if (progress == null) return child;
-          return const SizedBox(
-            width: 20,
-            height: 20,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          );
-        },
       ),
     );
   }

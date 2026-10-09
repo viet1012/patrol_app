@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'package:chuphinh/features/patrol/summary/reports/widgets/summary_grid_style.dart';
+
 /// Chiều cao cố định của ô (dùng chung để ô gộp / cột cố định khớp hàng).
 const double kSummaryHeaderCellHeight = 34;
 const double kSummaryCellHeight = 38;
@@ -48,15 +50,21 @@ class SummaryCellRow extends StatelessWidget {
   }
 }
 
+/// Thanh tiêu đề card SUMMARY (desktop) và các section mobile: icon + chữ
+/// căn giữa, nền nhạt ấm, viền dưới tách khỏi bảng.
 class SummaryTitleBar extends StatelessWidget {
+  static const double height = 44;
+
   final String text;
   final Color color;
+  final IconData icon;
   final double? width;
 
   const SummaryTitleBar({
     super.key,
     required this.text,
-    required this.color,
+    this.color = SummaryGridStyle.summaryTitleText,
+    this.icon = Icons.summarize_rounded,
     this.width,
   });
 
@@ -64,18 +72,36 @@ class SummaryTitleBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: width,
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      height: height,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: color.withOpacity(0.18),
-        border: Border.all(color: color.withOpacity(0.5)),
+        // Tông màu ~8% phủ trên nền header sáng.
+        color: Color.alphaBlend(
+          color.withValues(alpha: 0.08),
+          SummaryGridStyle.headerBg,
+        ),
+        border: Border(bottom: BorderSide(color: color, width: 2)),
       ),
-      child: Text(
-        text,
-        style: TextStyle(
-          color: color,
-          fontSize: 18,
-          fontWeight: FontWeight.w900,
+      // Card hẹp (mobile): thu nhỏ thay vì cắt chữ.
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 20, color: color),
+            const SizedBox(width: 8),
+            Text(
+              text,
+              maxLines: 1,
+              style: TextStyle(
+                color: color,
+                fontSize: 18,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 1.5,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -104,45 +130,48 @@ class SummaryGlass extends StatelessWidget {
 Widget summaryGroupHeader(String title, Color color, double width) {
   return Container(
     width: width,
-    padding: const EdgeInsets.symmetric(vertical: 10),
     alignment: Alignment.center,
     child: Text(
       title,
-      style: TextStyle(color: color, fontWeight: FontWeight.w800, fontSize: 16),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: SummaryGridStyle.headerStyle.copyWith(color: color),
     ),
   );
 }
 
+/// Header: căn giữa, [SummaryGridStyle.headerStyle]. Dữ liệu: [bold] = dòng
+/// SUM / % ([SummaryGridStyle.totalCellStyle]).
 Widget _cell(SummaryCellSpec c, {bool header = false, Color? bg}) {
-  final textColor = header ? Colors.black : Colors.black87;
-
   final baseBg =
       c.bg ??
       (header
           ? (bg ?? const Color(0xFFDDDDDD))
           : (bg ?? const Color(0xFFEFEFEF)));
 
+  final style = header
+      ? SummaryGridStyle.headerStyle
+      : (c.bold ? SummaryGridStyle.totalCellStyle : SummaryGridStyle.cellStyle);
+
   return Container(
     width: c.w,
     height: header ? kSummaryHeaderCellHeight : kSummaryCellHeight,
-    alignment: _resolveAlignment(c),
-    padding: const EdgeInsets.symmetric(horizontal: 8),
+    alignment: header ? Alignment.center : _resolveAlignment(c),
+    padding: const EdgeInsets.symmetric(
+      horizontal: SummaryGridStyle.cellPaddingH,
+    ),
     decoration: BoxDecoration(
       color: baseBg,
       border: Border.all(color: Colors.black12, width: 1),
     ),
     child: _cellText(
       c,
-      TextStyle(
-        color: c.textColor ?? textColor,
-        fontSize: 14,
-        fontWeight: c.bold ? FontWeight.w800 : FontWeight.w600,
-      ),
+      c.textColor == null ? style : style.copyWith(color: c.textColor),
     ),
   );
 }
 
-/// Tooltip chỉ khi text bị cắt (padding ngang 8 mỗi bên).
+/// Tooltip chỉ khi text bị cắt (trừ padding ngang 2 bên).
 Widget _cellText(SummaryCellSpec c, TextStyle style) {
   final text = Text(c.text, overflow: TextOverflow.ellipsis, style: style);
   if (!c.tooltip || c.text.isEmpty) return text;
@@ -151,7 +180,7 @@ Widget _cellText(SummaryCellSpec c, TextStyle style) {
     text: TextSpan(text: c.text, style: style),
     maxLines: 1,
     textDirection: TextDirection.ltr,
-  )..layout(maxWidth: c.w - 16);
+  )..layout(maxWidth: c.w - SummaryGridStyle.cellPaddingH * 2);
 
   return painter.didExceedMaxLines
       ? Tooltip(message: c.text, child: text)

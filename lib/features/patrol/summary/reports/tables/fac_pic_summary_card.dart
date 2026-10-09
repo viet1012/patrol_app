@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import 'package:chuphinh/shared/utils/plant_constants.dart';
@@ -44,13 +46,23 @@ class _FacPicSummaryCardState extends State<FacPicSummaryCard> {
     return fac.fac;
   }
 
+  /// Khoảng chừa dưới bảng cho thanh cuộn ngang (desktop), không đè dòng cuối.
+  static const double _scrollbarGap = 12;
+
+  /// Vừa khít số dòng; tối đa như mức cũ, quá thì bảng tự cuộn dọc.
   double get _tableHeight {
     final rowCount = widget.fac.displayRows.length;
 
-    if (rowCount <= 5) return 300;
-    if (rowCount >= 8) return 480;
+    final double maxHeight;
+    if (rowCount <= 5) {
+      maxHeight = 300;
+    } else if (rowCount >= 8) {
+      maxHeight = 480;
+    } else {
+      maxHeight = 370;
+    }
 
-    return 370;
+    return math.min(SummaryGridStyle.fittedTableHeight(rowCount), maxHeight);
   }
 
   @override
@@ -94,7 +106,7 @@ class _FacPicSummaryCardState extends State<FacPicSummaryCard> {
 
   Widget _buildDesktop() {
     return SizedBox(
-      height: _tableHeight,
+      height: _tableHeight + _scrollbarGap,
       child: Scrollbar(
         controller: _horizontalController,
         thumbVisibility: true,
@@ -104,6 +116,7 @@ class _FacPicSummaryCardState extends State<FacPicSummaryCard> {
         child: SingleChildScrollView(
           controller: _horizontalController,
           scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.only(bottom: _scrollbarGap),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -142,17 +155,19 @@ class _FacNameChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    const tone = SummaryGridStyle.summaryTitleText;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.10),
+        color: tone.withValues(alpha: 0.14),
         borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: tone.withValues(alpha: 0.45)),
       ),
       child: Text(
         name,
         style: const TextStyle(
-          color: Colors.white,
-          fontSize: 13,
+          color: tone,
+          fontSize: 14,
           fontWeight: FontWeight.w800,
         ),
       ),

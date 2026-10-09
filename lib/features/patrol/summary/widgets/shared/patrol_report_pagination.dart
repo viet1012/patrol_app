@@ -1,4 +1,9 @@
+import 'dart:math' as math;
+
+import 'package:chuphinh/features/patrol/summary/widgets/theme/patrol_report_theme.dart';
 import 'package:flutter/material.dart';
+
+typedef _T = PatrolReportTokens;
 
 class PatrolReportPagination extends StatelessWidget {
   final int page;
@@ -28,86 +33,64 @@ class PatrolReportPagination extends StatelessWidget {
     this.grandTotal,
   });
 
-  static const _controlBg = Color(0xFF172A33);
+  bool get _hasPrev => page > 0;
+  bool get _hasNext => page + 1 < totalPages;
+
+  /// "1–30 of 87".
+  String get _rangeText {
+    if (totalItems == 0) return '0 of 0';
+    final start = page * rowsPerPage + 1;
+    final end = math.min((page + 1) * rowsPerPage, totalItems);
+    return '$start–$end of $totalItems';
+  }
 
   @override
   Widget build(BuildContext context) {
     if (compact) return _buildCompact();
 
-    const controlBg = _controlBg;
-
     return Container(
-      color: const Color(0xFF0F2027),
+      color: _T.pageBg,
+      padding: const EdgeInsets.symmetric(horizontal: _T.s12),
       child: Row(
         children: [
-          Text(
-            'Rows: $totalItems',
-            style: const TextStyle(color: Colors.white70),
-          ),
           const Spacer(),
           Text(
-            'Page ${page + 1} / $totalPages',
+            _rangeText,
             style: const TextStyle(
-              color: Colors.white,
+              color: _T.textPrimary,
+              fontSize: _T.fsLg,
               fontWeight: FontWeight.w600,
             ),
           ),
-          const SizedBox(width: 12),
-          IconButton(
-            onPressed: page > 0 ? () => onPageChanged(page - 1) : null,
-            icon: const Icon(Icons.chevron_left),
-            color: Colors.white,
-            disabledColor: Colors.white38,
+          const SizedBox(width: _T.s8),
+          _navButton(
+            tooltip: 'Previous page',
+            icon: Icons.chevron_left,
+            onPressed: _hasPrev ? () => onPageChanged(page - 1) : null,
+            size: _T.tapTarget,
           ),
-          IconButton(
-            onPressed: page + 1 < totalPages
-                ? () => onPageChanged(page + 1)
-                : null,
-            icon: const Icon(Icons.chevron_right),
-            color: Colors.white,
-            disabledColor: Colors.white38,
+          _navButton(
+            tooltip: 'Next page',
+            icon: Icons.chevron_right,
+            onPressed: _hasNext ? () => onPageChanged(page + 1) : null,
+            size: _T.tapTarget,
           ),
-          const SizedBox(width: 12),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            decoration: BoxDecoration(
-              color: controlBg,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.white24),
-            ),
-            child: DropdownButton<int>(
-              value: rowsPerPage,
-              underline: const SizedBox(),
-              dropdownColor: controlBg,
-              iconEnabledColor: Colors.white,
-              style: const TextStyle(color: Colors.white),
-              items: pageSizeOptions
-                  .map(
-                    (size) => DropdownMenuItem<int>(
-                      value: size,
-                      child: Text('$size / page'),
-                    ),
-                  )
-                  .toList(),
-              onChanged: (value) {
-                if (value != null) onRowsPerPageChanged(value);
-              },
-            ),
-          ),
+          const SizedBox(width: _T.s12),
+          _pageSizeDropdown(compact: false),
         ],
       ),
     );
   }
 
   Widget _buildCompact() {
-    const small = TextStyle(color: Colors.white70, fontSize: 12);
+    const small = TextStyle(color: _T.textSecondary, fontSize: _T.fsSm);
     final rowsText = grandTotal == null
         ? 'Rows: $totalItems'
         : 'Rows: $totalItems / $grandTotal';
 
     return Container(
-      color: const Color(0xFF0F2027),
-      padding: const EdgeInsets.symmetric(horizontal: 8),
+      color: _T.pageBg,
+      padding: const EdgeInsets.symmetric(horizontal: _T.s8),
       child: Row(
         children: [
           Expanded(
@@ -121,68 +104,83 @@ class PatrolReportPagination extends StatelessWidget {
           Text(
             'Page ${page + 1} / $totalPages',
             style: const TextStyle(
-              color: Colors.white,
-              fontSize: 12,
+              color: _T.textPrimary,
+              fontSize: _T.fsSm,
               fontWeight: FontWeight.w600,
             ),
           ),
-          _compactNavButton(
+          _navButton(
+            tooltip: 'Previous page',
             icon: Icons.chevron_left,
-            onPressed: page > 0 ? () => onPageChanged(page - 1) : null,
+            onPressed: _hasPrev ? () => onPageChanged(page - 1) : null,
+            size: _T.tapTargetCompact,
           ),
-          _compactNavButton(
+          _navButton(
+            tooltip: 'Next page',
             icon: Icons.chevron_right,
-            onPressed: page + 1 < totalPages
-                ? () => onPageChanged(page + 1)
-                : null,
+            onPressed: _hasNext ? () => onPageChanged(page + 1) : null,
+            size: _T.tapTargetCompact,
           ),
-          const SizedBox(width: 4),
-          Container(
-            height: 30,
-            alignment: Alignment.center,
-            padding: const EdgeInsets.symmetric(horizontal: 6),
-            decoration: BoxDecoration(
-              color: _controlBg,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.white24),
-            ),
-            child: DropdownButton<int>(
-              value: rowsPerPage,
-              isDense: true,
-              iconSize: 18,
-              underline: const SizedBox(),
-              dropdownColor: _controlBg,
-              iconEnabledColor: Colors.white,
-              style: const TextStyle(color: Colors.white, fontSize: 12),
-              items: pageSizeOptions
-                  .map(
-                    (size) => DropdownMenuItem<int>(
-                      value: size,
-                      child: Text('$size / page'),
-                    ),
-                  )
-                  .toList(),
-              onChanged: (value) {
-                if (value != null) onRowsPerPageChanged(value);
-              },
-            ),
-          ),
+          const SizedBox(width: _T.s4),
+          _pageSizeDropdown(compact: true),
         ],
       ),
     );
   }
 
-  Widget _compactNavButton({
+  Widget _pageSizeDropdown({required bool compact}) {
+    return Tooltip(
+      message: 'Rows per page',
+      child: Container(
+        height: compact ? 30 : null,
+        alignment: compact ? Alignment.center : null,
+        padding: EdgeInsets.symmetric(horizontal: compact ? 6 : _T.s8),
+        decoration: BoxDecoration(
+          color: _T.surface,
+          borderRadius: BorderRadius.circular(_T.s8),
+          border: Border.all(color: _T.border),
+        ),
+        child: DropdownButton<int>(
+          value: rowsPerPage,
+          isDense: compact,
+          iconSize: compact ? 18 : 24,
+          underline: const SizedBox(),
+          dropdownColor: _T.surface,
+          iconEnabledColor: _T.textPrimary,
+          style: TextStyle(
+            color: _T.textPrimary,
+            fontSize: compact ? _T.fsSm : _T.fsLg,
+          ),
+          items: pageSizeOptions
+              .map(
+                (size) => DropdownMenuItem<int>(
+                  value: size,
+                  child: Text('$size / page'),
+                ),
+              )
+              .toList(),
+          onChanged: (value) {
+            if (value != null) onRowsPerPageChanged(value);
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _navButton({
+    required String tooltip,
     required IconData icon,
     required VoidCallback? onPressed,
+    required double size,
   }) {
     return IconButton(
+      tooltip: tooltip,
       onPressed: onPressed,
-      icon: Icon(icon, size: 20),
+      icon: Icon(icon, size: size >= _T.tapTarget ? 24 : 20),
       padding: EdgeInsets.zero,
-      constraints: const BoxConstraints.tightFor(width: 32, height: 36),
-      color: Colors.white,
-      disabledColor: Colors.white38,
+      constraints: BoxConstraints.tightFor(width: size, height: size),
+      color: _T.textPrimary,
+      disabledColor: _T.textMuted,
     );
   }
 }

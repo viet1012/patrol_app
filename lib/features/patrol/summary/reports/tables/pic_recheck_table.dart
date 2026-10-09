@@ -45,7 +45,8 @@ class PicRecheckTable extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SummaryGridTable(
-      titleCenter: 'HSE re-check (All)',
+      titleLeft: SummaryGridStyle.groupHseRecheck,
+      titleCenter: SummaryGridStyle.subtitleHseRecheck,
       titleRight: RatePair(
         goodLabel: 'OK',
         goodRate: fac.okRate,

@@ -5,6 +5,7 @@ import 'package:chuphinh/core/models/division_summary.dart';
 import 'package:chuphinh/shared/widgets/glass_action_button.dart';
 import 'package:chuphinh/features/patrol/summary/reports/tables/pic_summary_view.dart';
 import 'package:chuphinh/features/patrol/summary/reports/widgets/division_summary_table.dart';
+import 'package:chuphinh/features/patrol/summary/reports/widgets/summary_grid_style.dart';
 
 class BeforeAfterSummaryDialog extends StatefulWidget {
   final String fromD;
@@ -110,15 +111,19 @@ class _BeforeAfterSummaryDialogState extends State<BeforeAfterSummaryDialog> {
   }
 
   Widget _buildHeader() {
+    // Desktop: nút 36 + padding dọc 8×2 = cao ~52.
     return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 8, 8, 6),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       child: LayoutBuilder(
         builder: (context, constraints) {
           return Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
+              // Icon 18 + padding 8×2 + viền 1×2 = 36×36.
               GlassActionButton(
                 icon: Icons.close_rounded,
+                size: 18,
+                padding: EdgeInsets.zero,
                 onTap: () => Navigator.of(context).pop(),
               ),
               const SizedBox(width: 8),
@@ -186,7 +191,8 @@ class _BeforeAfterSummaryDialogState extends State<BeforeAfterSummaryDialog> {
   }
 }
 
-/// Tiêu đề + khoảng ngày của dialog; [compact] xếp dọc cho màn hình hẹp.
+/// Tiêu đề + chip fac, bên phải chip khoảng ngày / type. [compact]: tiêu đề
+/// dòng 1, các chip xuống dòng 2.
 class _SummaryHeaderText extends StatelessWidget {
   final String fac;
   final String fromD;
@@ -202,65 +208,103 @@ class _SummaryHeaderText extends StatelessWidget {
     required this.compact,
   });
 
+  static const _title = Text(
+    'HSE PATROL SUMMARY',
+    maxLines: 1,
+    overflow: TextOverflow.ellipsis,
+    style: TextStyle(
+      color: Colors.white,
+      fontSize: 16,
+      fontWeight: FontWeight.w800,
+    ),
+  );
+
   @override
   Widget build(BuildContext context) {
-    final title = 'HSE PATROL SUMMARY → $fac';
+    final facChip = _HeaderChip(text: fac, accent: true);
+    final dateChip = _HeaderChip(
+      icon: Icons.calendar_month_rounded,
+      text: '$fromD → $toD',
+    );
+    final typeChip = _HeaderChip(icon: Icons.assignment_outlined, text: type);
 
     if (compact) {
       return Column(
+        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            title,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 13,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            '$fromD → $toD • $type',
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: Colors.white70,
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-            ),
+          _title,
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [facChip, dateChip, typeChip],
           ),
         ],
       );
     }
 
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Flexible(
-          child: Text(
-            title,
+        const Flexible(child: _title),
+        const SizedBox(width: 8),
+        facChip,
+        const Spacer(),
+        const SizedBox(width: 12),
+        dateChip,
+        const SizedBox(width: 6),
+        typeChip,
+      ],
+    );
+  }
+}
+
+/// Chip nhỏ trên header dialog. [accent]: nền vàng cam nhạt (fac); mặc định
+/// glass (khoảng ngày / type).
+class _HeaderChip extends StatelessWidget {
+  final String text;
+  final IconData? icon;
+  final bool accent;
+
+  const _HeaderChip({required this.text, this.icon, this.accent = false});
+
+  static const _accent = SummaryGridStyle.summaryTitleText;
+
+  @override
+  Widget build(BuildContext context) {
+    final fg = accent ? _accent : Colors.white.withValues(alpha: 0.85);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: accent
+            ? _accent.withValues(alpha: 0.16)
+            : Colors.white.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+          color: accent
+              ? _accent.withValues(alpha: 0.45)
+              : Colors.white.withValues(alpha: 0.14),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null) ...[
+            Icon(icon, size: 14, color: fg),
+            const SizedBox(width: 6),
+          ],
+          Text(
+            text,
             maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
+            style: TextStyle(
+              color: fg,
+              fontSize: 13,
+              fontWeight: accent ? FontWeight.w800 : FontWeight.w700,
             ),
           ),
-        ),
-        const SizedBox(width: 12),
-        Flexible(
-          child: Text(
-            '$fromD → $toD   •   $type',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.right,
-            style: const TextStyle(color: Colors.white70, fontSize: 14),
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

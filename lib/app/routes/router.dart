@@ -7,31 +7,58 @@ import 'package:chuphinh/shared/camera/camera_preview_box.dart';
 import 'package:chuphinh/features/home/patrol_home_screen.dart';
 import 'package:chuphinh/core/models/patrol_group.dart';
 import 'package:chuphinh/features/auth/login/login_page.dart';
-import 'package:chuphinh/core/models/auth_me.dart';
+import 'package:chuphinh/app/routes/route_target.dart';
+import 'package:chuphinh/app/splash/splash_page.dart';
+import 'package:chuphinh/core/session/auth_session.dart';
 import 'package:chuphinh/core/session/session_store.dart';
-import 'package:chuphinh/features/patrol/summary/patrol_report_table.dart';
+import 'package:chuphinh/features/patrol/summary/patrol_report_table_page.dart';
 
 final router = GoRouter(
   navigatorKey: appNavigatorKey,
   // CameraPreviewBox tự suspend khi route của nó bị page route khác che.
   observers: [CameraPreviewRouteObserver.instance],
 
+  // Chạy lại redirect khi khôi phục phiên (F5) xong.
+  refreshListenable: AuthSession.instance,
+
   // ============================================================
   // GLOBAL AUTH GUARD
   // ============================================================
   redirect: (context, state) {
+    final location = state.matchedLocation;
+    final isLoginPage = location == RouteTarget.login;
+    final isSplash = location == RouteTarget.splash;
+
+    // URL đích: ở splash thì lấy từ ?from=, còn lại là URL hiện tại.
+    final target = isSplash
+        ? state.uri.queryParameters['from']
+        : state.uri.toString();
+
+    // Đang khôi phục phiên: chờ ở màn hình splash, giữ URL đích.
+    if (AuthSession.instance.isRestoring) {
+      if (isSplash) return null;
+      final from = RouteTarget.safe(target);
+      return from == null
+          ? RouteTarget.splash
+          : '${RouteTarget.splash}?from=${Uri.encodeComponent(from)}';
+    }
+
     final authenticatedAccount = SessionStore.authenticatedAccount;
 
     final isAuthenticated =
-        authenticatedAccount != null &&
-        authenticatedAccount.trim().isNotEmpty;
+        authenticatedAccount != null && authenticatedAccount.trim().isNotEmpty;
 
-    final isLoginPage = state.matchedLocation == '/';
-
-    // Chưa login -> chỉ được ở Login
+    // Chưa login -> chỉ được ở Login (giữ ?from= để quay lại sau khi login).
     if (!isAuthenticated) {
-      return isLoginPage ? null : '/';
+      if (isLoginPage) return null;
+      final from = RouteTarget.safe(target);
+      return from == null
+          ? RouteTarget.login
+          : '${RouteTarget.login}?from=${Uri.encodeComponent(from)}';
     }
+
+    // Đã login, đang ở splash -> về trang đích.
+    if (isSplash) return RouteTarget.afterLogin(target);
 
     // Đã login mà đang ở Login:
     // KHÔNG tự redirect sang Home.
@@ -44,8 +71,14 @@ final router = GoRouter(
       path: '/',
       pageBuilder: (context, state) => NoTransitionPage(
         key: state.pageKey,
-        child: const LoginPage(),
+        child: LoginPage(from: state.uri.queryParameters['from']),
       ),
+    ),
+
+    GoRoute(
+      path: RouteTarget.splash,
+      pageBuilder: (context, state) =>
+          NoTransitionPage(key: state.pageKey, child: const SplashPage()),
     ),
 
     GoRoute(
@@ -60,54 +93,24 @@ final router = GoRouter(
           return const LoginPage();
         }
 
-        return PatrolHomeScreen(
-          accountCode: accountCode.trim(),
-        );
+        return PatrolHomeScreen(accountCode: accountCode.trim());
       },
     ),
 
     GoRoute(
       path: '/home/summary',
       builder: (context, state) {
-        final authenticatedAccount =
-            SessionStore.authenticatedAccount;
+        final authenticatedAccount = SessionStore.authenticatedAccount;
 
         if (authenticatedAccount == null ||
             authenticatedAccount.trim().isEmpty) {
           return const LoginPage();
         }
 
-        final extra = state.extra;
-        final group =
-            state.uri.queryParameters['group'] ?? '';
-        final plant =
-            state.uri.queryParameters['plant'] ?? '';
-
-        AuthMe? me;
-
-        if (extra is Map<String, dynamic>) {
-          me = extra['me'] as AuthMe?;
-        }
-
-        if (me == null) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (context.mounted) {
-              context.go('/home');
-            }
-          });
-
-          return const Scaffold(
-            body: Center(
-              child: CircularProgressIndicator(),
-            ),
-          );
-        }
-
-        return PatrolReportTable(
-          patrolGroup: group,
-          plant: plant,
+        // Mọi tham số (group, plant, bộ lọc) nằm trong URL.
+        return PatrolReportTablePage(
           accountCode: authenticatedAccount.trim(),
-          auth: me,
+          uri: state.uri,
         );
       },
     ),
@@ -115,52 +118,44 @@ final router = GoRouter(
     GoRoute(
       path: '/after/:qr',
       builder: (context, state) {
-        final authenticatedAccount =
-            SessionStore.authenticatedAccount;
+        final authenticatedAccount = SessionStore.authenticatedAccount;
 
         if (authenticatedAccount == null ||
             authenticatedAccount.trim().isEmpty) {
           return const LoginPage();
         }
 
-        final qr = state.pathParameters['qr'] ?? '';
-        final extra = state.extra;
+        // /after/<qr>?group=<PatrolGroup.name>
+        final qr = (state.pathParameters['qr'] ?? '').trim();
+        final groupName = state.uri.queryParameters['group'];
+        final pg = PatrolGroup.values
+            .where((g) => g.name == groupName)
+            .firstOrNull;
 
-        if (extra is Map<String, dynamic>) {
-          final qrCode =
-              extra['qrCode']?.toString() ?? qr;
-          final pg = extra['patrolGroup'];
-
-          if (pg is! PatrolGroup) {
-            return const _MissingExtraPage();
-          }
-
-          return AfterReportScreen(
-            // Không tin accountCode từ extra nữa.
-            accountCode: authenticatedAccount.trim(),
-            qrCode: qrCode,
-            patrolGroup: pg,
-          );
+        if (qr.isEmpty || pg == null) {
+          return const _InvalidLinkPage();
         }
 
-        return const _MissingExtraPage();
+        return AfterReportScreen(
+          accountCode: authenticatedAccount.trim(),
+          qrCode: qr,
+          patrolGroup: pg,
+        );
       },
     ),
   ],
 );
 
-class _MissingExtraPage extends StatelessWidget {
-  const _MissingExtraPage();
+class _InvalidLinkPage extends StatelessWidget {
+  const _InvalidLinkPage();
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Invalid link'),
-      ),
+      appBar: AppBar(title: const Text('Invalid link')),
       body: const Center(
         child: Text(
-          'Thiếu dữ liệu điều hướng (extra).\n'
+          'Link thiếu hoặc sai tham số (qr, group).\n'
           'Vui lòng mở từ trong app.',
           textAlign: TextAlign.center,
         ),

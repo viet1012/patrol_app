@@ -4,6 +4,7 @@ import 'dart:html' as html;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:chuphinh/app/routes/route_target.dart';
 import 'package:chuphinh/core/api/auth_api.dart';
 import 'package:chuphinh/core/models/auth_result.dart';
 import 'package:chuphinh/features/auth/register/register_page.dart';
@@ -19,7 +20,10 @@ export 'package:chuphinh/features/auth/login/widgets/auth_input.dart';
 export 'package:chuphinh/features/auth/login/widgets/loading_dialog.dart';
 
 class LoginPage extends StatefulWidget {
-  const LoginPage({super.key});
+  /// Trang cần quay lại sau khi đăng nhập (`?from=`); không hợp lệ -> /home.
+  final String? from;
+
+  const LoginPage({super.key, this.from});
 
   @override
   State<LoginPage> createState() => _LoginPageState();
@@ -169,7 +173,7 @@ class _LoginPageState extends State<LoginPage> {
         if (!mounted) return;
 
         html.window.sessionStorage.remove(_reloadSessionKey);
-        context.go('/home', extra: {'accountCode': normalizedAccount});
+        context.go(RouteTarget.afterLogin(widget.from));
         return;
       }
 
@@ -262,7 +266,7 @@ class _LoginPageState extends State<LoginPage> {
 
       if (!mounted) return;
 
-      context.go('/home', extra: {'accountCode': code});
+      context.go(RouteTarget.afterLogin(widget.from));
       return;
     }
 
