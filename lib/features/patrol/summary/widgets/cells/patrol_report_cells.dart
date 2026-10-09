@@ -16,6 +16,7 @@ class PatrolReportCells {
     double width, {
     TextAlign align = TextAlign.left,
     bool tooltip = false,
+    int maxLines = maxTextLines,
   }) {
     final value = text.trim().isEmpty ? '-' : text.trim();
     final content = Padding(
@@ -24,7 +25,7 @@ class PatrolReportCells {
         value,
         style: const TextStyle(fontSize: 13),
         textAlign: align,
-        maxLines: maxTextLines,
+        maxLines: maxLines,
         overflow: TextOverflow.ellipsis,
       ),
     );

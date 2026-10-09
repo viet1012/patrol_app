@@ -48,6 +48,9 @@ class PatrolReportTableColumns {
       PatrolReportThumbSize.regularWidth +
       2 * PatrolReportThumbSize.cellPadding;
 
+  /// Cột tên người: PIC, Assign.
+  static const double _wPerson = 130;
+
   static List<PatrolReportColumnSpec> build() {
     return [
       PatrolReportColumnSpec(
@@ -184,10 +187,17 @@ class PatrolReportTableColumns {
       ),
       PatrolReportColumnSpec(
         label: 'PIC',
-        width: 90,
+        width: _wPerson,
         align: TextAlign.left,
         queryKey: 'pic',
         valueGetter: (e) => e.pic ?? '',
+      ),
+      PatrolReportColumnSpec(
+        label: 'Assign',
+        width: _wPerson,
+        title: 'AT Assign',
+        align: TextAlign.left,
+        valueGetter: (e) => e.atAssign ?? '',
       ),
       PatrolReportColumnSpec(
         label: 'Check Info',

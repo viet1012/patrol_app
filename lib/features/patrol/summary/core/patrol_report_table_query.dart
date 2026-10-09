@@ -66,6 +66,7 @@ class PatrolReportTableQuery {
           row.countermeasure,
           row.checkInfo,
           row.pic ?? '',
+          row.atAssign ?? '',
           row.atPic ?? '',
           row.atStatus ?? '',
           row.atComment ?? '',

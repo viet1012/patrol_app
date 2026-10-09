@@ -108,6 +108,13 @@ class PatrolReportRow extends StatelessWidget {
         return PatrolReportCells.dueStatus(r, w);
       case 'PIC':
         return text(r.pic);
+      case 'Assign':
+        return PatrolReportCells.text(
+          r.atAssign ?? '-',
+          w,
+          tooltip: true,
+          maxLines: 2,
+        );
       case 'Check Info':
         return text(r.checkInfo);
       case 'Risk F':
