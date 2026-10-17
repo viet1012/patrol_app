@@ -5,6 +5,7 @@ import 'package:chuphinh/core/models/fixed_asset_audit_save_response.dart';
 import 'package:chuphinh/core/models/fixed_asset_audit_summary.dart';
 import 'package:chuphinh/core/models/fixed_asset_machine.dart';
 import 'package:chuphinh/core/models/fixed_asset_machine_location.dart';
+import 'package:chuphinh/core/models/fixed_asset_qr_mismatch.dart';
 import 'package:chuphinh/core/models/fixed_asset_scan_info.dart';
 import 'package:chuphinh/core/models/fixed_asset_zone_lock.dart';
 import 'package:chuphinh/core/models/fixed_asset_zone_progress.dart';
@@ -55,6 +56,30 @@ class FixedAssetApi {
       'floor': floor,
       'positionA': positionA,
     });
+  }
+
+  /// Máy cần in lại QR (lần quét mới nhất trong kỳ có QrMismatch = 1).
+  /// [fac] rỗng/null: mọi Fac.
+  static Future<List<FixedAssetQrMismatch>> fetchQrMismatch({
+    String? fac,
+  }) async {
+    final f = fac?.trim() ?? '';
+    try {
+      final Response res = await DioClient.get(
+        '$_base/qr-mismatch',
+        queryParameters: {if (f.isNotEmpty) 'fac': f},
+      );
+
+      return _extractList(res.data)
+          .whereType<Map>()
+          .map(
+            (e) => FixedAssetQrMismatch.fromJson(Map<String, dynamic>.from(e)),
+          )
+          .where((e) => e.machineCode.isNotEmpty)
+          .toList();
+    } on DioException catch (e) {
+      throw Exception(DioErrorHandler.handle(e));
+    }
   }
 
   /// MachineCode đã có ít nhất một record audit (global, không lọc location).

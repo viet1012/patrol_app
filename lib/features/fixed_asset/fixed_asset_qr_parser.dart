@@ -32,6 +32,33 @@ String extractFixedAssetMachineCode(String rawQr) {
   return qr;
 }
 
+/// Nội dung QR KVH_ mới: KVH_{machineCode}_{floor}_{positionAA}[_{tên}].
+///
+/// Chỉ trả nội dung khi [parseFixedAssetQr] đọc lại ra ĐÚNG machineCode,
+/// Floor, PositionAA (ví dụ field chứa "_" hoặc rỗng -> null): QR in ra
+/// luôn quét được bằng chính parser này.
+String? buildFixedAssetQr({
+  required String machineCode,
+  required String floor,
+  required String positionAA,
+  String displayName = '',
+}) {
+  final code = machineCode.trim();
+  final f = floor.trim();
+  final aa = positionAA.trim();
+  final name = displayName.trim();
+  if (code.isEmpty || f.isEmpty || aa.isEmpty) return null;
+
+  final content = name.isEmpty ? 'KVH_${code}_${f}_$aa' : 'KVH_${code}_${f}_${aa}_$name';
+  final parsed = parseFixedAssetQr(content);
+  if (parsed.machineCode != code ||
+      parsed.floor != f ||
+      parsed.positionAA != aa) {
+    return null;
+  }
+  return content;
+}
+
 /// Tách thêm Floor + PositionAA (+ tên hiển thị) từ QR KVH_ cho AUTO.
 /// Chỉ nhận khi đủ segment; không suy đoán giá trị.
 FixedAssetQrData parseFixedAssetQr(String rawQr) {

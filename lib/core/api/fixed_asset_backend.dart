@@ -2,6 +2,7 @@ import 'package:chuphinh/core/models/fixed_asset_audit_check_response.dart';
 import 'package:chuphinh/core/models/fixed_asset_audit_save_response.dart';
 import 'package:chuphinh/core/models/fixed_asset_audit_summary.dart';
 import 'package:chuphinh/core/models/fixed_asset_machine.dart';
+import 'package:chuphinh/core/models/fixed_asset_qr_mismatch.dart';
 import 'package:chuphinh/core/models/fixed_asset_scan_info.dart';
 import 'package:chuphinh/core/models/fixed_asset_zone_lock.dart';
 import 'package:chuphinh/core/models/fixed_asset_zone_progress.dart';
@@ -14,6 +15,10 @@ class FixedAssetBackend {
 
   // MAP hierarchy (MANUAL cascade + "use the QR's location").
   Future<List<String>> fetchFacs() => FixedAssetApi.fetchFacs();
+
+  /// Máy cần in lại QR (màn "In lại QR" + badge ở home).
+  Future<List<FixedAssetQrMismatch>> fetchQrMismatch({String? fac}) =>
+      FixedAssetApi.fetchQrMismatch(fac: fac);
 
   Future<List<String>> fetchFloors({required String fac}) =>
       FixedAssetApi.fetchFloors(fac: fac);

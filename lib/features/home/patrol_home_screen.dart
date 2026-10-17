@@ -18,6 +18,9 @@ import 'package:chuphinh/shared/widgets/common_ui_helper.dart';
 import 'package:chuphinh/shared/utils/plant_constants.dart';
 import 'package:chuphinh/core/models/patrol_group.dart';
 import 'package:chuphinh/features/fixed_asset/fixed_asset_screen.dart';
+import 'package:chuphinh/features/fixed_asset/reprint/fixed_asset_reprint_badge.dart';
+import 'package:chuphinh/features/fixed_asset/reprint/fixed_asset_reprint_screen.dart';
+import 'package:chuphinh/features/fixed_asset/reprint/fixed_asset_reprint_strings.dart';
 import 'package:chuphinh/core/models/auth_me.dart';
 import 'package:chuphinh/core/models/hse_patrol_team_model.dart';
 import 'package:chuphinh/core/models/machine_model.dart';
@@ -58,6 +61,9 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
   bool _needManualSelect = true;
   bool _qrHandled = false;
   AuthMe? _authMe;
+
+  /// Tăng khi quay về từ màn Fixed Asset / In lại QR: badge tải lại số máy.
+  int _reprintBadgeTick = 0;
 
   // Chỉ dùng để chặn init trùng trong trường hợp widget bị gắn lại bất thường.
   bool _initializing = false;
@@ -668,16 +674,32 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
     required Color color,
     required String titleScreen,
   }) {
-    // Fixed Asset không thuộc workflow Patrol: chỉ có một action.
+    // Fixed Asset không thuộc workflow Patrol: kiểm kê + in lại QR.
     if (group == PatrolGroup.FixedAsset) {
       return Padding(
         padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
-        child: _patrolButton(
-          number: '1)',
-          title: 'Open Fixed Asset',
-          color: color,
-          enabled: true,
-          onTap: _openFixedAsset,
+        child: Column(
+          children: [
+            _patrolButton(
+              number: '1)',
+              title: 'Open Fixed Asset',
+              color: color,
+              enabled: true,
+              onTap: _openFixedAsset,
+            ),
+            const SizedBox(height: 16),
+            _patrolButton(
+              number: '2)',
+              title: FixedAssetReprintStrings.menuTitle,
+              color: color,
+              enabled: true,
+              onTap: _openFixedAssetReprint,
+              badge: FixedAssetReprintBadge(
+                key: ValueKey('reprint|$_reprintBadgeTick'),
+                color: color,
+              ),
+            ),
+          ],
         ),
       );
     }
@@ -748,6 +770,7 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
     required Color color,
     required bool enabled,
     VoidCallback? onTap,
+    Widget? badge,
   }) {
     return Opacity(
       opacity: enabled ? 1 : .5,
@@ -799,6 +822,7 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
                     ],
                   ),
                 ),
+                if (badge != null) ...[badge, const SizedBox(width: 10)],
                 if (enabled)
                   CallToActionArrow(color: color)
                 else
@@ -825,7 +849,19 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
           userName: _employeeName,
         ),
       ),
-    );
+    ).then((_) => _refreshReprintBadge());
+  }
+
+  /// "In lại QR" lấy mọi xưởng (audit lưu theo xưởng, không theo nhà máy).
+  void _openFixedAssetReprint() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const FixedAssetReprintScreen()),
+    ).then((_) => _refreshReprintBadge());
+  }
+
+  void _refreshReprintBadge() {
+    if (mounted) setState(() => _reprintBadgeTick++);
   }
 
   void _openBefore(PatrolGroup group, String titleScreen) {
