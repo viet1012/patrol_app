@@ -287,6 +287,11 @@ class FixedAssetApi {
     bool confirmLocationMismatch = false,
     // "AUTO" | "MANUAL"; bỏ qua khi null.
     String? mode,
+    // Vị trí in trên QR (MANUAL); field null không gửi.
+    String? qrFloor,
+    String? qrPositionA,
+    String? qrPositionAA,
+    bool? qrLocationMismatch,
   }) async {
     try {
       // Dùng DioClient.dio trực tiếp (không qua _retry): POST này INSERT
@@ -304,6 +309,11 @@ class FixedAssetApi {
           'note': note,
           'confirmLocationMismatch': confirmLocationMismatch,
           if (mode != null) 'mode': mode,
+          if (qrFloor != null) 'qrFloor': qrFloor,
+          if (qrPositionA != null) 'qrPositionA': qrPositionA,
+          if (qrPositionAA != null) 'qrPositionAA': qrPositionAA,
+          if (qrLocationMismatch != null)
+            'qrLocationMismatch': qrLocationMismatch,
         },
       );
 

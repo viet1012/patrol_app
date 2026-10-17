@@ -110,11 +110,23 @@ mixin _CaptureMixin
 
     final uploadInput = html.FileUploadInputElement()
       ..accept = 'image/*'
-      ..multiple = true;
+      ..multiple = true
+      ..style.display = 'none';
 
+    // Safari/iOS và một số WebView không mở picker hoặc không bắn `change`
+    // với input chưa gắn vào DOM. click() vẫn gọi đồng bộ trong onTap.
+    html.document.body?.append(uploadInput);
+    final picked = Future.any<void>([
+      uploadInput.onChange.first,
+      uploadInput.on['cancel'].first,
+    ]);
     uploadInput.click();
 
-    await uploadInput.onChange.first;
+    try {
+      await picked;
+    } finally {
+      uploadInput.remove();
+    }
 
     final files = uploadInput.files;
     if (files == null || files.isEmpty) return;

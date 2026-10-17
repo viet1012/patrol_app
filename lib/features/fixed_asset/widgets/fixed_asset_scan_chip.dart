@@ -43,7 +43,9 @@ class FixedAssetScanChip extends StatefulWidget {
     FixedAssetScanStatus.mismatchSaved ||
     FixedAssetScanStatus.unknownSaved ||
     FixedAssetScanStatus.zoneLocked ||
-    FixedAssetScanStatus.needsLocation => amber,
+    FixedAssetScanStatus.needsLocation ||
+    FixedAssetScanStatus.qrLocationMismatch ||
+    FixedAssetScanStatus.qrReprintSaved => amber,
   };
 
   @override

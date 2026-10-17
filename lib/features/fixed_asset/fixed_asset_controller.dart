@@ -30,6 +30,7 @@ class FixedAssetController extends ChangeNotifier {
     required this.accountCode,
     required this.userName,
     required this.confirmMismatch,
+    this.confirmQrMismatch,
     required this.showError,
     required this.resetQr,
     this.onScanAccepted,
@@ -37,6 +38,8 @@ class FixedAssetController extends ChangeNotifier {
     this.onManualFieldMissing,
     this.api = const FixedAssetBackend(),
     this.zoneLockEnabled = FixedAssetFeatures.zoneLock,
+    this.autoModeEnabled = FixedAssetFeatures.autoMode,
+    this.masterMismatchDialogEnabled = FixedAssetFeatures.masterMismatchDialog,
   }) {
     manual = FixedAssetManualCascade(
       onChanged: _notify,
@@ -49,6 +52,10 @@ class FixedAssetController extends ChangeNotifier {
   final String accountCode;
   final String userName;
   final FixedAssetConfirmMismatch confirmMismatch;
+
+  /// MANUAL: dialog "QR không khớp vị trí đang chọn". null (không có UI)
+  /// = đi tiếp như "Vẫn lưu" (vẫn đánh dấu qrLocationMismatch).
+  final FixedAssetConfirmQrMismatch? confirmQrMismatch;
   final ValueChanged<String> showError;
   final VoidCallback resetQr;
   final void Function(String rawQr, String machineCode)? onScanAccepted;
@@ -67,6 +74,14 @@ class FixedAssetController extends ChangeNotifier {
   /// được). false: không zone-lock, không chặn, không tự hiện khu vực dang
   /// dở. saveAudit vẫn gửi mode.
   final bool zoneLockEnabled;
+
+  /// Cho phép AUTO ([FixedAssetFeatures.autoMode]; test ghi đè được).
+  /// false: mặc định MANUAL và không chuyển được sang AUTO.
+  final bool autoModeEnabled;
+
+  /// MANUAL hiện dialog "Sai vị trí máy" ([FixedAssetFeatures
+  /// .masterMismatchDialog]; test ghi đè được). false: coi như "Vẫn lưu".
+  final bool masterMismatchDialogEnabled;
 
   late final FixedAssetManualCascade manual;
 
@@ -88,7 +103,9 @@ class FixedAssetController extends ChangeNotifier {
   // MODE + AUTO LOCATION
   // ============================================================
 
-  FixedAssetLocationMode _locationMode = FixedAssetLocationMode.auto;
+  late FixedAssetLocationMode _locationMode = autoModeEnabled
+      ? FixedAssetLocationMode.auto
+      : FixedAssetLocationMode.manual;
   FixedAssetLocationMode get locationMode => _locationMode;
 
   bool get isAutoMode => _locationMode == FixedAssetLocationMode.auto;
@@ -186,6 +203,21 @@ class FixedAssetController extends ChangeNotifier {
   /// mọi POST /audit của pipeline đó, kể cả re-POST sau xác nhận.
   final Map<int, String> _auditModeByScan = <int, String>{};
 
+  /// MANUAL: vị trí QR so với vị trí đang chọn của từng pipeline, gửi kèm
+  /// mọi POST /audit của pipeline đó (kể cả re-POST sau xác nhận). AUTO
+  /// không có entry -> không gửi field QR.
+  final Map<int, FixedAssetQrLocationCheck> _qrCheckByScan =
+      <int, FixedAssetQrLocationCheck>{};
+
+  /// Scan hiện tại đã lưu với qrLocationMismatch = true.
+  bool _qrReprintSaved = false;
+
+  /// Nhãn "Cần in lại QR" trên status card.
+  bool get needsQrReprint =>
+      _qrReprintSaved &&
+      (_scanStatus == FixedAssetScanStatus.qrReprintSaved ||
+          _scanStatus == FixedAssetScanStatus.unknownSaved);
+
   bool get _pipelineBusy =>
       _activeScan != null && _activeScanMode == _modeGeneration;
 
@@ -251,6 +283,37 @@ class FixedAssetController extends ChangeNotifier {
   /// đổi; chỉ xóa khi kỳ kiểm kê đổi (period của audit-summary).
   final Set<String> _auditedMachineCodes = <String>{};
   Set<String> get auditedMachineCodes => _auditedMachineCodes;
+
+  /// MachineCode có lần quét mới nhất QR lệch vị trí (cần in lại QR, chưa
+  /// tính kiểm kê), dạng trim().toLowerCase(). Nguồn: POST lưu với
+  /// qrLocationMismatch / needsQrReprint và `needsQrReprint` của GET
+  /// /machines. Rời tập khi lưu lại đúng vị trí. Không giao với
+  /// [_auditedMachineCodes].
+  final Set<String> _qrReprintMachineCodes = <String>{};
+  Set<String> get qrReprintMachineCodes => _qrReprintMachineCodes;
+
+  /// Tăng mỗi khi hai tập trên đổi (có thể bớt phần tử, nên length không
+  /// còn là version).
+  int _auditedVersion = 0;
+  int get auditedVersion => _auditedVersion;
+
+  /// Lưu được tính kiểm kê: ✓, bỏ dấu in lại QR.
+  void _markAudited(String machineCode) {
+    final code = machineCode.trim().toLowerCase();
+    if (code.isEmpty) return;
+    final changed =
+        _auditedMachineCodes.add(code) | _qrReprintMachineCodes.remove(code);
+    if (changed) _auditedVersion++;
+  }
+
+  /// Lưu với QR lệch vị trí: dấu in lại QR, KHÔNG ✓.
+  void _markQrReprint(String machineCode) {
+    final code = machineCode.trim().toLowerCase();
+    if (code.isEmpty) return;
+    final changed =
+        _qrReprintMachineCodes.add(code) | _auditedMachineCodes.remove(code);
+    if (changed) _auditedVersion++;
+  }
 
   /// Gọi trong lúc mutate state khi danh sách machine bị clear.
   void _clearMachineSearch() {
@@ -319,6 +382,8 @@ class FixedAssetController extends ChangeNotifier {
   /// machine list của location hiện tại (auditedInPeriod theo kỳ mới).
   void _onAuditPeriodChanged() {
     _auditedMachineCodes.clear();
+    _qrReprintMachineCodes.clear();
+    _auditedVersion++;
     final location = activeLocation;
     if (location == null) {
       _notify();
@@ -491,7 +556,7 @@ class FixedAssetController extends ChangeNotifier {
   /// Kết quả zone-lock thành công gần nhất (null = chưa tải được lần nào).
   FixedAssetZoneLock? _serverLock;
 
-  /// Lần tải zone-lock gần nhất bị lỗi: chỉ [_optimisticLock] còn chặn.
+  /// Lần tải zone-lock gần nhất bị lỗi: không chặn (khóa server bị bỏ).
   bool _zoneLockFailed = false;
 
   /// Khóa đặt ngay sau lần lưu AUTO, trước khi server xác nhận.
@@ -543,11 +608,15 @@ class FixedAssetController extends ChangeNotifier {
     );
   }
 
-  /// Khu vực AUTO đang khóa: khóa lạc quan của phiên, hoặc khóa server (khi
-  /// lần tải gần nhất thành công). Zone-progress báo đã xong -> không khóa.
+  /// Khu vực AUTO đang khóa: chỉ theo `locked` của server (lần tải gần nhất
+  /// thành công). Zone-progress báo đã xong -> không khóa.
+  ///
+  /// [_optimisticLock] (FE tự suy từ zone-progress) KHÔNG còn chặn: BE quyết
+  /// định khóa qua `locked` (hiện luôn false). Muốn chặn lạc quan lại thì
+  /// dùng `_optimisticLock ?? _serverLockedZone`.
   FixedAssetAuditLocation? get lockedZone {
     if (!zoneLockEnabled) return null;
-    final candidate = _optimisticLock ?? _serverLockedZone;
+    final candidate = _serverLockedZone;
     if (candidate == null) return null;
     if (_zoneProgressOf(candidate)?.isDone ?? false) return null;
     return candidate;
@@ -572,9 +641,11 @@ class FixedAssetController extends ChangeNotifier {
   }
 
   /// Không kiểm tra được khóa: lần tải gần nhất lỗi, hoặc UNRESOLVED.
-  /// (NO_AUTO_AUDIT không phải lỗi.)
+  /// (NO_AUTO_AUDIT không phải lỗi.) Chỉ cảnh báo khi server từng báo
+  /// `locked = true`: không có khóa thì không có gì để kiểm tra.
   bool get isZoneLockUnverified =>
       zoneLockEnabled &&
+      (_serverLock?.locked ?? false) &&
       (_zoneLockFailed ||
       _serverLock?.reason == FixedAssetZoneLockReason.unresolved);
 
@@ -718,6 +789,7 @@ class FixedAssetController extends ChangeNotifier {
     _lastAuditedUserId = null;
     _lastAuditedUserName = null;
     _mismatchMaster = null;
+    _qrReprintSaved = false;
     if (_lastSeenQr != null) _lastSeenAt = DateTime.now();
     _scanChipText = null;
     _pendingLocationQr = null;
@@ -1118,6 +1190,7 @@ class FixedAssetController extends ChangeNotifier {
     _lastAuditedUserId = null;
     _lastAuditedUserName = null;
     _mismatchMaster = null;
+    _qrReprintSaved = false;
     // Immediate feedback in both modes; MANUAL shows its own text.
     _scanStatus = FixedAssetScanStatus.checking;
     if (!isAutoMode) _statusMessage = 'Đang kiểm tra $machineCode…';
@@ -1135,6 +1208,7 @@ class FixedAssetController extends ChangeNotifier {
       // Chỉ pipeline này tự trả cờ: pipeline cũ (mode trước) kết thúc muộn
       // không được xóa cờ của pipeline mới.
       _auditModeByScan.remove(generation);
+      _qrCheckByScan.remove(generation);
       if (_activeScan == generation) {
         _activeScan = null;
         _processingRawQr = null;
@@ -1172,6 +1246,32 @@ class FixedAssetController extends ChangeNotifier {
     }
 
     _notifyScanAccepted(rawQr, machineCode);
+
+    // Vị trí in trên QR phải trùng vị trí đang chọn (trước bước MASTER).
+    // Lệch: hỏi; "Vẫn lưu" thì đi tiếp và mọi POST mang qrLocationMismatch.
+    final qrCheck = fixedAssetManualQrCheck(parseFixedAssetQr(rawQr), location);
+    _qrCheckByScan[generation] = qrCheck;
+    if (qrCheck.mismatch) {
+      uxLog('QR location ${qrCheck.floor}/${qrCheck.positionAA} != selected');
+      final confirmed = await _confirmQrLocationMismatch(
+        generation,
+        FixedAssetQrMismatchPrompt(
+          machineCode: machineCode,
+          faName: _scannedFaName,
+          selected: location,
+          qr: qrCheck,
+        ),
+      );
+      if (!_isCurrentScan(generation)) {
+        _reportDropped(machineCode, 'đã đổi khu vực/chế độ');
+        return;
+      }
+      if (!confirmed) {
+        _markMismatchCancelled(generation, qrLocation: true);
+        _shortRepeatQr = _processingRawQr;
+        return;
+      }
+    }
 
     // Local check first when the selected location's list is loaded: a
     // machine that is not in it is asked about right away (no POST first).
@@ -1234,17 +1334,21 @@ class FixedAssetController extends ChangeNotifier {
           uxLog('scan-info failed: ${fixedAssetErrorText(error)}');
         });
 
-    final confirmed = await _confirmLocationMismatch(
-      generation,
-      FixedAssetMismatchPrompt(
-        machineCode: machineCode,
-        faName: _scannedFaName,
-        master: null,
-        actual: location,
-        masterUpdates: master,
-        manual: true,
-      ),
-    );
+    // Dialog MASTER tắt: như "Vẫn lưu" (MASTER vẫn tra để hiện trên card).
+    final confirmed = masterMismatchDialogEnabled
+        ? await _confirmLocationMismatch(
+            generation,
+            FixedAssetMismatchPrompt(
+              machineCode: machineCode,
+              faName: _scannedFaName,
+              master: null,
+              actual: location,
+              masterUpdates: master,
+              manual: true,
+            ),
+          )
+        : _isCurrentScan(generation);
+    if (!masterMismatchDialogEnabled) uxLog('master dialog off: auto SAVE');
 
     if (!_isCurrentScan(generation)) {
       _reportDropped(machineCode, 'đã đổi khu vực/chế độ');
@@ -1487,7 +1591,7 @@ class FixedAssetController extends ChangeNotifier {
     _mismatchMaster = mismatchMaster;
 
     if (status == FixedAssetScanStatus.alreadyAudited) {
-      _auditedMachineCodes.add(machineCode.trim().toLowerCase());
+      _markAudited(machineCode);
     }
 
     if (location != null) {
@@ -1516,12 +1620,17 @@ class FixedAssetController extends ChangeNotifier {
     }
   }
 
-  void _markMismatchCancelled(int generation) {
+  void _markMismatchCancelled(int generation, {bool qrLocation = false}) {
     if (!_isCurrentScan(generation)) return;
-    _scanStatus = FixedAssetScanStatus.locationMismatch;
-    _statusMessage = _autoUnmappedActual != null
-        ? 'Không có trong MAP - chưa lưu'
-        : 'Sai vị trí - chưa lưu';
+    if (qrLocation) {
+      _scanStatus = FixedAssetScanStatus.qrLocationMismatch;
+      _statusMessage = 'QR khác vị trí đang chọn - chưa lưu';
+    } else {
+      _scanStatus = FixedAssetScanStatus.locationMismatch;
+      _statusMessage = _autoUnmappedActual != null
+          ? 'Không có trong MAP - chưa lưu'
+          : 'Sai vị trí - chưa lưu';
+    }
     _notify();
   }
 
@@ -1560,22 +1669,54 @@ class FixedAssetController extends ChangeNotifier {
   Future<bool> _confirmLocationMismatch(
     int generation,
     FixedAssetMismatchPrompt prompt,
-  ) async {
+  ) {
+    return _runConfirm(
+      generation,
+      prompt.machineCode,
+      manual: prompt.manual,
+      show: () => confirmMismatch(prompt),
+    );
+  }
+
+  /// MANUAL: dialog "QR không khớp vị trí đang chọn" (cùng cơ chế chặn scan
+  /// như dialog sai vị trí). Không có UI -> coi như "Vẫn lưu".
+  Future<bool> _confirmQrLocationMismatch(
+    int generation,
+    FixedAssetQrMismatchPrompt prompt,
+  ) {
+    final show = confirmQrMismatch;
+    if (show == null) return Future.value(_isCurrentScan(generation));
+    _scanStatus = FixedAssetScanStatus.qrLocationMismatch;
+    _notify();
+    return _runConfirm(
+      generation,
+      prompt.machineCode,
+      manual: true,
+      show: () => show(prompt),
+    );
+  }
+
+  Future<bool> _runConfirm(
+    int generation,
+    String machineCode, {
+    required bool manual,
+    required Future<bool> Function() show,
+  }) async {
     if (!_isCurrentScan(generation)) return false;
     // Only one dialog at a time (a pipeline of the previous mode may still
     // be waiting on one).
     if (_confirmOpen) return false;
 
     _confirmOpen = true;
-    _confirmCode = prompt.machineCode;
-    if (prompt.manual) {
-      _statusMessage = 'Xác nhận máy ${prompt.machineCode} trước';
+    _confirmCode = machineCode;
+    if (manual) {
+      _statusMessage = 'Xác nhận máy $machineCode trước';
       _notify();
     }
     uxLog('confirmMismatch called');
     bool confirmed;
     try {
-      confirmed = await confirmMismatch(prompt);
+      confirmed = await show();
     } finally {
       _confirmOpen = false;
       _confirmCode = null;
@@ -1601,6 +1742,7 @@ class FixedAssetController extends ChangeNotifier {
     final name = userName.trim();
     final saveUserName = name.isEmpty ? userId : name;
     final mode = _auditModeByScan[generation] ?? (isAutoMode ? 'AUTO' : 'MANUAL');
+    final qrCheck = _qrCheckByScan[generation];
 
     if (_scanStatus != FixedAssetScanStatus.saving) {
       _scanStatus = FixedAssetScanStatus.saving;
@@ -1626,6 +1768,10 @@ class FixedAssetController extends ChangeNotifier {
         userName: saveUserName,
         confirmLocationMismatch: confirmLocationMismatch,
         mode: mode,
+        qrFloor: qrCheck?.floor,
+        qrPositionA: qrCheck?.positionA,
+        qrPositionAA: qrCheck?.positionAA,
+        qrLocationMismatch: qrCheck?.mismatch,
       );
     } catch (error) {
       saveError = error;
@@ -1677,7 +1823,12 @@ class FixedAssetController extends ChangeNotifier {
       return;
     }
 
-    _applySaveResult(machineCode, result, errorText);
+    _applySaveResult(
+      machineCode,
+      result,
+      errorText,
+      qrLocationMismatch: qrCheck?.mismatch ?? false,
+    );
   }
 
   /// Fallback: POST trả requiresConfirmation -> cùng dialog, rồi re-POST
@@ -1716,17 +1867,23 @@ class FixedAssetController extends ChangeNotifier {
     _mismatchMaster = master;
     _notify();
 
-    final confirmed = await _confirmLocationMismatch(
-      generation,
-      FixedAssetMismatchPrompt(
-        machineCode: machineCode,
-        faName: _scannedFaName,
-        master: master,
-        actual: actual,
-        unmappedActual: rawActual,
-        manual: _auditModeByScan[generation] == 'MANUAL',
-      ),
-    );
+    final manual = _auditModeByScan[generation] == 'MANUAL';
+    // MANUAL + dialog MASTER tắt: như "Vẫn lưu". AUTO luôn hỏi.
+    final skipDialog = manual && !masterMismatchDialogEnabled;
+    if (skipDialog) uxLog('master dialog off: auto SAVE');
+    final confirmed = skipDialog
+        ? _isCurrentScan(generation)
+        : await _confirmLocationMismatch(
+            generation,
+            FixedAssetMismatchPrompt(
+              machineCode: machineCode,
+              faName: _scannedFaName,
+              master: master,
+              actual: actual,
+              unmappedActual: rawActual,
+              manual: manual,
+            ),
+          );
 
     if (!_isCurrentScan(generation)) {
       _reportDropped(machineCode, 'đã đổi khu vực/chế độ');
@@ -1753,8 +1910,16 @@ class FixedAssetController extends ChangeNotifier {
   void _applySaveResult(
     String machineCode,
     FixedAssetAuditSaveResponse? result,
-    String errorText,
-  ) {
+    String errorText, {
+    bool qrLocationMismatch = false,
+  }) {
+    // Lưu thành công với QR lệch vị trí -> "Cần in lại QR", chưa tính kiểm
+    // kê (backend không đếm; FE không ✓, tiến độ tải lại từ backend).
+    _qrReprintSaved =
+        (qrLocationMismatch || (result?.needsQrReprint ?? false)) &&
+        result != null &&
+        result.saved &&
+        !result.alreadyAudited;
     if (result == null) {
       _scanStatus = FixedAssetScanStatus.failed;
       _statusMessage = 'Save failed: $errorText';
@@ -1763,16 +1928,20 @@ class FixedAssetController extends ChangeNotifier {
       _lastAuditedAt = result.lastAuditedAt;
       _lastAuditedUserId = result.lastAuditedUserId;
       _lastAuditedUserName = result.lastAuditedUserName;
-      _auditedMachineCodes.add(machineCode.trim().toLowerCase());
+      _markAudited(machineCode);
     } else if (result.saved && result.unknownMachine) {
       // Hợp lệ về nghiệp vụ, không phải lỗi; không tính vào tiến độ.
       _scanStatus = FixedAssetScanStatus.unknownSaved;
+    } else if (_qrReprintSaved) {
+      // MASTER (nếu sai) vẫn hiện qua [mismatchMaster].
+      _scanStatus = FixedAssetScanStatus.qrReprintSaved;
+      _markQrReprint(machineCode);
     } else if (result.saved && result.locationMismatch) {
       _scanStatus = FixedAssetScanStatus.mismatchSaved;
-      _auditedMachineCodes.add(machineCode.trim().toLowerCase());
+      _markAudited(machineCode);
     } else if (result.saved) {
       _scanStatus = FixedAssetScanStatus.saved;
-      _auditedMachineCodes.add(machineCode.trim().toLowerCase());
+      _markAudited(machineCode);
     } else {
       _scanStatus = FixedAssetScanStatus.failed;
       _statusMessage = result.message.isNotEmpty
@@ -1786,9 +1955,18 @@ class FixedAssetController extends ChangeNotifier {
   // MODE SWITCH
   // ============================================================
 
+  /// Gọi một lần khi mở màn hình: chạy đúng các bước "vào mode" của
+  /// [setLocationMode] cho mode ban đầu (AUTO: zone lock; MANUAL: tải Fac,
+  /// tự chọn nếu chỉ có 1 Fac).
+  void start() {
+    if (_disposed) return;
+    _enterMode(_locationMode);
+  }
+
   void setLocationMode(FixedAssetLocationMode mode) {
     if (_disposed) return;
     if (mode == _locationMode) return;
+    if (mode == FixedAssetLocationMode.auto && !autoModeEnabled) return;
 
     // Vô hiệu hóa lookup/cascade/machine request đang chạy, và không để
     // location của mode cũ bị dùng lại ở mode mới.
@@ -1825,6 +2003,11 @@ class FixedAssetController extends ChangeNotifier {
     _scanLog('mode switched');
     _notify();
 
+    _enterMode(mode);
+  }
+
+  /// Bước khởi tạo khi vào [mode] (đổi mode hoặc mở màn hình).
+  void _enterMode(FixedAssetLocationMode mode) {
     // The lock is kept across modes (MANUAL ignores it); refresh it on the
     // way back to AUTO.
     if (mode == FixedAssetLocationMode.auto) loadZoneLock();
@@ -1929,16 +2112,22 @@ class FixedAssetController extends ChangeNotifier {
   // MACHINE LIST LOADING (AUTO + MANUAL)
   // ============================================================
 
-  /// Gộp `auditedInPeriod` của [machines] vào [_auditedMachineCodes] (chỉ
-  /// thêm). true nếu tập thay đổi.
+  /// Gộp `auditedInPeriod` / `needsQrReprint` của [machines] vào hai tập
+  /// (backend là nguồn đúng cho máy trong list). true nếu tập thay đổi.
   bool _mergeAuditedInPeriod(List<FixedAssetMachine> machines) {
-    var changed = false;
+    final before = _auditedVersion;
     for (final machine in machines) {
-      if (!machine.auditedInPeriod) continue;
       final code = machine.machineCode.trim().toLowerCase();
-      if (code.isNotEmpty && _auditedMachineCodes.add(code)) changed = true;
+      if (code.isEmpty) continue;
+      if (machine.needsQrReprint) {
+        _markQrReprint(code);
+      } else if (machine.auditedInPeriod) {
+        _markAudited(code);
+      } else if (_qrReprintMachineCodes.remove(code)) {
+        _auditedVersion++;
+      }
     }
-    return changed;
+    return _auditedVersion != before;
   }
 
   static bool _sameMachines(

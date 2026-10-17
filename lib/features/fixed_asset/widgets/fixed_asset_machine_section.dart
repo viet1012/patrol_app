@@ -3,7 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:chuphinh/core/models/fixed_asset_machine.dart';
 
 /// Machine list của location đang dùng: search cục bộ, audited-first,
-/// ✓ = đã kiểm kê trong kỳ (session). Rows chỉ đọc. Không gọi API.
+/// ✓ = đã kiểm kê trong kỳ (session), nhãn tím "In lại QR" = lần quét mới
+/// nhất QR lệch vị trí (chưa tính kiểm kê). Rows chỉ đọc. Không gọi API.
 class FixedAssetMachineSection extends StatefulWidget {
   /// false khi chưa có location (AUTO chưa scan / MANUAL chưa chọn đủ).
   final bool visible;
@@ -13,6 +14,10 @@ class FixedAssetMachineSection extends StatefulWidget {
   final String search;
   final TextEditingController searchController;
   final Set<String> auditedMachineCodes;
+  final Set<String> qrReprintMachineCodes;
+
+  /// Đổi khi một trong hai tập trên đổi (tập được mutate tại chỗ).
+  final int auditedVersion;
   final ValueChanged<String> onSearchChanged;
   final VoidCallback onClearSearch;
 
@@ -25,6 +30,8 @@ class FixedAssetMachineSection extends StatefulWidget {
     required this.search,
     required this.searchController,
     required this.auditedMachineCodes,
+    this.qrReprintMachineCodes = const <String>{},
+    required this.auditedVersion,
     required this.onSearchChanged,
     required this.onClearSearch,
   });
@@ -37,14 +44,14 @@ class FixedAssetMachineSection extends StatefulWidget {
 class _FixedAssetMachineSectionState extends State<FixedAssetMachineSection> {
   static const Color _accent = Color(0xFF4DD0E1);
 
-  // Cache filter + audited-first order. Recomputed only when the source
-  // list instance, the query, or the audited set (grows in place, so its
-  // length is the version signal) changes; unrelated parent rebuilds reuse
-  // it.
+  // Cache filter + not-audited-first order. Recomputed only when the source
+  // list instance, the query, or the audited sets (mutated in place, so
+  // [auditedVersion] is the version signal) change; unrelated parent
+  // rebuilds reuse it.
   List<FixedAssetMachine>? _cacheSource;
   String? _cacheQuery;
   Set<String>? _cacheAuditedSet;
-  int _cacheAuditedLength = -1;
+  int _cacheAuditedVersion = -1;
   int _filteredCount = 0;
   List<FixedAssetMachine> _displayMachines = const <FixedAssetMachine>[];
 
@@ -61,13 +68,13 @@ class _FixedAssetMachineSectionState extends State<FixedAssetMachineSection> {
     if (identical(machines, _cacheSource) &&
         query == _cacheQuery &&
         identical(auditedSet, _cacheAuditedSet) &&
-        auditedSet.length == _cacheAuditedLength) {
+        widget.auditedVersion == _cacheAuditedVersion) {
       return;
     }
     _cacheSource = machines;
     _cacheQuery = query;
     _cacheAuditedSet = auditedSet;
-    _cacheAuditedLength = auditedSet.length;
+    _cacheAuditedVersion = widget.auditedVersion;
 
     if (!identical(machines, _normalizedSource)) {
       _normalizedSource = machines;
@@ -77,8 +84,9 @@ class _FixedAssetMachineSectionState extends State<FixedAssetMachineSection> {
       _nameLower = <String>[for (final m in machines) m.faName.toLowerCase()];
     }
 
-    // Machine đã audit lên đầu. Chia nhóm (stable) để giữ nguyên thứ tự
-    // gốc trong từng nhóm; không mutate `machines`.
+    // Chưa kiểm kê (kể cả cần in lại QR) lên đầu, đã kiểm kê (✓) xuống
+    // cuối. Chia nhóm (stable) để giữ nguyên thứ tự gốc trong từng nhóm;
+    // không mutate `machines`.
     final audited = <FixedAssetMachine>[];
     final notAudited = <FixedAssetMachine>[];
     var filteredCount = 0;
@@ -90,16 +98,19 @@ class _FixedAssetMachineSectionState extends State<FixedAssetMachineSection> {
       }
       filteredCount++;
       final machine = machines[i];
-      (_isAuditedMachine(machine) ? audited : notAudited).add(machine);
+      final checked =
+          !_needsQrReprint(machine) && _isAuditedMachine(machine);
+      (checked ? audited : notAudited).add(machine);
     }
     _filteredCount = filteredCount;
     _displayMachines = List<FixedAssetMachine>.unmodifiable(<FixedAssetMachine>[
-      ...audited,
       ...notAudited,
+      ...audited,
     ]);
   }
 
   static const Color _success = Color(0xFF22C55E);
+  static const Color _violet = Color(0xFFA78BFA);
 
   @override
   Widget build(BuildContext context) {
@@ -232,8 +243,14 @@ class _FixedAssetMachineSectionState extends State<FixedAssetMachineSection> {
     return code.isNotEmpty && widget.auditedMachineCodes.contains(code);
   }
 
+  bool _needsQrReprint(FixedAssetMachine machine) {
+    final code = machine.machineCode.trim().toLowerCase();
+    return code.isNotEmpty && widget.qrReprintMachineCodes.contains(code);
+  }
+
   Widget _buildMachineRow(FixedAssetMachine machine) {
-    final audited = _isAuditedMachine(machine);
+    final reprint = _needsQrReprint(machine);
+    final audited = !reprint && _isAuditedMachine(machine);
 
     return Container(
       width: double.infinity,
@@ -275,10 +292,39 @@ class _FixedAssetMachineSectionState extends State<FixedAssetMachineSection> {
               ],
             ),
           ),
-          if (audited) ...[
+          if (reprint) ...[
+            const SizedBox(width: 8),
+            _reprintTag(),
+          ] else if (audited) ...[
             const SizedBox(width: 8),
             const Icon(Icons.check_circle_rounded, size: 18, color: _success),
           ],
+        ],
+      ),
+    );
+  }
+
+  Widget _reprintTag() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: _violet.withOpacity(.15),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: _violet.withOpacity(.6)),
+      ),
+      child: const Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.print_rounded, color: _violet, size: 12),
+          SizedBox(width: 4),
+          Text(
+            'In lại QR',
+            style: TextStyle(
+              color: _violet,
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
         ],
       ),
     );

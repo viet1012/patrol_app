@@ -14,6 +14,7 @@ import 'package:chuphinh/features/fixed_asset/widgets/fixed_asset_location_secti
 import 'package:chuphinh/features/fixed_asset/widgets/fixed_asset_machine_section.dart';
 import 'package:chuphinh/features/fixed_asset/widgets/fixed_asset_manual_selectors.dart';
 import 'package:chuphinh/features/fixed_asset/widgets/fixed_asset_mismatch_dialog.dart';
+import 'package:chuphinh/features/fixed_asset/widgets/fixed_asset_qr_mismatch_dialog.dart';
 import 'package:chuphinh/features/fixed_asset/widgets/fixed_asset_selector.dart';
 import 'package:chuphinh/features/fixed_asset/widgets/fixed_asset_scan_chip.dart';
 import 'package:chuphinh/features/fixed_asset/widgets/fixed_asset_status_card.dart';
@@ -66,6 +67,7 @@ class _FixedAssetScreenState extends State<FixedAssetScreen>
       accountCode: widget.accountCode,
       userName: widget.userName,
       confirmMismatch: _showMismatchDialog,
+      confirmQrMismatch: _showQrMismatchDialog,
       showError: _showError,
       resetQr: () => _cameraKey.currentState?.resetQr(),
       onZoneUnlocked: _showZoneUnlocked,
@@ -78,10 +80,12 @@ class _FixedAssetScreenState extends State<FixedAssetScreen>
       },
     );
 
-    // AUTO là mặc định: Fac chỉ load khi chuyển sang MANUAL.
     // Summary chạy độc lập, không chặn camera.
     _controller.loadAuditSummary();
-    _controller.loadZoneLock();
+    // Khởi tạo mode ban đầu như lúc chuyển mode (AUTO: zone lock; MANUAL:
+    // tải Fac + nhấp nháy ô trống đầu tiên).
+    _controller.start();
+    _flashFirstMissingManualField();
 
     WidgetsBinding.instance.addObserver(this);
   }
@@ -135,6 +139,10 @@ class _FixedAssetScreenState extends State<FixedAssetScreen>
   /// sau vì dropdown MANUAL chỉ được build sau khi đổi mode.
   void _onModeChanged(FixedAssetLocationMode mode) {
     _controller.setLocationMode(mode);
+    _flashFirstMissingManualField();
+  }
+
+  void _flashFirstMissingManualField() {
     if (_controller.isAutoMode) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || _controller.isAutoMode) return;
@@ -183,6 +191,27 @@ class _FixedAssetScreenState extends State<FixedAssetScreen>
       },
     );
 
+    // null = closed without a choice (e.g. system back): treated as skip.
+    return result == true;
+  }
+
+  /// Dialog "QR không khớp vị trí đang chọn" (MANUAL).
+  /// true = "Vẫn lưu (đánh dấu in lại QR)".
+  Future<bool> _showQrMismatchDialog(FixedAssetQrMismatchPrompt prompt) async {
+    if (!mounted) {
+      _controller.uxLog('QR dialog NOT shown: screen unmounted');
+      return false;
+    }
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => FixedAssetQrMismatchDialog(
+        machineCode: prompt.machineCode,
+        faName: prompt.faName,
+        selected: prompt.selected,
+        qr: prompt.qr,
+      ),
+    );
     // null = closed without a choice (e.g. system back): treated as skip.
     return result == true;
   }
@@ -281,6 +310,7 @@ class _FixedAssetScreenState extends State<FixedAssetScreen>
         lastAuditedUserName: c.lastAuditedUserName,
         mismatchMaster: c.mismatchMaster,
         qrLocationLabel: c.pendingQrLocationLabel,
+        needsQrReprint: c.needsQrReprint,
       ),
       builder: (context, v) => FixedAssetStatusCard(
         status: v.status,
@@ -295,7 +325,10 @@ class _FixedAssetScreenState extends State<FixedAssetScreen>
             c.setLocationMode(FixedAssetLocationMode.manual),
         qrLocationLabel: v.qrLocationLabel,
         onUseQrLocation: c.useLocationFromQr,
-        onSwitchAuto: () => c.setLocationMode(FixedAssetLocationMode.auto),
+        needsQrReprint: v.needsQrReprint,
+        onSwitchAuto: c.autoModeEnabled
+            ? () => c.setLocationMode(FixedAssetLocationMode.auto)
+            : null,
       ),
     );
   }
@@ -336,6 +369,7 @@ class _FixedAssetScreenState extends State<FixedAssetScreen>
           machineCount: c.displayMachineCount,
           auditedMachineCount: c.displayAuditedCount,
           onModeChanged: _onModeChanged,
+          showModeToggle: c.autoModeEnabled,
           lockedZone: c.lockedZone,
           lockedZoneProgress: c.lockedZoneProgress,
           zoneLockUnverified: c.isZoneLockUnverified,
@@ -369,8 +403,9 @@ class _FixedAssetScreenState extends State<FixedAssetScreen>
     );
   }
 
-  /// auditedMachineCodes bị mutate tại chỗ (chỉ thêm): length là version.
-  /// Filter/sort vẫn cache bên trong FixedAssetMachineSection.
+  /// auditedMachineCodes / qrReprintMachineCodes bị mutate tại chỗ:
+  /// auditedVersion là version. Filter/sort vẫn cache bên trong
+  /// FixedAssetMachineSection.
   Widget _buildMachineSection() {
     final c = _controller;
     return FixedAssetSelector(
@@ -382,7 +417,8 @@ class _FixedAssetScreenState extends State<FixedAssetScreen>
         error: c.machineError,
         search: c.machineSearch,
         audited: c.auditedMachineCodes,
-        auditedCount: c.auditedMachineCodes.length,
+        reprint: c.qrReprintMachineCodes,
+        auditedVersion: c.auditedVersion,
       ),
       builder: (context, v) => FixedAssetMachineSection(
         visible: v.visible,
@@ -392,6 +428,8 @@ class _FixedAssetScreenState extends State<FixedAssetScreen>
         search: v.search,
         searchController: c.machineSearchController,
         auditedMachineCodes: v.audited,
+        qrReprintMachineCodes: v.reprint,
+        auditedVersion: v.auditedVersion,
         onSearchChanged: c.setMachineSearch,
         onClearSearch: c.clearMachineSearch,
       ),

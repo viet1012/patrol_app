@@ -27,6 +27,9 @@ class FixedAssetStatusCard extends StatelessWidget {
   final VoidCallback? onUseQrLocation;
   final VoidCallback? onSwitchAuto;
 
+  /// Đã lưu với QR lệch vị trí đang chọn (MANUAL): nhãn "Cần in lại QR".
+  final bool needsQrReprint;
+
   const FixedAssetStatusCard({
     super.key,
     required this.status,
@@ -41,6 +44,7 @@ class FixedAssetStatusCard extends StatelessWidget {
     this.qrLocationLabel,
     this.onUseQrLocation,
     this.onSwitchAuto,
+    this.needsQrReprint = false,
   });
 
   /// "Việt (KVH_IT_Mem_Viet)" / "Việt" / "KVH_IT_Mem_Viet".
@@ -58,6 +62,7 @@ class FixedAssetStatusCard extends StatelessWidget {
   static const Color _accent = Color(0xFF4DD0E1);
   static const Color _success = Color(0xFF22C55E);
   static const Color _amber = Color(0xFFF59E0B);
+  static const Color _violet = Color(0xFFA78BFA);
 
   static final DateFormat _dateTimeFormat = DateFormat('dd/MM/yyyy HH:mm');
 
@@ -175,6 +180,32 @@ class FixedAssetStatusCard extends StatelessWidget {
           color: _amber,
           size: 20,
         );
+      case FixedAssetScanStatus.qrLocationMismatch:
+        // MANUAL: QR khác vị trí đang chọn; chờ xác nhận hoặc đã "Bỏ qua".
+        primary = machineCode;
+        if (faName.isNotEmpty) details.add(faName);
+        if ((message ?? '').isNotEmpty) details.add(message!);
+        label = 'QR khác vị trí';
+        color = _violet;
+        indicator = const Icon(
+          Icons.qr_code_2_rounded,
+          color: _violet,
+          size: 20,
+        );
+      case FixedAssetScanStatus.qrReprintSaved:
+        // Đã lưu nhưng QR lệch vị trí: KHÔNG phải "Đã kiểm kê".
+        primary = machineCode;
+        if (faName.isNotEmpty) details.add(faName);
+        if (mismatchMaster != null) {
+          details.add(
+            'MASTER: ${fixedAssetDash(mismatchMaster.positionA)} / '
+            '${fixedAssetDash(mismatchMaster.positionAA)}',
+          );
+        }
+        details.add('Đã lưu - cần in lại QR, chưa tính kiểm kê');
+        label = 'Chưa tính kiểm kê';
+        color = _violet;
+        indicator = const Icon(Icons.print_rounded, color: _violet, size: 20);
       case FixedAssetScanStatus.failed:
         // Invalid QR: không có MachineCode, message là dòng chính.
         primary = hasCode ? machineCode : (message ?? 'Scan failed');
@@ -255,6 +286,11 @@ class FixedAssetStatusCard extends StatelessWidget {
                         fontSize: 12,
                       ),
                     ),
+                  ),
+                if (needsQrReprint)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: _reprintTag(),
                   ),
                 if (needsLocation)
                   Padding(
@@ -351,6 +387,32 @@ class FixedAssetStatusCard extends StatelessWidget {
         if (label != null && indicator != null) const SizedBox(width: 6),
         if (indicator != null) indicator,
       ],
+    );
+  }
+
+  Widget _reprintTag() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: _violet.withOpacity(.15),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: _violet.withOpacity(.6)),
+      ),
+      child: const Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.print_rounded, color: _violet, size: 12),
+          SizedBox(width: 4),
+          Text(
+            'Cần in lại QR',
+            style: TextStyle(
+              color: _violet,
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
     );
   }
 

@@ -24,6 +24,9 @@ class FixedAssetAuditSaveResponse {
   final bool locationMismatch;
   final bool requiresConfirmation;
 
+  /// Bản ghi vừa lưu có QR lệch vị trí: cần in lại QR, chưa tính kiểm kê.
+  final bool needsQrReprint;
+
   final String masterFac;
   final String masterFloor;
   final String masterPositionA;
@@ -47,6 +50,7 @@ class FixedAssetAuditSaveResponse {
     required this.message,
     this.locationMismatch = false,
     this.requiresConfirmation = false,
+    this.needsQrReprint = false,
     this.masterFac = '',
     this.masterFloor = '',
     this.masterPositionA = '',
@@ -73,6 +77,7 @@ class FixedAssetAuditSaveResponse {
       message: str('message'),
       locationMismatch: parseBool(json['locationMismatch']),
       requiresConfirmation: parseBool(json['requiresConfirmation']),
+      needsQrReprint: parseBool(json['needsQrReprint']),
       masterFac: str('masterFac'),
       masterFloor: str('masterFloor'),
       masterPositionA: str('masterPositionA'),

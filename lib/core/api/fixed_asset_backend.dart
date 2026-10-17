@@ -68,6 +68,10 @@ class FixedAssetBackend {
     required String userName,
     bool confirmLocationMismatch = false,
     String? mode,
+    String? qrFloor,
+    String? qrPositionA,
+    String? qrPositionAA,
+    bool? qrLocationMismatch,
   }) => FixedAssetApi.saveAudit(
     fac: fac,
     floor: floor,
@@ -78,6 +82,10 @@ class FixedAssetBackend {
     userName: userName,
     confirmLocationMismatch: confirmLocationMismatch,
     mode: mode,
+    qrFloor: qrFloor,
+    qrPositionA: qrPositionA,
+    qrPositionAA: qrPositionAA,
+    qrLocationMismatch: qrLocationMismatch,
   );
 
   Future<List<FixedAssetMachine>> fetchMachines({

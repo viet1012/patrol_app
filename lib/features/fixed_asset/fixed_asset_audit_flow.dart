@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:chuphinh/core/models/fixed_asset_audit_check_response.dart';
 import 'package:chuphinh/core/models/fixed_asset_audit_save_response.dart';
 import 'package:chuphinh/features/fixed_asset/fixed_asset_location.dart';
+import 'package:chuphinh/features/fixed_asset/fixed_asset_qr_parser.dart';
 
 // Quy tắc nghiệp vụ thuần (không state, không UI) của luồng kiểm kê.
 
@@ -35,6 +36,14 @@ enum FixedAssetScanStatus {
   /// MANUAL: quét khi chưa chọn đủ Fac/Floor/PositionA/PositionAA (không
   /// gọi API; có thể đề nghị dùng vị trí trong QR).
   needsLocation,
+
+  /// MANUAL: vị trí in trên QR khác vị trí đang chọn: đang chờ xác nhận
+  /// hoặc operator đã "Bỏ qua".
+  qrLocationMismatch,
+
+  /// Đã lưu với QR lệch vị trí: cần in lại QR, CHƯA tính là đã kiểm kê
+  /// (backend không đếm vào tiến độ).
+  qrReprintSaved,
 }
 
 /// Dropdown của cascade MANUAL (đánh dấu ô còn trống đầu tiên).
@@ -81,6 +90,64 @@ class FixedAssetMismatchPrompt {
 /// UI trả true = "Vẫn lưu", false = "Hủy".
 typedef FixedAssetConfirmMismatch =
     Future<bool> Function(FixedAssetMismatchPrompt prompt);
+
+/// MANUAL: vị trí in trên QR so với vị trí đang chọn, gửi kèm mọi POST
+/// /audit của scan (qrFloor / qrPositionA / qrPositionAA / qrLocationMismatch).
+/// Field null = QR không có thông tin đó (QR KVH_ không có PositionA).
+class FixedAssetQrLocationCheck {
+  final String? floor;
+  final String? positionA;
+  final String? positionAA;
+  final bool mismatch;
+
+  const FixedAssetQrLocationCheck({
+    this.floor,
+    this.positionA,
+    this.positionAA,
+    required this.mismatch,
+  });
+}
+
+/// So vị trí dropdown với các field vị trí QR có (trim, không phân biệt hoa
+/// thường). QR không có vị trí -> không lệch.
+FixedAssetQrLocationCheck fixedAssetManualQrCheck(
+  FixedAssetQrData qr,
+  FixedAssetAuditLocation selected,
+) {
+  String norm(String v) => v.trim().toLowerCase();
+  String? valueOf(String v) => v.trim().isEmpty ? null : v.trim();
+
+  final floor = valueOf(qr.floor);
+  final positionAA = valueOf(qr.positionAA);
+  final mismatch =
+      (floor != null && norm(floor) != norm(selected.floor)) ||
+      (positionAA != null && norm(positionAA) != norm(selected.positionAA));
+
+  return FixedAssetQrLocationCheck(
+    floor: floor,
+    positionAA: positionAA,
+    mismatch: mismatch,
+  );
+}
+
+/// Dữ liệu cho dialog "QR không khớp vị trí đang chọn" (MANUAL).
+class FixedAssetQrMismatchPrompt {
+  final String machineCode;
+  final String faName;
+  final FixedAssetAuditLocation selected;
+  final FixedAssetQrLocationCheck qr;
+
+  const FixedAssetQrMismatchPrompt({
+    required this.machineCode,
+    required this.faName,
+    required this.selected,
+    required this.qr,
+  });
+}
+
+/// UI trả true = "Vẫn lưu (đánh dấu in lại QR)", false = "Bỏ qua".
+typedef FixedAssetConfirmQrMismatch =
+    Future<bool> Function(FixedAssetQrMismatchPrompt prompt);
 
 /// Thứ tự ưu tiên (không đổi):
 /// 1. đã kiểm kê trong kỳ -> không POST, không hỏi mismatch

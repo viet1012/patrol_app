@@ -18,6 +18,9 @@ class FixedAssetLocationSection extends StatelessWidget {
   final Widget manualSelectors;
   final ValueChanged<FixedAssetLocationMode> onModeChanged;
 
+  /// false: ẩn toggle Auto/Manual (AUTO đang tắt bằng cờ tính năng).
+  final bool showModeToggle;
+
   /// AUTO zone lock: the zone the user must finish first, its progress
   /// (all users), and whether the lock could not be verified.
   final FixedAssetAuditLocation? lockedZone;
@@ -37,6 +40,7 @@ class FixedAssetLocationSection extends StatelessWidget {
     required this.auditedMachineCount,
     required this.manualSelectors,
     required this.onModeChanged,
+    this.showModeToggle = true,
     this.lockedZone,
     this.lockedZoneProgress,
     this.zoneLockUnverified = false,
@@ -113,9 +117,10 @@ class FixedAssetLocationSection extends StatelessWidget {
                 ),
               ),
 
-              const SizedBox(width: 8),
-
-              _buildModeToggle(),
+              if (showModeToggle) ...[
+                const SizedBox(width: 8),
+                _buildModeToggle(),
+              ],
             ],
           ),
           if (_isAuto && resumedFromLock)

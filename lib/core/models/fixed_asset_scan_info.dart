@@ -16,6 +16,9 @@ class FixedAssetScanInfo {
   final DateTime? periodStart;
   final DateTime? periodEnd;
 
+  /// Lần quét mới nhất có QR lệch vị trí: cần in lại QR, chưa tính kiểm kê.
+  final bool needsQrReprint;
+
   const FixedAssetScanInfo({
     required this.machineCode,
     required this.existsInMaster,
@@ -30,6 +33,7 @@ class FixedAssetScanInfo {
     this.lastAuditedUserName,
     this.periodStart,
     this.periodEnd,
+    this.needsQrReprint = false,
   });
 
   factory FixedAssetScanInfo.fromJson(Map<String, dynamic> json) {
@@ -49,6 +53,7 @@ class FixedAssetScanInfo {
       lastAuditedUserName: json['lastAuditedUserName']?.toString(),
       periodStart: parseDate(json['periodStart']),
       periodEnd: parseDate(json['periodEnd']),
+      needsQrReprint: parseBool(json['needsQrReprint']),
     );
   }
 
