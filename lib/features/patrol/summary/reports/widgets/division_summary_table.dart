@@ -13,6 +13,12 @@ class SummaryTableStyle {
 
   static const double mobileBreakpoint = 700;
 
+  // Top N Remain TTL theo Area
+  static const int topRemainCount = 3;
+  static const Color topRemainBg = Color(0xFFDC2626); // red-600
+  static const Color topRemainText = Colors.white;
+  static const Color topRemainArea = Color(0xFFB91C1C); // red-700
+
   // Width
   static const double wFac = 80;
   static const double wDiv = 150;
@@ -103,6 +109,9 @@ class SummarySection {
   /// Section dạng TTL + I..V: ô TTL hiện % ở dòng '%'.
   final bool hasPctTtl;
 
+  /// Tô ô TTL của các dòng top (Remain).
+  final bool highlightTop;
+
   const SummarySection({
     required this.parent,
     required this.title,
@@ -112,6 +121,7 @@ class SummarySection {
     required this.headers,
     required this.values,
     required this.hasPctTtl,
+    this.highlightTop = false,
   });
 
   /// Title trùng parent ("Before" / "BEFORE"): desktop không lặp lại ở hàng
@@ -150,10 +160,15 @@ class SummarySection {
     );
   }
 
-  Widget dataRow(DivisionSummary r, double Function(int i) width) {
+  Widget dataRow(
+    DivisionSummary r,
+    double Function(int i) width, {
+    bool top = false,
+  }) {
     final isPct = r.isPctRow;
     final isTotal = r.isSumRow || isPct;
     final v = values(r);
+    final hot = top && highlightTop;
 
     return SummaryCellRow(
       bg: r.isSumRow ? SummaryTableStyle.sumBg : (isPct ? null : bodyColor),
@@ -163,8 +178,11 @@ class SummarySection {
             _valueCell(
               isPct ? fmtPct(v[i]) : fmtNum(v[i]),
               w: width(i),
-              bold: isTotal,
-              bg: isPct ? SummaryTableStyle.pctTtlBg : null,
+              bold: isTotal || hot,
+              bg: isPct
+                  ? SummaryTableStyle.pctTtlBg
+                  : (hot ? SummaryTableStyle.topRemainBg : null),
+              textColor: hot ? SummaryTableStyle.topRemainText : null,
             )
           else
             _valueCell(isPct ? '' : fmtNum(v[i]), w: width(i), bold: isTotal),
@@ -179,13 +197,14 @@ SummaryCellSpec _valueCell(
   required double w,
   bool bold = false,
   Color? bg,
+  Color? textColor,
 }) {
   return SummaryCellSpec(
     text,
     w: w,
     bold: bold,
     bg: bg,
-    textColor: text == '-' ? SummaryTableStyle.zeroText : null,
+    textColor: textColor ?? (text == '-' ? SummaryTableStyle.zeroText : null),
   );
 }
 
@@ -233,6 +252,7 @@ final List<SummarySection> summarySections = [
     bodyColor: SummaryTableStyle.remainBody,
     headers: _metricHeaders,
     hasPctTtl: true,
+    highlightTop: true,
     values: (r) => [
       r.remainTtl,
       r.remainI,
@@ -331,6 +351,22 @@ typedef _RowDeco = ({String plant, bool isFirst, BorderSide? top});
 /// [isFirst]: dòng đầu nhóm plant liên tiếp (cột Fac gộp từ dòng này).
 /// [top]: phân cách nhẹ giữa 2 nhà máy; dòng SUM (đầu khối SUM / %) kẻ đậm
 /// hơn. Dòng SUM / % không thuộc plant nào ([plant] rỗng).
+
+/// Index các dòng Area có Remain TTL thuộc top N (>0). Bằng điểm thì lấy hết.
+Set<int> _topRemainRows(List<DivisionSummary> rows) {
+  bool isData(DivisionSummary r) => !r.isSumRow && !r.isPctRow;
+  final vals = [
+    for (final r in rows)
+      if (isData(r) && r.remainTtl > 0) r.remainTtl,
+  ]..sort((a, b) => b.compareTo(a));
+  if (vals.isEmpty) return const {};
+  final cut = vals[math.min(SummaryTableStyle.topRemainCount, vals.length) - 1];
+  return {
+    for (var i = 0; i < rows.length; i++)
+      if (isData(rows[i]) && rows[i].remainTtl >= cut) i,
+  };
+}
+
 List<_RowDeco> _rowDecos(List<DivisionSummary> rows) {
   final out = <_RowDeco>[];
   String? prev;
@@ -419,6 +455,7 @@ class _SummaryTableCardState extends State<_SummaryTableCard> {
     final sections = widget.sections;
     final rows = widget.rows;
     final decos = _rowDecos(rows);
+    final top = _topRemainRows(rows);
     final numbersWidth = sections.fold<double>(
       0,
       (sum, s) => sum + _sectionWidth(s),
@@ -461,8 +498,10 @@ class _SummaryTableCardState extends State<_SummaryTableCard> {
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildLead(rows, decos),
-                    Expanded(child: _buildNumbers(rows, decos, numbersWidth)),
+                    _buildLead(rows, decos, top),
+                    Expanded(
+                      child: _buildNumbers(rows, decos, numbersWidth, top),
+                    ),
                   ],
                 ),
               ),
@@ -476,7 +515,11 @@ class _SummaryTableCardState extends State<_SummaryTableCard> {
   /// Cột Fac/Area: đứng yên khi phần số cuộn ngang.
   /// Các dòng liên tiếp cùng plant: 1 ô Fac gộp cao bằng tổng các dòng.
   /// Dòng SUM / %: Fac + Area gộp 1 ô ghi "SUM" / "%".
-  Widget _buildLead(List<DivisionSummary> rows, List<_RowDeco> decos) {
+  Widget _buildLead(
+    List<DivisionSummary> rows,
+    List<_RowDeco> decos,
+    Set<int> top,
+  ) {
     final children = <Widget>[];
     var i = 0;
     while (i < rows.length) {
@@ -530,6 +573,10 @@ class _SummaryTableCardState extends State<_SummaryTableCard> {
                         w: SummaryTableStyle.wDiv,
                         align: TextAlign.left,
                         tooltip: true,
+                        bold: top.contains(k),
+                        textColor: top.contains(k)
+                            ? SummaryTableStyle.topRemainArea
+                            : null,
                       ),
                     ],
                   ),
@@ -539,12 +586,12 @@ class _SummaryTableCardState extends State<_SummaryTableCard> {
         ],
       );
 
-      final top = decos[start].top;
+      final divider = decos[start].top;
       children.add(
         DecoratedBox(
           position: DecorationPosition.foreground,
           decoration: BoxDecoration(
-            border: top == null ? null : Border(top: top),
+            border: divider == null ? null : Border(top: divider),
           ),
           child: block,
         ),
@@ -578,6 +625,7 @@ class _SummaryTableCardState extends State<_SummaryTableCard> {
     List<DivisionSummary> rows,
     List<_RowDeco> decos,
     double numbersWidth,
+    Set<int> top,
   ) {
     final sections = widget.sections;
     final groups = widget.showParentRow
@@ -620,7 +668,11 @@ class _SummaryTableCardState extends State<_SummaryTableCard> {
                   Row(
                     children: [
                       for (final s in sections)
-                        s.dataRow(rows[i], (c) => _cellWidth(s, c)),
+                        s.dataRow(
+                          rows[i],
+                          (c) => _cellWidth(s, c),
+                          top: top.contains(i),
+                        ),
                     ],
                   ),
                 ),
@@ -779,7 +831,7 @@ class _TableScrollbar extends RawScrollbar {
          trackRadius: const Radius.circular(
            SummaryTableStyle.scrollbarThickness / 2,
          ),
-         thumbColor: SummaryTableStyle.scrollbarThumb,
+         thumbColor: const Color.fromARGB(204, 49, 32, 32),
          trackColor: SummaryTableStyle.scrollbarTrack,
          trackBorderColor: SummaryTableStyle.scrollbarTrackBorder,
          crossAxisMargin: 0,
