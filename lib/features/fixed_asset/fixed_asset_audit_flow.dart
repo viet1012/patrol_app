@@ -108,23 +108,29 @@ class FixedAssetQrLocationCheck {
   });
 }
 
-/// So vị trí dropdown với các field vị trí QR có (trim, không phân biệt hoa
-/// thường). QR không có vị trí -> không lệch.
+/// So vị trí dropdown với các field vị trí QR có (bỏ mọi khoảng trắng, không
+/// phân biệt hoa thường). Field QR rỗng -> bỏ qua; QR không có vị trí ->
+/// không lệch. Fac không so (QR không in Fac, chưa có bảng alias).
 FixedAssetQrLocationCheck fixedAssetManualQrCheck(
   FixedAssetQrData qr,
   FixedAssetAuditLocation selected,
 ) {
-  String norm(String v) => v.trim().toLowerCase();
+  String norm(String v) => v.replaceAll(RegExp(r'\s+'), '').toUpperCase();
   String? valueOf(String v) => v.trim().isEmpty ? null : v.trim();
+  bool differs(String? qrValue, String selectedValue) =>
+      qrValue != null && norm(qrValue) != norm(selectedValue);
 
   final floor = valueOf(qr.floor);
+  final positionA = valueOf(qr.positionA);
   final positionAA = valueOf(qr.positionAA);
   final mismatch =
-      (floor != null && norm(floor) != norm(selected.floor)) ||
-      (positionAA != null && norm(positionAA) != norm(selected.positionAA));
+      differs(floor, selected.floor) ||
+      differs(positionA, selected.positionA) ||
+      differs(positionAA, selected.positionAA);
 
   return FixedAssetQrLocationCheck(
     floor: floor,
+    positionA: positionA,
     positionAA: positionAA,
     mismatch: mismatch,
   );
