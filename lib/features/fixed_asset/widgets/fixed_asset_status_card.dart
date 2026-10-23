@@ -95,13 +95,13 @@ class FixedAssetStatusCard extends StatelessWidget {
       case FixedAssetScanStatus.saving:
         primary = machineCode;
         if (faName.isNotEmpty) details.add(faName);
-        label = 'Saving...';
+        label = 'Đang lưu...';
         color = _accent;
         indicator = _spinner();
       case FixedAssetScanStatus.saved:
         primary = machineCode;
         if (faName.isNotEmpty) details.add(faName);
-        label = 'Saved';
+        label = 'Kiểm kê thành công';
         color = _success;
         indicator = const Icon(
           Icons.check_circle_rounded,
@@ -111,6 +111,7 @@ class FixedAssetStatusCard extends StatelessWidget {
       case FixedAssetScanStatus.alreadyAudited:
         primary = machineCode;
         if (faName.isNotEmpty) details.add(faName);
+        if ((message ?? '').isNotEmpty) details.add(message!);
         alreadyAuditedBy = auditorLabel(lastAuditedUserName, lastAuditedUserId);
         if (lastAudited != null) {
           alreadyAuditedTime = _dateTimeFormat.format(lastAudited);
@@ -154,7 +155,7 @@ class FixedAssetStatusCard extends StatelessWidget {
         );
       case FixedAssetScanStatus.unknownSaved:
         primary = machineCode;
-        details.add('Saved outside master');
+        details.add('Đã lưu, máy chưa có trong danh sách MASTER');
         label = 'Không có trong MASTER';
         color = _amber;
         indicator = const Icon(
@@ -185,7 +186,7 @@ class FixedAssetStatusCard extends StatelessWidget {
         primary = machineCode;
         if (faName.isNotEmpty) details.add(faName);
         if ((message ?? '').isNotEmpty) details.add(message!);
-        label = 'QR khác vị trí';
+        label = 'Bỏ qua - QR khác vị trí';
         color = _violet;
         indicator = const Icon(
           Icons.qr_code_2_rounded,
@@ -193,7 +194,7 @@ class FixedAssetStatusCard extends StatelessWidget {
           size: 20,
         );
       case FixedAssetScanStatus.qrReprintSaved:
-        // Đã lưu nhưng QR lệch vị trí: KHÔNG phải "Đã kiểm kê".
+        // Đã lưu, QR lệch vị trí: "Đã kiểm kê" + cần in lại QR.
         primary = machineCode;
         if (faName.isNotEmpty) details.add(faName);
         if (mismatchMaster != null) {
@@ -202,8 +203,8 @@ class FixedAssetStatusCard extends StatelessWidget {
             '${fixedAssetDash(mismatchMaster.positionAA)}',
           );
         }
-        details.add('Đã lưu - cần in lại QR, chưa tính kiểm kê');
-        label = 'Chưa tính kiểm kê';
+        details.add('Đã lưu, cần in lại QR');
+        label = 'Đã kiểm kê';
         color = _violet;
         indicator = const Icon(Icons.print_rounded, color: _violet, size: 20);
       case FixedAssetScanStatus.failed:
@@ -303,7 +304,10 @@ class FixedAssetStatusCard extends StatelessWidget {
                         if (qrLocationLabel != null && onUseQrLocation != null)
                           FilledButton.icon(
                             onPressed: onUseQrLocation,
-                            icon: const Icon(Icons.my_location_rounded, size: 16),
+                            icon: const Icon(
+                              Icons.my_location_rounded,
+                              size: 16,
+                            ),
                             label: Text('Dùng vị trí $qrLocationLabel'),
                             style: FilledButton.styleFrom(
                               backgroundColor: _amber,

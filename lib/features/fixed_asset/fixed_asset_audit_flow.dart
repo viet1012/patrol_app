@@ -41,7 +41,7 @@ enum FixedAssetScanStatus {
   /// hoặc operator đã "Bỏ qua".
   qrLocationMismatch,
 
-  /// Đã lưu với QR lệch vị trí: cần in lại QR, CHƯA tính là đã kiểm kê
+  /// Đã lưu với QR lệch vị trí: đã kiểm kê, cần in lại QR
   /// (backend không đếm vào tiến độ).
   qrReprintSaved,
 }

@@ -19,7 +19,8 @@ import 'package:chuphinh/features/fixed_asset/widgets/fixed_asset_selector.dart'
 import 'package:chuphinh/features/fixed_asset/widgets/fixed_asset_scan_chip.dart';
 import 'package:chuphinh/features/fixed_asset/widgets/fixed_asset_status_card.dart';
 
-export 'package:chuphinh/features/fixed_asset/fixed_asset_audit_flow.dart' show FixedAssetLocationMode;
+export 'package:chuphinh/features/fixed_asset/fixed_asset_audit_flow.dart'
+    show FixedAssetLocationMode;
 
 /// Màn hình kiểm kê Fixed Asset (AUTO / MANUAL).
 ///
@@ -321,8 +322,7 @@ class _FixedAssetScreenState extends State<FixedAssetScreen>
         lastAuditedUserId: v.lastAuditedUserId,
         lastAuditedUserName: v.lastAuditedUserName,
         mismatchMaster: v.mismatchMaster,
-        onSwitchManual: () =>
-            c.setLocationMode(FixedAssetLocationMode.manual),
+        onSwitchManual: () => c.setLocationMode(FixedAssetLocationMode.manual),
         qrLocationLabel: v.qrLocationLabel,
         onUseQrLocation: c.useLocationFromQr,
         needsQrReprint: v.needsQrReprint,
@@ -493,9 +493,9 @@ class _FixedAssetScreenState extends State<FixedAssetScreen>
           child: Column(
             children: [
               _buildResponsiveCameraSection(isMobile),
-              _buildDetectedMap(),
               const SizedBox(height: 6),
               _buildStatusCard(),
+              _buildDetectedMap(),
               const SizedBox(height: 6),
               _buildAuditProgressCard(),
               SizedBox(height: isMobile ? 6 : 8),

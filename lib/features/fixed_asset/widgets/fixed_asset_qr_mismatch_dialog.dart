@@ -124,8 +124,8 @@ class FixedAssetQrMismatchDialog extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               Text(
-                'Các mục tô đỏ trên QR khác vị trí đang chọn. Kết quả vẫn được '
-                'lưu và máy này sẽ được đánh dấu cần in lại QR.',
+                'Các mục tô đỏ trên QR khác vị trí đang chọn. Kết quả kiểm kê '
+                'vẫn được lưu và máy này sẽ được đánh dấu cần in lại QR.',
                 style: TextStyle(
                   color: Colors.white.withOpacity(.8),
                   fontSize: 13,
@@ -295,7 +295,7 @@ class FixedAssetQrMismatchDialog extends StatelessWidget {
               ),
             ),
             child: const Text(
-              'Bỏ qua',
+              'Không lưu',
               style: TextStyle(fontWeight: FontWeight.w700),
             ),
           ),

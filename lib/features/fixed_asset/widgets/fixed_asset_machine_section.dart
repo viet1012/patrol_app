@@ -4,7 +4,7 @@ import 'package:chuphinh/core/models/fixed_asset_machine.dart';
 
 /// Machine list của location đang dùng: search cục bộ, audited-first,
 /// ✓ = đã kiểm kê trong kỳ (session), nhãn tím "In lại QR" = lần quét mới
-/// nhất QR lệch vị trí (chưa tính kiểm kê). Rows chỉ đọc. Không gọi API.
+/// nhất QR lệch vị trí (đã kiểm kê, cần in lại QR). Rows chỉ đọc. Không gọi API.
 class FixedAssetMachineSection extends StatefulWidget {
   /// false khi chưa có location (AUTO chưa scan / MANUAL chưa chọn đủ).
   final bool visible;

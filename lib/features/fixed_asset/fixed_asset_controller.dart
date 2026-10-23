@@ -284,10 +284,10 @@ class FixedAssetController extends ChangeNotifier {
   final Set<String> _auditedMachineCodes = <String>{};
   Set<String> get auditedMachineCodes => _auditedMachineCodes;
 
-  /// MachineCode có lần quét mới nhất QR lệch vị trí (cần in lại QR, chưa
-  /// tính kiểm kê), dạng trim().toLowerCase(). Nguồn: POST lưu với
+  /// MachineCode có lần quét mới nhất QR lệch vị trí (đã kiểm kê, cần in lại
+  /// QR), dạng trim().toLowerCase(). Nguồn: POST lưu với
   /// qrLocationMismatch / needsQrReprint và `needsQrReprint` của GET
-  /// /machines. Rời tập khi lưu lại đúng vị trí. Không giao với
+  /// /machines. Rời tập khi lưu lại đúng vị trí. Là tập con của
   /// [_auditedMachineCodes].
   final Set<String> _qrReprintMachineCodes = <String>{};
   Set<String> get qrReprintMachineCodes => _qrReprintMachineCodes;
@@ -306,12 +306,12 @@ class FixedAssetController extends ChangeNotifier {
     if (changed) _auditedVersion++;
   }
 
-  /// Lưu với QR lệch vị trí: dấu in lại QR, KHÔNG ✓.
+  /// Lưu với QR lệch vị trí: vẫn tính kiểm kê, thêm dấu in lại QR.
   void _markQrReprint(String machineCode) {
     final code = machineCode.trim().toLowerCase();
     if (code.isEmpty) return;
     final changed =
-        _qrReprintMachineCodes.add(code) | _auditedMachineCodes.remove(code);
+        _qrReprintMachineCodes.add(code) | _auditedMachineCodes.add(code);
     if (changed) _auditedVersion++;
   }
 
@@ -1793,8 +1793,15 @@ class FixedAssetController extends ChangeNotifier {
     // mismatch đã xác nhận). Vẫn refresh khi scan đã stale vì record đã
     // vào backend.
     if (isNewFixedAssetMasterAudit(result)) loadAuditSummary();
-    if (result != null && result.saved) {
-      if (mode == 'AUTO') _setOptimisticLock(target.location);
+    // Bản ghi in lại QR được backend chuyển sang vị trí mới (alreadyAudited,
+    // hết needsQrReprint): progress / list theo vị trí bản ghi cũng đổi.
+    final reprintCleared =
+        result != null &&
+        result.alreadyAudited &&
+        !result.needsQrReprint &&
+        _qrReprintMachineCodes.contains(machineCode.trim().toLowerCase());
+    if (result != null && (result.saved || reprintCleared)) {
+      if (mode == 'AUTO' && result.saved) _setOptimisticLock(target.location);
       // Zone progress + zone lock reload (shared 800 ms debounce).
       _scheduleZoneProgressRefresh();
     }
@@ -1913,18 +1920,31 @@ class FixedAssetController extends ChangeNotifier {
     String errorText, {
     bool qrLocationMismatch = false,
   }) {
-    // Lưu thành công với QR lệch vị trí -> "Cần in lại QR", chưa tính kiểm
-    // kê (backend không đếm; FE không ✓, tiến độ tải lại từ backend).
+    // Lưu thành công với QR lệch vị trí -> "Đã kiểm kê" + "Cần in lại QR"
+    // (tính vào tiến độ). Bản ghi trong kỳ backend còn báo needsQrReprint
+    // cũng vậy. alreadyAudited mà hết needsQrReprint: backend đã sửa bản ghi
+    // -> bỏ dấu in lại QR (_markAudited), dù FE còn giữ trong set.
+    final reprintRecord =
+        result != null && result.alreadyAudited && result.needsQrReprint;
     _qrReprintSaved =
-        (qrLocationMismatch || (result?.needsQrReprint ?? false)) &&
-        result != null &&
-        result.saved &&
-        !result.alreadyAudited;
+        reprintRecord ||
+        ((qrLocationMismatch || (result?.needsQrReprint ?? false)) &&
+            result != null &&
+            result.saved &&
+            !result.alreadyAudited);
     if (result == null) {
       _scanStatus = FixedAssetScanStatus.failed;
       _statusMessage = 'Save failed: $errorText';
+    } else if (reprintRecord) {
+      _scanStatus = FixedAssetScanStatus.qrReprintSaved;
+      _lastAuditedAt = result.lastAuditedAt;
+      _lastAuditedUserId = result.lastAuditedUserId;
+      _lastAuditedUserName = result.lastAuditedUserName;
+      _markAudited(machineCode);
+      _markQrReprint(machineCode);
     } else if (result.alreadyAudited) {
       _scanStatus = FixedAssetScanStatus.alreadyAudited;
+      _statusMessage = result.message.isNotEmpty ? result.message : null;
       _lastAuditedAt = result.lastAuditedAt;
       _lastAuditedUserId = result.lastAuditedUserId;
       _lastAuditedUserName = result.lastAuditedUserName;
@@ -1935,6 +1955,7 @@ class FixedAssetController extends ChangeNotifier {
     } else if (_qrReprintSaved) {
       // MASTER (nếu sai) vẫn hiện qua [mismatchMaster].
       _scanStatus = FixedAssetScanStatus.qrReprintSaved;
+      _markAudited(machineCode);
       _markQrReprint(machineCode);
     } else if (result.saved && result.locationMismatch) {
       _scanStatus = FixedAssetScanStatus.mismatchSaved;
