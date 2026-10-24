@@ -175,7 +175,13 @@ class _BeforeAfterSummaryDialogState extends State<BeforeAfterSummaryDialog> {
                 );
               }
 
-              return DivisionSummaryTable(rows: rows, controller: _tableHCtrl);
+              return DivisionSummaryTable(
+                rows: rows,
+                controller: _tableHCtrl,
+                highlightTopRemain:
+                    widget.fac.trim().toUpperCase() ==
+                    SummaryTableStyle.topRemainPlant,
+              );
             },
           ),
           const SizedBox(height: 8),

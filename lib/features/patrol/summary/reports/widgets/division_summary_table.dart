@@ -15,6 +15,8 @@ class SummaryTableStyle {
 
   // Top N Remain TTL theo Area
   static const int topRemainCount = 3;
+  static const String topRemainPlant = 'SPC';
+
   static const Color topRemainBg = Color(0xFFDC2626); // red-600
   static const Color topRemainText = Colors.white;
   static const Color topRemainArea = Color(0xFFB91C1C); // red-700
@@ -300,10 +302,14 @@ class DivisionSummaryTable extends StatelessWidget {
   /// Scroll ngang của card SUMMARY (desktop).
   final ScrollController controller;
 
+  /// Tô đỏ top N Remain TTL (chỉ khi fac là SPC).
+  final bool highlightTopRemain;
+
   const DivisionSummaryTable({
     super.key,
     required this.rows,
     required this.controller,
+    this.highlightTopRemain = false,
   });
 
   @override
@@ -325,6 +331,7 @@ class DivisionSummaryTable extends StatelessWidget {
                   rows: rows,
                   mobile: true,
                   maxWidth: maxWidth,
+                  highlightTopRemain: highlightTopRemain, // thêm
                 ),
               ],
             ],
@@ -339,6 +346,7 @@ class DivisionSummaryTable extends StatelessWidget {
           hover: true,
           maxWidth: maxWidth,
           controller: controller,
+          highlightTopRemain: highlightTopRemain, // thêm
         );
       },
     );
@@ -347,10 +355,6 @@ class DivisionSummaryTable extends StatelessWidget {
 
 /// Thông tin vẽ của 1 dòng dữ liệu, dùng chung cho cột Fac/Area và phần số.
 typedef _RowDeco = ({String plant, bool isFirst, BorderSide? top});
-
-/// [isFirst]: dòng đầu nhóm plant liên tiếp (cột Fac gộp từ dòng này).
-/// [top]: phân cách nhẹ giữa 2 nhà máy; dòng SUM (đầu khối SUM / %) kẻ đậm
-/// hơn. Dòng SUM / % không thuộc plant nào ([plant] rỗng).
 
 /// Index các dòng Area có Remain TTL thuộc top N (>0). Bằng điểm thì lấy hết.
 Set<int> _topRemainRows(List<DivisionSummary> rows) {
@@ -419,6 +423,9 @@ class _SummaryTableCard extends StatefulWidget {
   /// null: scroll view tự tạo controller riêng, không có Scrollbar.
   final ScrollController? controller;
 
+  /// Tô đỏ top N Remain TTL.
+  final bool highlightTopRemain;
+
   const _SummaryTableCard({
     required this.title,
     required this.sections,
@@ -427,6 +434,7 @@ class _SummaryTableCard extends StatefulWidget {
     this.mobile = false,
     this.showParentRow = false,
     this.hover = false,
+    this.highlightTopRemain = false,
     this.controller,
   });
 
@@ -455,7 +463,6 @@ class _SummaryTableCardState extends State<_SummaryTableCard> {
     final sections = widget.sections;
     final rows = widget.rows;
     final decos = _rowDecos(rows);
-    final top = _topRemainRows(rows);
     final numbersWidth = sections.fold<double>(
       0,
       (sum, s) => sum + _sectionWidth(s),
@@ -467,6 +474,10 @@ class _SummaryTableCardState extends State<_SummaryTableCard> {
       SummaryTableStyle.leadWidth + numbersWidth + chrome,
       widget.maxWidth,
     );
+
+    final top = widget.highlightTopRemain
+        ? _topRemainRows(rows)
+        : const <int>{};
 
     return SizedBox(
       width: cardWidth,
