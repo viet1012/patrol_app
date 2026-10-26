@@ -1,14 +1,12 @@
 import 'dart:async';
 import 'dart:html' as html;
 import 'dart:typed_data';
-import 'dart:ui' as ui;
 
-import 'package:flutter/painting.dart';
 import 'package:flutter/services.dart' show rootBundle;
+import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
-import 'package:qr_flutter/qr_flutter.dart';
 
 import 'package:chuphinh/features/fixed_asset/reprint/fixed_asset_reprint_controller.dart';
 
@@ -19,9 +17,10 @@ class FixedAssetQrLabel {
   final String faName;
   final String location;
   final String qrContent;
-
-  /// Xưởng (rỗng = chưa rõ): tem PDF in thêm một dòng nhỏ.
   final String fac;
+
+  /// Ngày tài sản (góc phải dưới, "Jan-2019"); null = để trống.
+  final DateTime? assetDate;
 
   const FixedAssetQrLabel({
     required this.machineCode,
@@ -29,6 +28,7 @@ class FixedAssetQrLabel {
     required this.location,
     required this.qrContent,
     this.fac = '',
+    this.assetDate,
   });
 
   factory FixedAssetQrLabel.of(FixedAssetReprintItem item) {
@@ -38,7 +38,14 @@ class FixedAssetQrLabel {
       location: item.newLocationLabel,
       qrContent: item.qrContent,
       fac: item.fac,
+      // TODO: backend trả ngày tài sản trong FixedAssetQrMismatch.
+      assetDate: null,
     );
+  }
+
+  String get dateLabel {
+    final date = assetDate;
+    return date == null ? '' : DateFormat('MMM-yyyy', 'en_US').format(date);
   }
 
   String get pngFileName => 'QR_${_safeFileName(machineCode)}.png';
@@ -48,60 +55,200 @@ String _safeFileName(String value) =>
     value.trim().replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_');
 
 // ============================================================
-// PNG (tem: QR + mã máy + vị trí, nền trắng)
+// LAYOUT TEM (theo mẫu "Check Master Fixed Asset QR Code")
 // ============================================================
 
-/// QR 640 px (>= 600 px để in), viền trắng an toàn 64 px.
-Future<Uint8List> renderFixedAssetQrPng(FixedAssetQrLabel label) async {
-  const qrSize = 640.0;
-  const pad = 64.0;
-  const width = qrSize + pad * 2;
+const double _mm = PdfPageFormat.mm;
+const double _labelW = 82 * _mm;
+const double _labelH = 35 * _mm;
+const double _gapX = 8 * _mm;
+const double _gapY = 11 * _mm;
+const double _qrColW = 28 * _mm;
+const double _footerH = 5.5 * _mm;
+const int _cols = 2;
+const int _rows = 5;
 
-  // Đúng chuỗi đã mã hóa trong QR; dài thì xuống dòng (không cắt "…").
-  final content = TextPainter(
-    text: TextSpan(
-      text: label.qrContent,
-      style: const TextStyle(
-        color: Color(0xFF000000),
-        fontSize: 36,
-        fontWeight: FontWeight.w800,
-      ),
+const PdfColor _navy = PdfColor.fromInt(0xFF0B2A5B);
+const PdfColor _peach = PdfColor.fromInt(0xFFFCE8DA);
+
+class _LabelFonts {
+  const _LabelFonts(this.bold, this.boldItalic, this.italic);
+  final pw.Font bold;
+  final pw.Font boldItalic;
+  final pw.Font italic;
+}
+
+Future<_LabelFonts>? _fontsFuture;
+Future<_LabelFonts> _labelFonts() => _fontsFuture ??= _loadLabelFonts();
+
+/// Tinos (giống Times, có tiếng Việt); thiếu thì Roboto; cuối cùng Times
+/// có sẵn của pdf (không dấu).
+Future<_LabelFonts> _loadLabelFonts() async {
+  Future<pw.Font?> load(String path) async {
+    try {
+      return pw.Font.ttf(await rootBundle.load(path));
+    } catch (_) {
+      return null;
+    }
+  }
+
+  const dir = 'assets/fonts/Tinos';
+  final bold = await load('$dir/Tinos-Bold.ttf');
+  final boldItalic = await load('$dir/Tinos-BoldItalic.ttf');
+  final italic = await load('$dir/Tinos-Italic.ttf');
+  final roboto = await load('assets/fonts/Roboto/Roboto-VariableFont_wdth.ttf');
+  return _LabelFonts(
+    bold ?? roboto ?? pw.Font.timesBold(),
+    boldItalic ?? roboto ?? pw.Font.timesBoldItalic(),
+    italic ?? roboto ?? pw.Font.timesItalic(),
+  );
+}
+
+pw.Widget _label(FixedAssetQrLabel label, _LabelFonts f) {
+  const border = 1.2;
+  return pw.Container(
+    width: _labelW,
+    height: _labelH,
+    // Chừa đúng độ dày viền: nội dung (khối QR) không vẽ đè lên viền.
+    padding: const pw.EdgeInsets.all(border),
+    decoration: pw.BoxDecoration(
+      border: pw.Border.all(color: PdfColors.black, width: border),
     ),
-    textDirection: TextDirection.ltr,
-    textAlign: TextAlign.center,
-  )..layout(maxWidth: width - pad);
-  final height = pad + qrSize + 24 + content.height + pad;
-
-  final recorder = ui.PictureRecorder();
-  final canvas = Canvas(recorder);
-  canvas.drawRect(
-    Rect.fromLTWH(0, 0, width, height),
-    Paint()..color = const Color(0xFFFFFFFF),
+    child: pw.Column(
+      children: [
+        pw.Expanded(
+          child: pw.Row(
+            crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+            children: [
+              // Mã máy (to) + tên máy (đậm nghiêng, <= 3 dòng).
+              pw.Expanded(
+                child: pw.Padding(
+                  padding: const pw.EdgeInsets.fromLTRB(
+                    1.5 * _mm,
+                    0.5 * _mm,
+                    1.5 * _mm,
+                    0,
+                  ),
+                  child: pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.FittedBox(
+                        fit: pw.BoxFit.scaleDown,
+                        alignment: pw.Alignment.centerLeft,
+                        child: pw.Text(
+                          label.machineCode,
+                          style: pw.TextStyle(
+                            font: f.bold,
+                            fontSize: 28,
+                            color: _navy,
+                          ),
+                        ),
+                      ),
+                      pw.Expanded(
+                        child: pw.Align(
+                          alignment: pw.Alignment.centerLeft,
+                          child: pw.Text(
+                            label.faName,
+                            maxLines: 3,
+                            overflow: pw.TextOverflow.clip,
+                            style: pw.TextStyle(
+                              font: f.boldItalic,
+                              fontSize: 9.5,
+                              color: _navy,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              // Khối peach + QR (nền trắng quanh QR để dễ quét).
+              pw.Container(
+                width: _qrColW,
+                color: _peach,
+                alignment: pw.Alignment.topCenter,
+                padding: const pw.EdgeInsets.only(top: 1 * _mm),
+                child: pw.Container(
+                  color: PdfColors.white,
+                  padding: const pw.EdgeInsets.all(1.2 * _mm),
+                  child: pw.BarcodeWidget(
+                    barcode: pw.Barcode.qrCode(
+                      errorCorrectLevel: pw.BarcodeQRCorrectionLevel.medium,
+                    ),
+                    data: label.qrContent,
+                    width: 20 * _mm,
+                    height: 20 * _mm,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        // Chuỗi QR · ngày.
+        pw.SizedBox(
+          height: _footerH,
+          child: pw.Row(
+            children: [
+              pw.Expanded(
+                child: pw.Padding(
+                  padding: const pw.EdgeInsets.symmetric(horizontal: 1.5 * _mm),
+                  child: pw.Center(
+                    child: pw.FittedBox(
+                      fit: pw.BoxFit.scaleDown,
+                      child: pw.Text(
+                        label.qrContent,
+                        maxLines: 1,
+                        style: pw.TextStyle(
+                          font: f.boldItalic,
+                          fontSize: 7,
+                          color: _navy,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              pw.SizedBox(
+                width: _qrColW,
+                child: pw.Center(
+                  child: pw.Text(
+                    label.dateLabel,
+                    style: pw.TextStyle(
+                      font: f.italic,
+                      fontSize: 7.5,
+                      color: _navy,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
   );
+}
 
-  canvas.save();
-  canvas.translate(pad, pad);
-  QrPainter(
-    data: label.qrContent,
-    version: QrVersions.auto,
-    errorCorrectionLevel: QrErrorCorrectLevel.M,
-    gapless: true,
-  ).paint(canvas, const Size.square(qrSize));
-  canvas.restore();
+// ============================================================
+// PNG: raster đúng tem PDF (600 dpi, QR ~470 px)
+// ============================================================
 
-  content.paint(
-    canvas,
-    Offset((width - content.width) / 2, pad + qrSize + 24),
-  );
-
-  final image = await recorder.endRecording().toImage(
-    width.ceil(),
-    height.ceil(),
-  );
-  final data = await image.toByteData(format: ui.ImageByteFormat.png);
-  image.dispose();
-  if (data == null) throw StateError('PNG encode failed');
-  return data.buffer.asUint8List();
+Future<Uint8List> renderFixedAssetQrPng(FixedAssetQrLabel label) async {
+  final fonts = await _labelFonts();
+  final doc = pw.Document()
+    ..addPage(
+      pw.Page(
+        pageFormat: const PdfPageFormat(_labelW, _labelH),
+        margin: pw.EdgeInsets.zero,
+        build: (_) => _label(label, fonts),
+      ),
+    );
+  final bytes = await doc.save();
+  await for (final page in Printing.raster(bytes, pages: const [0], dpi: 600)) {
+    return page.toPng();
+  }
+  throw StateError('PNG render failed');
 }
 
 /// Tải từng file PNG (chưa có package zip): mỗi file cách nhau một nhịp để
@@ -130,43 +277,41 @@ void _downloadBytes(Uint8List bytes, String fileName, String mimeType) {
 }
 
 // ============================================================
-// PDF A4 (lưới tem 3 x 6, đường cắt mờ) + hộp thoại in
+// PDF A4: 2 x 5 tem, căn giữa trang
 // ============================================================
 
-const int _pdfColumns = 3;
-const int _pdfRows = 6;
-
 Future<Uint8List> buildFixedAssetQrPdf(List<FixedAssetQrLabel> labels) async {
-  final font = await _loadPdfFont();
-  final doc = pw.Document(
-    theme: font == null ? null : pw.ThemeData.withFont(base: font, bold: font),
-  );
+  final fonts = await _labelFonts();
+  final doc = pw.Document();
+  const perPage = _cols * _rows;
 
-  const perPage = _pdfColumns * _pdfRows;
-  const margin = 10 * PdfPageFormat.mm;
-  final cellHeight = (PdfPageFormat.a4.height - margin * 2) / _pdfRows;
+  pw.Widget cell(List<FixedAssetQrLabel> page, int i) => i < page.length
+      ? _label(page[i], fonts)
+      : pw.SizedBox(width: _labelW, height: _labelH);
 
   for (var start = 0; start < labels.length; start += perPage) {
     final page = labels.sublist(
       start,
       (start + perPage).clamp(0, labels.length),
     );
+    final rows = (page.length / _cols).ceil();
     doc.addPage(
       pw.Page(
         pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.all(margin),
+        margin: const pw.EdgeInsets.only(top: 18 * _mm),
         build: (_) => pw.Column(
           children: [
-            for (var r = 0; r * _pdfColumns < page.length; r++)
-              pw.Row(
-                children: [
-                  for (var c = 0; c < _pdfColumns; c++)
-                    pw.Expanded(
-                      child: r * _pdfColumns + c < page.length
-                          ? _pdfLabel(page[r * _pdfColumns + c], cellHeight)
-                          : pw.SizedBox(height: cellHeight),
-                    ),
-                ],
+            for (var r = 0; r < rows; r++)
+              pw.Padding(
+                padding: const pw.EdgeInsets.only(bottom: _gapY),
+                child: pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.center,
+                  children: [
+                    cell(page, r * _cols),
+                    pw.SizedBox(width: _gapX),
+                    cell(page, r * _cols + 1),
+                  ],
+                ),
               ),
           ],
         ),
@@ -174,95 +319,6 @@ Future<Uint8List> buildFixedAssetQrPdf(List<FixedAssetQrLabel> labels) async {
     );
   }
   return doc.save();
-}
-
-pw.Widget _pdfLabel(FixedAssetQrLabel label, double height) {
-  const mm = PdfPageFormat.mm;
-  return pw.Container(
-    height: height,
-    decoration: pw.BoxDecoration(
-      border: pw.Border.all(
-        color: PdfColors.grey400,
-        width: .4,
-        style: pw.BorderStyle.dashed,
-      ),
-    ),
-    child: pw.Row(
-      children: [
-        // Viền trắng an toàn quanh QR (>= 4 module).
-        pw.Padding(
-          padding: const pw.EdgeInsets.all(4 * mm),
-          child: pw.BarcodeWidget(
-            barcode: pw.Barcode.qrCode(
-              errorCorrectLevel: pw.BarcodeQRCorrectionLevel.medium,
-            ),
-            data: label.qrContent,
-            width: 30 * mm,
-            height: 30 * mm,
-          ),
-        ),
-        pw.Expanded(
-          child: pw.Padding(
-            padding: const pw.EdgeInsets.only(right: 2 * mm),
-            child: pw.Column(
-              mainAxisAlignment: pw.MainAxisAlignment.center,
-              crossAxisAlignment: pw.CrossAxisAlignment.center,
-              children: [
-                // Đúng chuỗi đã mã hóa trong QR; cột chữ ~25 mm nên tự
-                // xuống dòng (không cắt).
-                pw.Text(
-                  label.qrContent,
-                  textAlign: pw.TextAlign.center,
-                  style: pw.TextStyle(
-                    fontSize: 8,
-                    fontWeight: pw.FontWeight.bold,
-                  ),
-                ),
-                if (label.faName.isNotEmpty) ...[
-                  pw.SizedBox(height: 1 * mm),
-                  pw.Text(
-                    _truncate(label.faName, 24),
-                    maxLines: 1,
-                    textAlign: pw.TextAlign.center,
-                    style: const pw.TextStyle(
-                      fontSize: 7,
-                      color: PdfColors.grey700,
-                    ),
-                  ),
-                ],
-                if (label.fac.isNotEmpty) ...[
-                  pw.SizedBox(height: 1 * mm),
-                  pw.Text(
-                    label.fac,
-                    textAlign: pw.TextAlign.center,
-                    style: const pw.TextStyle(
-                      fontSize: 7,
-                      color: PdfColors.grey700,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
-String _truncate(String value, int max) =>
-    value.length <= max ? value : '${value.substring(0, max - 1)}…';
-
-/// Roboto của app (có dấu tiếng Việt); lỗi thì dùng font mặc định của pdf.
-Future<pw.Font?> _loadPdfFont() async {
-  try {
-    final data = await rootBundle.load(
-      'assets/fonts/Roboto/Roboto-VariableFont_wdth.ttf',
-    );
-    return pw.Font.ttf(data);
-  } catch (_) {
-    return null;
-  }
 }
 
 /// Mở hộp thoại in của trình duyệt.
