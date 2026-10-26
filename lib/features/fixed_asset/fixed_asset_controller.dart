@@ -269,8 +269,7 @@ class FixedAssetController extends ChangeNotifier {
   int _machineReq = 0;
 
   // Search cục bộ, không gọi API.
-  final TextEditingController machineSearchController =
-      TextEditingController();
+  final TextEditingController machineSearchController = TextEditingController();
   String _machineSearch = '';
   String get machineSearch => _machineSearch;
 
@@ -647,7 +646,7 @@ class FixedAssetController extends ChangeNotifier {
       zoneLockEnabled &&
       (_serverLock?.locked ?? false) &&
       (_zoneLockFailed ||
-      _serverLock?.reason == FixedAssetZoneLockReason.unresolved);
+          _serverLock?.reason == FixedAssetZoneLockReason.unresolved);
 
   /// Khóa lạc quan sau lần lưu AUTO ở [location] (mapped), nếu zone-progress
   /// của nó có và chưa xong. Server xác nhận ở lần tải kế tiếp.
@@ -903,6 +902,18 @@ class FixedAssetController extends ChangeNotifier {
       _notify();
       return;
     }
+
+    // QR vừa bấm "Không": còn trong khung thì im lặng (gia hạn cửa sổ);
+    // rời khung quá _repeatScanWindow rồi quét lại thì hỏi lại.
+    final lastAt = _lastSeenAt;
+    if (qr == _declinedQr &&
+        lastAt != null &&
+        now.difference(lastAt) < _repeatScanWindow) {
+      _lastSeenAt = now;
+      return;
+    }
+    _declinedQr = null;
+
     final same =
         _scanStatus == FixedAssetScanStatus.needsLocation &&
         _scannedCode == data.machineCode &&
@@ -925,13 +936,20 @@ class FixedAssetController extends ChangeNotifier {
     _pendingLocationQr = data.hasLocation ? qr : null;
     _qrLocationUnresolved = false;
     _scanStatus = FixedAssetScanStatus.needsLocation;
-    _statusMessage = data.hasLocation
-        ? 'Chưa chọn vị trí. Máy ${data.machineCode} · '
-              'QR: ${data.floor}/${data.positionAA}'
-        : 'Chưa chọn vị trí. Máy ${data.machineCode}';
+    _scanLog('no location: ${data.machineCode} (qr=${data.hasLocation})');
+
+    if (data.hasLocation) {
+      // Có vị trí từ QR: chỉ hỏi "Dùng vị trí …?", không đánh dấu dropdown.
+      _statusMessage = null;
+      _manualMissingField = null;
+      _notify();
+      return;
+    }
+
+    // QR không có vị trí: phải chọn bằng tay -> đánh dấu ô trống đầu tiên.
+    _statusMessage = 'Chưa chọn vị trí. Máy ${data.machineCode}';
     _manualMissingField = _firstMissingManualField;
     _manualMissingTick++;
-    _scanLog('no location: ${data.machineCode} (missing $_manualMissingField)');
     _notify();
     _reportManualFieldMissing();
   }
@@ -955,11 +973,16 @@ class FixedAssetController extends ChangeNotifier {
         !_disposed && !isAutoMode && modeGeneration == _modeGeneration;
 
     try {
-      final matches = await _resolveLocationFromMap(data.floor, data.positionAA);
+      final matches = await _resolveLocationFromMap(
+        data.floor,
+        data.positionAA,
+      );
       if (!stillHere()) return;
       if (matches.length != 1) {
-        _scanLog('QR location ${data.floor}/${data.positionAA}: '
-            '${matches.length} matches');
+        _scanLog(
+          'QR location ${data.floor}/${data.positionAA}: '
+          '${matches.length} matches',
+        );
         _showQrLocationUnresolved(raw, data);
         return;
       }
@@ -1007,6 +1030,33 @@ class FixedAssetController extends ChangeNotifier {
     _manualMissingTick++;
     _notify();
     _reportManualFieldMissing();
+  }
+
+  /// QR vừa bấm "Không": còn trong khung camera thì không hỏi lại; rời
+  /// khung quá [_repeatScanWindow] rồi quét lại thì hỏi lại.
+  String? _declinedQr;
+
+  /// "Không": về trạng thái ban đầu (idle, ẩn chip), không đánh dấu dropdown.
+  void declineQrLocation() {
+    if (_disposed || _resolvingQrLocation || pendingQrLocationLabel == null) {
+      return;
+    }
+    _declinedQr = _pendingLocationQr;
+    _lastSeenAt = DateTime.now();
+    _pendingLocationQr = null;
+    _qrLocationUnresolved = false;
+    _scanStatus = FixedAssetScanStatus.idle;
+    _scannedCode = '';
+    _scannedFaName = '';
+    _statusMessage = null;
+    _manualMissingField = null;
+    _scanChipText = null;
+    uxLog('decline QR location');
+    _notify();
+
+    // Nhắc chọn tay: nhấp nháy + cuộn tới ô trống đầu tiên (một lần).
+    final field = _firstMissingManualField;
+    if (field != null) onManualFieldMissing?.call(field);
   }
 
   /// Every MAP location whose Floor + PositionAA equal the QR's (trimmed,
@@ -1110,7 +1160,9 @@ class FixedAssetController extends ChangeNotifier {
         ? _cancelRepeatWindow
         : _repeatScanWindow;
     final isRepeat =
-        qr == _lastSeenQr && lastAt != null && now.difference(lastAt) < repeatWindow;
+        qr == _lastSeenQr &&
+        lastAt != null &&
+        now.difference(lastAt) < repeatWindow;
 
     _lastSeenQr = qr;
     _lastSeenAt = now;
@@ -1213,7 +1265,9 @@ class FixedAssetController extends ChangeNotifier {
         _activeScan = null;
         _processingRawQr = null;
       }
-      _scanLog('end pipeline #$generation (current=${_isCurrentScan(generation)})');
+      _scanLog(
+        'end pipeline #$generation (current=${_isCurrentScan(generation)})',
+      );
 
       if (_isCurrentScan(generation)) {
         // Cửa sổ chống lặp tính từ lúc pipeline xong.
@@ -1297,7 +1351,9 @@ class FixedAssetController extends ChangeNotifier {
   }
 
   bool _machinesReadyFor(FixedAssetAuditLocation location) =>
-      !_loadingMachines && _machineError == null && _machinesLocation == location;
+      !_loadingMachines &&
+      _machineError == null &&
+      _machinesLocation == location;
 
   /// MANUAL: machine not in the selected location's list. The dialog opens
   /// at once; MASTER is looked up in parallel and filled in when it
@@ -1603,7 +1659,7 @@ class FixedAssetController extends ChangeNotifier {
 
     if (reloadMachines) {
       _machines = const <FixedAssetMachine>[];
-    _machinesLocation = null;
+      _machinesLocation = null;
       _machineError = null;
       if (!sameLocation) _clearMachineSearch();
     }
@@ -1741,7 +1797,8 @@ class FixedAssetController extends ChangeNotifier {
     final userId = accountCode.trim();
     final name = userName.trim();
     final saveUserName = name.isEmpty ? userId : name;
-    final mode = _auditModeByScan[generation] ?? (isAutoMode ? 'AUTO' : 'MANUAL');
+    final mode =
+        _auditModeByScan[generation] ?? (isAutoMode ? 'AUTO' : 'MANUAL');
     final qrCheck = _qrCheckByScan[generation];
 
     if (_scanStatus != FixedAssetScanStatus.saving) {
@@ -1755,8 +1812,10 @@ class FixedAssetController extends ChangeNotifier {
 
     uxLog('POST /audit start (confirm=$confirmLocationMismatch)');
     final postStart = _uxClock.elapsed;
-    _scanLog('saveAudit → $machineCode #$generation '
-        '(confirm=$confirmLocationMismatch)');
+    _scanLog(
+      'saveAudit → $machineCode #$generation '
+      '(confirm=$confirmLocationMismatch)',
+    );
     try {
       response = await api.saveAudit(
         fac: target.fac,
@@ -1785,9 +1844,11 @@ class FixedAssetController extends ChangeNotifier {
       'POST /audit end in ${(_uxClock.elapsed - postStart).inMilliseconds}ms '
       '(saved=${result?.saved} requiresConfirmation=${result?.requiresConfirmation})',
     );
-    _scanLog('saveAudit #$generation → '
-        '${result == null ? 'error: $errorText' : 'saved=${result.saved} '
-            'alreadyAudited=${result.alreadyAudited}'}');
+    _scanLog(
+      'saveAudit #$generation → '
+      '${result == null ? 'error: $errorText' : 'saved=${result.saved} '
+                'alreadyAudited=${result.alreadyAudited}'}',
+    );
 
     // Tiến độ MASTER đổi khi có insert mới cho machine MASTER (kể cả
     // mismatch đã xác nhận). Vẫn refresh khi scan đã stale vì record đã
@@ -1812,7 +1873,8 @@ class FixedAssetController extends ChangeNotifier {
       _reportDropped(machineCode, 'đã đổi khu vực/chế độ trong lúc lưu');
       return;
     }
-    if (result != null && fixedAssetSaveNeedsConfirmation(
+    if (result != null &&
+        fixedAssetSaveNeedsConfirmation(
           result,
           confirmLocationMismatch: confirmLocationMismatch,
         )) {
@@ -2249,7 +2311,7 @@ class FixedAssetController extends ChangeNotifier {
     } catch (error) {
       if (_disposed || req != _machineReq) return;
       _machines = const <FixedAssetMachine>[];
-    _machinesLocation = null;
+      _machinesLocation = null;
       _machineError = fixedAssetErrorText(error);
       _notify();
     } finally {

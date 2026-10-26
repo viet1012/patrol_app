@@ -25,6 +25,7 @@ class FixedAssetStatusCard extends StatelessWidget {
   /// (null label = not offered) and secondary "Chuyển Auto".
   final String? qrLocationLabel;
   final VoidCallback? onUseQrLocation;
+  final VoidCallback? onDeclineQrLocation; // "Không": bỏ qua vị trí QR
   final VoidCallback? onSwitchAuto;
 
   /// Đã lưu với QR lệch vị trí đang chọn (MANUAL): nhãn "Cần in lại QR".
@@ -42,6 +43,7 @@ class FixedAssetStatusCard extends StatelessWidget {
     required this.mismatchMaster,
     this.onSwitchManual,
     this.qrLocationLabel,
+    this.onDeclineQrLocation,
     this.onUseQrLocation,
     this.onSwitchAuto,
     this.needsQrReprint = false,
@@ -296,41 +298,85 @@ class FixedAssetStatusCard extends StatelessWidget {
                 if (needsLocation)
                   Padding(
                     padding: const EdgeInsets.only(top: 6),
-                    child: Wrap(
-                      spacing: 8,
-                      runSpacing: 6,
-                      alignment: WrapAlignment.end,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        if (qrLocationLabel != null && onUseQrLocation != null)
-                          FilledButton.icon(
-                            onPressed: onUseQrLocation,
-                            icon: const Icon(
-                              Icons.my_location_rounded,
-                              size: 16,
-                            ),
-                            label: Text('Dùng vị trí $qrLocationLabel'),
-                            style: FilledButton.styleFrom(
-                              backgroundColor: _amber,
-                              foregroundColor: Colors.black,
-                              visualDensity: VisualDensity.compact,
-                              textStyle: const TextStyle(
+                        if (qrLocationLabel != null &&
+                            onUseQrLocation != null) ...[
+                          Text.rich(
+                            TextSpan(
+                              style: const TextStyle(
+                                color: Colors.white,
                                 fontSize: 12.5,
-                                fontWeight: FontWeight.w800,
+                                fontWeight: FontWeight.w600,
                               ),
+                              children: [
+                                const TextSpan(text: 'Dùng vị trí '),
+                                TextSpan(
+                                  text: qrLocationLabel,
+                                  style: const TextStyle(
+                                    color: _amber,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                                const TextSpan(text: ' theo QR để kiểm kê?'),
+                              ],
                             ),
                           ),
-                        if (onSwitchAuto != null)
-                          TextButton(
-                            onPressed: onSwitchAuto,
-                            style: TextButton.styleFrom(
-                              foregroundColor: _amber,
-                              visualDensity: VisualDensity.compact,
-                              textStyle: const TextStyle(
-                                fontSize: 12.5,
-                                fontWeight: FontWeight.w700,
+                          const SizedBox(height: 6),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              if (onDeclineQrLocation != null) ...[
+                                OutlinedButton(
+                                  onPressed: onDeclineQrLocation,
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: Colors.white70,
+                                    side: BorderSide(
+                                      color: Colors.white.withOpacity(.3),
+                                    ),
+                                    visualDensity: VisualDensity.compact,
+                                    textStyle: const TextStyle(
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                  child: const Text('Không'),
+                                ),
+                                const SizedBox(width: 8),
+                              ],
+                              FilledButton(
+                                onPressed: onUseQrLocation,
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: _amber,
+                                  foregroundColor: Colors.black,
+                                  visualDensity: VisualDensity.compact,
+                                  textStyle: const TextStyle(
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                                child: const Text('Có'),
                               ),
+                            ],
+                          ),
+                        ],
+                        if (onSwitchAuto != null)
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton(
+                              onPressed: onSwitchAuto,
+                              style: TextButton.styleFrom(
+                                foregroundColor: _amber,
+                                visualDensity: VisualDensity.compact,
+                                textStyle: const TextStyle(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              child: const Text('Chuyển Auto'),
                             ),
-                            child: const Text('Chuyển Auto'),
                           ),
                       ],
                     ),

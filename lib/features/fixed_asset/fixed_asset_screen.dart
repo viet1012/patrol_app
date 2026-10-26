@@ -143,6 +143,14 @@ class _FixedAssetScreenState extends State<FixedAssetScreen>
     _flashFirstMissingManualField();
   }
 
+  /// "Không": bỏ gợi ý vị trí từ QR, nhấp nháy + cuộn tới ô trống đầu tiên
+  /// để user tự chọn.
+  void _onDeclineQrLocation() {
+    _controller.declineQrLocation();
+    final field = _controller.firstMissingManualField;
+    if (field != null) _flashKeyFor(field).currentState?.flash(scrollTo: true);
+  }
+
   void _flashFirstMissingManualField() {
     if (_controller.isAutoMode) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -311,6 +319,7 @@ class _FixedAssetScreenState extends State<FixedAssetScreen>
         lastAuditedUserName: c.lastAuditedUserName,
         mismatchMaster: c.mismatchMaster,
         qrLocationLabel: c.pendingQrLocationLabel,
+        onDeclineQrLocation: _onDeclineQrLocation,
         needsQrReprint: c.needsQrReprint,
       ),
       builder: (context, v) => FixedAssetStatusCard(
@@ -325,6 +334,7 @@ class _FixedAssetScreenState extends State<FixedAssetScreen>
         onSwitchManual: () => c.setLocationMode(FixedAssetLocationMode.manual),
         qrLocationLabel: v.qrLocationLabel,
         onUseQrLocation: c.useLocationFromQr,
+        onDeclineQrLocation: c.declineQrLocation,
         needsQrReprint: v.needsQrReprint,
         onSwitchAuto: c.autoModeEnabled
             ? () => c.setLocationMode(FixedAssetLocationMode.auto)
