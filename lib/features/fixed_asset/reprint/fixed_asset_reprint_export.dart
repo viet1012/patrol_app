@@ -38,8 +38,7 @@ class FixedAssetQrLabel {
       location: item.newLocationLabel,
       qrContent: item.qrContent,
       fac: item.fac,
-      // TODO: backend trả ngày tài sản trong FixedAssetQrMismatch.
-      assetDate: null,
+      assetDate: item.row.assetDate,
     );
   }
 

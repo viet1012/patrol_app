@@ -25,6 +25,9 @@ class FixedAssetQrMismatch {
   final String userName;
   final DateTime? updatedAt;
 
+  /// Ngày tài sản từ MASTER (F2_FIXED_ASSET.DateStart); null = không có.
+  final DateTime? assetDate;
+
   const FixedAssetQrMismatch({
     required this.machineCode,
     required this.faName,
@@ -37,6 +40,7 @@ class FixedAssetQrMismatch {
     required this.qrPositionAA,
     required this.userName,
     this.updatedAt,
+    this.assetDate,
   });
 
   factory FixedAssetQrMismatch.fromJson(Map<String, dynamic> json) {
@@ -54,6 +58,7 @@ class FixedAssetQrMismatch {
       qrPositionAA: str('qrPositionAA'),
       userName: str('userName'),
       updatedAt: _parseDateTime(json['updatedAt']),
+      assetDate: DateTime.tryParse(json['assetDate']?.toString() ?? ''),
     );
   }
 
