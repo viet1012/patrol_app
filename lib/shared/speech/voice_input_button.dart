@@ -56,12 +56,14 @@ class VoiceInputButton extends StatefulWidget {
     ValueChanged<String>? onTextInserted,
   }) {
     if (!isSupported) return null;
-    return VoiceInputButton(
-      controller: controller,
-      lang: lang,
-      plant: plant,
-      enabled: enabled,
-      onTextInserted: onTextInserted,
+    return _FirstLineAligned(
+      child: VoiceInputButton(
+        controller: controller,
+        lang: lang,
+        plant: plant,
+        enabled: enabled,
+        onTextInserted: onTextInserted,
+      ),
     );
   }
 
@@ -69,6 +71,90 @@ class VoiceInputButton extends StatefulWidget {
   // ignore: no_logic_in_create_state
   State<VoiceInputButton> createState() =>
       kUseWebSpeech ? _WebSpeechVoiceState() : _RecorderVoiceState();
+}
+
+/// InputDecorator luôn canh suffixIcon giữa theo chiều dọc; với ô nhiều dòng
+/// icon bị lệch xuống so với dòng đầu. Widget này cao bằng phần nội dung của
+/// TextField chứa nó (contentPadding + maxLines dòng) và đặt nút sao cho tâm
+/// nút trùng tâm dòng chữ đầu tiên. Mọi trạng thái của nút được canh trong
+/// cùng một ô 48px nên thẳng hàng như nhau.
+class _FirstLineAligned extends StatelessWidget {
+  static const double _slot = kMinInteractiveDimension;
+
+  final Widget child;
+
+  const _FirstLineAligned({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    final field = context.findAncestorWidgetOfExactType<TextField>();
+    final maxLines = field?.maxLines ?? 1;
+    if (field == null || maxLines <= 1) return child;
+
+    final padding =
+        (field.decoration?.contentPadding ?? const EdgeInsets.all(12))
+            .resolve(Directionality.of(context));
+
+    final style = Theme.of(
+      context,
+    ).textTheme.titleMedium!.merge(field.style);
+    final painter = TextPainter(
+      text: TextSpan(text: ' ', style: style),
+      textDirection: Directionality.of(context),
+      textScaler: MediaQuery.textScalerOf(context),
+    )..layout();
+    final lineHeight = painter.preferredLineHeight;
+    painter.dispose();
+
+    final height = padding.vertical + maxLines * lineHeight;
+    final slotTop = padding.top + lineHeight / 2 - _slot / 2;
+
+    return SizedBox(
+      height: height,
+      child: Align(
+        alignment: Alignment.topCenter,
+        widthFactor: 1,
+        child: Transform.translate(
+          // slotTop có thể âm vài px (nút 48px cao hơn dòng chữ).
+          offset: Offset(0, slotTop),
+          child: SizedBox(
+            height: _slot,
+            child: Center(widthFactor: 1, child: child),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Đảm bảo chỉ một VoiceInputButton nghe/ghi tại một thời điểm.
+/// Ô mới bắt đầu → ô đang nghe được stop() (giữ kết quả) trước.
+class VoiceInputCoordinator {
+  VoiceInputCoordinator._();
+
+  static Object? _owner;
+  static Future<void> Function()? _stopOwner;
+
+  /// Nhận quyền nghe cho [owner]; chờ ô đang nghe (nếu có) dừng xong.
+  static Future<void> acquire(
+    Object owner,
+    Future<void> Function() stop,
+  ) async {
+    final prevOwner = _owner;
+    final prevStop = _stopOwner;
+    _owner = owner;
+    _stopOwner = stop;
+
+    if (prevOwner != null && !identical(prevOwner, owner)) {
+      await prevStop?.call();
+    }
+  }
+
+  static void release(Object owner) {
+    if (!identical(_owner, owner)) return;
+    _owner = null;
+    _stopOwner = null;
+  }
 }
 
 /// Chèn [transcript] tại vị trí con trỏ, tự thêm khoảng trắng hai bên khi cần.
@@ -134,6 +220,9 @@ class _WebSpeechVoiceState extends State<VoiceInputButton>
   int _elapsed = 0;
   Timer? _ticker;
 
+  /// Đang chờ ô khác dừng để nhận quyền nghe.
+  bool _acquiring = false;
+
   @override
   void initState() {
     super.initState();
@@ -164,6 +253,7 @@ class _WebSpeechVoiceState extends State<VoiceInputButton>
     _ticker?.cancel();
     _speech.dispose();
     _pulse.dispose();
+    VoiceInputCoordinator.release(this);
     super.dispose();
   }
 
@@ -178,7 +268,20 @@ class _WebSpeechVoiceState extends State<VoiceInputButton>
     }
   }
 
-  void _start() {
+  Future<void> _start() async {
+    if (_acquiring) return;
+
+    _acquiring = true;
+    try {
+      await VoiceInputCoordinator.acquire(this, _stop);
+    } finally {
+      _acquiring = false;
+    }
+    if (!mounted || !widget.enabled || _state != _SpeechState.idle) {
+      VoiceInputCoordinator.release(this);
+      return;
+    }
+
     setState(() {
       _state = _SpeechState.listening;
       _interim = '';
@@ -228,6 +331,7 @@ class _WebSpeechVoiceState extends State<VoiceInputButton>
     _state = _SpeechState.idle;
     _interim = '';
     _elapsed = 0;
+    VoiceInputCoordinator.release(this);
   }
 
   static String _formatElapsed(int seconds) {
@@ -427,6 +531,7 @@ class _RecorderVoiceState extends State<VoiceInputButton> {
       _recorder.cancel();
       _state = _RecorderState.idle;
       _elapsed = 0;
+      VoiceInputCoordinator.release(this);
     }
   }
 
@@ -435,6 +540,7 @@ class _RecorderVoiceState extends State<VoiceInputButton> {
     _ticker?.cancel();
     _recorder.cancel();
     _cancelToken?.cancel();
+    VoiceInputCoordinator.release(this);
     super.dispose();
   }
 
@@ -453,15 +559,20 @@ class _RecorderVoiceState extends State<VoiceInputButton> {
   Future<void> _start() async {
     setState(() => _state = _RecorderState.starting);
 
+    await VoiceInputCoordinator.acquire(this, _stopAndTranscribe);
+    if (!mounted) return;
+
     try {
       final started = await _recorder.start();
       if (!mounted) return;
       if (!started) {
+        VoiceInputCoordinator.release(this);
         setState(() => _state = _RecorderState.idle);
         return;
       }
     } on AudioRecorderException catch (e) {
       if (!mounted) return;
+      VoiceInputCoordinator.release(this);
       setState(() => _state = _RecorderState.idle);
       _showVoiceError(context, e.message);
       return;
@@ -521,6 +632,7 @@ class _RecorderVoiceState extends State<VoiceInputButton> {
       }
     } finally {
       _cancelToken = null;
+      VoiceInputCoordinator.release(this);
       if (mounted) {
         setState(() {
           _state = _RecorderState.idle;
