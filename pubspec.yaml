@@ -66,6 +66,8 @@ dependencies:
   qr_flutter: ^4.1.0
   pdf: ^3.11.1
   printing: ^5.13.4
+  # Nhập giọng nói: MediaRecorder qua dart:js_interop.
+  web: ^1.1.1
 dev_dependencies:
   flutter_test:
     sdk: flutter

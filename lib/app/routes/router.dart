@@ -1,5 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+
+import 'package:chuphinh/core/api/auth_me_api.dart';
+import 'package:chuphinh/core/models/auth_me.dart';
 
 import 'package:chuphinh/features/patrol/after/after_report_screen.dart';
 import 'package:chuphinh/app/app_idle_detector.dart';
@@ -63,7 +68,10 @@ final router = GoRouter(
     // Đã login mà đang ở Login:
     // KHÔNG tự redirect sang Home.
     // LoginPage sẽ tự xử lý auto-login/manual-login.
-    return null;
+    if (isLoginPage) return null;
+
+    // Chỉ tới đây khi đã login: chưa login đã return ở trên, không gọi API.
+    return _permissionRedirect(state, authenticatedAccount.trim());
   },
 
   routes: [
@@ -126,13 +134,14 @@ final router = GoRouter(
         }
 
         // /after/<qr>?group=<PatrolGroup.name>
+        // Thiếu/sai group -> Patrol (QR in sẵn có thể không có group),
+        // khớp với route guard.
         final qr = (state.pathParameters['qr'] ?? '').trim();
-        final groupName = state.uri.queryParameters['group'];
-        final pg = PatrolGroup.values
-            .where((g) => g.name == groupName)
-            .firstOrNull;
+        final pg =
+            _parseGroup(state.uri.queryParameters['group']) ??
+            PatrolGroup.Patrol;
 
-        if (qr.isEmpty || pg == null) {
+        if (qr.isEmpty) {
           return const _InvalidLinkPage();
         }
 
@@ -145,6 +154,45 @@ final router = GoRouter(
     ),
   ],
 );
+
+// ============================================================
+// PERMISSION GUARD
+// ============================================================
+
+/// /home/summary cần quyền summary, /after/:qr cần quyền after của `?group=`.
+/// Thiếu quyền / không tải được quyền -> về /home.
+/// Group thiếu/sai: summary -> /home; after -> mặc định Patrol (QR in sẵn).
+FutureOr<String?> _permissionRedirect(GoRouterState state, String account) {
+  final path = state.uri.path;
+  final isSummary = path == '/home/summary';
+
+  final PatrolAction action;
+  if (isSummary) {
+    action = PatrolAction.summary;
+  } else if (path.startsWith('/after/')) {
+    action = PatrolAction.after;
+  } else {
+    return null;
+  }
+
+  final parsedGroup = _parseGroup(state.uri.queryParameters['group']);
+  if (parsedGroup == null && isSummary) return RouteTarget.home;
+  final group = parsedGroup ?? PatrolGroup.Patrol;
+
+  bool allowed(AuthMe? me) => me != null && me.can(group, action);
+
+  // Có cache thì quyết định ngay, không chờ API.
+  final cached = SessionStore.authMe;
+  if (cached != null) return allowed(cached) ? null : RouteTarget.home;
+
+  // F5 / mở link trực tiếp: chưa có cache -> tải (AuthMeApi tự cache).
+  return AuthMeApi.fetch(
+    account,
+  ).then((me) => allowed(me) ? null : RouteTarget.home);
+}
+
+PatrolGroup? _parseGroup(String? name) =>
+    PatrolGroup.values.where((g) => g.name == name).firstOrNull;
 
 class _InvalidLinkPage extends StatelessWidget {
   const _InvalidLinkPage();

@@ -49,5 +49,8 @@
   "impact_claim": "クレーム発生",
   "impact_defect_in_process": "工程内不良（不良品）発生",
   "impact_accident_risk": "労働災害発生リスクあり",
-  "impact_gauge_damage": "検査治具／測定器の破損発生"
+  "impact_gauge_damage": "検査治具／測定器の破損発生",
+  "no_permission": "権限がありません",
+  "perm_load_failed": "権限を読み込めませんでした",
+  "retry": "再試行"
 }

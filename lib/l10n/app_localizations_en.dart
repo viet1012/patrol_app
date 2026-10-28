@@ -144,4 +144,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get impact_gauge_damage => '検査治具／測定器の破損発生';
+
+  @override
+  String get no_permission => 'No permission';
+
+  @override
+  String get perm_load_failed => 'Could not load permissions';
+
+  @override
+  String get retry => 'Retry';
 }

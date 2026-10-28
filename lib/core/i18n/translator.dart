@@ -59,6 +59,9 @@ extension TranslateExtension on String {
       case 'impact_defect_in_process': value = t!.impact_defect_in_process; break;
       case 'impact_accident_risk': value = t!.impact_accident_risk; break;
       case 'impact_gauge_damage': value = t!.impact_gauge_damage; break;
+      case 'no_permission': value = t!.no_permission; break;
+      case 'perm_load_failed': value = t!.perm_load_failed; break;
+      case 'retry': value = t!.retry; break;
       default:
         value = this;
     }
@@ -127,6 +130,9 @@ extension TranslateExtension on String {
       case 'impact_defect_in_process': return t.impact_defect_in_process;
       case 'impact_accident_risk': return t.impact_accident_risk;
       case 'impact_gauge_damage': return t.impact_gauge_damage;
+      case 'no_permission': return t.no_permission;
+      case 'perm_load_failed': return t.perm_load_failed;
+      case 'retry': return t.retry;
     }
 
     return key;

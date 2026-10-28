@@ -366,6 +366,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'検査治具／測定器の破損発生'**
   String get impact_gauge_damage;
+
+  /// No description provided for @no_permission.
+  ///
+  /// In en, this message translates to:
+  /// **'No permission'**
+  String get no_permission;
+
+  /// No description provided for @perm_load_failed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load permissions'**
+  String get perm_load_failed;
+
+  /// No description provided for @retry.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry'**
+  String get retry;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

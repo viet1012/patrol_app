@@ -10,6 +10,7 @@ import 'package:http/http.dart' hide MultipartFile;
 import 'package:chuphinh/features/patrol/common/after_camera_box.dart';
 import 'package:chuphinh/features/patrol/common/replaceable_image_item.dart';
 import 'package:chuphinh/core/network/dio_client.dart';
+import 'package:chuphinh/core/api/api_conflict_exception.dart';
 import 'package:chuphinh/core/api/hse_master_service.dart';
 import 'package:chuphinh/core/api/patrol_report_api.dart';
 import 'package:chuphinh/core/api/replace_image_api.dart';
@@ -993,6 +994,9 @@ class _RedoDetailPageState extends State<RedoDetailPage> {
                               'Update AF successful!',
                               Colors.green,
                             );
+                          } on ApiConflictException catch (e) {
+                            hideLoading(context);
+                            _showSnackBar(e.message, Colors.orange);
                           } catch (e) {
                             debugPrint('Update AT error: $e');
                             _showSnackBar('Server error: $e', Colors.red);
@@ -1233,6 +1237,10 @@ class _RedoDetailPageState extends State<RedoDetailPage> {
 
       debugPrint('Response status: ${response.statusCode}');
       debugPrint('Response data: ${response.data}');
+
+      if (response.statusCode == ApiConflictException.statusCode) {
+        throw ApiConflictException.fromResponseData(response.data);
+      }
 
       if (response.statusCode != 200 && response.statusCode != 201) {
         throw Exception('Update AT failed: ${response.statusCode}');

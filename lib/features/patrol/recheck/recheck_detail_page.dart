@@ -10,6 +10,7 @@ import 'package:http/http.dart' hide MultipartFile;
 import 'package:chuphinh/features/patrol/common/after_camera_box.dart';
 import 'package:chuphinh/features/patrol/common/replaceable_image_item.dart';
 import 'package:chuphinh/core/network/dio_client.dart';
+import 'package:chuphinh/core/api/api_conflict_exception.dart';
 import 'package:chuphinh/core/api/hse_master_service.dart';
 import 'package:chuphinh/core/api/patrol_report_api.dart';
 import 'package:chuphinh/core/api/replace_image_api.dart';
@@ -33,6 +34,13 @@ class RecheckDetailPage extends StatefulWidget {
     required this.patrolGroup,
     this.qrCode,
   });
+
+  /// Chỉ report đã hoàn thành After (atStatus = Pro_Done) mới được HSE chấm.
+  static bool canRecheck(PatrolReportModel report) {
+    return (report.atStatus ?? '').trim().toLowerCase() == 'pro_done';
+  }
+
+  static const String notAfterDoneLabel = 'Chưa hoàn thành After';
 
   @override
   State<RecheckDetailPage> createState() => _RecheckDetailPageState();
@@ -935,11 +943,45 @@ class _RecheckDetailPageState extends State<RecheckDetailPage> {
             ),
             const SizedBox(height: 8),
 
-            _buildHseJudgeButtons(),
+            if (RecheckDetailPage.canRecheck(widget.report))
+              _buildHseJudgeButtons()
+            else
+              _buildNotAfterDoneBanner(),
 
             // ],
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildNotAfterDoneBanner() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+      decoration: BoxDecoration(
+        color: Colors.orange.withOpacity(.15),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.orangeAccent.withOpacity(.5)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(
+            Icons.hourglass_top_rounded,
+            color: Colors.orangeAccent,
+            size: 20,
+          ),
+          const SizedBox(width: 6),
+          Text(
+            RecheckDetailPage.notAfterDoneLabel,
+            style: const TextStyle(
+              color: Colors.orangeAccent,
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1383,6 +1425,10 @@ class _RecheckDetailPageState extends State<RecheckDetailPage> {
       debugPrint('DATA   : ${response.data}');
       debugPrint('=========================================');
 
+      if (response.statusCode == ApiConflictException.statusCode) {
+        throw ApiConflictException.fromResponseData(response.data);
+      }
+
       if (response.statusCode != 200 && response.statusCode != 201) {
         throw Exception('Upload failed: ${response.statusCode}');
       }
@@ -1401,6 +1447,15 @@ class _RecheckDetailPageState extends State<RecheckDetailPage> {
   }
 
   Future<void> _submitHseJudge(String value) async {
+    if (!RecheckDetailPage.canRecheck(widget.report)) {
+      _showSnackBar(
+        RecheckDetailPage.notAfterDoneLabel,
+        Colors.orange,
+        duration: const Duration(seconds: 3),
+      );
+      return;
+    }
+
     if (_employeeLoading) {
       _showSnackBar(
         'Đang kiểm tra MSNV, vui lòng chờ.',
@@ -1469,7 +1524,11 @@ class _RecheckDetailPageState extends State<RecheckDetailPage> {
         _hseJudge = null;
       });
 
-      _showSnackBar('Server error: $e', Colors.redAccent);
+      if (e is ApiConflictException) {
+        _showSnackBar(e.message, Colors.orange);
+      } else {
+        _showSnackBar('Server error: $e', Colors.redAccent);
+      }
     }
   }
 }

@@ -5,6 +5,7 @@ import 'dart:ui';
 
 import 'package:auto_size_text/auto_size_text.dart';
 import 'package:chuphinh/shared/camera/camera_preview_box.dart';
+import 'package:chuphinh/shared/speech/voice_input_button.dart';
 import 'package:chuphinh/core/i18n/translator.dart';
 import 'package:chuphinh/shared/widgets/glass_action_button.dart';
 import 'package:chuphinh/shared/widgets/required_field_flash.dart';

@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import 'package:chuphinh/core/models/auth_me.dart';
 import 'package:chuphinh/core/network/dio_client.dart';
+import 'package:chuphinh/core/session/session_store.dart';
 
 class AuthMeApi {
   /// Quyền của user; `null` nếu lỗi (không làm fail cả màn hình).
@@ -13,7 +14,9 @@ class AuthMeApi {
       );
 
       if (response.statusCode == 200 && response.data != null) {
-        return AuthMe.fromJson(Map<String, dynamic>.from(response.data));
+        final me = AuthMe.fromJson(Map<String, dynamic>.from(response.data));
+        SessionStore.cacheAuthMe(accountCode, me);
+        return me;
       }
     } catch (error) {
       debugPrint('Load auth me error: $error');

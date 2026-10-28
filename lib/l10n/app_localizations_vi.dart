@@ -144,4 +144,13 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get impact_gauge_damage => 'Phát sinh hư hỏng dụng cụ kiểm tra';
+
+  @override
+  String get no_permission => 'Không có quyền';
+
+  @override
+  String get perm_load_failed => 'Không tải được quyền';
+
+  @override
+  String get retry => 'Thử lại';
 }

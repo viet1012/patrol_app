@@ -1,7 +1,7 @@
 import 'dart:async';
-import 'dart:ui';
 
 import 'package:chuphinh/core/api/auth_me_api.dart';
+import 'package:chuphinh/core/api/fixed_asset_backend.dart';
 import 'package:chuphinh/shared/widgets/glass_action_button.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -17,11 +17,13 @@ import 'package:chuphinh/shared/widgets/app_version_text.dart';
 import 'package:chuphinh/shared/widgets/common_ui_helper.dart';
 import 'package:chuphinh/shared/utils/plant_constants.dart';
 import 'package:chuphinh/core/models/patrol_group.dart';
+import 'package:chuphinh/core/permission/patrol_group_ui.dart';
 import 'package:chuphinh/features/fixed_asset/fixed_asset_screen.dart';
 import 'package:chuphinh/features/fixed_asset/reprint/fixed_asset_reprint_badge.dart';
 import 'package:chuphinh/features/fixed_asset/reprint/fixed_asset_reprint_screen.dart';
 import 'package:chuphinh/features/fixed_asset/reprint/fixed_asset_reprint_strings.dart';
 import 'package:chuphinh/core/models/auth_me.dart';
+import 'package:chuphinh/core/models/group_access.dart';
 import 'package:chuphinh/core/models/hse_patrol_team_model.dart';
 import 'package:chuphinh/core/models/machine_model.dart';
 import 'package:chuphinh/shared/qr/qr_scanner_dialog.dart';
@@ -60,10 +62,22 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
   HsePatrolTeamModel? _autoTeam;
   bool _needManualSelect = true;
   bool _qrHandled = false;
-  AuthMe? _authMe;
 
-  /// Tăng khi quay về từ màn Fixed Asset / In lại QR: badge tải lại số máy.
-  int _reprintBadgeTick = 0;
+  /// Quyền theo group, tính 1 lần sau khi tải AuthMe.
+  Map<PatrolGroup, GroupAccess> _access = const {};
+
+  /// Tải AuthMe lỗi: ẩn mọi group, hiện banner "Thử lại".
+  bool _authFailed = false;
+  bool _authRetrying = false;
+
+  /// Số máy cần in lại QR (badge). `null` = chưa tải / lỗi.
+  int? _reprintCount;
+
+  /// Đã tải lần đầu (khi mở card Fixed Asset) -> đóng/mở card không tải lại.
+  bool _reprintFetched = false;
+
+  /// Bỏ qua kết quả của request cũ nếu có request mới hơn.
+  int _reprintRequestId = 0;
 
   // Chỉ dùng để chặn init trùng trong trường hợp widget bị gắn lại bất thường.
   bool _initializing = false;
@@ -159,8 +173,13 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
           ? initialPlant
           : null;
 
+      final access = GroupAccess.mapOf(authMe);
+      final autoExpand =
+          patrolTeam != null && access[PatrolGroup.Patrol]!.any;
+
       setState(() {
-        _authMe = authMe;
+        _access = access;
+        _authFailed = authMe == null;
         machines = List.unmodifiable(loadedMachines);
         teams = List.unmodifiable(loadedTeams);
         _factories = List.unmodifiable(factories);
@@ -169,7 +188,7 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
         selectedFactory = validInitialPlant;
 
         _autoTeam = patrolTeam;
-        expandedGroup = patrolTeam == null ? null : PatrolGroup.Patrol;
+        expandedGroup = autoExpand ? PatrolGroup.Patrol : null;
         _needManualSelect = patrolTeam == null;
 
         errorMessage = null;
@@ -196,7 +215,43 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
   }
 
   // Auth permission lỗi không nên làm toàn màn hình fail -> trả null.
+  // AuthMeApi.fetch đã tự catch và trả null khi lỗi -> null = tải quyền lỗi.
   Future<AuthMe?> _fetchAuthMe() => AuthMeApi.fetch(widget.accountCode);
+
+  GroupAccess _accessOf(PatrolGroup group) =>
+      _access[group] ?? GroupAccess.none;
+
+  Future<void> _retryAuthMe() async {
+    if (_authRetrying) return;
+    setState(() => _authRetrying = true);
+
+    final authMe = await _fetchAuthMe();
+    if (!mounted) return;
+
+    setState(() {
+      _authRetrying = false;
+      _access = GroupAccess.mapOf(authMe);
+      _authFailed = authMe == null;
+
+      // Lần đầu chưa có plant (do HR lỗi) -> dùng plant HR nếu hợp lệ.
+      final hrPlant = authMe?.plant?.trim();
+      if (selectedFactory == null && _factories.contains(hrPlant)) {
+        selectedFactory = hrPlant;
+      }
+
+      if (expandedGroup != null && !_visibleGroups.contains(expandedGroup)) {
+        expandedGroup = null;
+      }
+    });
+  }
+
+  void _showNoPermission() {
+    CommonUI.showSnackBar(
+      context: context,
+      message: 'no_permission'.tr(context),
+      color: Colors.redAccent,
+    );
+  }
 
   Future<String> _fetchEmployeeNameValue(String code) async {
     final employeeCode = code.trim();
@@ -305,6 +360,10 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
           ),
           const SizedBox(height: 8),
           _buildToolbar(validFactory),
+          if (_authFailed) ...[
+            const SizedBox(height: 8),
+            _buildAuthFailedBanner(),
+          ],
           const SizedBox(height: 18),
           Expanded(child: _buildGroupList()),
           _buildBottomActions(),
@@ -389,6 +448,47 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
     );
   }
 
+  Widget _buildAuthFailedBanner() {
+    return Container(
+      padding: const EdgeInsets.only(left: 12, right: 4),
+      decoration: _glassDecorationSmall.copyWith(
+        border: Border.all(color: Colors.orangeAccent.withOpacity(.6)),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.warning_amber_rounded,
+            color: Colors.orangeAccent,
+            size: 20,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'perm_load_failed'.tr(context),
+              style: const TextStyle(fontSize: 14, color: Colors.white70),
+            ),
+          ),
+          TextButton(
+            onPressed: _authRetrying ? null : _retryAuthMe,
+            child: _authRetrying
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.orangeAccent,
+                    ),
+                  )
+                : Text(
+                    'retry'.tr(context),
+                    style: const TextStyle(color: Colors.orangeAccent),
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
   OutlineInputBorder _plantBorder(Color color, {double width = 1}) {
     return OutlineInputBorder(
       borderRadius: BorderRadius.circular(14),
@@ -404,9 +504,12 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
       _autoTeam = null;
       _needManualSelect = true;
 
-      // Group đang mở bị ẩn ở chế độ SPC -> quay về Patrol.
-      if (expandedGroup != null && !_visibleGroups.contains(expandedGroup)) {
-        expandedGroup = PatrolGroup.Patrol;
+      // Group đang mở bị ẩn ở plant mới -> quay về Patrol (nếu Patrol hiện).
+      final visible = _visibleGroups;
+      if (expandedGroup != null && !visible.contains(expandedGroup)) {
+        expandedGroup = visible.contains(PatrolGroup.Patrol)
+            ? PatrolGroup.Patrol
+            : null;
       }
     });
 
@@ -417,9 +520,19 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
 
   bool get _isAllPlant => isAllPlant(selectedFactory);
 
-  // SPC chỉ xem Data Table của Patrol, các group khác ẩn.
-  List<PatrolGroup> get _visibleGroups =>
-      _isAllPlant ? const [PatrolGroup.Patrol] : PatrolGroup.values;
+  // SPC chỉ xem Data Table của Patrol (cần quyền summary), group khác ẩn.
+  // Plant thường: group có ít nhất 1 quyền. Group không quyền -> ẩn.
+  List<PatrolGroup> get _visibleGroups {
+    if (_isAllPlant) {
+      return _accessOf(PatrolGroup.Patrol).summary
+          ? const [PatrolGroup.Patrol]
+          : const [];
+    }
+
+    return PatrolGroup.values
+        .where((g) => _accessOf(g).any)
+        .toList(growable: false);
+  }
 
   Widget _buildGroupList() {
     if (selectedFactory == null) {
@@ -439,63 +552,15 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
       itemCount: groups.length,
       itemBuilder: (context, index) {
         final group = groups[index];
-        final config = _groupConfig(group);
 
         return RepaintBoundary(
           child: _PatrolEntryAnimation(
             index: index,
-            child: _patrolGroupCard(
-              group: group,
-              title: config.title,
-              icon: config.icon,
-              prefix: config.prefix,
-              titleScreen: config.titleScreen,
-              enabled: config.enabled,
-            ),
+            child: _patrolGroupCard(group: group, ui: kPatrolGroupUi[group]!),
           ),
         );
       },
     );
-  }
-
-  _GroupConfig _groupConfig(PatrolGroup group) {
-    switch (group) {
-      case PatrolGroup.Patrol:
-        return const _GroupConfig(
-          title: 'Weekly Safety Patrol',
-          icon: Icons.security,
-          prefix: 'Patrol',
-          titleScreen: 'Safety Patrol',
-        );
-      case PatrolGroup.Audit:
-        return const _GroupConfig(
-          title: 'SRG Safety Audit',
-          icon: Icons.groups,
-          prefix: 'Audit',
-          titleScreen: 'Safety Audit',
-        );
-      case PatrolGroup.QualityPatrol:
-        return const _GroupConfig(
-          title: 'QA Quality Patrol',
-          icon: Icons.verified,
-          prefix: 'QA Patrol',
-          titleScreen: 'QA Patrol',
-        );
-      case PatrolGroup.AssetUpdate:
-        return const _GroupConfig(
-          title: 'MA Machine Patrol',
-          icon: Icons.inventory_rounded,
-          prefix: 'Machine Patrol',
-          titleScreen: 'MA Machine Patrol',
-        );
-      case PatrolGroup.FixedAsset:
-        return const _GroupConfig(
-          title: 'Fixed Asset Audit',
-          icon: Icons.precision_manufacturing_rounded,
-          prefix: 'Fixed Asset Audit',
-          titleScreen: 'Fixed Asset Audit',
-        );
-    }
   }
 
   Widget _buildBottomActions() {
@@ -508,12 +573,13 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
             left: 0,
             child: GlassActionButton(icon: Icons.logout, onTap: _logout),
           ),
-          Center(
-            child: QrScanGlassButton(
-              onTap: _openQrScannerDialog,
-              duration: const Duration(milliseconds: 900),
+          if (_accessOf(PatrolGroup.Patrol).after)
+            Center(
+              child: QrScanGlassButton(
+                onTap: _openQrScannerDialog,
+                duration: const Duration(milliseconds: 900),
+              ),
             ),
-          ),
         ],
       ),
     );
@@ -543,25 +609,6 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
   // GROUP CARD
   // ============================================================
 
-  Color _groupColor(PatrolGroup group, bool enabled) {
-    if (!enabled) {
-      return Colors.white.withOpacity(.5);
-    }
-
-    switch (group) {
-      case PatrolGroup.Patrol:
-        return Colors.lightBlueAccent.shade400;
-      case PatrolGroup.Audit:
-        return Colors.green.shade400;
-      case PatrolGroup.QualityPatrol:
-        return Colors.purpleAccent.shade100;
-      case PatrolGroup.AssetUpdate:
-        return Colors.amber.shade600; // vàng máy móc
-      case PatrolGroup.FixedAsset:
-        return const Color.fromARGB(255, 247, 115, 104); // coral
-    }
-  }
-
   void _onExpandGroup(PatrolGroup group) {
     if (expandedGroup == group) {
       setState(() {
@@ -583,18 +630,19 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
       _autoTeam = team;
       _needManualSelect = team == null;
     });
+
+    if (group == PatrolGroup.FixedAsset && !_reprintFetched) {
+      _fetchReprintCount();
+    }
   }
 
+  // Group không quyền đã bị ẩn ở _visibleGroups -> card luôn mở được.
   Widget _patrolGroupCard({
     required PatrolGroup group,
-    required String title,
-    required IconData icon,
-    required String prefix,
-    required String titleScreen,
-    bool enabled = true,
+    required PatrolGroupUi ui,
   }) {
     final expanded = expandedGroup == group;
-    final color = _groupColor(group, enabled);
+    final color = ui.color;
 
     /*
      * Bỏ BackdropFilter ở từng card.
@@ -612,16 +660,16 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
       child: Column(
         children: [
           InkWell(
-            onTap: enabled ? () => _onExpandGroup(group) : null,
+            onTap: () => _onExpandGroup(group),
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 22),
               child: Row(
                 children: [
-                  Icon(icon, color: color, size: 26),
+                  Icon(ui.icon, color: color, size: 26),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      title,
+                      ui.title,
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w900,
@@ -630,15 +678,12 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
                       ),
                     ),
                   ),
-                  if (enabled)
-                    AnimatedRotation(
-                      turns: expanded ? .5 : 0,
-                      duration: const Duration(milliseconds: 220),
-                      curve: Curves.easeOut,
-                      child: Icon(Icons.expand_more, size: 34, color: color),
-                    )
-                  else
-                    Icon(Icons.lock_outline, color: color, size: 26),
+                  AnimatedRotation(
+                    turns: expanded ? .5 : 0,
+                    duration: const Duration(milliseconds: 220),
+                    curve: Curves.easeOut,
+                    child: Icon(Icons.expand_more, size: 34, color: color),
+                  ),
                 ],
               ),
             ),
@@ -654,12 +699,7 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
               curve: Curves.easeOutCubic,
               alignment: Alignment.topCenter,
               child: expanded
-                  ? _childPatrolContainer(
-                      group: group,
-                      prefix: prefix,
-                      color: color,
-                      titleScreen: titleScreen,
-                    )
+                  ? _childPatrolContainer(group: group, ui: ui)
                   : const SizedBox(width: double.infinity, height: 0),
             ),
           ),
@@ -670,10 +710,13 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
 
   Widget _childPatrolContainer({
     required PatrolGroup group,
-    required String prefix,
-    required Color color,
-    required String titleScreen,
+    required PatrolGroupUi ui,
   }) {
+    final access = _accessOf(group);
+    final color = ui.color;
+    final prefix = ui.prefix;
+    final titleScreen = ui.titleScreen;
+
     // Fixed Asset không thuộc workflow Patrol: kiểm kê + in lại QR.
     if (group == PatrolGroup.FixedAsset) {
       return Padding(
@@ -684,7 +727,7 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
               number: '1)',
               title: 'Open Fixed Asset',
               color: color,
-              enabled: true,
+              enabled: access.can(kFixedAssetAuditAction),
               onTap: _openFixedAsset,
             ),
             const SizedBox(height: 16),
@@ -692,19 +735,17 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
               number: '2)',
               title: FixedAssetReprintStrings.menuTitle,
               color: color,
-              enabled: true,
+              enabled: access.can(kFixedAssetReprintAction),
               onTap: _openFixedAssetReprint,
               badge: FixedAssetReprintBadge(
-                key: ValueKey('reprint|$_reprintBadgeTick'),
                 color: color,
+                count: _reprintCount,
               ),
             ),
           ],
         ),
       );
     }
-
-    final canTable = _authMe?.can(group, PatrolAction.summary) ?? false;
 
     // SPC (tất cả nhà máy): chỉ xem Data Table.
     if (_isAllPlant) {
@@ -714,53 +755,61 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
           number: '1)',
           title: 'Data Table',
           color: color,
-          enabled: canTable,
+          enabled: access.summary,
           onTap: () => _openSummary(group),
         ),
       );
     }
 
-    final canBefore = _authMe?.can(group, PatrolAction.before) ?? false;
-    final canAfter = _authMe?.can(group, PatrolAction.after) ?? false;
-    final canRecheck = _authMe?.can(group, PatrolAction.recheck) ?? false;
+    // Chỉ render nút group có; số thứ tự đánh theo nút thực sự hiện ra.
+    final buttons = <Widget>[];
+    void addButton(
+      PatrolAction action,
+      String title,
+      bool enabled,
+      VoidCallback onTap,
+    ) {
+      if (!ui.actions.contains(action)) return;
+      if (buttons.isNotEmpty) buttons.add(const SizedBox(height: 16));
+      buttons.add(
+        _patrolButton(
+          number: '${(buttons.length ~/ 2) + 1})',
+          title: title,
+          color: color,
+          enabled: enabled,
+          onTap: onTap,
+        ),
+      );
+    }
+
+    addButton(
+      PatrolAction.before,
+      '$prefix Before',
+      access.before,
+      () => _openBefore(group, titleScreen),
+    );
+    addButton(
+      PatrolAction.after,
+      'Action After',
+      access.after,
+      () => _openAfter(group, titleScreen),
+    );
+    addButton(
+      PatrolAction.recheck,
+      ui.recheckTitle,
+      access.recheck,
+      () => _openRecheck(group, titleScreen),
+    );
+    addButton(
+      PatrolAction.summary,
+      'Data Table',
+      access.summary,
+      () => _openSummary(group),
+    );
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
-      child: Column(
-        children: [
-          _patrolButton(
-            number: '1)',
-            title: '$prefix Before',
-            color: color,
-            enabled: canBefore,
-            onTap: () => _openBefore(group, titleScreen),
-          ),
-          const SizedBox(height: 16),
-          _patrolButton(
-            number: '2)',
-            title: 'Action After',
-            color: color,
-            enabled: canAfter,
-            onTap: () => _openAfter(group, titleScreen),
-          ),
-          const SizedBox(height: 16),
-          _patrolButton(
-            number: '3)',
-            title: _recheckTitle(group),
-            color: color,
-            enabled: canRecheck,
-            onTap: () => _openRecheck(group, titleScreen),
-          ),
-          const SizedBox(height: 16),
-          _patrolButton(
-            number: '4)',
-            title: 'Data Table',
-            color: color,
-            enabled: canTable,
-            onTap: () => _openSummary(group),
-          ),
-        ],
-      ),
+      child: Column(children: buttons),
     );
   }
 
@@ -778,7 +827,7 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
         color: Colors.transparent,
         borderRadius: BorderRadius.circular(20),
         child: InkWell(
-          onTap: enabled ? onTap : null,
+          onTap: enabled ? onTap : _showNoPermission,
           borderRadius: BorderRadius.circular(20),
           child: Ink(
             padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 24),
@@ -811,9 +860,9 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
                         ),
                       ),
                       if (!enabled)
-                        const Text(
-                          'Permission',
-                          style: TextStyle(
+                        Text(
+                          'no_permission'.tr(context),
+                          style: const TextStyle(
                             fontSize: 14,
                             color: Colors.white54,
                             fontStyle: FontStyle.italic,
@@ -849,7 +898,7 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
           userName: _employeeName,
         ),
       ),
-    ).then((_) => _refreshReprintBadge());
+    ).then((_) => _fetchReprintCount());
   }
 
   /// "In lại QR" lấy mọi xưởng (audit lưu theo xưởng, không theo nhà máy).
@@ -857,11 +906,20 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => const FixedAssetReprintScreen()),
-    ).then((_) => _refreshReprintBadge());
+    ).then((_) => _fetchReprintCount());
   }
 
-  void _refreshReprintBadge() {
-    if (mounted) setState(() => _reprintBadgeTick++);
+  /// Tải số máy cần in lại QR cho badge. Lỗi: giữ số cũ.
+  Future<void> _fetchReprintCount() async {
+    _reprintFetched = true;
+    final requestId = ++_reprintRequestId;
+    try {
+      final rows = await const FixedAssetBackend().fetchQrMismatch();
+      if (!mounted || requestId != _reprintRequestId) return;
+      setState(() => _reprintCount = rows.length);
+    } catch (_) {
+      // Lỗi: giữ nguyên badge.
+    }
   }
 
   void _openBefore(PatrolGroup group, String titleScreen) {
@@ -922,26 +980,16 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
     );
   }
 
-  String _recheckTitle(PatrolGroup group) {
-    switch (group) {
-      case PatrolGroup.Patrol:
-        return 'HSE ReCheck';
-      case PatrolGroup.Audit:
-        return 'SRG Recheck';
-      case PatrolGroup.QualityPatrol:
-        return 'QA Recheck';
-      case PatrolGroup.AssetUpdate:
-        return 'Asset Recheck';
-      case PatrolGroup.FixedAsset:
-        return 'Recheck';
-    }
-  }
-
   // ============================================================
   // QR DIALOG
   // ============================================================
 
   Future<void> _openQrScannerDialog() async {
+    if (!_accessOf(PatrolGroup.Patrol).after) {
+      _showNoPermission();
+      return;
+    }
+
     final dialogKey = GlobalKey<QrScannerDialogState>();
     _qrHandled = false;
 
@@ -1082,20 +1130,4 @@ class _PatrolEntryAnimation extends StatelessWidget {
       },
     );
   }
-}
-
-class _GroupConfig {
-  final String title;
-  final IconData icon;
-  final String prefix;
-  final String titleScreen;
-  final bool enabled;
-
-  const _GroupConfig({
-    required this.title,
-    required this.icon,
-    required this.prefix,
-    required this.titleScreen,
-    this.enabled = true,
-  });
 }

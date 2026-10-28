@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Demo chuyển giọng nói thành văn bản</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #EAF0F6;
+    --surface: #FFFFFF;
+    --ink: #17263B;
+    --muted: #5B6B80;
+    --line: #C9D4E1;
+    --accent: #2457D6;
+    --rec: #D93A3F;
+    --rec-soft: rgba(217, 58, 63, .18);
+    --ok: #1F7A4D;
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #101A28; --surface: #182538; --ink: #E6EDF6; --muted: #93A3B8;
+      --line: #2C3D55; --accent: #7AA2FF; --rec: #FF6B6F; --rec-soft: rgba(255, 107, 111, .2);
+      --ok: #5BC98D; color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #101A28; --surface: #182538; --ink: #E6EDF6; --muted: #93A3B8;
+    --line: #2C3D55; --accent: #7AA2FF; --rec: #FF6B6F; --rec-soft: rgba(255, 107, 111, .2);
+    --ok: #5BC98D; color-scheme: dark;
+  }
+  *, *::before, *::after { box-sizing: inherit; }
+  html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Be Vietnam Pro", "Segoe UI", system-ui, -apple-system, sans-serif;
+    font-size: 1rem;
+    line-height: 1.6;
+  }
+  main { max-width: 44rem; margin: 0 auto; padding: 2.5rem 1.25rem 3rem; }
+  h1 { font-size: clamp(1.6rem, 4vw, 2.2rem); line-height: 1.2; margin: 0 0 .5rem; font-weight: 700; letter-spacing: -.01em; }
+  .lead { color: var(--muted); margin: 0 0 2rem; max-width: 36rem; }
+
+  .controls { display: flex; align-items: center; gap: 1.25rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
+  .mic {
+    position: relative; width: 5rem; height: 5rem; border-radius: 50%;
+    border: none; background: var(--accent); color: #fff; cursor: pointer;
+    display: grid; place-items: center; flex-shrink: 0;
+    transition: background .2s;
+  }
+  .mic svg { width: 2rem; height: 2rem; }
+  .mic.on { background: var(--rec); }
+  .mic.on::before, .mic.on::after {
+    content: ""; position: absolute; inset: 0; border-radius: 50%;
+    background: var(--rec-soft); animation: pulse 1.6s ease-out infinite; z-index: -1;
+  }
+  .mic.on::after { animation-delay: .8s; }
+  @keyframes pulse { from { transform: scale(1); opacity: 1; } to { transform: scale(1.8); opacity: 0; } }
+  .mic:disabled { opacity: .4; cursor: not-allowed; }
+  .mic:focus-visible, button:focus-visible, select:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+
+  .side { display: flex; flex-direction: column; gap: .4rem; min-width: 0; }
+  .status { font-weight: 500; }
+  .status.on { color: var(--rec); }
+  .status.err { color: var(--rec); }
+  label { font-size: .9rem; color: var(--muted); display: flex; align-items: center; gap: .5rem; }
+  select {
+    font: inherit; font-size: .9rem; color: var(--ink); background: var(--surface);
+    border: 1px solid var(--line); border-radius: .4rem; padding: .25rem .5rem;
+  }
+
+  .paper {
+    background: var(--surface); border: 1px solid var(--line); border-radius: .75rem;
+    padding: 1.25rem 1.25rem 1rem; min-height: 14rem;
+  }
+  #out {
+    min-height: 10rem; font-size: 1.15rem; line-height: 1.7; white-space: pre-wrap;
+    word-wrap: break-word; outline: none;
+  }
+  #out:empty::before { content: attr(data-empty); color: var(--muted); }
+  .interim { color: var(--muted); font-style: italic; }
+  .meta { display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap;
+    border-top: 1px solid var(--line); margin-top: 1rem; padding-top: .75rem; }
+  .count { font-size: .85rem; color: var(--muted); }
+  .actions { display: flex; gap: .5rem; }
+  .btn {
+    font: inherit; font-size: .9rem; font-weight: 500; padding: .4rem .9rem; border-radius: .4rem;
+    border: 1px solid var(--line); background: transparent; color: var(--ink); cursor: pointer;
+  }
+  .btn:hover { border-color: var(--accent); color: var(--accent); }
+  .btn.done { color: var(--ok); border-color: var(--ok); }
+
+  .note { font-size: .85rem; color: var(--muted); margin-top: 1.5rem; }
+  .unsupported {
+    border: 1px solid var(--rec); color: var(--ink); background: var(--rec-soft);
+    border-radius: .5rem; padding: .75rem 1rem; margin-bottom: 1.5rem;
+  }
+  @media (prefers-reduced-motion: reduce) { .mic.on::before, .mic.on::after { animation: none; opacity: .6; transform: scale(1.25); } }
+</style>
+</head>
+<body>
+<main>
+  <h1>Nói, và xem chữ hiện ra</h1>
+  <p class="lead">Bấm nút micro rồi nói. Phần chữ nghiêng là kết quả tạm, sẽ được chốt lại khi bạn ngừng một nhịp.</p>
+
+  <div id="unsupported" class="unsupported" hidden>
+    Trình duyệt này không hỗ trợ nhận diện giọng nói. Hãy mở trang bằng Chrome hoặc Edge trên máy tính.
+  </div>
+
+  <div class="controls">
+    <button id="mic" class="mic" aria-label="Bắt đầu ghi" aria-pressed="false">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0"/><path d="M12 18v3"/>
+      </svg>
+    </button>
+    <div class="side">
+      <span id="status" class="status" role="status" aria-live="polite">Sẵn sàng</span>
+      <label>Ngôn ngữ
+        <select id="lang">
+          <option value="vi-VN">Tiếng Việt</option>
+          <option value="en-US">English</option>
+          <option value="ja-JP">日本語</option>
+        </select>
+      </label>
+    </div>
+  </div>
+
+  <div class="paper">
+    <div id="out" data-empty="Văn bản sẽ hiện ở đây…" aria-live="polite"></div>
+    <div class="meta">
+      <span id="count" class="count">0 từ</span>
+      <div class="actions">
+        <button id="copy" class="btn">Sao chép</button>
+        <button id="clear" class="btn">Xoá</button>
+      </div>
+    </div>
+  </div>
+
+  <p class="note">Trang cần quyền dùng micro và phải chạy qua HTTPS hoặc localhost. Trên Chrome, âm thanh được gửi tới máy chủ Google để nhận diện, vì vậy không nên đọc nội dung bí mật.</p>
+</main>
+
+<script>
+(function () {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const micBtn = document.getElementById('mic');
+  const statusEl = document.getElementById('status');
+  const out = document.getElementById('out');
+  const langSel = document.getElementById('lang');
+  const countEl = document.getElementById('count');
+  const copyBtn = document.getElementById('copy');
+  const clearBtn = document.getElementById('clear');
+
+  let finalText = '';
+  let listening = false;   // người dùng muốn nghe
+  let recognition = null;
+
+  // Khôi phục văn bản và ngôn ngữ đã lưu (nếu có)
+  try {
+    finalText = localStorage.getItem('stt-text') || '';
+    const savedLang = localStorage.getItem('stt-lang');
+    if (savedLang) langSel.value = savedLang;
+  } catch (e) {}
+
+  function save() {
+    try { localStorage.setItem('stt-text', finalText); localStorage.setItem('stt-lang', langSel.value); } catch (e) {}
+  }
+
+  function render(interim) {
+    out.textContent = finalText;
+    if (interim) {
+      const span = document.createElement('span');
+      span.className = 'interim';
+      span.textContent = interim;
+      out.appendChild(span);
+    }
+    const words = finalText.trim() ? finalText.trim().split(/\s+/).length : 0;
+    countEl.textContent = words + ' từ';
+  }
+
+  function setStatus(text, cls) {
+    statusEl.textContent = text;
+    statusEl.className = 'status' + (cls ? ' ' + cls : '');
+  }
+
+  function setUI(on) {
+    micBtn.classList.toggle('on', on);
+    micBtn.setAttribute('aria-pressed', String(on));
+    micBtn.setAttribute('aria-label', on ? 'Dừng ghi' : 'Bắt đầu ghi');
+  }
+
+  render('');
+
+  if (!SR) {
+    document.getElementById('unsupported').hidden = false;
+    micBtn.disabled = true;
+    setStatus('Không hỗ trợ', 'err');
+    return;
+  }
+
+  function createRecognition() {
+    const r = new SR();
+    r.lang = langSel.value;
+    r.continuous = true;       // nghe liên tục
+    r.interimResults = true;   // trả kết quả tạm
+
+    r.onstart = () => setStatus('Đang nghe…', 'on');
+
+    r.onresult = (event) => {
+      let interim = '';
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const t = event.results[i][0].transcript;
+        if (event.results[i].isFinal) {
+          finalText += (finalText && !finalText.endsWith(' ') ? ' ' : '') + t.trim();
+          save();
+        } else {
+          interim += t;
+        }
+      }
+      render(interim);
+    };
+
+    r.onerror = (event) => {
+      const messages = {
+        'not-allowed': 'Chưa có quyền dùng micro. Hãy cho phép trong cài đặt trình duyệt.',
+        'service-not-allowed': 'Trình duyệt chặn dịch vụ nhận diện. Hãy mở trang qua HTTPS.',
+        'no-speech': 'Không nghe thấy tiếng nói. Hãy nói gần micro hơn.',
+        'audio-capture': 'Không tìm thấy micro.',
+        'network': 'Lỗi mạng. Dịch vụ nhận diện cần kết nối Internet.'
+      };
+      if (event.error === 'no-speech' || event.error === 'aborted') {
+        if (event.error === 'no-speech') setStatus(messages['no-speech'], 'err');
+        return; // onend sẽ tự khởi động lại
+      }
+      listening = false;
+      setUI(false);
+      setStatus(messages[event.error] || ('Lỗi: ' + event.error), 'err');
+    };
+
+    // API tự dừng sau một lúc im lặng → khởi động lại nếu người dùng vẫn muốn nghe
+    r.onend = () => {
+      render('');
+      if (listening) {
+        try { r.start(); } catch (e) {}
+      } else {
+        setUI(false);
+        if (!statusEl.classList.contains('err')) setStatus('Đã dừng');
+      }
+    };
+    return r;
+  }
+
+  function start() {
+    recognition = createRecognition();
+    listening = true;
+    setUI(true);
+    try { recognition.start(); } catch (e) { setStatus('Không thể bắt đầu: ' + e.message, 'err'); }
+  }
+
+  function stop() {
+    listening = false;
+    if (recognition) recognition.stop();
+  }
+
+  micBtn.addEventListener('click', () => (listening ? stop() : start()));
+
+  langSel.addEventListener('change', () => {
+    save();
+    if (listening) { // đổi ngôn ngữ khi đang nghe → khởi động lại
+      listening = false;
+      recognition.onend = () => start();
+      recognition.stop();
+    }
+  });
+
+  copyBtn.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(finalText);
+    } catch (e) { // dự phòng khi clipboard API bị chặn
+      const range = document.createRange();
+      range.selectNodeContents(out);
+      const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(range);
+      try { document.execCommand('copy'); } catch (err) {}
+      sel.removeAllRanges();
+    }
+    copyBtn.textContent = 'Đã sao chép';
+    copyBtn.classList.add('done');
+    setTimeout(() => { copyBtn.textContent = 'Sao chép'; copyBtn.classList.remove('done'); }, 1500);
+  });
+
+  clearBtn.addEventListener('click', () => {
+    finalText = '';
+    save();
+    render('');
+  });
+})();
+</script>
+</body>
+</html>

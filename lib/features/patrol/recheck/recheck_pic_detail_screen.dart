@@ -647,6 +647,9 @@ class _RecheckPicDetailScreenState extends State<RecheckPicDetailScreen> {
                   ],
                 ),
               ),
+
+              // AFTER STATUS
+              DataColumn(label: Text('After')),
             ],
 
             rows: reports.map(_buildDataRow).toList(),
@@ -715,7 +718,47 @@ class _RecheckPicDetailScreenState extends State<RecheckPicDetailScreen> {
         // DEADLINE
         // ======================================================
         DataCell(_buildDeadlineCell(report.dueDate)),
+
+        // ======================================================
+        // AFTER STATUS
+        // ======================================================
+        DataCell(_buildAfterStatusCell(report)),
       ],
+    );
+  }
+
+  // ============================================================
+  // AFTER STATUS
+  // ============================================================
+
+  Widget _buildAfterStatusCell(PatrolReportModel report) {
+    if (RecheckDetailPage.canRecheck(report)) {
+      return const SizedBox(
+        width: 80,
+        child: Icon(
+          Icons.check_circle_rounded,
+          size: 18,
+          color: Colors.greenAccent,
+        ),
+      );
+    }
+
+    return const SizedBox(
+      width: 80,
+
+      child: Text(
+        RecheckDetailPage.notAfterDoneLabel,
+
+        maxLines: 2,
+
+        overflow: TextOverflow.ellipsis,
+
+        style: TextStyle(
+          color: Colors.orangeAccent,
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
     );
   }
 

@@ -542,6 +542,19 @@ extension _PatrolBeforeScreenView on _PatrolBeforeScreenState {
                                           contentPadding: const EdgeInsets.all(
                                             12,
                                           ),
+                                          suffixIcon:
+                                              VoiceInputButton.suffixIcon(
+                                                controller: controller,
+                                                lang: widget.lang,
+                                                plant: _selectedPlant,
+                                                enabled: !_isSubmitting,
+                                                onTextInserted: (value) {
+                                                  _comment = value;
+                                                  _commentFontSizeNotifier
+                                                          .value =
+                                                      _resolveFontSize(value);
+                                                },
+                                              ),
                                         ),
                                         onChanged: (value) {
                                           _commentFontSizeNotifier.value =

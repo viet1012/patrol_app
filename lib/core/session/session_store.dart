@@ -4,6 +4,8 @@ import 'dart:html' as html;
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
+import 'package:chuphinh/core/models/auth_me.dart';
+
 class SessionStore {
   static const FlutterSecureStorage _secureStorage = FlutterSecureStorage();
 
@@ -14,12 +16,36 @@ class SessionStore {
   static void clearAuthenticatedAccount() {
     debugPrint('AUTH CLEAR: old=$_authenticatedAccountCode');
     _authenticatedAccountCode = null;
+    clearAuthMe();
   }
 
   static void markAuthenticated(String accountCode) {
     final normalized = accountCode.trim();
     debugPrint('AUTH MARK: $normalized');
+    if (normalized != _authenticatedAccountCode) clearAuthMe();
     _authenticatedAccountCode = normalized.isEmpty ? null : normalized;
+  }
+
+  // ================= AUTH ME (memory) =================
+  // Chỉ cache trong bộ nhớ: F5 / logout là mất, route guard sẽ tải lại.
+  static AuthMe? _authMe;
+  static String? _authMeAccount;
+
+  /// Quyền đã cache của tài khoản đang đăng nhập (null nếu chưa có).
+  static AuthMe? get authMe {
+    final account = _authenticatedAccountCode;
+    if (account == null || account != _authMeAccount) return null;
+    return _authMe;
+  }
+
+  static void cacheAuthMe(String accountCode, AuthMe me) {
+    _authMeAccount = accountCode.trim();
+    _authMe = me;
+  }
+
+  static void clearAuthMe() {
+    _authMe = null;
+    _authMeAccount = null;
   }
 
   static const _kAccount = 'account_code';

@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:intl/intl.dart';
 
+import 'package:chuphinh/core/api/api_conflict_exception.dart';
 import 'package:chuphinh/core/network/dio_client.dart';
 
 Future<String> replaceImageApi({
@@ -216,6 +217,10 @@ Future<void> updateAfterReportApi({
     '/api/patrol_report/$reportId/update_at',
     data: formData,
   );
+
+  if (response.statusCode == ApiConflictException.statusCode) {
+    throw ApiConflictException.fromResponseData(response.data);
+  }
 
   if (response.statusCode != 200 && response.statusCode != 201) {
     throw Exception(

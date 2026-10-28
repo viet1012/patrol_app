@@ -49,5 +49,8 @@
   "impact_claim": "Phát sinh claim",
   "impact_defect_in_process": "Phát sinh phế phẩm trong công đoạn",
   "impact_accident_risk": "Có rủi ro phát sinh tai nạn lao động",
-  "impact_gauge_damage": "Phát sinh hư hỏng dụng cụ kiểm tra"
+  "impact_gauge_damage": "Phát sinh hư hỏng dụng cụ kiểm tra",
+  "no_permission": "Không có quyền",
+  "perm_load_failed": "Không tải được quyền",
+  "retry": "Thử lại"
 }

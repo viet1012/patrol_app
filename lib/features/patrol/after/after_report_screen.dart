@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:chuphinh/core/api/api_conflict_exception.dart';
 import 'package:chuphinh/core/api/hse_master_service.dart';
 import 'package:chuphinh/core/api/patrol_report_api.dart';
 import 'package:chuphinh/core/api/replace_image_api.dart';
@@ -264,7 +265,11 @@ class _AfterReportScreenState extends State<AfterReportScreen>
 
       if (!mounted) return;
 
-      _showSnackBar('Server error: $e', Colors.redAccent);
+      if (e is ApiConflictException) {
+        _showSnackBar(e.message, Colors.orange);
+      } else {
+        _showSnackBar('Server error: $e', Colors.redAccent);
+      }
     } finally {
       // Chỉ unlock nếu submit thất bại.
       // Thành công thì page đã pop rồi.
