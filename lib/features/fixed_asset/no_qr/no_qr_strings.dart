@@ -6,7 +6,6 @@ abstract final class NoQrStrings {
   static const entryTitle = 'Máy không có QR';
   static const entrySubtitle = 'Bấm để ghi nhận máy không quét được';
   static const entryAction = 'Ghi nhận';
-  static const cameraLink = 'Không quét được? Ghi máy thiếu QR';
   static const rowAction = 'Ghi máy thiếu QR';
   static const tag = 'Thiếu QR';
   static const openFailed = 'Không mở được form ghi nhận máy thiếu QR';
@@ -35,5 +34,6 @@ abstract final class NoQrStrings {
   static const cancel = 'Hủy';
   static const save = 'Lưu';
   static const saved = 'Đã ghi nhận máy thiếu QR';
+  static const alreadyAudited = 'Đã kiểm kê, đã đánh dấu in tem';
   static const saveFailed = 'Không lưu được, vui lòng thử lại';
 }

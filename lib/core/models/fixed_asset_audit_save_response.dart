@@ -1,3 +1,4 @@
+import 'package:chuphinh/core/models/fixed_asset_reprint_info.dart';
 import 'package:chuphinh/core/models/fixed_asset_scan_info.dart' show parseBool, parseDate;
 
 /// Response của POST /api/fixed-assets/audit.
@@ -27,6 +28,10 @@ class FixedAssetAuditSaveResponse {
   /// Bản ghi vừa lưu có QR lệch vị trí: cần in lại QR, chưa tính kiểm kê.
   final bool needsQrReprint;
 
+  /// Máy đang chờ in lại được quét bằng tem CŨ (chưa thay): không đổi gì,
+  /// [actualFac]... = *_Act của dòng.
+  final bool qrLabelNotReplaced;
+
   final String masterFac;
   final String masterFloor;
   final String masterPositionA;
@@ -36,6 +41,10 @@ class FixedAssetAuditSaveResponse {
   final String actualFloor;
   final String actualPositionA;
   final String actualPositionAA;
+
+  /// reprintQr* = tem hiện tại của dòng còn cần in lại (null = không có
+  /// field nào: dòng NO_QR / không cần in lại).
+  final FixedAssetReprintInfo? reprint;
 
   const FixedAssetAuditSaveResponse({
     required this.success,
@@ -51,6 +60,7 @@ class FixedAssetAuditSaveResponse {
     this.locationMismatch = false,
     this.requiresConfirmation = false,
     this.needsQrReprint = false,
+    this.qrLabelNotReplaced = false,
     this.masterFac = '',
     this.masterFloor = '',
     this.masterPositionA = '',
@@ -59,6 +69,7 @@ class FixedAssetAuditSaveResponse {
     this.actualFloor = '',
     this.actualPositionA = '',
     this.actualPositionAA = '',
+    this.reprint,
   });
 
   factory FixedAssetAuditSaveResponse.fromJson(Map<String, dynamic> json) {
@@ -78,6 +89,7 @@ class FixedAssetAuditSaveResponse {
       locationMismatch: parseBool(json['locationMismatch']),
       requiresConfirmation: parseBool(json['requiresConfirmation']),
       needsQrReprint: parseBool(json['needsQrReprint']),
+      qrLabelNotReplaced: parseBool(json['qrLabelNotReplaced']),
       masterFac: str('masterFac'),
       masterFloor: str('masterFloor'),
       masterPositionA: str('masterPositionA'),
@@ -86,6 +98,7 @@ class FixedAssetAuditSaveResponse {
       actualFloor: str('actualFloor'),
       actualPositionA: str('actualPositionA'),
       actualPositionAA: str('actualPositionAA'),
+      reprint: FixedAssetReprintInfo.fromJson(json),
     );
   }
 }

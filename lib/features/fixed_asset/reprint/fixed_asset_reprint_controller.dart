@@ -7,6 +7,7 @@ import 'package:chuphinh/features/fixed_asset/fixed_asset_audit_flow.dart'
 import 'package:chuphinh/features/fixed_asset/fixed_asset_location.dart'
     show fixedAssetDash;
 import 'package:chuphinh/features/fixed_asset/fixed_asset_qr_parser.dart';
+import 'package:chuphinh/features/fixed_asset/reprint/fixed_asset_reprint_strings.dart';
 
 enum FixedAssetReprintQrState {
   /// Đang tra Fac + Floor từ MAP.
@@ -44,6 +45,11 @@ class FixedAssetReprintItem {
 
   String get machineCode => row.machineCode;
   bool get isReady => state == FixedAssetReprintQrState.ready;
+
+  /// Lý do cần in lại theo auditMode (NO_QR = không có tem).
+  String get reasonLabel => row.isNoQr
+      ? FixedAssetReprintStrings.reasonNoQr
+      : FixedAssetReprintStrings.reasonWrongLocation;
 
   /// Vị trí trên QR cũ: Fac / Floor / A / AA.
   String get oldLocationLabel => _locationLabel([

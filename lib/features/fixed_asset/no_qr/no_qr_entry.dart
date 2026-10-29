@@ -134,46 +134,6 @@ class NoQrEntryTile extends StatelessWidget {
   }
 }
 
-/// Link nhỏ dưới khung quét trong camera. Thấp (~18px) để lọt giữa đáy khung
-/// quét và zoom control của camera.
-class NoQrCameraLink extends StatelessWidget {
-  final VoidCallback onTap;
-
-  const NoQrCameraLink({super.key, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: const Color(0xCC111827),
-      shape: const StadiumBorder(),
-      child: InkWell(
-        customBorder: const StadiumBorder(),
-        onTap: onTap,
-        child: const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.warning_amber_rounded, color: _amber, size: 13),
-              SizedBox(width: 4),
-              Text(
-                NoQrStrings.cameraLink,
-                style: TextStyle(
-                  color: _amber,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  decoration: TextDecoration.underline,
-                  decorationColor: _amber,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 /// Nhãn vàng "Thiếu QR" trên dòng máy đã ghi thiếu QR.
 class NoQrTag extends StatelessWidget {
   const NoQrTag({super.key});

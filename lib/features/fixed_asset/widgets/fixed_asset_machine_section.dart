@@ -280,10 +280,17 @@ class _FixedAssetMachineSectionState extends State<FixedAssetMachineSection> {
         onReportNoQr != null ? 2 : 12,
         7,
       ),
+      // Cần in tem: nền + viền tím riêng để nổi giữa các dòng.
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(.05),
+        color: reprint
+            ? _violet.withOpacity(.10)
+            : Colors.white.withOpacity(.05),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withOpacity(.12)),
+        border: Border.all(
+          color: reprint
+              ? _violet.withOpacity(.55)
+              : Colors.white.withOpacity(.12),
+        ),
       ),
       child: Row(
         children: [
@@ -355,7 +362,7 @@ class _FixedAssetMachineSectionState extends State<FixedAssetMachineSection> {
           Icon(Icons.print_rounded, color: _violet, size: 12),
           SizedBox(width: 4),
           Text(
-            'In lại QR',
+            'Cần in QR',
             style: TextStyle(
               color: _violet,
               fontSize: 11,

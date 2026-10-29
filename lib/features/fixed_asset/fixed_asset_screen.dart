@@ -2,6 +2,7 @@ import 'package:chuphinh/shared/camera/camera_preview_box.dart';
 import 'package:chuphinh/shared/widgets/glass_action_button.dart';
 import 'package:chuphinh/shared/widgets/required_field_flash.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'package:chuphinh/shared/widgets/common_ui_helper.dart';
 import 'package:chuphinh/core/models/patrol_group.dart';
@@ -15,11 +16,14 @@ import 'package:chuphinh/features/fixed_asset/no_qr/no_qr_report_service.dart';
 import 'package:chuphinh/features/fixed_asset/no_qr/no_qr_report_sheet.dart';
 import 'package:chuphinh/features/fixed_asset/no_qr/no_qr_strings.dart';
 import 'package:chuphinh/features/fixed_asset/widgets/fixed_asset_audit_progress_card.dart';
+import 'package:chuphinh/features/fixed_asset/widgets/fixed_asset_awaiting_label_banner.dart';
+import 'package:chuphinh/features/fixed_asset/widgets/fixed_asset_label_not_replaced_dialog.dart';
 import 'package:chuphinh/features/fixed_asset/widgets/fixed_asset_location_section.dart';
 import 'package:chuphinh/features/fixed_asset/widgets/fixed_asset_machine_section.dart';
 import 'package:chuphinh/features/fixed_asset/widgets/fixed_asset_manual_selectors.dart';
 import 'package:chuphinh/features/fixed_asset/widgets/fixed_asset_mismatch_dialog.dart';
 import 'package:chuphinh/features/fixed_asset/widgets/fixed_asset_qr_mismatch_dialog.dart';
+import 'package:chuphinh/features/fixed_asset/widgets/fixed_asset_reprint_move_dialog.dart';
 import 'package:chuphinh/features/fixed_asset/widgets/fixed_asset_selector.dart';
 import 'package:chuphinh/features/fixed_asset/widgets/fixed_asset_scan_chip.dart';
 import 'package:chuphinh/features/fixed_asset/widgets/fixed_asset_status_card.dart';
@@ -59,8 +63,11 @@ class _FixedAssetScreenState extends State<FixedAssetScreen>
 
   late final FixedAssetController _controller;
 
-  /// Case "máy thiếu QR" của phiên (chưa có BE).
-  final NoQrReportService _noQrService = NoQrReportService();
+  /// Case "máy thiếu QR" của phiên (lưu qua POST /audit, mode NO_QR).
+  late final NoQrReportService _noQrService = NoQrReportService(
+    userId: widget.accountCode,
+    userName: widget.userName,
+  );
   static const String _noQrPauseReason = 'no_qr_sheet';
   bool _noQrSheetOpen = false;
 
@@ -89,6 +96,10 @@ class _FixedAssetScreenState extends State<FixedAssetScreen>
       userName: widget.userName,
       confirmMismatch: _showMismatchDialog,
       confirmQrMismatch: _showQrMismatchDialog,
+      confirmReprintMove: _showReprintMoveDialog,
+      showLabelNotReplaced: _showLabelNotReplacedDialog,
+      confirmExitAwaitingLabel: _confirmExitAwaitingLabel,
+      onOldLabelScanned: _showOldLabelScanned,
       showError: _showError,
       resetQr: () => _cameraKey.currentState?.resetQr(),
       onZoneUnlocked: _showZoneUnlocked,
@@ -246,6 +257,57 @@ class _FixedAssetScreenState extends State<FixedAssetScreen>
     return result == true;
   }
 
+  /// Dialog "Máy đã dời vị trí?" (máy đang chờ in lại tem).
+  /// true = "Xác nhận đã dời".
+  Future<bool> _showReprintMoveDialog(FixedAssetReprintMovePrompt prompt) async {
+    if (!mounted) {
+      _controller.uxLog('reprint move dialog NOT shown: screen unmounted');
+      return false;
+    }
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => FixedAssetReprintMoveDialog(prompt: prompt),
+    );
+    // null = closed without a choice (e.g. system back): treated as cancel.
+    return result == true;
+  }
+
+  /// Popup "QR chưa được thay". Đóng không chọn = "Để sau".
+  Future<FixedAssetLabelNotReplacedAction> _showLabelNotReplacedDialog(
+    FixedAssetLabelNotReplacedPrompt prompt,
+  ) async {
+    if (!mounted) return FixedAssetLabelNotReplacedAction.later;
+    final result = await showDialog<FixedAssetLabelNotReplacedAction>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => FixedAssetLabelNotReplacedDialog(prompt: prompt),
+    );
+    return result ?? FixedAssetLabelNotReplacedAction.later;
+  }
+
+  /// Chờ tem mới, quét máy khác: true = thoát chế độ chờ.
+  Future<bool> _confirmExitAwaitingLabel(String machineCode) async {
+    if (!mounted) return true;
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => FixedAssetExitAwaitingDialog(machineCode: machineCode),
+    );
+    return result == true;
+  }
+
+  /// Chờ QR mới, quét đúng máy nhưng vẫn QR cũ: rung + toast.
+  void _showOldLabelScanned(String machineCode) {
+    if (!mounted) return;
+    HapticFeedback.vibrate();
+    CommonUI.showSnackBar(
+      context: context,
+      message: 'Vẫn là QR cũ ($machineCode)',
+      color: const Color(0xFFF59E0B),
+    );
+  }
+
   /// Khu vực AUTO đang khóa vừa xong (controller báo đúng một lần).
   void _showZoneUnlocked(String positionAA) {
     if (!mounted) return;
@@ -286,6 +348,7 @@ class _FixedAssetScreenState extends State<FixedAssetScreen>
     _noQrSheetOpen = true;
     c.pauseQrScan(_noQrPauseReason);
     NoQrReport? saved;
+    NoQrSubmitOutcome? outcome;
     try {
       saved = await showNoQrReportSheet(
         context: context,
@@ -293,7 +356,13 @@ class _FixedAssetScreenState extends State<FixedAssetScreen>
         machines: location == null ? const [] : c.machines,
         initialSelection: draft,
         initialMachineCode: machineCode,
-        onSubmit: _noQrService.submit,
+        onSubmit: (report) async {
+          outcome = await _noQrService.submit(
+            report,
+            confirmMismatch: _showMismatchDialog,
+          );
+          return outcome != NoQrSubmitOutcome.cancelled;
+        },
         lang: widget.lang,
         plant: widget.selectedPlant,
       );
@@ -309,9 +378,14 @@ class _FixedAssetScreenState extends State<FixedAssetScreen>
     if (saved == null || !mounted) return;
     CommonUI.showSnackBar(
       context: context,
-      message: NoQrStrings.saved,
+      message: outcome == NoQrSubmitOutcome.alreadyAudited
+          ? NoQrStrings.alreadyAudited
+          : NoQrStrings.saved,
       color: const Color(0xFF16A34A),
     );
+    // Bản ghi mới / bản ghi được đánh dấu in tem đã vào backend.
+    c.loadAuditSummary();
+    c.refreshZoneProgress();
     if (saved.location != c.activeLocation) c.applyLocation(saved.location);
   }
 
@@ -392,6 +466,7 @@ class _FixedAssetScreenState extends State<FixedAssetScreen>
         qrLocationLabel: c.pendingQrLocationLabel,
         onDeclineQrLocation: _onDeclineQrLocation,
         needsQrReprint: c.needsQrReprint,
+        reprintInfo: c.reprintInfo,
       ),
       builder: (context, v) => FixedAssetStatusCard(
         status: v.status,
@@ -407,6 +482,7 @@ class _FixedAssetScreenState extends State<FixedAssetScreen>
         onUseQrLocation: c.useLocationFromQr,
         onDeclineQrLocation: c.declineQrLocation,
         needsQrReprint: v.needsQrReprint,
+        reprintInfo: v.reprintInfo,
         onSwitchAuto: c.autoModeEnabled
             ? () => c.setLocationMode(FixedAssetLocationMode.auto)
             : null,
@@ -686,14 +762,6 @@ class _FixedAssetScreenState extends State<FixedAssetScreen>
             ),
           ),
         ),
-        // Scan frame (205, centred in 340) ends at ~272; the hardware zoom
-        // control starts at ~294: the link fits in between.
-        Positioned(
-          top: 275,
-          left: 0,
-          right: 0,
-          child: Center(child: NoQrCameraLink(onTap: _openNoQrSheet)),
-        ),
         Positioned(
           top: 12,
           left: 12,
@@ -715,6 +783,22 @@ class _FixedAssetScreenState extends State<FixedAssetScreen>
                 settled: v.settled,
               ),
             ),
+          ),
+        ),
+        // Chế độ chờ tem mới: banner dưới chip, có nút thoát.
+        Positioned(
+          top: 52,
+          left: 12,
+          right: 12,
+          child: FixedAssetSelector(
+            listenable: c,
+            select: () => c.awaitingLabel,
+            builder: (context, awaiting) => awaiting == null
+                ? const SizedBox.shrink()
+                : FixedAssetAwaitingLabelBanner(
+                    awaiting: awaiting,
+                    onExit: c.exitAwaitingLabel,
+                  ),
           ),
         ),
       ],

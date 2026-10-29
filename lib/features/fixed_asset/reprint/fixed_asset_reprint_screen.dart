@@ -16,7 +16,10 @@ import 'package:chuphinh/features/fixed_asset/reprint/widgets/fixed_asset_reprin
 /// Lấy mọi xưởng (audit lưu theo xưởng Fac_A/B/C, không theo nhà máy ở
 /// home); lọc xưởng bằng hàng chip trên UI.
 class FixedAssetReprintScreen extends StatefulWidget {
-  const FixedAssetReprintScreen({super.key});
+  /// Mở tới máy này: tìm sẵn theo mã, tải xong thì mở xem trước tem.
+  final String? initialMachineCode;
+
+  const FixedAssetReprintScreen({super.key, this.initialMachineCode});
 
   @override
   State<FixedAssetReprintScreen> createState() =>
@@ -31,14 +34,48 @@ class _FixedAssetReprintScreenState extends State<FixedAssetReprintScreen> {
   /// Đang tạo PNG / PDF: chặn bấm lặp.
   bool _busy = false;
 
+  /// [FixedAssetReprintScreen.initialMachineCode] chưa mở xem trước.
+  String? _pendingPreview;
+
   @override
   void initState() {
     super.initState();
+    final code = widget.initialMachineCode?.trim() ?? '';
+    if (code.isNotEmpty) {
+      _pendingPreview = code;
+      _searchController.text = code;
+      _controller.setSearch(code);
+      _controller.addListener(_openPendingPreview);
+    }
     _controller.load();
+  }
+
+  /// Mở xem trước một lần khi máy đã có trong danh sách và hết tra vị trí.
+  void _openPendingPreview() {
+    final code = _pendingPreview;
+    if (code == null || !mounted || _controller.loading) return;
+    final want = code.toLowerCase();
+    FixedAssetReprintItem? item;
+    for (final e in _controller.items) {
+      if (e.machineCode.trim().toLowerCase() == want) item = e;
+    }
+    if (item == null) {
+      // Tải xong mà không có máy (hoặc lỗi): giữ ô tìm kiếm, thôi chờ.
+      _pendingPreview = null;
+      return;
+    }
+    if (item.state == FixedAssetReprintQrState.resolving) return;
+    _pendingPreview = null;
+    if (!item.isReady) return;
+    final ready = item;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _preview(ready);
+    });
   }
 
   @override
   void dispose() {
+    _controller.removeListener(_openPendingPreview);
     _controller.dispose();
     _searchController.dispose();
     super.dispose();

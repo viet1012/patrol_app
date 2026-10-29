@@ -19,8 +19,9 @@ typedef NoQrLocationDraft = ({
   String? positionAA,
 });
 
-/// Mở form "máy thiếu QR". Trả về report đã lưu ([onSubmit] xong), null =
-/// "Hủy" / đóng.
+/// Mở form "máy thiếu QR". Trả về report đã lưu ([onSubmit] trả true), null =
+/// "Hủy" / đóng. [onSubmit] trả false (ví dụ bỏ qua xác nhận sai vị trí):
+/// form giữ nguyên để sửa.
 ///
 /// [location] null (chưa đủ vị trí): form hiện 4 dropdown ở đầu, điền sẵn
 /// [initialSelection]. [machines] = danh sách máy của [location] (rỗng thì
@@ -30,7 +31,7 @@ Future<NoQrReport?> showNoQrReportSheet({
   required BuildContext context,
   required FixedAssetAuditLocation? location,
   required List<FixedAssetMachine> machines,
-  required Future<void> Function(NoQrReport report) onSubmit,
+  required Future<bool> Function(NoQrReport report) onSubmit,
   NoQrLocationDraft? initialSelection,
   String? initialMachineCode,
   String lang = 'VI',
@@ -68,7 +69,7 @@ Future<NoQrReport?> showNoQrReportSheet({
 class NoQrReportSheet extends StatefulWidget {
   final FixedAssetAuditLocation? location;
   final List<FixedAssetMachine> machines;
-  final Future<void> Function(NoQrReport report) onSubmit;
+  final Future<bool> Function(NoQrReport report) onSubmit;
   final NoQrLocationDraft? initialSelection;
   final String? initialMachineCode;
   final String lang;
@@ -457,8 +458,12 @@ class _NoQrReportSheetState extends State<NoQrReportSheet> {
     );
 
     try {
-      await widget.onSubmit(report);
+      final done = await widget.onSubmit(report);
       if (!mounted) return;
+      if (!done) {
+        setState(() => _saving = false);
+        return;
+      }
       Navigator.of(context).pop(report);
     } catch (_) {
       if (!mounted) return;

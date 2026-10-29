@@ -21,6 +21,9 @@ class FixedAssetQrMismatch {
   final String qrPositionA;
   final String qrPositionAA;
 
+  /// Mode lúc lưu ("AUTO" / "MANUAL" / "NO_QR"); null khi API cũ chưa trả.
+  final String? auditMode;
+
   final String userName;
   final DateTime? updatedAt;
 
@@ -38,6 +41,7 @@ class FixedAssetQrMismatch {
     required this.qrFloor,
     required this.qrPositionA,
     required this.qrPositionAA,
+    this.auditMode,
     required this.userName,
     this.updatedAt,
     this.assetDate,
@@ -62,11 +66,15 @@ class FixedAssetQrMismatch {
       qrFloor: str('qrFloor'),
       qrPositionA: str('qrPositionA'),
       qrPositionAA: str('qrPositionAA'),
+      auditMode: opt('auditMode')?.toUpperCase(),
       userName: str('userName'),
       updatedAt: _parseDateTime(json['updatedAt']),
       assetDate: DateTime.tryParse(json['assetDate']?.toString() ?? ''),
     );
   }
+
+  /// Ghi nhận "máy không có tem" (không có QR cũ).
+  bool get isNoQr => auditMode == 'NO_QR';
 
   /// LocalDateTime: chuỗi ISO, hoặc mảng [y, M, d, h, m, s] (Jackson).
   static DateTime? _parseDateTime(dynamic value) {

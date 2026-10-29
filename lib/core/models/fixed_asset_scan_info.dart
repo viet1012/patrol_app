@@ -1,3 +1,5 @@
+import 'package:chuphinh/core/models/fixed_asset_reprint_info.dart';
+
 /// GET /api/fixed-assets/scan-info?machineCode=...
 class FixedAssetScanInfo {
   final String machineCode;
@@ -19,6 +21,9 @@ class FixedAssetScanInfo {
   /// Lần quét mới nhất có QR lệch vị trí: cần in lại QR, chưa tính kiểm kê.
   final bool needsQrReprint;
 
+  /// reprintAct* / reprintQr* của dòng cần in lại; null khi không cần.
+  final FixedAssetReprintInfo? reprint;
+
   const FixedAssetScanInfo({
     required this.machineCode,
     required this.existsInMaster,
@@ -34,6 +39,7 @@ class FixedAssetScanInfo {
     this.periodStart,
     this.periodEnd,
     this.needsQrReprint = false,
+    this.reprint,
   });
 
   factory FixedAssetScanInfo.fromJson(Map<String, dynamic> json) {
@@ -54,6 +60,7 @@ class FixedAssetScanInfo {
       periodStart: parseDate(json['periodStart']),
       periodEnd: parseDate(json['periodEnd']),
       needsQrReprint: parseBool(json['needsQrReprint']),
+      reprint: FixedAssetReprintInfo.fromJson(json),
     );
   }
 

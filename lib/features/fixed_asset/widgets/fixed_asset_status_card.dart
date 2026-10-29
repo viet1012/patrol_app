@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import 'package:chuphinh/core/models/fixed_asset_reprint_info.dart';
 import 'package:chuphinh/features/fixed_asset/fixed_asset_audit_flow.dart';
 import 'package:chuphinh/features/fixed_asset/fixed_asset_location.dart';
 
@@ -28,8 +29,11 @@ class FixedAssetStatusCard extends StatelessWidget {
   final VoidCallback? onDeclineQrLocation; // "Không": bỏ qua vị trí QR
   final VoidCallback? onSwitchAuto;
 
-  /// Đã lưu với QR lệch vị trí đang chọn (MANUAL): nhãn "Cần in lại QR".
+  /// Máy cần in lại QR: badge "Cần in lại QR".
   final bool needsQrReprint;
+
+  /// Vị trí thực tế + tem hiện tại khi [needsQrReprint] (null = không có).
+  final FixedAssetReprintInfo? reprintInfo;
 
   const FixedAssetStatusCard({
     super.key,
@@ -47,6 +51,7 @@ class FixedAssetStatusCard extends StatelessWidget {
     this.onUseQrLocation,
     this.onSwitchAuto,
     this.needsQrReprint = false,
+    this.reprintInfo,
   });
 
   /// "Việt (KVH_IT_Mem_Viet)" / "Việt" / "KVH_IT_Mem_Viet".
@@ -73,6 +78,7 @@ class FixedAssetStatusCard extends StatelessWidget {
     final hasCode = machineCode.isNotEmpty;
     final lastAudited = lastAuditedAt;
     final mismatchMaster = this.mismatchMaster;
+    final reprint = reprintInfo;
 
     final String primary;
     final List<String> details = <String>[];
@@ -199,16 +205,49 @@ class FixedAssetStatusCard extends StatelessWidget {
         // Đã lưu, QR lệch vị trí: "Đã kiểm kê" + cần in lại QR.
         primary = machineCode;
         if (faName.isNotEmpty) details.add(faName);
-        if (mismatchMaster != null) {
-          details.add(
-            'MASTER: ${fixedAssetDash(mismatchMaster.positionA)} / '
-            '${fixedAssetDash(mismatchMaster.positionAA)}',
-          );
+        if (reprint != null) {
+          details.addAll(_reprintLines(reprint));
+        } else {
+          if (mismatchMaster != null) {
+            details.add(
+              'MASTER: ${fixedAssetDash(mismatchMaster.positionA)} / '
+              '${fixedAssetDash(mismatchMaster.positionAA)}',
+            );
+          }
+          details.add('Đã lưu, cần in lại QR');
         }
-        details.add('Đã lưu, cần in lại QR');
         label = 'Đã kiểm kê';
         color = _violet;
         indicator = const Icon(Icons.print_rounded, color: _violet, size: 20);
+      case FixedAssetScanStatus.qrLabelNotReplaced:
+        // Quét bằng tem cũ: không đổi gì, không hiện ✓ "Đã kiểm kê".
+        primary = machineCode;
+        details.add(
+          reprint != null && reprint.hasAct
+              ? 'QR chưa được thay – cần in QR ${reprint.actLabel}'
+              : 'QR chưa được thay – cần in QR',
+        );
+        if (reprint != null) details.addAll(_reprintLines(reprint));
+        label = 'QR chưa được thay';
+        color = _amber;
+        indicator = const Icon(Icons.print_rounded, color: _amber, size: 20);
+      case FixedAssetScanStatus.qrReprintCleared:
+        // Như card kiểm kê thành công + người / thời gian kiểm kê.
+        primary = machineCode;
+        if (faName.isNotEmpty) details.add(faName);
+        details.add('Đã kiểm kê thành công');
+        details.add('QR mới khớp vị trí, đã gỡ đánh dấu in lại');
+        alreadyAuditedBy = auditorLabel(lastAuditedUserName, lastAuditedUserId);
+        if (lastAudited != null) {
+          alreadyAuditedTime = _dateTimeFormat.format(lastAudited);
+        }
+        label = 'Đã kiểm kê';
+        color = _success;
+        indicator = const Icon(
+          Icons.check_circle_rounded,
+          color: _success,
+          size: 20,
+        );
       case FixedAssetScanStatus.failed:
         // Invalid QR: không có MachineCode, message là dòng chính.
         primary = hasCode ? machineCode : (message ?? 'Scan failed');
@@ -227,6 +266,10 @@ class FixedAssetStatusCard extends StatelessWidget {
     final failed = status == FixedAssetScanStatus.failed;
     final zoneLocked = status == FixedAssetScanStatus.zoneLocked;
     final needsLocation = status == FixedAssetScanStatus.needsLocation;
+    // Dòng vị trí "Fac/Floor/A/AA" có thể dài: cho 2 dòng.
+    final reprintDetails =
+        status == FixedAssetScanStatus.qrLabelNotReplaced ||
+        (status == FixedAssetScanStatus.qrReprintSaved && reprint != null);
     final statusIndicator = _statusIndicator(
       label: label,
       color: color,
@@ -280,7 +323,10 @@ class FixedAssetStatusCard extends StatelessWidget {
                     padding: const EdgeInsets.only(top: 1),
                     child: Text(
                       detail,
-                      maxLines: failed || zoneLocked || needsLocation ? 2 : 1,
+                      maxLines:
+                          failed || zoneLocked || needsLocation || reprintDetails
+                          ? 2
+                          : 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: failed
@@ -398,7 +444,8 @@ class FixedAssetStatusCard extends StatelessWidget {
                       ),
                     ),
                   ),
-                if (status == FixedAssetScanStatus.alreadyAudited &&
+                if ((status == FixedAssetScanStatus.alreadyAudited ||
+                        status == FixedAssetScanStatus.qrReprintCleared) &&
                     (alreadyAuditedBy != null || alreadyAuditedTime != null))
                   Padding(
                     padding: const EdgeInsets.only(top: 2),
@@ -439,6 +486,14 @@ class FixedAssetStatusCard extends StatelessWidget {
       ],
     );
   }
+
+  /// "Vị trí thực tế: ..." + "QR hiện tại: ..." (NO_QR: "Chưa có QR";
+  /// không tra được QR: bỏ dòng QR).
+  static List<String> _reprintLines(FixedAssetReprintInfo reprint) => [
+    'Vị trí thực tế: ${reprint.actLabel}',
+    if (!reprint.labelUnknown)
+      'QR hiện tại: ${reprint.hasLabel ? reprint.qrLabel : 'Chưa có QR'}',
+  ];
 
   Widget _reprintTag() {
     return Container(

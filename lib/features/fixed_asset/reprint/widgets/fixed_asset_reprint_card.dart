@@ -116,6 +116,11 @@ class FixedAssetReprintCard extends StatelessWidget {
                       ),
                     const SizedBox(height: 6),
                     _locationLine(
+                      '${FixedAssetReprintStrings.reason}: ',
+                      item.reasonLabel,
+                      FixedAssetReprintColors.amber,
+                    ),
+                    _locationLine(
                       '${FixedAssetReprintStrings.oldQr}: ',
                       item.oldLocationLabel,
                       Colors.redAccent.shade100,

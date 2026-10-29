@@ -8,6 +8,7 @@ import 'package:chuphinh/core/models/fixed_asset_audit_check_response.dart';
 import 'package:chuphinh/core/models/fixed_asset_audit_save_response.dart';
 import 'package:chuphinh/core/models/fixed_asset_audit_summary.dart';
 import 'package:chuphinh/core/models/fixed_asset_machine.dart';
+import 'package:chuphinh/core/models/fixed_asset_reprint_info.dart';
 import 'package:chuphinh/core/models/fixed_asset_zone_lock.dart';
 import 'package:chuphinh/core/models/fixed_asset_zone_progress.dart';
 import 'package:chuphinh/features/fixed_asset/fixed_asset_audit_flow.dart';
@@ -31,6 +32,10 @@ class FixedAssetController extends ChangeNotifier {
     required this.userName,
     required this.confirmMismatch,
     this.confirmQrMismatch,
+    this.confirmReprintMove,
+    this.showLabelNotReplaced,
+    this.confirmExitAwaitingLabel,
+    this.onOldLabelScanned,
     required this.showError,
     required this.resetQr,
     this.onScanAccepted,
@@ -56,6 +61,21 @@ class FixedAssetController extends ChangeNotifier {
   /// MANUAL: dialog "QR không khớp vị trí đang chọn". null (không có UI)
   /// = đi tiếp như "Vẫn lưu" (vẫn đánh dấu qrLocationMismatch).
   final FixedAssetConfirmQrMismatch? confirmQrMismatch;
+
+  /// Máy chờ in lại tem, vị trí khác vị trí thực tế đã ghi nhận: dialog
+  /// "Xác nhận máy đã dời?". null (không có UI) = coi như "Hủy" (không dời).
+  final FixedAssetConfirmReprintMove? confirmReprintMove;
+
+  /// Popup "QR chưa được thay". null (không có UI) = "Để sau".
+  final FixedAssetShowLabelNotReplaced? showLabelNotReplaced;
+
+  /// Chế độ chờ tem mới, quét mã máy khác: "Thoát chế độ chờ?" (true =
+  /// thoát và xử lý QR đó). null = thoát luôn.
+  final Future<bool> Function(String awaitingMachineCode)?
+  confirmExitAwaitingLabel;
+
+  /// Chế độ chờ tem mới, quét đúng máy nhưng vẫn là tem cũ: rung + toast.
+  final ValueChanged<String>? onOldLabelScanned;
   final ValueChanged<String> showError;
   final VoidCallback resetQr;
   final void Function(String rawQr, String machineCode)? onScanAccepted;
@@ -209,14 +229,38 @@ class FixedAssetController extends ChangeNotifier {
   final Map<int, FixedAssetQrLocationCheck> _qrCheckByScan =
       <int, FixedAssetQrLocationCheck>{};
 
+  /// reprintAct* / reprintQr* từ audit-check (AUTO) hoặc scan-info của từng
+  /// pipeline: vị trí thực tế đang ghi nhận + tem hiện tại của máy chờ in lại.
+  final Map<int, FixedAssetReprintInfo> _reprintByScan =
+      <int, FixedAssetReprintInfo>{};
+
   /// Scan hiện tại đã lưu với qrLocationMismatch = true.
   bool _qrReprintSaved = false;
 
-  /// Nhãn "Cần in lại QR" trên status card.
+  /// Badge "Cần in lại QR" trên status card.
   bool get needsQrReprint =>
       _qrReprintSaved &&
       (_scanStatus == FixedAssetScanStatus.qrReprintSaved ||
+          _scanStatus == FixedAssetScanStatus.qrLabelNotReplaced ||
           _scanStatus == FixedAssetScanStatus.unknownSaved);
+
+  /// Vị trí thực tế + tem hiện tại hiển thị khi [needsQrReprint].
+  FixedAssetReprintInfo? _reprintInfo;
+  FixedAssetReprintInfo? get reprintInfo => needsQrReprint ? _reprintInfo : null;
+
+  /// Chế độ chờ QR mới (sau "Quét QR mới" của popup QR chưa được thay);
+  /// null = không chờ. Giữ qua đổi vị trí / mode, thoát khi gỡ cờ
+  /// thành công, bấm thoát, hoặc xác nhận thoát khi quét máy khác.
+  FixedAssetAwaitingLabel? _awaitingLabel;
+  FixedAssetAwaitingLabel? get awaitingLabel => _awaitingLabel;
+
+  /// Nút thoát trên banner chờ tem mới.
+  void exitAwaitingLabel() {
+    if (_disposed || _awaitingLabel == null) return;
+    _scanLog('awaiting label: exit ${_awaitingLabel!.machineCode}');
+    _awaitingLabel = null;
+    _notify();
+  }
 
   bool get _pipelineBusy =>
       _activeScan != null && _activeScanMode == _modeGeneration;
@@ -397,6 +441,7 @@ class FixedAssetController extends ChangeNotifier {
   void _onAuditPeriodChanged() {
     _auditedMachineCodes.clear();
     _qrReprintMachineCodes.clear();
+    _awaitingLabel = null;
     _auditedVersion++;
     final location = activeLocation;
     if (location == null) {
@@ -804,6 +849,7 @@ class FixedAssetController extends ChangeNotifier {
     _lastAuditedUserName = null;
     _mismatchMaster = null;
     _qrReprintSaved = false;
+    _reprintInfo = null;
     if (_lastSeenQr != null) _lastSeenAt = DateTime.now();
     _scanChipText = null;
     _pendingLocationQr = null;
@@ -1164,6 +1210,13 @@ class FixedAssetController extends ChangeNotifier {
       return;
     }
 
+    // Chế độ chờ tem mới: tem cũ / máy khác xử lý ở đây; tem mới của đúng
+    // máy đi tiếp như scan thường.
+    final awaiting = _awaitingLabel;
+    if (awaiting != null && await _handleAwaitingLabelScan(qr, now, awaiting)) {
+      return;
+    }
+
     // MANUAL without a full location: never saved, so no repeat window
     // applies — every scan shows "choose a location" (and can offer the
     // QR's own location).
@@ -1263,6 +1316,7 @@ class FixedAssetController extends ChangeNotifier {
     _lastAuditedUserName = null;
     _mismatchMaster = null;
     _qrReprintSaved = false;
+    _reprintInfo = null;
     // Immediate feedback in both modes; MANUAL shows its own text.
     _scanStatus = FixedAssetScanStatus.checking;
     if (!isAutoMode) _statusMessage = 'Đang kiểm tra $machineCode…';
@@ -1281,6 +1335,7 @@ class FixedAssetController extends ChangeNotifier {
       // không được xóa cờ của pipeline mới.
       _auditModeByScan.remove(generation);
       _qrCheckByScan.remove(generation);
+      _reprintByScan.remove(generation);
       if (_activeScan == generation) {
         _activeScan = null;
         _processingRawQr = null;
@@ -1296,6 +1351,66 @@ class FixedAssetController extends ChangeNotifier {
         resetQr();
       }
     }
+  }
+
+  /// Chế độ chờ tem mới. true = đã xử lý (không vào pipeline):
+  /// - đúng máy, vẫn tem cũ: rung + toast, không gọi save;
+  /// - máy khác: hỏi "Thoát chế độ chờ?" (Không: bỏ qua QR; Có: thoát rồi
+  ///   xử lý QR đó như thường -> false).
+  /// Đúng máy + tem mới -> false (save như bình thường).
+  Future<bool> _handleAwaitingLabelScan(
+    String qr,
+    DateTime now,
+    FixedAssetAwaitingLabel awaiting,
+  ) async {
+    final data = parseFixedAssetQr(qr);
+    if (data.machineCode.isEmpty) return false;
+    final sameMachine = awaiting.isMachine(data.machineCode);
+    if (sameMachine && !fixedAssetQrIsOldLabel(data, awaiting.reprint)) {
+      return false;
+    }
+
+    // Detect lặp của cùng QR còn trong khung: chỉ nháy chip.
+    final lastAt = _lastSeenAt;
+    final isRepeat =
+        qr == _lastSeenQr &&
+        lastAt != null &&
+        now.difference(lastAt) < _repeatScanWindow;
+    _lastSeenQr = qr;
+    _lastSeenAt = now;
+    _setScanChip(qr);
+    if (isRepeat) return true;
+
+    if (sameMachine) {
+      _scanLog('awaiting label: old label of ${awaiting.machineCode}');
+      onOldLabelScanned?.call(awaiting.machineCode);
+      return true;
+    }
+
+    _scanLog('awaiting label: other machine ${data.machineCode}');
+    final ask = confirmExitAwaitingLabel;
+    var exit = true;
+    if (ask != null) {
+      _confirmOpen = true;
+      _confirmCode = awaiting.machineCode;
+      try {
+        exit = await ask(awaiting.machineCode);
+      } finally {
+        _confirmOpen = false;
+        _confirmCode = null;
+      }
+    }
+    if (_disposed) return true;
+    if (!exit) {
+      // QR còn trong khung không hỏi lại tới khi rời khung.
+      _lastSeenAt = DateTime.now();
+      return true;
+    }
+    exitAwaitingLabel();
+    // Xử lý ngay QR này (không coi là detect lặp).
+    _lastSeenQr = null;
+    _lastSeenAt = null;
+    return false;
   }
 
   /// MANUAL: location lấy từ dropdown. Mismatch (nếu có) do POST báo về.
@@ -1323,8 +1438,53 @@ class FixedAssetController extends ChangeNotifier {
 
     // Vị trí in trên QR phải trùng vị trí đang chọn (trước bước MASTER).
     // Lệch: hỏi; "Vẫn lưu" thì đi tiếp và mọi POST mang qrLocationMismatch.
-    final qrCheck = fixedAssetManualQrCheck(parseFixedAssetQr(rawQr), location);
+    // qr* luôn được gửi (kể cả khi khớp).
+    final qrData = parseFixedAssetQr(rawQr);
+    final qrCheck = fixedAssetManualQrCheck(qrData, location);
     _qrCheckByScan[generation] = qrCheck;
+
+    // audit-check trước: máy needsQrReprint đi luồng in lại QR (QR cũ /
+    // gỡ cờ / máy đã dời), không qua dialog QR lệch / sai vị trí / list.
+    FixedAssetAuditCheckResponse? check;
+    try {
+      check = await api.checkAudit(
+        machineCode: machineCode,
+        floor: location.floor,
+        positionAA: location.positionAA,
+      );
+    } catch (error) {
+      uxLog('audit-check failed: ${fixedAssetErrorText(error)}');
+    }
+    if (!_isCurrentScan(generation)) {
+      _reportDropped(machineCode, 'đã đổi khu vực/chế độ');
+      return;
+    }
+
+    if (check != null && check.needsQrReprint) {
+      if (check.faName.isNotEmpty) _scannedFaName = check.faName;
+      await _runReprintRescan(
+        machineCode: machineCode,
+        generation: generation,
+        qrData: qrData,
+        check: check,
+        target: FixedAssetSaveTarget.mapped(location),
+      );
+      return;
+    }
+
+    // audit-check lỗi mà FE đã biết máy chờ in lại: POST thẳng, backend
+    // quyết định (QR cũ / gỡ cờ / hỏi máy đã dời).
+    if (check == null &&
+        _qrReprintMachineCodes.contains(machineCode.trim().toLowerCase())) {
+      uxLog('reprint rescan (no audit-check): POST directly');
+      await _saveAudit(
+        machineCode,
+        FixedAssetSaveTarget.mapped(location),
+        generation,
+      );
+      return;
+    }
+
     if (qrCheck.mismatch) {
       uxLog('QR location ${qrCheck.floor}/${qrCheck.positionAA} != selected');
       final confirmed = await _confirmQrLocationMismatch(
@@ -1496,8 +1656,38 @@ class FixedAssetController extends ChangeNotifier {
     final faName = check.faName.isNotEmpty ? check.faName : qrData.displayName;
     final outcome = classifyFixedAssetAutoCheck(check, actual);
     _scanLog('checkAudit #$generation → ${outcome.name}, actual=$actual');
+    final reprint = check.reprint;
+    if (reprint != null) _reprintByScan[generation] = reprint;
 
     switch (outcome) {
+      case FixedAssetAutoCheckOutcome.reprintRescan:
+        // 0. Đang chờ in lại QR: QR cũ / gỡ cờ / máy đã dời, không qua
+        //    dialog sai vị trí.
+        _applyAutoCheck(
+          machineCode,
+          actual,
+          faName,
+          FixedAssetScanStatus.checking,
+        );
+        await _runReprintRescan(
+          machineCode: machineCode,
+          generation: generation,
+          qrData: qrData,
+          check: check,
+          target: actual != null
+              ? FixedAssetSaveTarget.mapped(actual)
+              : FixedAssetSaveTarget.unmapped(
+                  FixedAssetUnmappedActual(
+                    fac: check.actualFac.isNotEmpty ? check.actualFac : null,
+                    floor: check.actualFloor.isNotEmpty
+                        ? check.actualFloor
+                        : qrData.floor,
+                    positionAA: check.actualPositionAA.isNotEmpty
+                        ? check.actualPositionAA
+                        : qrData.positionAA,
+                  ),
+                ),
+        );
       case FixedAssetAutoCheckOutcome.alreadyAudited:
         // 1. Trùng trong kỳ: không POST. Location card ưu tiên ACTUAL,
         //    không có thì dùng MASTER (strict).
@@ -1876,14 +2066,22 @@ class FixedAssetController extends ChangeNotifier {
     // mismatch đã xác nhận). Vẫn refresh khi scan đã stale vì record đã
     // vào backend.
     if (isNewFixedAssetMasterAudit(result)) loadAuditSummary();
-    // Bản ghi in lại QR được backend chuyển sang vị trí mới (alreadyAudited,
-    // hết needsQrReprint): progress / list theo vị trí bản ghi cũng đổi.
+    // Máy đang chờ in lại tem (FE biết qua list / audit-check / scan-info).
+    final wasFlagged =
+        _reprintByScan.containsKey(generation) ||
+        _qrReprintMachineCodes.contains(machineCode.trim().toLowerCase());
+    // Bản ghi in lại QR được gỡ cờ (alreadyAudited, hết needsQrReprint) hoặc
+    // dời sang vị trí mới sau xác nhận: progress / list theo vị trí đổi.
     final reprintCleared =
         result != null &&
         result.alreadyAudited &&
         !result.needsQrReprint &&
-        _qrReprintMachineCodes.contains(machineCode.trim().toLowerCase());
-    if (result != null && (result.saved || reprintCleared)) {
+        wasFlagged;
+    final reprintMoved =
+        result != null &&
+        confirmLocationMismatch &&
+        fixedAssetSaveIsReprintMove(result);
+    if (result != null && (result.saved || reprintCleared || reprintMoved)) {
       if (mode == 'AUTO' && result.saved) _setOptimisticLock(target.location);
       // Zone progress + zone lock reload (shared 800 ms debounce).
       _scheduleZoneProgressRefresh();
@@ -1919,7 +2117,90 @@ class FixedAssetController extends ChangeNotifier {
       result,
       errorText,
       qrLocationMismatch: qrCheck?.mismatch ?? false,
+      wasFlagged: wasFlagged,
     );
+    await _afterReprintResult(machineCode, generation);
+  }
+
+  /// act* = actual* của response (*_Act của dòng); qr* = reprintQr* của
+  /// response (không có = dòng NO_QR, chưa có tem).
+  static FixedAssetReprintInfo _reprintFromResponse(
+    FixedAssetAuditSaveResponse result,
+  ) {
+    String? opt(String v) => v.trim().isEmpty ? null : v.trim();
+    return (result.reprint ?? const FixedAssetReprintInfo())
+        .withAct(
+          fac: opt(result.actualFac),
+          floor: opt(result.actualFloor),
+          positionA: opt(result.actualPositionA),
+          positionAA: opt(result.actualPositionAA),
+        );
+  }
+
+  /// Sau khi áp kết quả POST:
+  /// - QR chưa thay: đang chờ QR mới của máy này -> rung + toast; không thì
+  ///   popup "QR chưa được thay";
+  /// - gỡ cờ thành công: thoát chế độ chờ;
+  /// - vẫn cần in lại (máy đã dời): cập nhật tem cũ của chế độ chờ.
+  Future<void> _afterReprintResult(String machineCode, int generation) async {
+    final awaiting = _awaitingLabel;
+    final awaitingThis = awaiting != null && awaiting.isMachine(machineCode);
+
+    switch (_scanStatus) {
+      case FixedAssetScanStatus.qrReprintCleared:
+        if (awaitingThis) {
+          _awaitingLabel = null;
+          _notify();
+        }
+      case FixedAssetScanStatus.qrReprintSaved:
+        if (awaiting != null && awaitingThis) {
+          _awaitingLabel = FixedAssetAwaitingLabel(
+            machineCode: awaiting.machineCode,
+            faName: awaiting.faName,
+            reprint: _reprintInfo,
+          );
+          _notify();
+        }
+      case FixedAssetScanStatus.qrLabelNotReplaced:
+        if (awaitingThis) {
+          onOldLabelScanned?.call(machineCode);
+          return;
+        }
+        await _showLabelNotReplaced(machineCode, generation);
+      default:
+        break;
+    }
+  }
+
+  /// Popup "QR chưa được thay" (chặn scan khác trong lúc mở).
+  Future<void> _showLabelNotReplaced(String machineCode, int generation) async {
+    final show = showLabelNotReplaced;
+    if (show == null || !_isCurrentScan(generation) || _confirmOpen) return;
+    final prompt = FixedAssetLabelNotReplacedPrompt(
+      machineCode: machineCode,
+      faName: _scannedFaName,
+      reprint: _reprintInfo,
+    );
+
+    _confirmOpen = true;
+    _confirmCode = machineCode;
+    FixedAssetLabelNotReplacedAction action;
+    try {
+      action = await show(prompt);
+    } finally {
+      _confirmOpen = false;
+      _confirmCode = null;
+    }
+    uxLog('label not replaced: ${action.name}');
+    if (_disposed || action == FixedAssetLabelNotReplacedAction.later) return;
+
+    _awaitingLabel = FixedAssetAwaitingLabel(
+      machineCode: machineCode,
+      faName: prompt.faName,
+      reprint: prompt.reprint,
+    );
+    _scanLog('awaiting label: start $machineCode');
+    _notify();
   }
 
   /// Fallback: POST trả requiresConfirmation -> cùng dialog, rồi re-POST
@@ -1930,6 +2211,16 @@ class FixedAssetController extends ChangeNotifier {
     FixedAssetAuditSaveResponse result,
     int generation,
   ) async {
+    if (fixedAssetSaveIsReprintMove(result)) {
+      await _confirmReprintMove(
+        machineCode,
+        target,
+        generation,
+        result: result,
+      );
+      return;
+    }
+
     final master = fixedAssetMasterDisplay(
       result.masterFac,
       result.masterFloor,
@@ -1998,12 +2289,139 @@ class FixedAssetController extends ChangeNotifier {
     );
   }
 
+  /// Máy needsQrReprint (audit-check, MANUAL + AUTO), không qua dialog QR
+  /// lệch / sai vị trí:
+  /// - QR = reprintQr*: "QR chưa được thay" (popup / toast khi đang chờ),
+  ///   không gọi save;
+  /// - QR = reprintAct* và vị trí chọn = reprintAct*: save (gỡ cờ);
+  /// - còn lại: dialog "Máy đã dời?" rồi save với confirmLocationMismatch.
+  Future<void> _runReprintRescan({
+    required String machineCode,
+    required int generation,
+    required FixedAssetQrData qrData,
+    required FixedAssetAuditCheckResponse check,
+    required FixedAssetSaveTarget target,
+  }) async {
+    final reprint = check.reprint;
+    if (reprint != null) _reprintByScan[generation] = reprint;
+
+    final decision = classifyFixedAssetReprintRescan(
+      qrData,
+      reprint,
+      selectedFac: target.fac,
+      selectedFloor: target.floor,
+      selectedPositionA: target.positionA,
+      selectedPositionAA: target.positionAA,
+    );
+    uxLog('reprint rescan: ${decision.name}');
+
+    switch (decision) {
+      case FixedAssetReprintRescan.oldLabel:
+        _qrReprintSaved = true;
+        _reprintInfo = reprint;
+        _scanStatus = FixedAssetScanStatus.qrLabelNotReplaced;
+        _statusMessage = null;
+        _mismatchMaster = null;
+        _lastAuditedAt = check.lastAuditedAt;
+        _lastAuditedUserId = check.lastAuditedUserId;
+        _lastAuditedUserName = check.lastAuditedUserName;
+        _markQrReprint(machineCode);
+        _notify();
+        await _afterReprintResult(machineCode, generation);
+      case FixedAssetReprintRescan.save:
+        await _saveAudit(machineCode, target, generation);
+      case FixedAssetReprintRescan.moved:
+        await _confirmReprintMove(machineCode, target, generation);
+    }
+  }
+
+  /// Máy chờ in lại QR, QR / vị trí chọn khác vị trí thực tế đã ghi nhận:
+  /// hỏi "máy đã dời?" -> POST [target] với confirmLocationMismatch = true
+  /// (backend ghi đè *_Act / *_Qr). Gọi trước POST (từ audit-check, [result]
+  /// null) hoặc khi POST trả requiresConfirmation.
+  Future<void> _confirmReprintMove(
+    String machineCode,
+    FixedAssetSaveTarget target,
+    int generation, {
+    FixedAssetAuditSaveResponse? result,
+  }) async {
+    final manual = _auditModeByScan[generation] == 'MANUAL';
+    _scanStatus = FixedAssetScanStatus.locationMismatch;
+    _statusMessage = null;
+    _mismatchMaster = null;
+    _notify();
+
+    // Response này không có reprintAct*: lấy từ audit-check, thiếu thì
+    // scan-info.
+    var recorded = _reprintByScan[generation];
+    if (recorded == null || !recorded.hasAct) {
+      try {
+        recorded = (await api.fetchScanInfo(machineCode)).reprint ?? recorded;
+      } catch (error) {
+        uxLog('scan-info failed: ${fixedAssetErrorText(error)}');
+      }
+      if (!_isCurrentScan(generation)) {
+        _reportDropped(machineCode, 'đã đổi khu vực/chế độ');
+        return;
+      }
+      if (recorded != null) _reprintByScan[generation] = recorded;
+    }
+
+    // actual* của response = vị trí đang chọn (Fac / A backend điền từ MAP).
+    String pick(String? fromResponse, String? fromTarget) =>
+        (fromResponse ?? '').isNotEmpty ? fromResponse! : (fromTarget ?? '');
+    final prompt = FixedAssetReprintMovePrompt(
+      machineCode: machineCode,
+      faName: _scannedFaName,
+      recordedLabel: recorded != null && recorded.hasAct
+          ? recorded.actLabel
+          : null,
+      selectedLabel: fixedAssetLocationLabel(
+        pick(result?.actualFac, target.fac),
+        pick(result?.actualFloor, target.floor),
+        pick(result?.actualPositionA, target.positionA),
+        pick(result?.actualPositionAA, target.positionAA),
+      ),
+    );
+
+    final show = confirmReprintMove;
+    final confirmed = show != null &&
+        await _runConfirm(
+          generation,
+          machineCode,
+          manual: manual,
+          show: () => show(prompt),
+        );
+
+    if (!_isCurrentScan(generation)) {
+      _reportDropped(machineCode, 'đã đổi khu vực/chế độ');
+      return;
+    }
+    if (!confirmed) {
+      _scanStatus = FixedAssetScanStatus.locationMismatch;
+      _statusMessage = 'Chưa xác nhận máy đã dời - chưa lưu';
+      _notify();
+      if (manual) _shortRepeatQr = _processingRawQr;
+      return;
+    }
+
+    await _saveAudit(
+      machineCode,
+      target,
+      generation,
+      confirmLocationMismatch: true,
+    );
+  }
+
   /// Kết quả POST -> status card + audited set (một notify).
+  ///
+  /// [wasFlagged] = máy đang chờ in lại.
   void _applySaveResult(
     String machineCode,
     FixedAssetAuditSaveResponse? result,
     String errorText, {
     bool qrLocationMismatch = false,
+    bool wasFlagged = false,
   }) {
     // Lưu thành công với QR lệch vị trí -> "Đã kiểm kê" + "Cần in lại QR"
     // (tính vào tiến độ). Bản ghi trong kỳ backend còn báo needsQrReprint
@@ -2017,9 +2435,23 @@ class FixedAssetController extends ChangeNotifier {
             result != null &&
             result.saved &&
             !result.alreadyAudited);
+    // Vị trí thực tế = actual* của response (*_Act của dòng khi quét lại);
+    // tem hiện tại = reprintQr* của response, không lấy từ tem vừa quét.
+    _reprintInfo = result == null || !_qrReprintSaved
+        ? null
+        : _reprintFromResponse(result);
     if (result == null) {
       _scanStatus = FixedAssetScanStatus.failed;
-      _statusMessage = 'Save failed: $errorText';
+      _statusMessage = fixedAssetIsMissingQrLocationError(errorText)
+          ? 'Không đọc được vị trí trên QR, quét lại'
+          : 'Save failed: $errorText';
+    } else if (result.qrLabelNotReplaced) {
+      // Tem cũ: không đổi gì, không hiện "Đã kiểm kê".
+      _scanStatus = FixedAssetScanStatus.qrLabelNotReplaced;
+      _lastAuditedAt = result.lastAuditedAt;
+      _lastAuditedUserId = result.lastAuditedUserId;
+      _lastAuditedUserName = result.lastAuditedUserName;
+      _markQrReprint(machineCode);
     } else if (reprintRecord) {
       _scanStatus = FixedAssetScanStatus.qrReprintSaved;
       _lastAuditedAt = result.lastAuditedAt;
@@ -2027,6 +2459,13 @@ class FixedAssetController extends ChangeNotifier {
       _lastAuditedUserName = result.lastAuditedUserName;
       _markAudited(machineCode);
       _markQrReprint(machineCode);
+    } else if (result.alreadyAudited && wasFlagged) {
+      // Tem mới khớp vị trí thực tế: backend đã gỡ cờ in lại.
+      _scanStatus = FixedAssetScanStatus.qrReprintCleared;
+      _lastAuditedAt = result.lastAuditedAt;
+      _lastAuditedUserId = result.lastAuditedUserId;
+      _lastAuditedUserName = result.lastAuditedUserName;
+      _markAudited(machineCode);
     } else if (result.alreadyAudited) {
       _scanStatus = FixedAssetScanStatus.alreadyAudited;
       _statusMessage = result.message.isNotEmpty ? result.message : null;

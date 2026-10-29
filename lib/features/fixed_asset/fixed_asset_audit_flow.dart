@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart' show ValueListenable;
 
 import 'package:chuphinh/core/models/fixed_asset_audit_check_response.dart';
 import 'package:chuphinh/core/models/fixed_asset_audit_save_response.dart';
+import 'package:chuphinh/core/models/fixed_asset_reprint_info.dart';
 import 'package:chuphinh/features/fixed_asset/fixed_asset_location.dart';
 import 'package:chuphinh/features/fixed_asset/fixed_asset_qr_parser.dart';
 
@@ -44,6 +45,13 @@ enum FixedAssetScanStatus {
   /// Đã lưu với QR lệch vị trí: đã kiểm kê, cần in lại QR
   /// (backend không đếm vào tiến độ).
   qrReprintSaved,
+
+  /// Máy đang chờ in lại được quét bằng tem cũ: không đổi gì, vẫn cần in tem
+  /// (không hiện "Đã kiểm kê").
+  qrLabelNotReplaced,
+
+  /// Tem mới khớp vị trí thực tế: backend đã gỡ đánh dấu in lại.
+  qrReprintCleared,
 }
 
 /// Dropdown của cascade MANUAL (đánh dấu ô còn trống đầu tiên).
@@ -52,6 +60,10 @@ enum FixedAssetManualField { fac, floor, positionA, positionAA }
 /// Phân loại kết quả /audit-check trong AUTO.
 enum FixedAssetAutoCheckOutcome {
   alreadyAudited,
+
+  /// Đang chờ in lại QR (needsQrReprint): QR cũ / gỡ cờ / máy đã dời theo
+  /// [classifyFixedAssetReprintRescan].
+  reprintRescan,
   unmappedActual,
   unresolvedActual,
   mappedMismatch,
@@ -169,7 +181,165 @@ class FixedAssetQrMismatchPrompt {
 typedef FixedAssetConfirmQrMismatch =
     Future<bool> Function(FixedAssetQrMismatchPrompt prompt);
 
+/// Máy đang chờ in lại tem, vị trí tem / vị trí chọn khác vị trí thực tế đã
+/// ghi nhận: hỏi "máy đã dời?" (labels dạng "Fac/Floor/A/AA").
+class FixedAssetReprintMovePrompt {
+  final String machineCode;
+  final String faName;
+
+  /// Vị trí thực tế đang ghi nhận (reprintAct*); null = không tra được.
+  final String? recordedLabel;
+  final String selectedLabel;
+
+  const FixedAssetReprintMovePrompt({
+    required this.machineCode,
+    required this.faName,
+    required this.recordedLabel,
+    required this.selectedLabel,
+  });
+}
+
+/// UI trả true = "Xác nhận đã dời", false = "Hủy".
+typedef FixedAssetConfirmReprintMove =
+    Future<bool> Function(FixedAssetReprintMovePrompt prompt);
+
+/// Popup "QR chưa được thay" (save trả qrLabelNotReplaced).
+class FixedAssetLabelNotReplacedPrompt {
+  final String machineCode;
+  final String faName;
+
+  /// reprintAct* / reprintQr* từ backend; null = không tra được.
+  final FixedAssetReprintInfo? reprint;
+
+  const FixedAssetLabelNotReplacedPrompt({
+    required this.machineCode,
+    required this.faName,
+    required this.reprint,
+  });
+}
+
+enum FixedAssetLabelNotReplacedAction {
+  /// "Quét QR mới": vào chế độ chờ QR mới.
+  scanNewLabel,
+
+  /// "Để sau": giữ card "QR chưa được thay", không chờ.
+  later,
+}
+
+typedef FixedAssetShowLabelNotReplaced =
+    Future<FixedAssetLabelNotReplacedAction> Function(
+      FixedAssetLabelNotReplacedPrompt prompt,
+    );
+
+/// Chế độ chờ tem mới: máy [machineCode] vừa quét bằng tem cũ, đang chờ quét
+/// tem in lại.
+class FixedAssetAwaitingLabel {
+  final String machineCode;
+  final String faName;
+
+  /// Vị trí thực tế + tem cũ (reprintQr*); null = không tra được (tem cũ khi
+  /// đó do backend nhận ra qua qrLabelNotReplaced).
+  final FixedAssetReprintInfo? reprint;
+
+  const FixedAssetAwaitingLabel({
+    required this.machineCode,
+    required this.faName,
+    required this.reprint,
+  });
+
+  /// PositionAA thực tế cho banner ("-" khi không rõ).
+  String get actualPositionAA {
+    final aa = reprint?.actPositionAA?.trim() ?? '';
+    return aa.isEmpty ? '-' : aa;
+  }
+
+  bool isMachine(String code) =>
+      code.trim().toLowerCase() == machineCode.trim().toLowerCase();
+}
+
+/// Quét lại máy needsQrReprint (theo audit-check, trước mọi dialog / save).
+enum FixedAssetReprintRescan {
+  /// QR = reprintQr*: popup "QR chưa được thay" (chờ QR mới: toast), không save.
+  oldLabel,
+
+  /// Save (kèm qr*), backend quyết định: QR = reprintAct* và vị trí chọn =
+  /// reprintAct* (gỡ cờ), hoặc dòng NO_QR / không rõ tem hiện tại.
+  save,
+
+  /// Còn lại: dialog "Máy đã dời?", xác nhận thì save với
+  /// confirmLocationMismatch.
+  moved,
+}
+
+/// [selectedFac]... = vị trí đang chọn (MANUAL: dropdown; AUTO: ACTUAL
+/// resolve từ QR). Cùng quy tắc với backend: Fac chỉ so khi cả hai có. QR
+/// không in A thì không so A (backend tự tra; lệch thì POST trả
+/// requiresConfirmation -> dialog dời).
+///
+/// Dòng NO_QR (reprintQr* null) hoặc không có reprint*: không có "QR cũ" để
+/// so -> luôn save, backend gỡ cờ hoặc yêu cầu xác nhận dời.
+FixedAssetReprintRescan classifyFixedAssetReprintRescan(
+  FixedAssetQrData qr,
+  FixedAssetReprintInfo? reprint, {
+  required String? selectedFac,
+  required String selectedFloor,
+  required String? selectedPositionA,
+  required String selectedPositionAA,
+}) {
+  if (reprint == null || reprint.labelUnknown || !reprint.hasLabel) {
+    return FixedAssetReprintRescan.save;
+  }
+  if (fixedAssetQrIsOldLabel(qr, reprint)) {
+    return FixedAssetReprintRescan.oldLabel;
+  }
+  if (!reprint.hasAct) return FixedAssetReprintRescan.moved;
+
+  String norm(String? v) => (v ?? '').trim().toUpperCase();
+  bool same(String? a, String? b) =>
+      norm(a).isNotEmpty && norm(a) == norm(b);
+  bool sameIfBoth(String? a, String? b) =>
+      norm(a).isEmpty || norm(b).isEmpty || norm(a) == norm(b);
+
+  final qrIsActual =
+      same(qr.floor, reprint.actFloor) &&
+      same(qr.positionAA, reprint.actPositionAA) &&
+      sameIfBoth(qr.positionA, reprint.actPositionA);
+  final selectedIsActual =
+      sameIfBoth(selectedFac, reprint.actFac) &&
+      same(selectedFloor, reprint.actFloor) &&
+      same(selectedPositionA, reprint.actPositionA) &&
+      same(selectedPositionAA, reprint.actPositionAA);
+
+  return qrIsActual && selectedIsActual
+      ? FixedAssetReprintRescan.save
+      : FixedAssetReprintRescan.moved;
+}
+
+/// QR vừa quét vẫn là tem cũ ([label].qr*), cùng quy tắc với backend: Floor
+/// + AA phải trùng; A chỉ so khi cả hai có. Tem cũ không rõ / NO_QR -> false.
+bool fixedAssetQrIsOldLabel(FixedAssetQrData qr, FixedAssetReprintInfo? label) {
+  if (label == null || label.labelUnknown || !label.hasLabel) return false;
+  String norm(String? v) =>
+      (v ?? '').replaceAll(RegExp(r'\s+'), '').toUpperCase();
+  bool same(String qrValue, String? labelValue) =>
+      norm(qrValue) == norm(labelValue);
+
+  if (qr.floor.trim().isEmpty || qr.positionAA.trim().isEmpty) return false;
+  if (!same(qr.floor, label.qrFloor)) return false;
+  if (!same(qr.positionAA, label.qrPositionAA)) return false;
+  final labelA = label.qrPositionA;
+  if (qr.positionA.trim().isNotEmpty &&
+      labelA != null &&
+      labelA.trim().isNotEmpty &&
+      !same(qr.positionA, labelA)) {
+    return false;
+  }
+  return true;
+}
+
 /// Thứ tự ưu tiên (không đổi):
+/// 0. đang chờ in lại QR -> [classifyFixedAssetReprintRescan] (QR cũ / gỡ cờ
+///    / máy đã dời), không qua dialog sai vị trí
 /// 1. đã kiểm kê trong kỳ -> không POST, không hỏi mismatch
 /// 2. known machine + vị trí đang quét không có trong MAP + cho xác nhận
 /// 3. vị trí đang quét không resolve được (không xác nhận được) -> lỗi
@@ -179,6 +349,7 @@ FixedAssetAutoCheckOutcome classifyFixedAssetAutoCheck(
   FixedAssetAuditCheckResponse check,
   FixedAssetAuditLocation? actual,
 ) {
+  if (check.needsQrReprint) return FixedAssetAutoCheckOutcome.reprintRescan;
   if (check.alreadyAudited) return FixedAssetAutoCheckOutcome.alreadyAudited;
 
   if (check.existsInMaster &&
@@ -254,7 +425,9 @@ bool isNewFixedAssetMasterAudit(FixedAssetAuditSaveResponse? result) {
       !result.unknownMachine;
 }
 
-/// Backend yêu cầu xác nhận sai vị trí khi POST (chủ yếu MANUAL).
+/// Backend yêu cầu xác nhận sai vị trí khi POST (chủ yếu MANUAL), hoặc máy
+/// đang chờ in lại tem có vị trí khác vị trí thực tế đã ghi nhận
+/// ([fixedAssetSaveIsReprintMove], response có alreadyAudited = true).
 bool fixedAssetSaveNeedsConfirmation(
   FixedAssetAuditSaveResponse? result, {
   required bool confirmLocationMismatch,
@@ -262,8 +435,18 @@ bool fixedAssetSaveNeedsConfirmation(
   return result != null &&
       !confirmLocationMismatch &&
       !result.saved &&
-      !result.alreadyAudited &&
-      result.requiresConfirmation;
+      result.requiresConfirmation &&
+      (!result.alreadyAudited || result.needsQrReprint);
+}
+
+/// requiresConfirmation của nhánh quét lại máy đang chờ in lại tem.
+bool fixedAssetSaveIsReprintMove(FixedAssetAuditSaveResponse result) =>
+    result.alreadyAudited && result.needsQrReprint;
+
+/// Lỗi 400 khi máy chờ in lại mà request thiếu qrFloor / qrPositionAA.
+bool fixedAssetIsMissingQrLocationError(String message) {
+  final lower = message.toLowerCase();
+  return lower.contains('qrfloor') && lower.contains('required');
 }
 
 String fixedAssetErrorText(Object error) {

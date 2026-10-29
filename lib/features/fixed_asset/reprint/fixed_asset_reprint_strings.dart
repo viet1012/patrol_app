@@ -16,6 +16,10 @@ abstract final class FixedAssetReprintStrings {
   static const selectAll = 'Chọn tất cả';
   static const deselectAll = 'Bỏ chọn';
 
+  static const reason = 'Lý do';
+  static const reasonNoQr = 'Không có tem';
+  static const reasonWrongLocation = 'Tem sai vị trí';
+
   static const oldQr = 'QR cũ';
   static const newQr = 'QR mới';
   static const missingLocation = 'Thiếu dữ liệu vị trí';

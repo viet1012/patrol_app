@@ -1,3 +1,4 @@
+import 'package:chuphinh/core/models/fixed_asset_reprint_info.dart';
 import 'package:chuphinh/core/models/fixed_asset_scan_info.dart' show parseBool, parseDate;
 
 /// Response của POST /api/fixed-assets/audit-check.
@@ -33,9 +34,17 @@ class FixedAssetAuditCheckResponse {
 
   final String message;
 
+  /// Dòng mới nhất trong kỳ có QrMismatch = 1 (cần in lại tem).
+  final bool needsQrReprint;
+
+  /// reprintAct* / reprintQr* của dòng đó; null khi không cần in lại.
+  final FixedAssetReprintInfo? reprint;
+
   const FixedAssetAuditCheckResponse({
     required this.machineCode,
     required this.alreadyAudited,
+    this.needsQrReprint = false,
+    this.reprint,
     this.lastAuditedAt,
     this.lastAuditedUserId,
     this.lastAuditedUserName,
@@ -61,6 +70,8 @@ class FixedAssetAuditCheckResponse {
     return FixedAssetAuditCheckResponse(
       machineCode: str('machineCode'),
       alreadyAudited: parseBool(json['alreadyAudited']),
+      needsQrReprint: parseBool(json['needsQrReprint']),
+      reprint: FixedAssetReprintInfo.fromJson(json),
       lastAuditedAt: parseDate(json['lastAuditedAt']),
       lastAuditedUserId: json['lastAuditedUserId']?.toString(),
       lastAuditedUserName: json['lastAuditedUserName']?.toString(),
