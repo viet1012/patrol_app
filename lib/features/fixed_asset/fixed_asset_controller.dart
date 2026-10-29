@@ -203,9 +203,9 @@ class FixedAssetController extends ChangeNotifier {
   /// mọi POST /audit của pipeline đó, kể cả re-POST sau xác nhận.
   final Map<int, String> _auditModeByScan = <int, String>{};
 
-  /// MANUAL: vị trí QR so với vị trí đang chọn của từng pipeline, gửi kèm
-  /// mọi POST /audit của pipeline đó (kể cả re-POST sau xác nhận). AUTO
-  /// không có entry -> không gửi field QR.
+  /// Vị trí in trên QR của từng pipeline, gửi kèm mọi POST /audit của
+  /// pipeline đó (kể cả re-POST sau xác nhận). MANUAL: so với vị trí đang
+  /// chọn; AUTO: chỉ gửi vị trí QR (không gửi qrLocationMismatch).
   final Map<int, FixedAssetQrLocationCheck> _qrCheckByScan =
       <int, FixedAssetQrLocationCheck>{};
 
@@ -1444,6 +1444,7 @@ class FixedAssetController extends ChangeNotifier {
   /// machine-location cho cùng scan.
   Future<void> _runAutoScan(FixedAssetQrData qrData, int generation) async {
     final machineCode = qrData.machineCode;
+    _qrCheckByScan[generation] = fixedAssetAutoQrLocation(qrData);
 
     final FixedAssetAuditCheckResponse check;
 
@@ -1538,6 +1539,7 @@ class FixedAssetController extends ChangeNotifier {
     int generation,
   ) async {
     final raw = FixedAssetUnmappedActual(
+      fac: check.actualFac.isNotEmpty ? check.actualFac : null,
       floor: check.actualFloor.isNotEmpty ? check.actualFloor : qrData.floor,
       positionAA: check.actualPositionAA.isNotEmpty
           ? check.actualPositionAA
@@ -1830,7 +1832,7 @@ class FixedAssetController extends ChangeNotifier {
         qrFloor: qrCheck?.floor,
         qrPositionA: qrCheck?.positionA,
         qrPositionAA: qrCheck?.positionAA,
-        qrLocationMismatch: qrCheck?.mismatch,
+        qrLocationMismatch: mode == 'MANUAL' ? qrCheck?.mismatch : null,
       );
     } catch (error) {
       saveError = error;
@@ -1927,6 +1929,7 @@ class FixedAssetController extends ChangeNotifier {
         ? null
         : (target.unmapped ??
               FixedAssetUnmappedActual(
+                fac: result.actualFac.isNotEmpty ? result.actualFac : null,
                 floor: result.actualFloor,
                 positionAA: result.actualPositionAA,
               ));

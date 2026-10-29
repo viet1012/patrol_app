@@ -91,9 +91,10 @@ class FixedAssetMismatchPrompt {
 typedef FixedAssetConfirmMismatch =
     Future<bool> Function(FixedAssetMismatchPrompt prompt);
 
-/// MANUAL: vị trí in trên QR so với vị trí đang chọn, gửi kèm mọi POST
-/// /audit của scan (qrFloor / qrPositionA / qrPositionAA / qrLocationMismatch).
-/// Field null = QR không có thông tin đó (QR KVH_ không có PositionA).
+/// Vị trí in trên QR, gửi kèm mọi POST /audit của scan (qrFloor /
+/// qrPositionA / qrPositionAA; MANUAL thêm qrLocationMismatch).
+/// Field null = QR không có thông tin đó (layout KVH_{mã máy}_{floor}_{AA}
+/// không in PositionA: backend tự tra A_Qr từ MAP).
 class FixedAssetQrLocationCheck {
   final String? floor;
   final String? positionA;
@@ -133,6 +134,19 @@ FixedAssetQrLocationCheck fixedAssetManualQrCheck(
     positionA: positionA,
     positionAA: positionAA,
     mismatch: mismatch,
+  );
+}
+
+/// AUTO: vị trí in trên QR gửi kèm POST /audit. Không so lệch vì ACTUAL
+/// được resolve từ chính QR.
+FixedAssetQrLocationCheck fixedAssetAutoQrLocation(FixedAssetQrData qr) {
+  String? valueOf(String v) => v.trim().isEmpty ? null : v.trim();
+
+  return FixedAssetQrLocationCheck(
+    floor: valueOf(qr.floor),
+    positionA: valueOf(qr.positionA),
+    positionAA: valueOf(qr.positionAA),
+    mismatch: false,
   );
 }
 

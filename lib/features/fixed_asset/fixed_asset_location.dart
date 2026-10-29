@@ -28,13 +28,15 @@ class FixedAssetAuditLocation {
 }
 
 /// Vị trí đang quét KHÔNG có trong MAP (known machine): chỉ có raw Floor +
-/// PositionAA từ backend. Không có Fac/PositionA và không được suy ra
-/// (ví dụ KHÔNG đổi A35-1 thành A35).
+/// PositionAA từ backend. PositionA không được suy ra (ví dụ KHÔNG đổi A35-1
+/// thành A35); [fac] chỉ có khi backend trả actualFac.
 class FixedAssetUnmappedActual {
+  final String? fac;
   final String floor;
   final String positionAA;
 
   const FixedAssetUnmappedActual({
+    this.fac,
     required this.floor,
     required this.positionAA,
   });
@@ -43,8 +45,9 @@ class FixedAssetUnmappedActual {
 /// Nơi DUY NHẤT dựng các field location cho POST /audit.
 ///
 /// - [FixedAssetSaveTarget.mapped]: location đầy đủ (match / mismatch / manual).
-/// - [FixedAssetSaveTarget.unmapped]: vị trí không có trong MAP -> fac và
-///   positionA = null, backend lưu A_Act = null, AA_Act = raw.
+/// - [FixedAssetSaveTarget.unmapped]: vị trí không có trong MAP -> positionA
+///   = null (fac = actualFac nếu backend có trả), backend lưu A_Act = null,
+///   AA_Act = raw.
 class FixedAssetSaveTarget {
   final FixedAssetAuditLocation? location;
   final FixedAssetUnmappedActual? unmapped;
@@ -55,7 +58,7 @@ class FixedAssetSaveTarget {
   const FixedAssetSaveTarget.unmapped(FixedAssetUnmappedActual this.unmapped)
     : location = null;
 
-  String? get fac => location?.fac;
+  String? get fac => location?.fac ?? unmapped?.fac;
   String get floor => location?.floor ?? unmapped?.floor ?? '';
   String? get positionA => location?.positionA;
   String get positionAA => location?.positionAA ?? unmapped?.positionAA ?? '';

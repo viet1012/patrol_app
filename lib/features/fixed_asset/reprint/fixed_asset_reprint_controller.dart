@@ -45,11 +45,21 @@ class FixedAssetReprintItem {
   String get machineCode => row.machineCode;
   bool get isReady => state == FixedAssetReprintQrState.ready;
 
-  String get oldLocationLabel =>
-      '${fixedAssetDash(row.qrFloor)} / ${fixedAssetDash(row.qrPositionAA)}';
+  /// Vị trí trên QR cũ: Fac / Floor / A / AA.
+  String get oldLocationLabel => _locationLabel([
+    row.facQr,
+    row.qrFloor,
+    row.qrPositionA,
+    row.qrPositionAA,
+  ]);
 
+  /// Vị trí thực tế (đang chọn): Fac / Floor / A / AA.
   String get newLocationLabel =>
-      '${fixedAssetDash(floor)} / ${fixedAssetDash(row.positionAA)}';
+      _locationLabel([fac, floor, row.positionA, row.positionAA]);
+
+  /// Giá trị null / rỗng hiển thị "-".
+  static String _locationLabel(List<String?> parts) =>
+      parts.map((v) => fixedAssetDash(v ?? '')).join(' / ');
 }
 
 /// Nhóm hiển thị theo xưởng (fac rỗng = chưa rõ xưởng, luôn ở cuối).
@@ -140,22 +150,24 @@ class FixedAssetReprintController extends ChangeNotifier {
   }
 
   FixedAssetReprintItem _initialItem(FixedAssetQrMismatch row) {
-    if (row.fac.isNotEmpty && row.floor.isNotEmpty) {
-      return _withLocation(row, (fac: row.fac, floor: row.floor));
+    final fac = row.facAct ?? '';
+    final floor = row.floorAct ?? '';
+    if (fac.isNotEmpty && floor.isNotEmpty) {
+      return _withLocation(row, (fac: fac, floor: floor));
     }
     if (row.positionA.isEmpty || row.positionAA.isEmpty) {
       return FixedAssetReprintItem._(
         row,
         FixedAssetReprintQrState.missing,
-        fac: row.fac,
-        floor: row.floor,
+        fac: fac,
+        floor: floor,
       );
     }
     return FixedAssetReprintItem._(
       row,
       FixedAssetReprintQrState.resolving,
-      fac: row.fac,
-      floor: row.floor,
+      fac: fac,
+      floor: floor,
     );
   }
 
@@ -164,8 +176,8 @@ class FixedAssetReprintController extends ChangeNotifier {
     FixedAssetQrMismatch row,
     ({String fac, String floor})? location,
   ) {
-    final fac = (location?.fac ?? row.fac).trim();
-    final floor = (location?.floor ?? row.floor).trim();
+    final fac = (location?.fac ?? row.facAct ?? '').trim();
+    final floor = (location?.floor ?? row.floorAct ?? '').trim();
     final content = floor.isEmpty
         ? null
         : buildFixedAssetQr(
@@ -191,7 +203,7 @@ class FixedAssetReprintController extends ChangeNotifier {
     );
   }
 
-  /// Bảng audit không lưu Fac / Floor: tra trong MAP mọi xưởng cặp
+  /// Bản ghi cũ chưa có Fac_Act / Floor_Act: tra trong MAP mọi xưởng cặp
   /// (Fac, Floor) DUY NHẤT có đúng PositionA + PositionAA đang chọn.
   /// 0 hoặc nhiều cặp -> thiếu dữ liệu.
   void _resolveLocations(int req) {
@@ -212,8 +224,8 @@ class FixedAssetReprintController extends ChangeNotifier {
 
   Future<({String fac, String floor})?> _locationFor(FixedAssetQrMismatch row) {
     final key = [
-      _norm(row.fac),
-      _norm(row.floor),
+      _norm(row.facAct ?? ''),
+      _norm(row.floorAct ?? ''),
       _norm(row.positionA),
       _norm(row.positionAA),
     ].join('|');
@@ -225,11 +237,12 @@ class FixedAssetReprintController extends ChangeNotifier {
   ) async {
     final wantA = _norm(row.positionA);
     final wantAA = _norm(row.positionAA);
-    final wantFloor = _norm(row.floor);
+    final wantFloor = _norm(row.floorAct ?? '');
+    final rowFac = row.facAct ?? '';
     final found = <({String fac, String floor})>{};
     try {
-      final facs = row.fac.isNotEmpty
-          ? <String>[row.fac]
+      final facs = rowFac.isNotEmpty
+          ? <String>[rowFac]
           : await _cached('facs', api.fetchFacs);
 
       await Future.wait(
