@@ -81,9 +81,32 @@ class VoiceInputButton extends StatefulWidget {
 class _FirstLineAligned extends StatelessWidget {
   static const double _slot = kMinInteractiveDimension;
 
+  /// Cache 1 phần tử: ô rebuild mỗi lần gõ phím nhưng style hiếm khi đổi.
+  static Object? _lineHeightKey;
+  static double _lineHeight = 0;
+
   final Widget child;
 
   const _FirstLineAligned({required this.child});
+
+  static double _lineHeightOf(
+    TextStyle style,
+    TextScaler scaler,
+    TextDirection direction,
+  ) {
+    final key = (style, scaler, direction);
+    if (key == _lineHeightKey) return _lineHeight;
+
+    final painter = TextPainter(
+      text: TextSpan(text: ' ', style: style),
+      textDirection: direction,
+      textScaler: scaler,
+    )..layout();
+    _lineHeight = painter.preferredLineHeight;
+    painter.dispose();
+    _lineHeightKey = key;
+    return _lineHeight;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -91,20 +114,19 @@ class _FirstLineAligned extends StatelessWidget {
     final maxLines = field?.maxLines ?? 1;
     if (field == null || maxLines <= 1) return child;
 
+    final direction = Directionality.of(context);
     final padding =
         (field.decoration?.contentPadding ?? const EdgeInsets.all(12))
-            .resolve(Directionality.of(context));
+            .resolve(direction);
 
     final style = Theme.of(
       context,
     ).textTheme.titleMedium!.merge(field.style);
-    final painter = TextPainter(
-      text: TextSpan(text: ' ', style: style),
-      textDirection: Directionality.of(context),
-      textScaler: MediaQuery.textScalerOf(context),
-    )..layout();
-    final lineHeight = painter.preferredLineHeight;
-    painter.dispose();
+    final lineHeight = _lineHeightOf(
+      style,
+      MediaQuery.textScalerOf(context),
+      direction,
+    );
 
     final height = padding.vertical + maxLines * lineHeight;
     final slotTop = padding.top + lineHeight / 2 - _slot / 2;
@@ -214,6 +236,20 @@ class _WebSpeechVoiceState extends State<VoiceInputButton>
     vsync: this,
     duration: const Duration(milliseconds: 800),
   );
+
+  // Pulse chỉ dùng opacity/scale (không blur) để mỗi frame vẽ lại rẻ.
+  late final Animation<double> _haloOpacity = Tween<double>(
+    begin: .45,
+    end: 0,
+  ).animate(_pulse);
+  late final Animation<double> _haloScale = Tween<double>(
+    begin: 1,
+    end: 1.5,
+  ).animate(_pulse);
+  late final Animation<double> _iconScale = Tween<double>(
+    begin: 1,
+    end: 1.12,
+  ).animate(_pulse);
 
   _SpeechState _state = _SpeechState.idle;
   String _interim = '';
@@ -432,32 +468,36 @@ class _WebSpeechVoiceState extends State<VoiceInputButton>
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  AnimatedBuilder(
-                    animation: _pulse,
-                    builder: (context, child) {
-                      final t = _pulse.value;
-                      return DecoratedBox(
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.redAccent.withOpacity(
-                                .45 * (1 - t),
+                  // Tách layer để pulse 60fps không vẽ lại cả trang.
+                  RepaintBoundary(
+                    child: SizedBox.square(
+                      dimension: 24,
+                      child: Stack(
+                        alignment: Alignment.center,
+                        clipBehavior: Clip.none,
+                        children: [
+                          FadeTransition(
+                            opacity: _haloOpacity,
+                            child: ScaleTransition(
+                              scale: _haloScale,
+                              child: const DecoratedBox(
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: Colors.redAccent,
+                                ),
+                                child: SizedBox.square(dimension: 24),
                               ),
-                              blurRadius: 4 + 8 * t,
-                              spreadRadius: 1 + 4 * t,
                             ),
-                          ],
-                        ),
-                        child: Transform.scale(
-                          scale: 1 + .12 * t,
-                          child: child,
-                        ),
-                      );
-                    },
-                    child: const Icon(
-                      Icons.stop_rounded,
-                      color: Colors.redAccent,
+                          ),
+                          ScaleTransition(
+                            scale: _iconScale,
+                            child: const Icon(
+                              Icons.stop_rounded,
+                              color: Colors.redAccent,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                   const SizedBox(width: 4),

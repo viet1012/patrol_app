@@ -15,6 +15,12 @@ class WebSpeechService {
 
   static const _restartDelay = Duration(milliseconds: 250);
 
+  /// Phiên ngắn hơn mức này coi là bị ngắt ngay (mic bị chiếm…).
+  static const _quickEndThreshold = Duration(seconds: 1);
+
+  /// Số lần bị ngắt ngay liên tiếp trước khi báo lỗi và dừng hẳn.
+  static const _maxQuickEnds = 3;
+
   /// Chờ onend tối đa sau khi gọi stop().
   static const _stopTimeout = Duration(seconds: 3);
 
@@ -68,6 +74,9 @@ class WebSpeechService {
   Timer? _restartTimer;
   Timer? _stopTimer;
 
+  DateTime? _sessionStartedAt;
+  int _quickEnds = 0;
+
   /// Interim mới nhất chưa được chốt.
   String _interim = '';
 
@@ -100,6 +109,7 @@ class WebSpeechService {
     _recognition = rec;
     _wantListening = true;
     _interim = '';
+    _quickEnds = 0;
 
     if (!_startRecognition()) {
       _fail('Không thể bắt đầu nhận dạng giọng nói.');
@@ -166,10 +176,12 @@ class WebSpeechService {
     try {
       rec.callMethod<JSAny?>('start'.toJS);
       _active = true;
+      _sessionStartedAt = DateTime.now();
       return true;
     } catch (e) {
       if (e.toString().contains('InvalidStateError')) {
         _active = true;
+        _sessionStartedAt = DateTime.now();
         return true;
       }
       return false;
@@ -303,8 +315,22 @@ class WebSpeechService {
       onInterim?.call('');
     }
 
+    // Trình duyệt ngắt ngay sau khi start nhiều lần liền → không start lại
+    // vô hạn (mỗi lần có tiếng bíp và tốn main thread).
+    final startedAt = _sessionStartedAt;
+    final quickEnd = startedAt != null &&
+        DateTime.now().difference(startedAt) < _quickEndThreshold;
+    _quickEnds = quickEnd ? _quickEnds + 1 : 0;
+    if (_quickEnds >= _maxQuickEnds) {
+      _fail(
+        'Nhận dạng giọng nói bị ngắt liên tục. '
+        'Micro có thể đang bị ứng dụng khác dùng.',
+      );
+      return;
+    }
+
     _restartTimer?.cancel();
-    _restartTimer = Timer(_restartDelay, () {
+    _restartTimer = Timer(_restartDelay * (_quickEnds + 1), () {
       if (!_wantListening || _active) return;
       if (!_startRecognition()) {
         _fail('Không thể tiếp tục nhận dạng giọng nói.');

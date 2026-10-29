@@ -896,6 +896,7 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
           accountCode: widget.accountCode,
           selectedPlant: selectedFactory,
           userName: _employeeName,
+          lang: currentLang,
         ),
       ),
     ).then((_) => _fetchReprintCount());
