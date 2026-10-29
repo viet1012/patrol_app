@@ -9,6 +9,7 @@ import 'package:chuphinh/core/models/auth_me.dart';
 import 'package:chuphinh/features/patrol/after/after_report_screen.dart';
 import 'package:chuphinh/app/app_idle_detector.dart';
 import 'package:chuphinh/shared/camera/camera_preview_box.dart';
+import 'package:chuphinh/shared/speech/voice_input_button.dart';
 import 'package:chuphinh/features/home/patrol_home_screen.dart';
 import 'package:chuphinh/core/models/patrol_group.dart';
 import 'package:chuphinh/features/auth/login/login_page.dart';
@@ -20,8 +21,9 @@ import 'package:chuphinh/features/patrol/summary/patrol_report_table_page.dart';
 
 final router = GoRouter(
   navigatorKey: appNavigatorKey,
-  // CameraPreviewBox tự suspend khi route của nó bị page route khác che.
-  observers: [CameraPreviewRouteObserver.instance],
+  // CameraPreviewBox tự suspend khi route của nó bị page route khác che;
+  // nút voice dừng nghe khi màn chứa nó bị che.
+  observers: [CameraPreviewRouteObserver.instance, voiceInputRouteObserver],
 
   // Chạy lại redirect khi khôi phục phiên (F5) xong.
   refreshListenable: AuthSession.instance,

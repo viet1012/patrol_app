@@ -33,6 +33,10 @@ class VoiceInputButton extends StatefulWidget {
   /// Gọi sau khi chèn text (controller đổi bằng code không kích hoạt onChanged).
   final ValueChanged<String>? onTextInserted;
 
+  /// Giới hạn ký tự của ô (chèn giọng nói vượt thì cắt bớt). null = lấy
+  /// maxLength của TextField chứa nút.
+  final int? maxLength;
+
   const VoiceInputButton({
     super.key,
     required this.controller,
@@ -41,6 +45,7 @@ class VoiceInputButton extends StatefulWidget {
     this.enabled = true,
     this.maxDuration = const Duration(seconds: 60),
     this.onTextInserted,
+    this.maxLength,
   });
 
   static bool get isSupported => kUseWebSpeech
@@ -54,6 +59,7 @@ class VoiceInputButton extends StatefulWidget {
     String? plant,
     bool enabled = true,
     ValueChanged<String>? onTextInserted,
+    int? maxLength,
   }) {
     if (!isSupported) return null;
     return _FirstLineAligned(
@@ -63,6 +69,7 @@ class VoiceInputButton extends StatefulWidget {
         plant: plant,
         enabled: enabled,
         onTextInserted: onTextInserted,
+        maxLength: maxLength,
       ),
     );
   }
@@ -179,8 +186,28 @@ class VoiceInputCoordinator {
   }
 }
 
+/// Route observer cho nút voice: màn chứa nút bị page route khác che
+/// (didPushNext) thì dừng nghe. Gắn vào GoRouter (`observers`).
+final RouteObserver<PageRoute<dynamic>> voiceInputRouteObserver =
+    RouteObserver<PageRoute<dynamic>>();
+
+/// Giới hạn ký tự của ô: [explicit] nếu có, không thì maxLength của TextField
+/// chứa nút; null = không giới hạn.
+int? _maxLengthOf(BuildContext context, int? explicit) {
+  if (explicit != null && explicit > 0) return explicit;
+  final field = context.findAncestorWidgetOfExactType<TextField>();
+  final max = field?.maxLength;
+  return max != null && max > 0 ? max : null;
+}
+
 /// Chèn [transcript] tại vị trí con trỏ, tự thêm khoảng trắng hai bên khi cần.
-String _insertAtCursor(TextEditingController controller, String transcript) {
+/// Có [maxLength]: cắt bớt phần chèn cho vừa (đếm theo ký tự hiển thị như
+/// TextField). Trả về text mới (null = không chèn được gì) và có bị cắt không.
+({String? text, bool truncated}) _insertAtCursor(
+  TextEditingController controller,
+  String transcript, {
+  int? maxLength,
+}) {
   final value = controller.value;
   final text = value.text;
 
@@ -201,12 +228,24 @@ String _insertAtCursor(TextEditingController controller, String transcript) {
     insert = '$insert ';
   }
 
+  var truncated = false;
+  if (maxLength != null) {
+    final room =
+        maxLength - before.characters.length - after.characters.length;
+    final chars = insert.characters;
+    if (chars.length > room) {
+      truncated = true;
+      insert = room > 0 ? chars.take(room).toString() : '';
+    }
+  }
+  if (insert.trim().isEmpty) return (text: null, truncated: truncated);
+
   final newText = '$before$insert$after';
   controller.value = TextEditingValue(
     text: newText,
     selection: TextSelection.collapsed(offset: before.length + insert.length),
   );
-  return newText;
+  return (text: newText, truncated: truncated);
 }
 
 void _showVoiceError(BuildContext context, String message) {
@@ -217,6 +256,17 @@ void _showVoiceError(BuildContext context, String message) {
   );
 }
 
+void _showVoiceNotice(BuildContext context, String message) {
+  CommonUI.showSnackBar(
+    context: context,
+    message: message,
+    color: const Color(0xFFF59E0B),
+  );
+}
+
+String _truncatedMessage(int maxLength) =>
+    'Đã cắt bớt nội dung giọng nói vì vượt giới hạn $maxLength ký tự.';
+
 // ===========================================================================
 // Engine 1: Web Speech API
 // ===========================================================================
@@ -224,9 +274,13 @@ void _showVoiceError(BuildContext context, String message) {
 enum _SpeechState { idle, listening, stopping }
 
 class _WebSpeechVoiceState extends State<VoiceInputButton>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin
+    implements RouteAware {
   /// Giới hạn an toàn: tự dừng sau 5 phút.
   static const _maxListenSeconds = 5 * 60;
+
+  /// Không có kết quả (interim / final) quá lâu: tự dừng.
+  static const _maxSilenceSeconds = 20;
 
   final WebSpeechService _speech = WebSpeechService();
   final OverlayPortalController _interimOverlay = OverlayPortalController();
@@ -256,8 +310,17 @@ class _WebSpeechVoiceState extends State<VoiceInputButton>
   int _elapsed = 0;
   Timer? _ticker;
 
+  /// Số giây liên tiếp chưa có kết quả nào.
+  int _silentSeconds = 0;
+
   /// Đang chờ ô khác dừng để nhận quyền nghe.
   bool _acquiring = false;
+
+  /// Page route đang subscribe [voiceInputRouteObserver].
+  PageRoute<dynamic>? _route;
+
+  /// Đang lắng nghe FocusManager (chỉ trong lúc nghe).
+  bool _watchingFocus = false;
 
   @override
   void initState() {
@@ -274,6 +337,19 @@ class _WebSpeechVoiceState extends State<VoiceInputButton>
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Popup route (sheet, dialog) không subscribe: chỉ page route được
+    // RouteObserver<PageRoute> báo; ô trong sheet dựa vào mất focus / dispose.
+    final route = ModalRoute.of(context);
+    final pageRoute = route is PageRoute<dynamic> ? route : null;
+    if (identical(pageRoute, _route)) return;
+    voiceInputRouteObserver.unsubscribe(this);
+    _route = pageRoute;
+    if (pageRoute != null) voiceInputRouteObserver.subscribe(this, pageRoute);
+  }
+
+  @override
   void didUpdateWidget(covariant VoiceInputButton oldWidget) {
     super.didUpdateWidget(oldWidget);
     // Ô bị khóa → dừng, không chèn thêm.
@@ -287,10 +363,84 @@ class _WebSpeechVoiceState extends State<VoiceInputButton>
   @override
   void dispose() {
     _ticker?.cancel();
+    _unwatchFocus();
+    voiceInputRouteObserver.unsubscribe(this);
     _speech.dispose();
     _pulse.dispose();
     VoiceInputCoordinator.release(this);
     super.dispose();
+  }
+
+  // RouteAware: màn chứa nút bị page route khác che -> dừng, giữ phần đã
+  // chốt. Sự kiện đến trong lúc navigator flush: dời sang microtask.
+  @override
+  void didPushNext() => _stopSoon();
+
+  @override
+  void didPush() {}
+
+  @override
+  void didPop() {}
+
+  @override
+  void didPopNext() {}
+
+  void _stopSoon() {
+    if (_state != _SpeechState.listening) return;
+    scheduleMicrotask(() {
+      if (mounted && _state == _SpeechState.listening) _stop();
+    });
+  }
+
+  // ---- Mất focus: focus chuyển ra ngoài TextField chứa nút ----
+
+  void _watchFocus() {
+    if (_watchingFocus) return;
+    _watchingFocus = true;
+    FocusManager.instance.addListener(_onFocusChanged);
+  }
+
+  void _unwatchFocus() {
+    if (!_watchingFocus) return;
+    _watchingFocus = false;
+    FocusManager.instance.removeListener(_onFocusChanged);
+  }
+
+  void _onFocusChanged() {
+    if (!mounted || _state != _SpeechState.listening) return;
+    if (!_focusInField()) _stopSoon();
+  }
+
+  /// Element của TextField chứa nút (null = nút không nằm trong TextField).
+  Element? _fieldElement() {
+    Element? found;
+    context.visitAncestorElements((element) {
+      if (element.widget is TextField) {
+        found = element;
+        return false;
+      }
+      return true;
+    });
+    return found;
+  }
+
+  /// Focus hiện tại nằm trong TextField chứa nút. Không có TextField -> true
+  /// (không dừng theo focus).
+  bool _focusInField() {
+    final field = _fieldElement();
+    if (field == null) return true;
+    final focused = FocusManager.instance.primaryFocus?.context;
+    if (focused == null) return false;
+    if (identical(focused, field)) return true;
+    var inside = false;
+    focused.visitAncestorElements((element) {
+      if (identical(element, field)) {
+        inside = true;
+        return false;
+      }
+      return true;
+    });
+    return inside;
   }
 
   void _toggle() {
@@ -322,14 +472,21 @@ class _WebSpeechVoiceState extends State<VoiceInputButton>
       _state = _SpeechState.listening;
       _interim = '';
       _elapsed = 0;
+      _silentSeconds = 0;
     });
     _pulse.repeat(reverse: true);
+    _watchFocus();
 
     _ticker?.cancel();
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted || _state != _SpeechState.listening) return;
       setState(() => _elapsed++);
-      if (_elapsed >= _maxListenSeconds) _stop();
+      if (++_silentSeconds >= _maxSilenceSeconds) {
+        _showVoiceNotice(context, 'Đã dừng vì không nghe thấy tiếng nói');
+        _stop();
+      } else if (_elapsed >= _maxListenSeconds) {
+        _stop();
+      }
     });
 
     // Có thể gọi onStopped đồng bộ nếu start lỗi ngay.
@@ -340,6 +497,7 @@ class _WebSpeechVoiceState extends State<VoiceInputButton>
     if (_state != _SpeechState.listening) return;
 
     _ticker?.cancel();
+    _unwatchFocus();
     _pulse
       ..stop()
       ..reset();
@@ -360,6 +518,7 @@ class _WebSpeechVoiceState extends State<VoiceInputButton>
 
   void _resetToIdle() {
     _ticker?.cancel();
+    _unwatchFocus();
     _pulse
       ..stop()
       ..reset();
@@ -367,6 +526,7 @@ class _WebSpeechVoiceState extends State<VoiceInputButton>
     _state = _SpeechState.idle;
     _interim = '';
     _elapsed = 0;
+    _silentSeconds = 0;
     VoiceInputCoordinator.release(this);
   }
 
@@ -378,12 +538,25 @@ class _WebSpeechVoiceState extends State<VoiceInputButton>
 
   void _onFinal(String text) {
     if (!mounted) return;
-    final newText = _insertAtCursor(widget.controller, text);
-    widget.onTextInserted?.call(newText);
+    if (text.trim().isNotEmpty) _silentSeconds = 0;
+    final maxLength = _maxLengthOf(context, widget.maxLength);
+    final result = _insertAtCursor(
+      widget.controller,
+      text,
+      maxLength: maxLength,
+    );
+    final newText = result.text;
+    if (newText != null) widget.onTextInserted?.call(newText);
+    if (result.truncated && maxLength != null) {
+      _showVoiceNotice(context, _truncatedMessage(maxLength));
+      // Ô đã đầy: nghe tiếp cũng không chèn được.
+      if (_state == _SpeechState.listening) _stop();
+    }
   }
 
   void _onInterim(String text) {
     if (!mounted || _state != _SpeechState.listening) return;
+    if (text.trim().isNotEmpty) _silentSeconds = 0;
     setState(() => _interim = text);
     if (text.isEmpty) {
       _interimOverlay.hide();
@@ -658,8 +831,17 @@ class _RecorderVoiceState extends State<VoiceInputButton> {
       );
       if (!mounted) return;
 
-      final newText = _insertAtCursor(widget.controller, text);
-      widget.onTextInserted?.call(newText);
+      final maxLength = _maxLengthOf(context, widget.maxLength);
+      final result = _insertAtCursor(
+        widget.controller,
+        text,
+        maxLength: maxLength,
+      );
+      final newText = result.text;
+      if (newText != null) widget.onTextInserted?.call(newText);
+      if (result.truncated && maxLength != null) {
+        _showVoiceNotice(context, _truncatedMessage(maxLength));
+      }
     } on SpeechTranscribeException catch (e) {
       if (mounted) _showVoiceError(context, e.message);
     } on DioException catch (e) {

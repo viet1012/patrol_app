@@ -477,6 +477,7 @@ extension _PatrolBeforeScreenView on _PatrolBeforeScreenState {
                                         focusNode: focusNode,
                                         enabled: !_isSubmitting,
                                         maxLines: 3,
+                                        maxLength: 1000,
                                         style: TextStyle(
                                           color: Colors.white,
                                           fontSize: fontSize,
@@ -708,6 +709,7 @@ extension _PatrolBeforeScreenView on _PatrolBeforeScreenState {
                                         focusNode: focusNode,
                                         enabled: !_isSubmitting,
                                         maxLines: 3,
+                                        maxLength: 1000,
                                         style: TextStyle(
                                           color: Colors.white,
                                           fontSize: fontSize,

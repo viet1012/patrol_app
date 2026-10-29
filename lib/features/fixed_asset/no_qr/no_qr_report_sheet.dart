@@ -1064,6 +1064,7 @@ class _NoQrReportSheetState extends State<NoQrReportSheet> {
       enabled: !_saving,
       minLines: 3,
       maxLines: 3,
+      maxLength: 1000,
       keyboardType: TextInputType.multiline,
       style: const TextStyle(color: Colors.white, fontSize: 13.5),
       cursorColor: _accent,
