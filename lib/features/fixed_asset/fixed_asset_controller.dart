@@ -238,6 +238,21 @@ class FixedAssetController extends ChangeNotifier {
   bool _isCurrentScan(int generation) =>
       !_disposed && generation == _scanGeneration;
 
+  /// Lý do đang tạm dừng quét (vd 'no_qr_sheet' khi form máy thiếu QR mở).
+  /// Khác rỗng: mọi QR nhận được đều bị bỏ qua (không check / lưu).
+  final Set<String> _qrScanPauseReasons = <String>{};
+  bool get isQrScanPaused => _qrScanPauseReasons.isNotEmpty;
+
+  void pauseQrScan(String reason) {
+    if (_disposed) return;
+    if (_qrScanPauseReasons.add(reason)) _scanLog('pause ($reason)');
+  }
+
+  void resumeQrScan(String reason) {
+    if (_disposed) return;
+    if (_qrScanPauseReasons.remove(reason)) _scanLog('resume ($reason)');
+  }
+
   /// Log tạm cho luồng scan (chỉ debug).
   void _scanLog(String message) {
     if (!kDebugMode) return;
@@ -1118,6 +1133,11 @@ class FixedAssetController extends ChangeNotifier {
     _scanLog('received "$qr"');
     if (qr.isEmpty || _disposed) {
       _scanLog('skip: empty or disposed');
+      return;
+    }
+
+    if (isQrScanPaused) {
+      _scanLog('skip: paused (${_qrScanPauseReasons.join(', ')})');
       return;
     }
 
@@ -2191,6 +2211,49 @@ class FixedAssetController extends ChangeNotifier {
     final positionA = manual.selectedPositionA;
     if (fac != null && floor != null && positionA != null && value != null) {
       _manualMachineLoad = _loadMachines(fac, floor, positionA, value);
+    }
+  }
+
+  /// Đưa location màn hình về [location] (vị trí vừa dùng ở form máy thiếu
+  /// QR). MANUAL: chọn lần lượt 4 dropdown như user chọn tay (tải list +
+  /// machines, reset scan state như mọi lần đổi vị trí). AUTO: chỉ hiển thị
+  /// (location card, map, machine list); không đụng scan state / zone lock,
+  /// lần quét kế tiếp vẫn lấy vị trí từ QR.
+  Future<void> applyLocation(FixedAssetAuditLocation location) async {
+    if (_disposed || activeLocation == location) return;
+
+    if (isAutoMode) {
+      _autoLocation = location;
+      _autoUnmappedActual = null;
+      _autoLocationMismatch = false;
+      _isResumedFromLock = false;
+      _machineReq++;
+      _machines = const <FixedAssetMachine>[];
+      _machinesLocation = null;
+      _machineError = null;
+      _clearMachineSearch();
+      _loadMachines(
+        location.fac,
+        location.floor,
+        location.positionA,
+        location.positionAA,
+      );
+      return;
+    }
+
+    final modeGeneration = _modeGeneration;
+    bool stillHere() =>
+        !_disposed && !isAutoMode && modeGeneration == _modeGeneration;
+
+    await onFacChanged(location.fac);
+    if (stillHere() && manual.selectedFloor != location.floor) {
+      await onFloorChanged(location.floor);
+    }
+    if (stillHere() && manual.selectedPositionA != location.positionA) {
+      await onPositionAChanged(location.positionA);
+    }
+    if (stillHere() && manual.selectedPositionAA != location.positionAA) {
+      await onPositionAAChanged(location.positionAA);
     }
   }
 

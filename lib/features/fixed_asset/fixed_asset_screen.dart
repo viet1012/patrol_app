@@ -9,6 +9,11 @@ import 'package:chuphinh/core/models/fixed_asset_zone_progress.dart';
 import 'package:chuphinh/features/fixed_asset/fixed_asset_audit_flow.dart';
 import 'package:chuphinh/features/fixed_asset/fixed_asset_controller.dart';
 import 'package:chuphinh/features/fixed_asset/map/fixed_asset_detected_map.dart';
+import 'package:chuphinh/features/fixed_asset/no_qr/no_qr_entry.dart';
+import 'package:chuphinh/features/fixed_asset/no_qr/no_qr_report.dart';
+import 'package:chuphinh/features/fixed_asset/no_qr/no_qr_report_service.dart';
+import 'package:chuphinh/features/fixed_asset/no_qr/no_qr_report_sheet.dart';
+import 'package:chuphinh/features/fixed_asset/no_qr/no_qr_strings.dart';
 import 'package:chuphinh/features/fixed_asset/widgets/fixed_asset_audit_progress_card.dart';
 import 'package:chuphinh/features/fixed_asset/widgets/fixed_asset_location_section.dart';
 import 'package:chuphinh/features/fixed_asset/widgets/fixed_asset_machine_section.dart';
@@ -32,11 +37,15 @@ class FixedAssetScreen extends StatefulWidget {
   final String? selectedPlant;
   final String userName;
 
+  /// currentLang của app (VI / EN / JA), cho nhập giọng nói.
+  final String lang;
+
   const FixedAssetScreen({
     super.key,
     required this.accountCode,
     this.selectedPlant,
     this.userName = '',
+    this.lang = 'VI',
   });
 
   @override
@@ -49,6 +58,17 @@ class _FixedAssetScreenState extends State<FixedAssetScreen>
       GlobalKey<CameraPreviewBoxState>();
 
   late final FixedAssetController _controller;
+
+  /// Case "máy thiếu QR" của phiên (chưa có BE).
+  final NoQrReportService _noQrService = NoQrReportService();
+  static const String _noQrPauseReason = 'no_qr_sheet';
+  bool _noQrSheetOpen = false;
+
+  /// Machine list: rebuild theo controller và theo case thiếu QR.
+  late final Listenable _machineListenable = Listenable.merge([
+    _controller,
+    _noQrService,
+  ]);
 
   final _facFlashKey = GlobalKey<RequiredFieldFlashState>();
   final _floorFlashKey = GlobalKey<RequiredFieldFlashState>();
@@ -111,6 +131,7 @@ class _FixedAssetScreenState extends State<FixedAssetScreen>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _controller.dispose();
+    _noQrService.dispose();
     super.dispose();
   }
 
@@ -244,6 +265,56 @@ class _FixedAssetScreenState extends State<FixedAssetScreen>
     );
   }
 
+  /// Form "máy thiếu QR": luôn mở, kể cả chưa đủ vị trí (form tự hiện 4
+  /// dropdown, điền sẵn các cấp đã chọn ở MANUAL). Quét QR tạm dừng trong
+  /// lúc form mở. Lưu xong với vị trí khác màn hình: màn hình theo vị trí đó.
+  Future<void> _openNoQrSheet({String? machineCode}) async {
+    // Sheet đang mở (che màn hình): lần bấm này không tới được đây.
+    if (_noQrSheetOpen || !mounted) return;
+    final c = _controller;
+    final location = c.activeLocation;
+    final manual = c.manual;
+    final NoQrLocationDraft? draft = location == null && !c.isAutoMode
+        ? (
+            fac: manual.selectedFac,
+            floor: manual.selectedFloor,
+            positionA: manual.selectedPositionA,
+            positionAA: manual.selectedPositionAA,
+          )
+        : null;
+
+    _noQrSheetOpen = true;
+    c.pauseQrScan(_noQrPauseReason);
+    NoQrReport? saved;
+    try {
+      saved = await showNoQrReportSheet(
+        context: context,
+        location: location,
+        machines: location == null ? const [] : c.machines,
+        initialSelection: draft,
+        initialMachineCode: machineCode,
+        onSubmit: _noQrService.submit,
+        lang: widget.lang,
+        plant: widget.selectedPlant,
+      );
+    } catch (error, stackTrace) {
+      debugPrint('No-QR sheet error: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      _showError(NoQrStrings.openFailed);
+    } finally {
+      _noQrSheetOpen = false;
+      c.resumeQrScan(_noQrPauseReason);
+    }
+
+    if (saved == null || !mounted) return;
+    CommonUI.showSnackBar(
+      context: context,
+      message: NoQrStrings.saved,
+      color: const Color(0xFF16A34A),
+    );
+    if (saved.location != c.activeLocation) c.applyLocation(saved.location);
+  }
+
   // ============================================================
   // UI
   // ============================================================
@@ -343,6 +414,14 @@ class _FixedAssetScreenState extends State<FixedAssetScreen>
     );
   }
 
+  Widget _buildNoQrEntry() {
+    return ListenableBuilder(
+      listenable: _noQrService,
+      builder: (context, _) =>
+          NoQrEntryTile(count: _noQrService.count, onTap: _openNoQrSheet),
+    );
+  }
+
   Widget _buildAuditProgressCard() {
     final c = _controller;
     return FixedAssetSelector(
@@ -414,12 +493,12 @@ class _FixedAssetScreenState extends State<FixedAssetScreen>
   }
 
   /// auditedMachineCodes / qrReprintMachineCodes bị mutate tại chỗ:
-  /// auditedVersion là version. Filter/sort vẫn cache bên trong
-  /// FixedAssetMachineSection.
+  /// auditedVersion là version (noQrMachineCodes: noQrCount). Filter/sort
+  /// vẫn cache bên trong FixedAssetMachineSection.
   Widget _buildMachineSection() {
     final c = _controller;
     return FixedAssetSelector(
-      listenable: c,
+      listenable: _machineListenable,
       select: () => (
         visible: c.activeLocation != null,
         machines: c.machines,
@@ -429,6 +508,8 @@ class _FixedAssetScreenState extends State<FixedAssetScreen>
         audited: c.auditedMachineCodes,
         reprint: c.qrReprintMachineCodes,
         auditedVersion: c.auditedVersion,
+        noQr: _noQrService.machineCodes,
+        noQrCount: _noQrService.count,
       ),
       builder: (context, v) => FixedAssetMachineSection(
         visible: v.visible,
@@ -442,6 +523,8 @@ class _FixedAssetScreenState extends State<FixedAssetScreen>
         auditedVersion: v.auditedVersion,
         onSearchChanged: c.setMachineSearch,
         onClearSearch: c.clearMachineSearch,
+        noQrMachineCodes: v.noQr,
+        onReportNoQr: (code) => _openNoQrSheet(machineCode: code),
       ),
     );
   }
@@ -505,6 +588,8 @@ class _FixedAssetScreenState extends State<FixedAssetScreen>
               _buildResponsiveCameraSection(isMobile),
               const SizedBox(height: 6),
               _buildStatusCard(),
+              const SizedBox(height: 6),
+              _buildNoQrEntry(),
               _buildDetectedMap(),
               const SizedBox(height: 6),
               _buildAuditProgressCard(),
@@ -545,9 +630,10 @@ class _FixedAssetScreenState extends State<FixedAssetScreen>
     );
   }
 
-  /// Overlays above the (never rebuilt) camera: the parsed scan chip and,
-  /// in MANUAL without a full location, a light "choose a location" veil.
-  /// Pointer events pass through to the camera controls.
+  /// Overlays above the (never rebuilt) camera: the parsed scan chip, the
+  /// "no QR" link under the scan frame and, in MANUAL without a full
+  /// location, a light "choose a location" veil. Pointer events pass
+  /// through to the camera controls (except on the link).
   Widget _buildCameraOverlays() {
     final c = _controller;
     return Stack(
@@ -599,6 +685,14 @@ class _FixedAssetScreenState extends State<FixedAssetScreen>
               ),
             ),
           ),
+        ),
+        // Scan frame (205, centred in 340) ends at ~272; the hardware zoom
+        // control starts at ~294: the link fits in between.
+        Positioned(
+          top: 275,
+          left: 0,
+          right: 0,
+          child: Center(child: NoQrCameraLink(onTap: _openNoQrSheet)),
         ),
         Positioned(
           top: 12,

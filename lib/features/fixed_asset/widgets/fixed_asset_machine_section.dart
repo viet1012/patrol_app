@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 
 import 'package:chuphinh/core/models/fixed_asset_machine.dart';
+import 'package:chuphinh/features/fixed_asset/no_qr/no_qr_entry.dart';
+import 'package:chuphinh/features/fixed_asset/no_qr/no_qr_strings.dart';
 
 /// Machine list của location đang dùng: search cục bộ, audited-first,
 /// ✓ = đã kiểm kê trong kỳ (session), nhãn tím "In lại QR" = lần quét mới
-/// nhất QR lệch vị trí (đã kiểm kê, cần in lại QR). Rows chỉ đọc. Không gọi API.
+/// nhất QR lệch vị trí (đã kiểm kê, cần in lại QR), nhãn vàng "Thiếu QR" =
+/// đã ghi máy thiếu QR trong phiên. Icon ⚠ cuối dòng mở form máy thiếu QR.
+/// Không gọi API.
 class FixedAssetMachineSection extends StatefulWidget {
   /// false khi chưa có location (AUTO chưa scan / MANUAL chưa chọn đủ).
   final bool visible;
@@ -21,6 +25,12 @@ class FixedAssetMachineSection extends StatefulWidget {
   final ValueChanged<String> onSearchChanged;
   final VoidCallback onClearSearch;
 
+  /// MachineCode đã ghi thiếu QR (trim().toLowerCase()).
+  final Set<String> noQrMachineCodes;
+
+  /// Icon ⚠ cuối dòng: mở form máy thiếu QR với mã máy điền sẵn. null = ẩn.
+  final ValueChanged<String>? onReportNoQr;
+
   const FixedAssetMachineSection({
     super.key,
     required this.visible,
@@ -34,6 +44,8 @@ class FixedAssetMachineSection extends StatefulWidget {
     required this.auditedVersion,
     required this.onSearchChanged,
     required this.onClearSearch,
+    this.noQrMachineCodes = const <String>{},
+    this.onReportNoQr,
   });
 
   @override
@@ -111,6 +123,7 @@ class _FixedAssetMachineSectionState extends State<FixedAssetMachineSection> {
 
   static const Color _success = Color(0xFF22C55E);
   static const Color _violet = Color(0xFFA78BFA);
+  static const Color _amber = Color(0xFFF59E0B);
 
   @override
   Widget build(BuildContext context) {
@@ -248,13 +261,25 @@ class _FixedAssetMachineSectionState extends State<FixedAssetMachineSection> {
     return code.isNotEmpty && widget.qrReprintMachineCodes.contains(code);
   }
 
+  bool _isNoQr(FixedAssetMachine machine) {
+    final code = machine.machineCode.trim().toLowerCase();
+    return code.isNotEmpty && widget.noQrMachineCodes.contains(code);
+  }
+
   Widget _buildMachineRow(FixedAssetMachine machine) {
     final reprint = _needsQrReprint(machine);
     final audited = !reprint && _isAuditedMachine(machine);
+    final noQr = _isNoQr(machine);
+    final onReportNoQr = widget.onReportNoQr;
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+      padding: EdgeInsets.fromLTRB(
+        12,
+        7,
+        onReportNoQr != null ? 2 : 12,
+        7,
+      ),
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(.05),
         borderRadius: BorderRadius.circular(12),
@@ -299,6 +324,18 @@ class _FixedAssetMachineSectionState extends State<FixedAssetMachineSection> {
             const SizedBox(width: 8),
             const Icon(Icons.check_circle_rounded, size: 18, color: _success),
           ],
+          if (noQr) ...[const SizedBox(width: 6), const NoQrTag()],
+          if (onReportNoQr != null)
+            IconButton(
+              tooltip: NoQrStrings.rowAction,
+              onPressed: () => onReportNoQr(machine.machineCode),
+              icon: const Icon(Icons.warning_amber_rounded),
+              iconSize: 18,
+              color: _amber.withOpacity(.85),
+              visualDensity: VisualDensity.compact,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
+            ),
         ],
       ),
     );
