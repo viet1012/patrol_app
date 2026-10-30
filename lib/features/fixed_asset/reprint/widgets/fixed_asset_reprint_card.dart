@@ -67,7 +67,9 @@ class FixedAssetReprintCard extends StatelessWidget {
                   : Colors.white.withValues(alpha: .14),
             ),
           ),
+          // Cao theo nội dung; checkbox + ảnh QR căn trên.
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Màu tường minh cho mọi trạng thái (không theo theme sáng).
               Checkbox(

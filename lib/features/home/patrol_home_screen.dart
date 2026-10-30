@@ -19,6 +19,9 @@ import 'package:chuphinh/shared/utils/plant_constants.dart';
 import 'package:chuphinh/core/models/patrol_group.dart';
 import 'package:chuphinh/core/permission/patrol_group_ui.dart';
 import 'package:chuphinh/features/fixed_asset/fixed_asset_screen.dart';
+import 'package:chuphinh/features/fixed_asset/fixed_asset_strings.dart';
+import 'package:chuphinh/features/fixed_asset/replace/fixed_asset_replace_screen.dart';
+import 'package:chuphinh/features/fixed_asset/replace/fixed_asset_replace_strings.dart';
 import 'package:chuphinh/features/fixed_asset/reprint/fixed_asset_reprint_badge.dart';
 import 'package:chuphinh/features/fixed_asset/reprint/fixed_asset_reprint_screen.dart';
 import 'package:chuphinh/features/fixed_asset/reprint/fixed_asset_reprint_strings.dart';
@@ -725,7 +728,7 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
           children: [
             _patrolButton(
               number: '1)',
-              title: 'Open Fixed Asset',
+              title: FixedAssetStrings.menuTitle,
               color: color,
               enabled: access.can(kFixedAssetAuditAction),
               onTap: _openFixedAsset,
@@ -737,6 +740,20 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
               color: color,
               enabled: access.can(kFixedAssetReprintAction),
               onTap: _openFixedAssetReprint,
+              badge: FixedAssetReprintBadge(
+                color: color,
+                count: _reprintCount,
+              ),
+            ),
+            const SizedBox(height: 16),
+            // Badge = số máy chờ thay QR (needsQrReprint: QrMismatch = 1 AND
+            // ReprintSts = 0). Thay QR = quét lưu kiểm kê -> quyền kiểm kê.
+            _patrolButton(
+              number: '3)',
+              title: FixedAssetReplaceStrings.menuTitle,
+              color: color,
+              enabled: access.can(kFixedAssetAuditAction),
+              onTap: _openFixedAssetReplace,
               badge: FixedAssetReprintBadge(
                 color: color,
                 count: _reprintCount,
@@ -907,6 +924,21 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => const FixedAssetReprintScreen()),
+    ).then((_) => _fetchReprintCount());
+  }
+
+  /// "Thay QR" theo khu vực (mọi xưởng, lọc xưởng trong màn).
+  void _openFixedAssetReplace() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => FixedAssetReplaceScreen(
+          accountCode: widget.accountCode,
+          selectedPlant: selectedFactory,
+          userName: _employeeName,
+          lang: currentLang,
+        ),
+      ),
     ).then((_) => _fetchReprintCount());
   }
 

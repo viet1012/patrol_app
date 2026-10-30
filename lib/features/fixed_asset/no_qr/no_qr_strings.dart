@@ -34,6 +34,6 @@ abstract final class NoQrStrings {
   static const cancel = 'Hủy';
   static const save = 'Lưu';
   static const saved = 'Đã ghi nhận máy thiếu QR';
-  static const alreadyAudited = 'Đã kiểm kê, đã đánh dấu in tem';
+  static const alreadyAudited = 'Đã kiểm kê, đã đánh dấu in QR';
   static const saveFailed = 'Không lưu được, vui lòng thử lại';
 }

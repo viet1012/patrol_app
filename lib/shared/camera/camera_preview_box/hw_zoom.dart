@@ -47,6 +47,35 @@ mixin _HwZoomMixin on State<CameraPreviewBox>, _CameraStreamMixin {
     return tracks.isEmpty ? null : tracks.first;
   }
 
+  /// Đèn flash (torch) của camera đang chạy. true = áp được; false = máy /
+  /// trình duyệt không hỗ trợ, chưa có camera hoặc lỗi (chỉ log).
+  Future<bool> setTorch(bool on) async {
+    final track = _currentVideoTrack();
+    if (!mounted || track == null || _cameraSleeping) return false;
+    try {
+      if (js_util.hasProperty(track, 'getCapabilities')) {
+        final capabilities =
+            js_util.callMethod<Object?>(track, 'getCapabilities', const []);
+        if (capabilities == null ||
+            js_util.getProperty<Object?>(capabilities, 'torch') != true) {
+          return false;
+        }
+      }
+      final constraints = js_util.jsify({
+        'advanced': [
+          {'torch': on},
+        ],
+      });
+      await js_util.promiseToFuture<Object?>(
+        js_util.callMethod<Object>(track, 'applyConstraints', [constraints]),
+      );
+      return true;
+    } catch (error) {
+      debugPrint('Camera torch apply failed: $error');
+      return false;
+    }
+  }
+
   double? _jsNumber(Object? object, String name) {
     if (object == null || !js_util.hasProperty(object, name)) return null;
     final value = js_util.getProperty<Object?>(object, name);

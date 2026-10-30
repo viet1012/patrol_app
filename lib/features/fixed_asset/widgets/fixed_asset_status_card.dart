@@ -35,6 +35,9 @@ class FixedAssetStatusCard extends StatelessWidget {
   /// Vị trí thực tế + tem hiện tại khi [needsQrReprint] (null = không có).
   final FixedAssetReprintInfo? reprintInfo;
 
+  /// [FixedAssetScanStatus.qrReplaced]: lúc thay QR (reprintAt).
+  final DateTime? qrReplacedAt;
+
   const FixedAssetStatusCard({
     super.key,
     required this.status,
@@ -52,6 +55,7 @@ class FixedAssetStatusCard extends StatelessWidget {
     this.onSwitchAuto,
     this.needsQrReprint = false,
     this.reprintInfo,
+    this.qrReplacedAt,
   });
 
   /// "Việt (KVH_IT_Mem_Viet)" / "Việt" / "KVH_IT_Mem_Viet".
@@ -227,10 +231,50 @@ class FixedAssetStatusCard extends StatelessWidget {
               ? 'QR chưa được thay – cần in QR ${reprint.actLabel}'
               : 'QR chưa được thay – cần in QR',
         );
-        if (reprint != null) details.addAll(_reprintLines(reprint));
+        if (reprint != null && !reprint.labelUnknown && reprint.hasLabel) {
+          details.add('QR đang dán: ${reprint.qrLabel} (cũ)');
+        }
+        details.add('Thay QR tại mục 3) Thay QR');
         label = 'QR chưa được thay';
         color = _amber;
         indicator = const Icon(Icons.print_rounded, color: _amber, size: 20);
+      case FixedAssetScanStatus.qrReplacePending:
+        // Quét ngoài tab "3) Thay QR": không gỡ cờ, chỉ báo.
+        primary = machineCode;
+        details.add('Máy đang chờ thay QR');
+        if (reprint != null) {
+          details.add('Vị trí thực tế: ${reprint.actLabel}');
+          details.add(
+            reprint.hasLabel
+                ? 'QR đang dán: ${reprint.qrLabel} (cũ)'
+                : 'Chưa có QR',
+          );
+        }
+        details.add('Thay QR tại mục 3) Thay QR');
+        label = 'Chờ thay QR';
+        color = _amber;
+        indicator = const Icon(Icons.print_rounded, color: _amber, size: 20);
+      case FixedAssetScanStatus.qrReplaced:
+        // Máy đã thay QR: kiểm kê bình thường (như card kiểm kê thành công).
+        primary = machineCode;
+        if (faName.isNotEmpty) details.add(faName);
+        final replacedAt = qrReplacedAt;
+        details.add(
+          replacedAt != null
+              ? 'Đã thay QR lúc ${_dateTimeFormat.format(replacedAt)}'
+              : 'Đã thay QR',
+        );
+        alreadyAuditedBy = auditorLabel(lastAuditedUserName, lastAuditedUserId);
+        if (lastAudited != null) {
+          alreadyAuditedTime = _dateTimeFormat.format(lastAudited);
+        }
+        label = 'Đã kiểm kê';
+        color = _success;
+        indicator = const Icon(
+          Icons.check_circle_rounded,
+          color: _success,
+          size: 20,
+        );
       case FixedAssetScanStatus.qrReprintCleared:
         // Như card kiểm kê thành công + người / thời gian kiểm kê.
         primary = machineCode;
@@ -269,6 +313,7 @@ class FixedAssetStatusCard extends StatelessWidget {
     // Dòng vị trí "Fac/Floor/A/AA" có thể dài: cho 2 dòng.
     final reprintDetails =
         status == FixedAssetScanStatus.qrLabelNotReplaced ||
+        status == FixedAssetScanStatus.qrReplacePending ||
         (status == FixedAssetScanStatus.qrReprintSaved && reprint != null);
     final statusIndicator = _statusIndicator(
       label: label,
@@ -445,7 +490,8 @@ class FixedAssetStatusCard extends StatelessWidget {
                     ),
                   ),
                 if ((status == FixedAssetScanStatus.alreadyAudited ||
-                        status == FixedAssetScanStatus.qrReprintCleared) &&
+                        status == FixedAssetScanStatus.qrReprintCleared ||
+                        status == FixedAssetScanStatus.qrReplaced) &&
                     (alreadyAuditedBy != null || alreadyAuditedTime != null))
                   Padding(
                     padding: const EdgeInsets.only(top: 2),

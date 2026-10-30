@@ -319,6 +319,8 @@ class FixedAssetApi {
     bool? qrLocationMismatch,
     // NO_QR: máy không có tem -> đánh dấu in tem; null không gửi.
     bool? needsQrReprint,
+    // Tab "3) Thay QR", bước quét QR mới: cho phép gỡ cờ; null không gửi.
+    bool? qrReplace,
   }) async {
     try {
       // Dùng DioClient.dio trực tiếp (không qua _retry): POST này INSERT
@@ -342,6 +344,7 @@ class FixedAssetApi {
           if (qrLocationMismatch != null)
             'qrLocationMismatch': qrLocationMismatch,
           if (needsQrReprint != null) 'needsQrReprint': needsQrReprint,
+          if (qrReplace != null) 'qrReplace': qrReplace,
         },
       );
 

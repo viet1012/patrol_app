@@ -17,8 +17,8 @@ abstract final class FixedAssetReprintStrings {
   static const deselectAll = 'Bỏ chọn';
 
   static const reason = 'Lý do';
-  static const reasonNoQr = 'Không có tem';
-  static const reasonWrongLocation = 'Tem sai vị trí';
+  static const reasonNoQr = 'Không có QR';
+  static const reasonWrongLocation = 'QR sai vị trí';
 
   static const oldQr = 'QR cũ';
   static const newQr = 'QR mới';
@@ -27,7 +27,7 @@ abstract final class FixedAssetReprintStrings {
 
   static String selected(int count) => 'Đã chọn $count';
   static const downloadPng = 'Tải PNG';
-  static const printLabels = 'In tem (PDF)';
+  static const printLabels = 'In QR (PDF)';
   static const print = 'In';
 
   static const empty = 'Không có QR nào cần in lại ✓';

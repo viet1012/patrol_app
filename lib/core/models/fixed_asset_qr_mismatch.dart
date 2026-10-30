@@ -1,4 +1,5 @@
-import 'package:chuphinh/core/models/fixed_asset_scan_info.dart' show parseDate;
+import 'package:chuphinh/core/models/fixed_asset_scan_info.dart'
+    show parseBool, parseDateTime;
 
 /// Một dòng GET /api/fixed-assets/qr-mismatch (FixedAssetQrMismatchDto):
 /// lần quét mới nhất trong kỳ của máy có QR lệch vị trí đang chọn.
@@ -30,6 +31,15 @@ class FixedAssetQrMismatch {
   /// Ngày tài sản từ MASTER (F2_FIXED_ASSET.DateStart); null = không có.
   final DateTime? assetDate;
 
+  /// Đang chờ thay QR (QrMismatch = 1 AND ReprintSts = 0): field
+  /// needsQrReprint của backend; DTO không có field này thì = !reprintSts
+  /// (mọi dòng của endpoint đã là QrMismatch = 1).
+  final bool needsQrReprint;
+
+  /// Đã thay QR (ReprintSts = 1) + lúc thay; *_Qr vẫn là QR cũ.
+  final bool reprintSts;
+  final DateTime? reprintAt;
+
   const FixedAssetQrMismatch({
     required this.machineCode,
     required this.faName,
@@ -45,6 +55,9 @@ class FixedAssetQrMismatch {
     required this.userName,
     this.updatedAt,
     this.assetDate,
+    this.needsQrReprint = true,
+    this.reprintSts = false,
+    this.reprintAt,
   });
 
   factory FixedAssetQrMismatch.fromJson(Map<String, dynamic> json) {
@@ -55,6 +68,7 @@ class FixedAssetQrMismatch {
       return value.isEmpty ? null : value;
     }
 
+    final reprintSts = parseBool(json['reprintSts']);
     return FixedAssetQrMismatch(
       machineCode: str('machineCode'),
       faName: str('faName'),
@@ -62,26 +76,27 @@ class FixedAssetQrMismatch {
       floorAct: opt('floorAct'),
       positionA: str('positionAAct'),
       positionAA: str('positionAAAct'),
-      facQr: opt('facQr'),
+      // DTO: qrFac (facQr giữ cho tương thích).
+      facQr: opt('qrFac') ?? opt('facQr'),
       qrFloor: str('qrFloor'),
       qrPositionA: str('qrPositionA'),
       qrPositionAA: str('qrPositionAA'),
       auditMode: opt('auditMode')?.toUpperCase(),
       userName: str('userName'),
-      updatedAt: _parseDateTime(json['updatedAt']),
+      updatedAt: parseDateTime(json['updatedAt']),
       assetDate: DateTime.tryParse(json['assetDate']?.toString() ?? ''),
+      needsQrReprint: json.containsKey('needsQrReprint')
+          ? parseBool(json['needsQrReprint'])
+          : !reprintSts,
+      reprintSts: reprintSts,
+      reprintAt: parseDateTime(json['reprintAt']),
     );
   }
 
   /// Ghi nhận "máy không có tem" (không có QR cũ).
   bool get isNoQr => auditMode == 'NO_QR';
 
-  /// LocalDateTime: chuỗi ISO, hoặc mảng [y, M, d, h, m, s] (Jackson).
-  static DateTime? _parseDateTime(dynamic value) {
-    if (value is List && value.length >= 3) {
-      int at(int i) => i < value.length ? (value[i] as num).toInt() : 0;
-      return DateTime(at(0), at(1), at(2), at(3), at(4), at(5));
-    }
-    return parseDate(value);
-  }
+  /// Có QR cũ lúc kiểm kê (Floor_Qr / AA_Qr); false = chưa có QR. Chỉ dùng
+  /// để phân loại việc (Mất QR / Sai QR), không quyết định "chờ thay QR".
+  bool get hasQrLabel => qrFloor.isNotEmpty || qrPositionAA.isNotEmpty;
 }

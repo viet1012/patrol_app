@@ -1,5 +1,5 @@
 import 'package:chuphinh/core/models/fixed_asset_reprint_info.dart';
-import 'package:chuphinh/core/models/fixed_asset_scan_info.dart' show parseBool, parseDate;
+import 'package:chuphinh/core/models/fixed_asset_scan_info.dart' show parseBool, parseDate, parseDateTime;
 
 /// Response của POST /api/fixed-assets/audit.
 ///
@@ -25,12 +25,20 @@ class FixedAssetAuditSaveResponse {
   final bool locationMismatch;
   final bool requiresConfirmation;
 
-  /// Bản ghi vừa lưu có QR lệch vị trí: cần in lại QR, chưa tính kiểm kê.
+  /// Đang chờ thay QR (backend: QrMismatch = 1 AND ReprintSts = 0).
   final bool needsQrReprint;
+
+  /// Đã thay QR (ReprintSts = 1) + lúc thay; *_Qr vẫn là QR cũ.
+  final bool reprintSts;
+  final DateTime? reprintAt;
 
   /// Máy đang chờ in lại được quét bằng tem CŨ (chưa thay): không đổi gì,
   /// [actualFac]... = *_Act của dòng.
   final bool qrLabelNotReplaced;
+
+  /// Máy đang chờ thay QR, quét ngoài tab "3) Thay QR" (không gửi
+  /// qrReplace): backend không gỡ cờ.
+  final bool pendingQrReplace;
 
   final String masterFac;
   final String masterFloor;
@@ -60,7 +68,10 @@ class FixedAssetAuditSaveResponse {
     this.locationMismatch = false,
     this.requiresConfirmation = false,
     this.needsQrReprint = false,
+    this.reprintSts = false,
+    this.reprintAt,
     this.qrLabelNotReplaced = false,
+    this.pendingQrReplace = false,
     this.masterFac = '',
     this.masterFloor = '',
     this.masterPositionA = '',
@@ -89,7 +100,10 @@ class FixedAssetAuditSaveResponse {
       locationMismatch: parseBool(json['locationMismatch']),
       requiresConfirmation: parseBool(json['requiresConfirmation']),
       needsQrReprint: parseBool(json['needsQrReprint']),
+      reprintSts: parseBool(json['reprintSts']),
+      reprintAt: parseDateTime(json['reprintAt']),
       qrLabelNotReplaced: parseBool(json['qrLabelNotReplaced']),
+      pendingQrReplace: parseBool(json['pendingQrReplace']),
       masterFac: str('masterFac'),
       masterFloor: str('masterFloor'),
       masterPositionA: str('masterPositionA'),

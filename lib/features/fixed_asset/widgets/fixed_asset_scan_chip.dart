@@ -37,7 +37,8 @@ class FixedAssetScanChip extends StatefulWidget {
     FixedAssetScanStatus.checking ||
     FixedAssetScanStatus.saving => accent,
     FixedAssetScanStatus.saved ||
-    FixedAssetScanStatus.qrReprintCleared => success,
+    FixedAssetScanStatus.qrReprintCleared ||
+    FixedAssetScanStatus.qrReplaced => success,
     FixedAssetScanStatus.failed => error,
     FixedAssetScanStatus.alreadyAudited ||
     FixedAssetScanStatus.locationMismatch ||
@@ -47,7 +48,8 @@ class FixedAssetScanChip extends StatefulWidget {
     FixedAssetScanStatus.needsLocation ||
     FixedAssetScanStatus.qrLocationMismatch ||
     FixedAssetScanStatus.qrReprintSaved ||
-    FixedAssetScanStatus.qrLabelNotReplaced => amber,
+    FixedAssetScanStatus.qrLabelNotReplaced ||
+    FixedAssetScanStatus.qrReplacePending => amber,
   };
 
   @override

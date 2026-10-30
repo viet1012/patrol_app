@@ -17,8 +17,13 @@ class FixedAssetBackend {
   Future<List<String>> fetchFacs() => FixedAssetApi.fetchFacs();
 
   /// Máy cần in lại QR (màn "In lại QR" + badge ở home).
-  Future<List<FixedAssetQrMismatch>> fetchQrMismatch({String? fac}) =>
-      FixedAssetApi.fetchQrMismatch(fac: fac);
+  /// Chỉ giữ máy đang chờ thay QR theo needsQrReprint của backend (dòng
+  /// ReprintSts = 1 đã thay xong): một nguồn cho badge home, "In lại QR",
+  /// "Thay QR".
+  Future<List<FixedAssetQrMismatch>> fetchQrMismatch({String? fac}) async {
+    final rows = await FixedAssetApi.fetchQrMismatch(fac: fac);
+    return rows.where((r) => r.needsQrReprint).toList(growable: false);
+  }
 
   Future<List<String>> fetchFloors({required String fac}) =>
       FixedAssetApi.fetchFloors(fac: fac);
@@ -79,6 +84,7 @@ class FixedAssetBackend {
     String? qrPositionAA,
     bool? qrLocationMismatch,
     bool? needsQrReprint,
+    bool? qrReplace,
   }) => FixedAssetApi.saveAudit(
     fac: fac,
     floor: floor,
@@ -95,6 +101,7 @@ class FixedAssetBackend {
     qrPositionAA: qrPositionAA,
     qrLocationMismatch: qrLocationMismatch,
     needsQrReprint: needsQrReprint,
+    qrReplace: qrReplace,
   );
 
   Future<List<FixedAssetMachine>> fetchMachines({

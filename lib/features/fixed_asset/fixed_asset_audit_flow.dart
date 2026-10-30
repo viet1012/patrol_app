@@ -52,6 +52,13 @@ enum FixedAssetScanStatus {
 
   /// Tem mới khớp vị trí thực tế: backend đã gỡ đánh dấu in lại.
   qrReprintCleared,
+
+  /// Máy đang chờ thay QR, quét ở màn này (backend trả pendingQrReplace):
+  /// không gỡ cờ, thay QR ở tab "3) Thay QR".
+  qrReplacePending,
+
+  /// Máy đã thay QR (reprintSts): đã kiểm kê, card xanh + giờ thay QR.
+  qrReplaced,
 }
 
 /// Dropdown của cascade MANUAL (đánh dấu ô còn trống đầu tiên).
@@ -203,63 +210,9 @@ class FixedAssetReprintMovePrompt {
 typedef FixedAssetConfirmReprintMove =
     Future<bool> Function(FixedAssetReprintMovePrompt prompt);
 
-/// Popup "QR chưa được thay" (save trả qrLabelNotReplaced).
-class FixedAssetLabelNotReplacedPrompt {
-  final String machineCode;
-  final String faName;
-
-  /// reprintAct* / reprintQr* từ backend; null = không tra được.
-  final FixedAssetReprintInfo? reprint;
-
-  const FixedAssetLabelNotReplacedPrompt({
-    required this.machineCode,
-    required this.faName,
-    required this.reprint,
-  });
-}
-
-enum FixedAssetLabelNotReplacedAction {
-  /// "Quét QR mới": vào chế độ chờ QR mới.
-  scanNewLabel,
-
-  /// "Để sau": giữ card "QR chưa được thay", không chờ.
-  later,
-}
-
-typedef FixedAssetShowLabelNotReplaced =
-    Future<FixedAssetLabelNotReplacedAction> Function(
-      FixedAssetLabelNotReplacedPrompt prompt,
-    );
-
-/// Chế độ chờ tem mới: máy [machineCode] vừa quét bằng tem cũ, đang chờ quét
-/// tem in lại.
-class FixedAssetAwaitingLabel {
-  final String machineCode;
-  final String faName;
-
-  /// Vị trí thực tế + tem cũ (reprintQr*); null = không tra được (tem cũ khi
-  /// đó do backend nhận ra qua qrLabelNotReplaced).
-  final FixedAssetReprintInfo? reprint;
-
-  const FixedAssetAwaitingLabel({
-    required this.machineCode,
-    required this.faName,
-    required this.reprint,
-  });
-
-  /// PositionAA thực tế cho banner ("-" khi không rõ).
-  String get actualPositionAA {
-    final aa = reprint?.actPositionAA?.trim() ?? '';
-    return aa.isEmpty ? '-' : aa;
-  }
-
-  bool isMachine(String code) =>
-      code.trim().toLowerCase() == machineCode.trim().toLowerCase();
-}
-
 /// Quét lại máy needsQrReprint (theo audit-check, trước mọi dialog / save).
 enum FixedAssetReprintRescan {
-  /// QR = reprintQr*: popup "QR chưa được thay" (chờ QR mới: toast), không save.
+  /// QR = reprintQr*: card "QR chưa được thay", không save.
   oldLabel,
 
   /// Save (kèm qr*), backend quyết định: QR = reprintAct* và vị trí chọn =
@@ -432,8 +385,10 @@ bool fixedAssetSaveNeedsConfirmation(
   FixedAssetAuditSaveResponse? result, {
   required bool confirmLocationMismatch,
 }) {
+  // pendingQrReplace: chỉ báo "chờ thay QR", không hỏi gì.
   return result != null &&
       !confirmLocationMismatch &&
+      !result.pendingQrReplace &&
       !result.saved &&
       result.requiresConfirmation &&
       (!result.alreadyAudited || result.needsQrReprint);

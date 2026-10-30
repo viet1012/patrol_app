@@ -484,34 +484,44 @@ class _FixedAssetReprintScreenState extends State<FixedAssetReprintScreen> {
       onPreview: () => _preview(item),
     );
 
-    // Mobile: 1 cột; tablet / desktop rộng: lưới 2–3 cột.
+    // Mobile: 1 cột; tablet / desktop rộng: 2–3 cột. Card cao theo nội dung
+    // (không chiều cao cố định): nhiều cột dùng Wrap với width theo số cột.
+    const hPadding = 10.0;
+    const spacing = 10.0;
     return LayoutBuilder(
       builder: (context, constraints) {
         final width = constraints.maxWidth;
         final columns = width >= 1100 ? 3 : (width >= 700 ? 2 : 1);
+        final cardWidth =
+            ((width - hPadding * 2 - spacing * (columns - 1)) / columns)
+                .floorToDouble();
         return CustomScrollView(
           slivers: [
             for (final group in groups) ...[
               if (showHeaders)
                 SliverToBoxAdapter(child: _groupHeader(group)),
               SliverPadding(
-                padding: EdgeInsets.fromLTRB(10, showHeaders ? 0 : 6, 10, 6),
+                padding: EdgeInsets.fromLTRB(
+                  hPadding,
+                  showHeaders ? 0 : 6,
+                  hPadding,
+                  6,
+                ),
                 sliver: columns == 1
                     ? SliverList.separated(
                         itemCount: group.items.length,
                         separatorBuilder: (_, __) => const SizedBox(height: 8),
                         itemBuilder: (_, i) => card(group.items[i]),
                       )
-                    : SliverGrid.builder(
-                        gridDelegate:
-                            SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: columns,
-                              mainAxisExtent: 128,
-                              crossAxisSpacing: 10,
-                              mainAxisSpacing: 10,
-                            ),
-                        itemCount: group.items.length,
-                        itemBuilder: (_, i) => card(group.items[i]),
+                    : SliverToBoxAdapter(
+                        child: Wrap(
+                          spacing: spacing,
+                          runSpacing: spacing,
+                          children: [
+                            for (final item in group.items)
+                              SizedBox(width: cardWidth, child: card(item)),
+                          ],
+                        ),
                       ),
               ),
             ],
