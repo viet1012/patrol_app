@@ -16,6 +16,8 @@ abstract final class NoQrStrings {
   static const done = 'Xong';
 
   static const location = 'Vị trí';
+  static const pic = 'PIC';
+  static const picFirst = 'Chọn PIC trước';
   static const locationRequired = 'Chọn đủ Fac / Floor / PositionA / PositionAA';
 
   static const machineCode = 'Mã máy';

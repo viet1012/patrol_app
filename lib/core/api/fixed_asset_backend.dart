@@ -2,8 +2,10 @@ import 'package:chuphinh/core/models/fixed_asset_audit_check_response.dart';
 import 'package:chuphinh/core/models/fixed_asset_audit_save_response.dart';
 import 'package:chuphinh/core/models/fixed_asset_audit_summary.dart';
 import 'package:chuphinh/core/models/fixed_asset_machine.dart';
+import 'package:chuphinh/core/models/fixed_asset_pic.dart';
 import 'package:chuphinh/core/models/fixed_asset_qr_mismatch.dart';
 import 'package:chuphinh/core/models/fixed_asset_scan_info.dart';
+import 'package:chuphinh/core/models/fixed_asset_summary.dart';
 import 'package:chuphinh/core/models/fixed_asset_zone_lock.dart';
 import 'package:chuphinh/core/models/fixed_asset_zone_progress.dart';
 import 'package:chuphinh/core/api/fixed_asset_api.dart';
@@ -13,8 +15,41 @@ import 'package:chuphinh/core/api/fixed_asset_api.dart';
 class FixedAssetBackend {
   const FixedAssetBackend();
 
-  // MAP hierarchy (MANUAL cascade + "use the QR's location").
-  Future<List<String>> fetchFacs() => FixedAssetApi.fetchFacs();
+  // Summary (period "YYYY-Qn"; null = kỳ hiện tại).
+  Future<FixedAssetSummaryOverview> fetchSummary({String? period}) =>
+      FixedAssetApi.fetchSummary(period: period);
+
+  Future<List<FixedAssetSummaryPic>> fetchSummaryPics({String? period}) =>
+      FixedAssetApi.fetchSummaryPics(period: period);
+
+  Future<FixedAssetSummaryPicDetail> fetchSummaryPicDetail({
+    required String pic,
+    String? period,
+  }) => FixedAssetApi.fetchSummaryPicDetail(pic: pic, period: period);
+
+  /// Máy của PIC trong kỳ; vị trí null = không lọc.
+  Future<List<FixedAssetPicMachine>> fetchSummaryPicMachines({
+    required String pic,
+    String? period,
+    String? fac,
+    String? floor,
+    String? positionA,
+    String? positionAA,
+  }) => FixedAssetApi.fetchSummaryPicMachines(
+    pic: pic,
+    period: period,
+    fac: fac,
+    floor: floor,
+    positionA: positionA,
+    positionAA: positionAA,
+  );
+
+  /// PIC (người phụ trách) + số máy / số khu.
+  Future<List<FixedAssetPic>> fetchPics() => FixedAssetApi.fetchPics();
+
+  // MAP hierarchy (cascade dropdown). [pic] null = mọi PIC.
+  Future<List<String>> fetchFacs({String? pic}) =>
+      FixedAssetApi.fetchFacs(pic: pic);
 
   /// Máy cần in lại QR (màn "In lại QR" + badge ở home).
   /// Chỉ giữ máy đang chờ thay QR theo needsQrReprint của backend (dòng
@@ -25,31 +60,35 @@ class FixedAssetBackend {
     return rows.where((r) => r.needsQrReprint).toList(growable: false);
   }
 
-  Future<List<String>> fetchFloors({required String fac}) =>
-      FixedAssetApi.fetchFloors(fac: fac);
+  Future<List<String>> fetchFloors({required String fac, String? pic}) =>
+      FixedAssetApi.fetchFloors(fac: fac, pic: pic);
 
   Future<List<String>> fetchPositionA({
     required String fac,
     required String floor,
-  }) => FixedAssetApi.fetchPositionA(fac: fac, floor: floor);
+    String? pic,
+  }) => FixedAssetApi.fetchPositionA(fac: fac, floor: floor, pic: pic);
 
   Future<List<String>> fetchPositionAA({
     required String fac,
     required String floor,
     required String positionA,
+    String? pic,
   }) => FixedAssetApi.fetchPositionAA(
     fac: fac,
     floor: floor,
     positionA: positionA,
+    pic: pic,
   );
 
-  Future<FixedAssetAuditSummary> fetchAuditSummary() =>
-      FixedAssetApi.fetchAuditSummary();
+  Future<FixedAssetAuditSummary> fetchAuditSummary({String? pic}) =>
+      FixedAssetApi.fetchAuditSummary(pic: pic);
 
   Future<List<FixedAssetZoneProgressRow>> fetchZoneProgress({
     required String fac,
     required String floor,
-  }) => FixedAssetApi.fetchZoneProgress(fac: fac, floor: floor);
+    String? pic,
+  }) => FixedAssetApi.fetchZoneProgress(fac: fac, floor: floor, pic: pic);
 
   Future<FixedAssetZoneLock> fetchZoneLock({required String userId}) =>
       FixedAssetApi.fetchZoneLock(userId: userId);
@@ -85,6 +124,7 @@ class FixedAssetBackend {
     bool? qrLocationMismatch,
     bool? needsQrReprint,
     bool? qrReplace,
+    String? pic,
   }) => FixedAssetApi.saveAudit(
     fac: fac,
     floor: floor,
@@ -102,6 +142,7 @@ class FixedAssetBackend {
     qrLocationMismatch: qrLocationMismatch,
     needsQrReprint: needsQrReprint,
     qrReplace: qrReplace,
+    pic: pic,
   );
 
   Future<List<FixedAssetMachine>> fetchMachines({
@@ -109,10 +150,12 @@ class FixedAssetBackend {
     required String floor,
     required String positionA,
     required String positionAA,
+    String? pic,
   }) => FixedAssetApi.fetchMachines(
     fac: fac,
     floor: floor,
     positionA: positionA,
     positionAA: positionAA,
+    pic: pic,
   );
 }

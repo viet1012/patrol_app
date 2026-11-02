@@ -40,6 +40,9 @@ class FixedAssetQrMismatch {
   final bool reprintSts;
   final DateTime? reprintAt;
 
+  /// Email PIC lúc kiểm kê; null = máy không có PIC / API cũ chưa trả.
+  final String? pic;
+
   const FixedAssetQrMismatch({
     required this.machineCode,
     required this.faName,
@@ -58,6 +61,7 @@ class FixedAssetQrMismatch {
     this.needsQrReprint = true,
     this.reprintSts = false,
     this.reprintAt,
+    this.pic,
   });
 
   factory FixedAssetQrMismatch.fromJson(Map<String, dynamic> json) {
@@ -90,6 +94,7 @@ class FixedAssetQrMismatch {
           : !reprintSts,
       reprintSts: reprintSts,
       reprintAt: parseDateTime(json['reprintAt']),
+      pic: opt('pic'),
     );
   }
 

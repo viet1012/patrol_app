@@ -5,8 +5,10 @@ import 'package:chuphinh/core/models/fixed_asset_audit_save_response.dart';
 import 'package:chuphinh/core/models/fixed_asset_audit_summary.dart';
 import 'package:chuphinh/core/models/fixed_asset_machine.dart';
 import 'package:chuphinh/core/models/fixed_asset_machine_location.dart';
+import 'package:chuphinh/core/models/fixed_asset_pic.dart';
 import 'package:chuphinh/core/models/fixed_asset_qr_mismatch.dart';
 import 'package:chuphinh/core/models/fixed_asset_scan_info.dart';
+import 'package:chuphinh/core/models/fixed_asset_summary.dart';
 import 'package:chuphinh/core/models/fixed_asset_zone_lock.dart';
 import 'package:chuphinh/core/models/fixed_asset_zone_progress.dart';
 import 'package:chuphinh/core/network/dio_error_handler.dart';
@@ -30,31 +32,61 @@ class FixedAssetApi {
 
   // Backend Fixed Asset cố định scope KVH ở phía server: không API nào
   // nhận/cần div từ frontend.
+  //
+  // [pic] (email PIC, tuỳ chọn): chỉ lấy dữ liệu của máy thuộc PIC đó;
+  // null/rỗng = mọi PIC (không gửi).
 
-  static Future<List<String>> fetchFacs() {
-    return _getStrings('$_base/facs');
+  static Map<String, dynamic> _picParam(String? pic) {
+    final p = pic?.trim() ?? '';
+    return {if (p.isNotEmpty) 'pic': p};
   }
 
-  static Future<List<String>> fetchFloors({required String fac}) {
-    return _getStrings('$_base/floors', {'fac': fac});
+  /// Danh sách PIC + số máy / số khu của từng PIC.
+  static Future<List<FixedAssetPic>> fetchPics() async {
+    try {
+      final Response res = await DioClient.get('$_base/pics');
+
+      return _extractList(res.data)
+          .whereType<Map>()
+          .map((e) => FixedAssetPic.fromJson(Map<String, dynamic>.from(e)))
+          .where((e) => e.email.isNotEmpty)
+          .toList();
+    } on DioException catch (e) {
+      throw Exception(DioErrorHandler.handle(e));
+    }
+  }
+
+  static Future<List<String>> fetchFacs({String? pic}) {
+    return _getStrings('$_base/facs', _picParam(pic));
+  }
+
+  static Future<List<String>> fetchFloors({required String fac, String? pic}) {
+    return _getStrings('$_base/floors', {'fac': fac, ..._picParam(pic)});
   }
 
   static Future<List<String>> fetchPositionA({
     required String fac,
     required String floor,
+    String? pic,
   }) {
-    return _getStrings('$_base/position-a', {'fac': fac, 'floor': floor});
+    return _getStrings('$_base/position-a', {
+      'fac': fac,
+      'floor': floor,
+      ..._picParam(pic),
+    });
   }
 
   static Future<List<String>> fetchPositionAA({
     required String fac,
     required String floor,
     required String positionA,
+    String? pic,
   }) {
     return _getStrings('$_base/position-aa', {
       'fac': fac,
       'floor': floor,
       'positionA': positionA,
+      ..._picParam(pic),
     });
   }
 
@@ -99,9 +131,101 @@ class FixedAssetApi {
   }
 
   /// Tiến độ kiểm kê của kỳ 3 tháng hiện tại.
-  static Future<FixedAssetAuditSummary> fetchAuditSummary() async {
-    final data = await _getMapOnce('$_base/audit-summary');
+  static Future<FixedAssetAuditSummary> fetchAuditSummary({
+    String? pic,
+  }) async {
+    final data = await _getMapOnce(
+      '$_base/audit-summary',
+      queryParameters: _picParam(pic),
+    );
     return FixedAssetAuditSummary.fromJson(data);
+  }
+
+  // ------------------------------------------------------------
+  // SUMMARY (period = "YYYY-Qn"; null = kỳ hiện tại theo backend)
+  // ------------------------------------------------------------
+
+  static Map<String, dynamic> _periodParam(String? period) {
+    final p = period?.trim() ?? '';
+    return {if (p.isNotEmpty) 'period': p};
+  }
+
+  /// Tổng quan kỳ: tiến độ, kế hoạch, biểu đồ theo tuần, máy chờ thay QR.
+  static Future<FixedAssetSummaryOverview> fetchSummary({
+    String? period,
+  }) async {
+    final data = await _getMapOnce(
+      '$_base/summary',
+      queryParameters: _periodParam(period),
+    );
+    return FixedAssetSummaryOverview.fromJson(data);
+  }
+
+  /// Tiến độ từng PIC trong kỳ.
+  static Future<List<FixedAssetSummaryPic>> fetchSummaryPics({
+    String? period,
+  }) async {
+    try {
+      final Response res = await DioClient.get(
+        '$_base/summary/pics',
+        queryParameters: _periodParam(period),
+      );
+      return _extractList(res.data)
+          .whereType<Map>()
+          .map(
+            (e) => FixedAssetSummaryPic.fromJson(Map<String, dynamic>.from(e)),
+          )
+          .where((e) => e.email.isNotEmpty)
+          .toList();
+    } on DioException catch (e) {
+      throw Exception(DioErrorHandler.handle(e));
+    }
+  }
+
+  /// Chi tiết một PIC: theo khu + máy chưa kiểm kê.
+  static Future<FixedAssetSummaryPicDetail> fetchSummaryPicDetail({
+    required String pic,
+    String? period,
+  }) async {
+    final data = await _getMapOnce(
+      '$_base/summary/pic-detail',
+      queryParameters: {'pic': pic, ..._periodParam(period)},
+    );
+    return FixedAssetSummaryPicDetail.fromJson(data);
+  }
+
+  /// Máy của một PIC trong kỳ; vị trí rỗng / null = không lọc cấp đó
+  /// (không truyền gì = toàn bộ máy của PIC).
+  static Future<List<FixedAssetPicMachine>> fetchSummaryPicMachines({
+    required String pic,
+    String? period,
+    String? fac,
+    String? floor,
+    String? positionA,
+    String? positionAA,
+  }) async {
+    final location = <String, String>{
+      if (fac?.trim().isNotEmpty ?? false) 'fac': fac!.trim(),
+      if (floor?.trim().isNotEmpty ?? false) 'floor': floor!.trim(),
+      if (positionA?.trim().isNotEmpty ?? false) 'positionA': positionA!.trim(),
+      if (positionAA?.trim().isNotEmpty ?? false)
+        'positionAA': positionAA!.trim(),
+    };
+    try {
+      final Response res = await DioClient.get(
+        '$_base/summary/pic-machines',
+        queryParameters: {'pic': pic, ..._periodParam(period), ...location},
+      );
+      return _extractList(res.data)
+          .whereType<Map>()
+          .map(
+            (e) => FixedAssetPicMachine.fromJson(Map<String, dynamic>.from(e)),
+          )
+          .where((e) => e.machineCode.isNotEmpty)
+          .toList();
+    } on DioException catch (e) {
+      throw Exception(DioErrorHandler.handle(e));
+    }
   }
 
   /// Khóa khu vực AUTO của [userId] (bản ghi AUTO mới nhất trong kỳ).
@@ -121,11 +245,12 @@ class FixedAssetApi {
   static Future<List<FixedAssetZoneProgressRow>> fetchZoneProgress({
     required String fac,
     required String floor,
+    String? pic,
   }) async {
     try {
       final Response res = await DioClient.get(
         '$_base/zone-progress',
-        queryParameters: {'fac': fac, 'floor': floor},
+        queryParameters: {'fac': fac, 'floor': floor, ..._picParam(pic)},
       );
 
       return _extractList(res.data)
@@ -272,6 +397,7 @@ class FixedAssetApi {
     required String floor,
     required String positionA,
     required String positionAA,
+    String? pic,
   }) async {
     try {
       final Response res = await DioClient.get(
@@ -281,6 +407,7 @@ class FixedAssetApi {
           'floor': floor,
           'positionA': positionA,
           'positionAA': positionAA,
+          ..._picParam(pic),
         },
       );
 
@@ -321,6 +448,8 @@ class FixedAssetApi {
     bool? needsQrReprint,
     // Tab "3) Thay QR", bước quét QR mới: cho phép gỡ cờ; null không gửi.
     bool? qrReplace,
+    // Email PIC (form máy thiếu QR); null không gửi.
+    String? pic,
   }) async {
     try {
       // Dùng DioClient.dio trực tiếp (không qua _retry): POST này INSERT
@@ -345,6 +474,7 @@ class FixedAssetApi {
             'qrLocationMismatch': qrLocationMismatch,
           if (needsQrReprint != null) 'needsQrReprint': needsQrReprint,
           if (qrReplace != null) 'qrReplace': qrReplace,
+          if (pic != null) 'pic': pic,
         },
       );
 

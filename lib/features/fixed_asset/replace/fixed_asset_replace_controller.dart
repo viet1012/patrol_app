@@ -5,9 +5,20 @@ import 'package:chuphinh/core/models/fixed_asset_audit_save_response.dart';
 import 'package:chuphinh/features/fixed_asset/fixed_asset_audit_flow.dart'
     show fixedAssetErrorText, fixedAssetManualQrCheck;
 import 'package:chuphinh/features/fixed_asset/fixed_asset_location.dart';
+import 'package:chuphinh/features/fixed_asset/fixed_asset_pic_filter.dart';
 import 'package:chuphinh/features/fixed_asset/fixed_asset_qr_parser.dart';
 import 'package:chuphinh/features/fixed_asset/replace/fixed_asset_replace_models.dart';
 import 'package:chuphinh/features/fixed_asset/replace/fixed_asset_replace_strings.dart';
+
+/// Lỗi một lần quét ở bước thay QR. [apiFailed] false: QR sai, camera vẫn
+/// mở để quét tiếp; true: POST lỗi / backend chưa gỡ cờ, đóng camera và báo
+/// ở màn "Việc cần làm".
+class FixedAssetReplaceScanError {
+  final String message;
+  final bool apiFailed;
+
+  const FixedAssetReplaceScanError(this.message, {this.apiFailed = false});
+}
 
 /// Nhóm theo PositionA thực tế: các khu AA bên trong.
 class FixedAssetReplaceArea {
@@ -31,11 +42,18 @@ class FixedAssetReplaceFloor {
 }
 
 /// State màn "Thay QR": máy còn chờ thay QR (GET /qr-mismatch, mọi xưởng),
-/// lọc xưởng, gom Floor → A → AA theo vị trí thực tế (*_Act).
+/// lọc PIC + xưởng, gom Floor → A → AA theo vị trí thực tế (*_Act).
 class FixedAssetReplaceController extends ChangeNotifier {
-  FixedAssetReplaceController({this.api = const FixedAssetBackend()});
+  FixedAssetReplaceController({this.api = const FixedAssetBackend()}) {
+    // PIC rút từ chính danh sách chờ (không gọi GET /pics).
+    picFilter = FixedAssetPicFilter(api: api, localOnly: true)
+      ..addListener(_onPicChanged);
+  }
 
   final FixedAssetBackend api;
+
+  /// PIC (chung các màn trong phiên); lọc phía FE theo pic của dòng.
+  late final FixedAssetPicFilter picFilter;
 
   bool _disposed = false;
   int _req = 0;
@@ -60,8 +78,19 @@ class FixedAssetReplaceController extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    picFilter.dispose();
     super.dispose();
   }
+
+  /// PIC đổi (ở màn này hoặc màn khác) / danh sách PIC tải xong.
+  void _onPicChanged() {
+    if (_fac != null && !facs.contains(_fac)) _fac = null;
+    _notify();
+  }
+
+  /// Máy của PIC đang chọn (máy không có PIC chỉ có ở "Tất cả PIC").
+  Iterable<FixedAssetReplaceTask> get _picTasks =>
+      _tasks.where((t) => picFilter.matches(t.row.pic));
 
   /// [silent]: tải lại khi quay về từ màn quét, giữ danh sách cũ tới khi có
   /// kết quả (lỗi thì giữ nguyên).
@@ -80,6 +109,8 @@ class FixedAssetReplaceController extends ChangeNotifier {
           .where((r) => r.machineCode.isNotEmpty)
           .map(FixedAssetReplaceTask.new)
           .toList(growable: false);
+      // Tính lại danh sách PIC + số máy chờ.
+      picFilter.setFromRows(_tasks.map((t) => t.row));
       _error = null;
       _loading = false;
       if (_fac != null && !facs.contains(_fac)) _fac = null;
@@ -101,7 +132,7 @@ class FixedAssetReplaceController extends ChangeNotifier {
   /// Xưởng (thực tế) có trong dữ liệu, sắp theo tên.
   List<String> get facs {
     final set = <String>{
-      for (final t in _tasks)
+      for (final t in _picTasks)
         if ((t.row.facAct ?? '').isNotEmpty) t.row.facAct!,
     };
     return set.toList()..sort();
@@ -110,14 +141,15 @@ class FixedAssetReplaceController extends ChangeNotifier {
   bool _inFac(String? fac) => _fac == null || (fac ?? '') == _fac;
 
   /// Máy của xưởng đang lọc (kể cả chưa rõ vị trí).
-  int get visibleCount =>
-      _tasks.where((t) => _inFac(t.row.facAct) || t.row.facAct == null).length;
+  int get visibleCount => _picTasks
+      .where((t) => _inFac(t.row.facAct) || t.row.facAct == null)
+      .length;
 
   /// Floor → A → AA của xưởng đang lọc (chỉ dòng có đủ vị trí thực tế).
   List<FixedAssetReplaceFloor> get floors {
     final byZone = <String, List<FixedAssetReplaceTask>>{};
     final locationOf = <String, FixedAssetAuditLocation>{};
-    for (final task in _tasks) {
+    for (final task in _picTasks) {
       final location = fixedAssetReplaceLocationOf(task.row);
       if (location == null || !_inFac(location.fac)) continue;
       final key = fixedAssetReplaceZoneKey(location);
@@ -156,7 +188,7 @@ class FixedAssetReplaceController extends ChangeNotifier {
   /// lọc: gồm cả dòng không có Fac. null = không có máy nào.
   FixedAssetReplaceZone? get unknownZone {
     final tasks = [
-      for (final t in _tasks)
+      for (final t in _picTasks)
         if (fixedAssetReplaceLocationOf(t.row) == null &&
             (_inFac(t.row.facAct) || (t.row.facAct ?? '').isEmpty))
           t,
@@ -165,13 +197,13 @@ class FixedAssetReplaceController extends ChangeNotifier {
   }
 
   /// Khu theo [FixedAssetReplaceZone.key] trong dữ liệu hiện tại (mọi xưởng
-  /// với khu đã biết); khu hết máy -> danh sách rỗng.
+  /// với khu đã biết, theo PIC đang chọn); khu hết máy -> danh sách rỗng.
   FixedAssetReplaceZone zoneByKey(String key, FixedAssetReplaceZone fallback) {
     if (key.isEmpty) {
       return unknownZone ?? FixedAssetReplaceZone(null, const []);
     }
     final tasks = [
-      for (final t in _tasks)
+      for (final t in _picTasks)
         if (fixedAssetReplaceZoneKey(fixedAssetReplaceLocationOf(t.row)) ==
             key)
           t,
@@ -218,13 +250,17 @@ class FixedAssetReplaceController extends ChangeNotifier {
   }
 
   /// Bước QR cũ: chỉ kiểm ở FE (mã máy + vị trí = *_Qr), không gọi save.
-  /// null = đúng (đã ghi nhận), còn lại = câu báo lỗi.
-  String? scanOldQr(FixedAssetReplaceTask task, String rawQr) {
+  /// null = đúng (đã ghi nhận), còn lại = QR sai (camera quét tiếp).
+  FixedAssetReplaceScanError? scanOldQr(
+    FixedAssetReplaceTask task,
+    String rawQr,
+  ) {
     final qr = parseFixedAssetQr(rawQr);
-    final error = _machineError(task, qr);
-    if (error != null) return error;
-    if (!task.isOldQr(qr)) {
-      return FixedAssetReplaceStrings.notOldQr(task.oldQrShort);
+    if (qr.machineCode.isEmpty) {
+      return const FixedAssetReplaceScanError(FixedAssetReplaceStrings.invalidQr);
+    }
+    if (!task.isMachine(qr.machineCode) || !task.isOldQr(qr)) {
+      return _mismatch(qr, task, task.oldQrShort);
     }
     _oldScannedAt[task.code] = DateTime.now();
     _notify();
@@ -233,28 +269,30 @@ class FixedAssetReplaceController extends ChangeNotifier {
 
   /// Bước QR mới: kiểm ở FE (đúng máy, không phải QR cũ, vị trí = *_Act) rồi
   /// POST /audit (MANUAL, vị trí chọn = *_Act). Chỉ tính xong khi backend gỡ
-  /// cờ. Không hỏi "Máy đã dời?". null = xong, còn lại = câu báo lỗi.
-  Future<String?> scanNewQr(
+  /// cờ. Không hỏi "Máy đã dời?". null = xong; QR sai: camera quét tiếp;
+  /// POST lỗi / chưa gỡ cờ: [FixedAssetReplaceScanError.apiFailed].
+  Future<FixedAssetReplaceScanError?> scanNewQr(
     FixedAssetReplaceTask task,
     String rawQr, {
     required String userId,
     required String userName,
   }) async {
     final location = task.location;
-    if (location == null) return FixedAssetReplaceStrings.unknownAct;
+    if (location == null) {
+      return const FixedAssetReplaceScanError(
+        FixedAssetReplaceStrings.unknownAct,
+        apiFailed: true,
+      );
+    }
 
     final qr = parseFixedAssetQr(rawQr);
-    final error = _machineError(task, qr);
-    if (error != null) return error;
-    if (task.isOldQr(qr)) return FixedAssetReplaceStrings.stillOldQr;
-    if (!qr.hasLocation) {
-      return FixedAssetReplaceStrings.newQrNoLocation(task.actShort);
+    if (qr.machineCode.isEmpty) {
+      return const FixedAssetReplaceScanError(FixedAssetReplaceStrings.invalidQr);
     }
-    if (!task.qrMatchesAct(qr)) {
-      return FixedAssetReplaceStrings.newQrWrongLocation(
-        '${qr.floor}/${qr.positionAA}',
-        task.actShort,
-      );
+    if (!task.isMachine(qr.machineCode) ||
+        task.isOldQr(qr) ||
+        !task.qrMatchesAct(qr)) {
+      return _mismatch(qr, task, task.actShort);
     }
 
     final qrCheck = fixedAssetManualQrCheck(qr, location);
@@ -278,33 +316,45 @@ class FixedAssetReplaceController extends ChangeNotifier {
         qrReplace: true,
       );
     } catch (error) {
-      return FixedAssetReplaceStrings.saveFailed(fixedAssetErrorText(error));
+      return FixedAssetReplaceScanError(
+        FixedAssetReplaceStrings.saveFailed(fixedAssetErrorText(error)),
+        apiFailed: true,
+      );
     }
     if (_disposed) return null;
 
-    if (result.qrLabelNotReplaced) return FixedAssetReplaceStrings.stillOldQr;
+    // Backend: vẫn là tem cũ -> QR sai, quét tiếp.
+    if (result.qrLabelNotReplaced) return _mismatch(qr, task, task.actShort);
     final cleared =
         (result.saved || result.alreadyAudited) &&
         !result.needsQrReprint &&
         !result.requiresConfirmation &&
         !result.pendingQrReplace;
     if (!cleared) {
-      return FixedAssetReplaceStrings.notCleared(result.message.trim());
+      return FixedAssetReplaceScanError(
+        FixedAssetReplaceStrings.notCleared(result.message.trim()),
+        apiFailed: true,
+      );
     }
     _doneAt[task.code] = DateTime.now();
     _notify();
     return null;
   }
 
-  String? _machineError(FixedAssetReplaceTask task, FixedAssetQrData qr) {
-    if (qr.machineCode.isEmpty) return FixedAssetReplaceStrings.invalidQr;
-    if (!task.isMachine(qr.machineCode)) {
-      return FixedAssetReplaceStrings.otherMachine(
-        qr.machineCode,
-        task.machineCode,
-      );
-    }
-    return null;
+  /// "QR không khớp: đang quét {mã · AA}, cần {mã · [expected]}".
+  static FixedAssetReplaceScanError _mismatch(
+    FixedAssetQrData qr,
+    FixedAssetReplaceTask task,
+    String expected,
+  ) {
+    final aa = qr.positionAA.trim();
+    final scanned = aa.isEmpty ? qr.machineCode : '${qr.machineCode} · $aa';
+    return FixedAssetReplaceScanError(
+      FixedAssetReplaceStrings.mismatch(
+        scanned,
+        '${task.machineCode} · $expected',
+      ),
+    );
   }
 
   /// So sánh chuỗi có số theo giá trị số ("A2" < "A10").

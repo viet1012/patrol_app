@@ -19,13 +19,17 @@ class _ReplaceStep {
 
   /// Không làm được ở đây (vd chưa rõ vị trí thực tế); null = làm được.
   final String? blockedReason;
-  final Future<String?> Function(String rawQr) onScan;
+  final Future<FixedAssetReplaceScanError?> Function(String rawQr) onScan;
+
+  /// Bước quét QR mới (bước cuối, gọi API hoàn tất).
+  final bool isNew;
 
   const _ReplaceStep({
     required this.title,
     required this.scanTitle,
     required this.doneAt,
     required this.onScan,
+    required this.isNew,
     this.blockedReason,
   });
 
@@ -35,7 +39,11 @@ class _ReplaceStep {
 /// Màn "Việc cần làm" của một máy: header (mã, tên, vị trí thực tế, loại
 /// việc) + checklist đánh số; chỉ ô kế tiếp bấm được, bấm -> camera quét.
 /// Sai QR: (1) QR cũ (2) QR mới; Mất QR: (1) QR mới.
-class FixedAssetReplaceTaskScreen extends StatelessWidget {
+///
+/// QR cũ đúng: camera đóng, ~600 ms sau tự mở camera bước QR mới. QR mới
+/// xong: snackbar "Đã thay QR …" rồi pop true (màn trước tải lại). Tự đóng
+/// camera / lưu lỗi: ở lại, bước QR mới bấm lại được.
+class FixedAssetReplaceTaskScreen extends StatefulWidget {
   final FixedAssetReplaceController controller;
   final FixedAssetReplaceTask task;
 
@@ -53,7 +61,44 @@ class FixedAssetReplaceTaskScreen extends StatelessWidget {
     this.userName = '',
   });
 
+  @override
+  State<FixedAssetReplaceTaskScreen> createState() =>
+      _FixedAssetReplaceTaskScreenState();
+}
+
+class _FixedAssetReplaceTaskScreenState
+    extends State<FixedAssetReplaceTaskScreen> {
   static final DateFormat _time = DateFormat('HH:mm');
+
+  /// Từ lúc đóng camera QR cũ tới lúc tự mở camera QR mới.
+  static const Duration _autoNextDelay = Duration(milliseconds: 600);
+
+  FixedAssetReplaceController get controller => widget.controller;
+  FixedAssetReplaceTask get task => widget.task;
+  String get zoneKey => widget.zoneKey;
+  String get accountCode => widget.accountCode;
+  String get userName => widget.userName;
+
+  /// Camera đang mở: chặn mở chồng (bấm nhanh / tự mở bước 2).
+  bool _cameraOpen = false;
+
+  /// Lỗi lưu ở bước QR mới (camera đã đóng); null = không có.
+  String? _saveError;
+
+  @override
+  void initState() {
+    super.initState();
+    // Vào màn: mở ngay camera bước đang chờ (thường là bước 1). Đóng camera
+    // thì ở lại, bấm bước để mở lại.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      for (final step in _steps()) {
+        if (step.done) continue;
+        if (step.blockedReason == null) _openCamera(context, step);
+        return;
+      }
+    });
+  }
 
   List<_ReplaceStep> _steps() {
     final userId = accountCode.trim();
@@ -74,6 +119,7 @@ class FixedAssetReplaceTaskScreen extends StatelessWidget {
         userId: userId,
         userName: name,
       ),
+      isNew: true,
     );
     if (task.kind == FixedAssetReplaceKind.missingQr) return [newStep];
     return [
@@ -85,13 +131,17 @@ class FixedAssetReplaceTaskScreen extends StatelessWidget {
         ),
         doneAt: controller.oldScannedAt(task),
         onScan: (raw) async => controller.scanOldQr(task, raw),
+        isNew: false,
       ),
       newStep,
     ];
   }
 
-  Future<void> _openCamera(BuildContext context, _ReplaceStep step) {
-    return Navigator.push<bool>(
+  Future<void> _openCamera(BuildContext context, _ReplaceStep step) async {
+    if (_cameraOpen) return;
+    _cameraOpen = true;
+    setState(() => _saveError = null);
+    final result = await Navigator.push<FixedAssetReplaceScanResult>(
       context,
       MaterialPageRoute(
         builder: (_) => FixedAssetReplaceScanScreen(
@@ -100,11 +150,80 @@ class FixedAssetReplaceTaskScreen extends StatelessWidget {
         ),
       ),
     );
+    _cameraOpen = false;
+    // null = tự đóng camera: ở lại, bước đang chờ vẫn bấm được.
+    if (!mounted || result == null) return;
+    if (!result.done) {
+      setState(() => _saveError = result.error);
+      return;
+    }
+
+    if (!step.isNew) {
+      // QR cũ xong (tick xanh): tự mở camera QR mới.
+      await Future<void>.delayed(_autoNextDelay);
+      if (!mounted || !(ModalRoute.of(this.context)?.isCurrent ?? false)) {
+        return;
+      }
+      for (final next in _steps()) {
+        if (next.done) continue;
+        if (next.isNew && next.blockedReason == null) {
+          await _openCamera(this.context, next);
+        }
+        return;
+      }
+      return;
+    }
+
+    _afterReplaced();
   }
 
-  void _openNext(BuildContext context, FixedAssetReplaceTask next) {
+  /// Thay xong máy này: khu còn máy chờ -> thay màn bằng "Việc cần làm" của
+  /// máy kế tiếp; hết máy -> pop về danh sách khu (true, khu tự tải lại).
+  void _afterReplaced() {
+    final next = controller.nextTask(zoneKey, task);
+    final messenger = ScaffoldMessenger.of(context)..hideCurrentSnackBar();
+    if (next == null) {
+      final location = task.location;
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            location == null
+                ? FixedAssetReplaceStrings.replaced(task.machineCode)
+                : FixedAssetReplaceStrings.zoneFinished(
+                    '${location.floor}/${location.positionA}/'
+                    '${location.positionAA}',
+                  ),
+          ),
+        ),
+      );
+      // Danh sách khu tải lại; rỗng thì nó tự pop về danh sách khu vực.
+      controller.load(silent: true);
+      Navigator.pop(context, true);
+      return;
+    }
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(
+          FixedAssetReplaceStrings.replacedNext(
+            task.machineCode,
+            next.machineCode,
+          ),
+        ),
+      ),
+    );
+    // Danh sách khu cập nhật ngầm trong lúc làm máy kế tiếp.
+    controller.load(silent: true);
+    _openNext(context, next, result: true);
+  }
+
+  void _openNext(
+    BuildContext context,
+    FixedAssetReplaceTask next, {
+    bool? result,
+  }) {
     Navigator.pushReplacement(
       context,
+      result: result,
       MaterialPageRoute(
         builder: (_) => FixedAssetReplaceTaskScreen(
           controller: controller,
@@ -271,14 +390,15 @@ class FixedAssetReplaceTaskScreen extends StatelessWidget {
         : enabled
         ? FixedAssetReprintColors.coral
         : Colors.white.withValues(alpha: .3);
+    // Lưu lỗi ở bước QR mới: báo dưới bước, bấm lại để quét.
+    final saveError = enabled && step.isNew ? _saveError : null;
 
     final subtitle = done
         ? FixedAssetReplaceStrings.doneAt(_time.format(step.doneAt!))
         : blocked
         ? step.blockedReason!
-        : enabled
-        ? FixedAssetReplaceStrings.tapToScan
-        : null;
+        : saveError ??
+              (enabled ? FixedAssetReplaceStrings.tapToScan : null);
 
     return Opacity(
       opacity: done || active ? 1 : .4,
@@ -345,6 +465,8 @@ class FixedAssetReplaceTaskScreen extends StatelessWidget {
                                 ? FixedAssetReprintColors.newQr
                                 : blocked
                                 ? FixedAssetReprintColors.amber
+                                : saveError != null
+                                ? Colors.redAccent
                                 : Colors.white.withValues(alpha: .7),
                             fontSize: 13.5,
                             fontWeight: FontWeight.w700,

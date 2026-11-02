@@ -4,6 +4,9 @@ import 'package:chuphinh/features/fixed_asset/fixed_asset_location.dart';
 class NoQrReport {
   /// Vị trí đang dùng lúc ghi (AUTO: vị trí đang quét, MANUAL: 4 dropdown).
   final FixedAssetAuditLocation location;
+
+  /// Email PIC chọn trong form (bắt buộc).
+  final String pic;
   final String machineCode;
 
   /// true = nhập tay (máy không có trong danh sách của vị trí).
@@ -13,6 +16,7 @@ class NoQrReport {
 
   const NoQrReport({
     required this.location,
+    required this.pic,
     required this.machineCode,
     required this.isManualCode,
     required this.note,

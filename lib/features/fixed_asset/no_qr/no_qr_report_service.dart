@@ -108,6 +108,7 @@ class NoQrReportService extends ChangeNotifier {
       confirmLocationMismatch: confirmLocationMismatch,
       mode: 'NO_QR',
       needsQrReprint: true,
+      pic: report.pic,
     );
   }
 

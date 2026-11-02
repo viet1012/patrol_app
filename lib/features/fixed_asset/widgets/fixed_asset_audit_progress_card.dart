@@ -11,12 +11,16 @@ class FixedAssetAuditProgressCard extends StatelessWidget {
   final String? error;
   final VoidCallback onRetry;
 
+  /// Tên PIC đang lọc (null = tất cả PIC): hiện cạnh tiêu đề.
+  final String? picName;
+
   const FixedAssetAuditProgressCard({
     super.key,
     required this.summary,
     required this.loading,
     required this.error,
     required this.onRetry,
+    this.picName,
   });
 
   static const Color _accent = Color(0xFF4DD0E1);
@@ -143,6 +147,16 @@ class FixedAssetAuditProgressCard extends StatelessWidget {
           _retrySummaryButton(),
         ],
       );
+    } else if (!loading) {
+      // Chưa chọn PIC: không có số liệu.
+      body = Text(
+        '—',
+        style: TextStyle(
+          color: Colors.white.withOpacity(.55),
+          fontSize: 13.5,
+          fontWeight: FontWeight.w800,
+        ),
+      );
     } else {
       // Loading lần đầu: skeleton gọn.
       body = ClipRRect(
@@ -178,6 +192,21 @@ class FixedAssetAuditProgressCard extends StatelessWidget {
                   letterSpacing: .8,
                 ),
               ),
+              if (picName != null) ...[
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Text(
+                    '· PIC $picName',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: _accent,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
               const Spacer(),
               // Refresh chạy nền khi đã có số liệu cũ.
               if (loading && summary != null) ...[

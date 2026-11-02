@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 
 import 'package:chuphinh/core/api/fixed_asset_backend.dart';
 import 'package:chuphinh/core/models/fixed_asset_machine.dart';
+import 'package:chuphinh/core/models/fixed_asset_pic.dart';
 import 'package:chuphinh/features/fixed_asset/fixed_asset_audit_flow.dart';
 import 'package:chuphinh/features/fixed_asset/fixed_asset_location.dart';
 import 'package:chuphinh/features/fixed_asset/fixed_asset_manual_cascade.dart';
 import 'package:chuphinh/features/fixed_asset/no_qr/no_qr_report.dart';
 import 'package:chuphinh/features/fixed_asset/no_qr/no_qr_strings.dart';
 import 'package:chuphinh/features/fixed_asset/widgets/fixed_asset_manual_selectors.dart';
+import 'package:chuphinh/features/fixed_asset/widgets/fixed_asset_pic_selector.dart';
 import 'package:chuphinh/shared/speech/voice_input_button.dart';
 import 'package:chuphinh/shared/widgets/required_field_flash.dart';
 
@@ -24,14 +26,19 @@ typedef NoQrLocationDraft = ({
 /// form giữ nguyên để sửa.
 ///
 /// [location] null (chưa đủ vị trí): form hiện 4 dropdown ở đầu, điền sẵn
-/// [initialSelection]. [machines] = danh sách máy của [location] (rỗng thì
-/// form tự tải). [initialMachineCode] điền sẵn mã máy (từ dòng trong danh
-/// sách máy): có trong [machines] thì vào thẳng trạng thái đã chọn.
+/// [initialSelection]. [machines] = danh sách máy của [location] theo
+/// [initialPic] (rỗng thì form tự tải). [initialMachineCode] điền sẵn mã máy
+/// (từ dòng trong danh sách máy): có trong [machines] thì vào thẳng trạng
+/// thái đã chọn. [pics] = danh sách PIC của màn chính; [initialPic] null =
+/// chưa chọn (vị trí + máy bị khóa).
 Future<NoQrReport?> showNoQrReportSheet({
   required BuildContext context,
   required FixedAssetAuditLocation? location,
   required List<FixedAssetMachine> machines,
   required Future<bool> Function(NoQrReport report) onSubmit,
+  required List<FixedAssetPic> pics,
+  String? initialPic,
+  bool loadingPics = false,
   NoQrLocationDraft? initialSelection,
   String? initialMachineCode,
   String lang = 'VI',
@@ -50,6 +57,9 @@ Future<NoQrReport?> showNoQrReportSheet({
       location: location,
       machines: machines,
       onSubmit: onSubmit,
+      pics: pics,
+      initialPic: initialPic,
+      loadingPics: loadingPics,
       initialSelection: initialSelection,
       initialMachineCode: initialMachineCode,
       lang: lang,
@@ -70,6 +80,9 @@ class NoQrReportSheet extends StatefulWidget {
   final FixedAssetAuditLocation? location;
   final List<FixedAssetMachine> machines;
   final Future<bool> Function(NoQrReport report) onSubmit;
+  final List<FixedAssetPic> pics;
+  final String? initialPic;
+  final bool loadingPics;
   final NoQrLocationDraft? initialSelection;
   final String? initialMachineCode;
   final String lang;
@@ -81,6 +94,9 @@ class NoQrReportSheet extends StatefulWidget {
     required this.location,
     required this.machines,
     required this.onSubmit,
+    this.pics = const <FixedAssetPic>[],
+    this.initialPic,
+    this.loadingPics = false,
     this.initialSelection,
     this.initialMachineCode,
     this.lang = 'VI',
@@ -115,10 +131,23 @@ class _NoQrReportSheetState extends State<NoQrReportSheet> {
 
   bool _disposed = false;
 
+  // ---------------- PIC ----------------
+
+  /// Email PIC của form (bắt buộc; null = chưa chọn: vị trí + tìm máy bị
+  /// khóa). Chỉ trong form, không đổi PIC của màn chính.
+  late String? _pic = (widget.initialPic?.trim().isEmpty ?? true)
+      ? null
+      : widget.initialPic!.trim();
+
+  bool get _picMissing => _pic == null;
+
   // ---------------- Vị trí ----------------
 
-  /// null khi đang đổi và chưa chọn đủ 4 cấp.
-  late FixedAssetAuditLocation? _location = widget.location;
+  /// null khi đang đổi và chưa chọn đủ 4 cấp. Chưa có PIC thì không nhận
+  /// vị trí của màn chính.
+  late FixedAssetAuditLocation? _location = _pic == null
+      ? null
+      : widget.location;
 
   /// Cascade riêng của form (cùng nguồn + logic phụ thuộc cấp với Location
   /// section); khác null = đang hiện 4 dropdown. Tự đóng khi chọn đủ 4 cấp.
@@ -131,13 +160,13 @@ class _NoQrReportSheetState extends State<NoQrReportSheet> {
 
   // ---------------- Máy ----------------
 
-  late List<FixedAssetMachine> _machines = widget.location == null
+  late List<FixedAssetMachine> _machines = _location == null
       ? const <FixedAssetMachine>[]
       : widget.machines;
 
   /// Vị trí của [_machines]; null = chưa có danh sách (form tự tải).
   late FixedAssetAuditLocation? _machinesLocation =
-      widget.machines.isEmpty ? null : widget.location;
+      widget.machines.isEmpty ? null : _location;
   bool _loadingMachines = false;
   String? _machinesError;
   int _machinesReq = 0;
@@ -158,15 +187,22 @@ class _NoQrReportSheetState extends State<NoQrReportSheet> {
   void initState() {
     super.initState();
 
-    if (widget.location == null) {
+    if (_location == null) {
       final cascade = _cascade = _newCascade();
-      _prefillCascade(cascade, widget.initialSelection);
+      // Chưa có PIC: dropdown khóa, không điền sẵn vị trí.
+      if (_pic != null) _prefillCascade(cascade, widget.initialSelection);
     }
     // Tải sau frame đầu: loader báo onChanged (setState) ngay khi gọi.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      // Chưa có PIC mà danh sách đúng 1 người: tự chọn (tải luôn vị trí).
+      final picPick = fixedAssetAutoPick(widget.pics, hasValue: _pic != null);
+      if (picPick != null) {
+        _onPicChanged(picPick.email);
+        return;
+      }
       final cascade = _cascade;
-      if (cascade != null) _loadCascadeLists(cascade);
+      if (cascade != null && _pic != null) _loadCascadeLists(cascade);
       final location = _location;
       if (location != null && _machinesLocation != location) {
         _loadMachines(location);
@@ -213,6 +249,7 @@ class _NoQrReportSheetState extends State<NoQrReportSheet> {
   // VỊ TRÍ
   // ============================================================
 
+  /// Cascade lọc theo PIC của form (cùng API / tham số pic như màn chính).
   FixedAssetManualCascade _newCascade() => FixedAssetManualCascade(
     onChanged: _onCascadeChanged,
     onError: (message) {
@@ -220,7 +257,32 @@ class _NoQrReportSheetState extends State<NoQrReportSheet> {
     },
     isDisposed: () => _disposed,
     api: widget.api,
-  );
+  )..pic = _pic;
+
+  /// Đổi PIC: xóa vị trí + máy đã chọn, mở 4 dropdown trống và tải Fac
+  /// theo PIC mới.
+  void _onPicChanged(String? email) {
+    final value = (email?.trim().isEmpty ?? true) ? null : email!.trim();
+    if (value == _pic) return;
+    final cascade = _newCascade()..pic = value;
+    setState(() {
+      _pic = value;
+      _cascade = cascade;
+      _location = null;
+      _locationError = null;
+      _locationAttempted = false;
+      _machinesReq++;
+      _machines = const <FixedAssetMachine>[];
+      _machinesLocation = null;
+      _loadingMachines = false;
+      _machinesError = null;
+      _selectedMachine = null;
+      _manualCode = false;
+      _manualController.clear();
+      _searchController.clear();
+    });
+    if (value != null) _loadCascadeLists(cascade);
+  }
 
   /// Chọn sẵn các cấp liên tiếp đã có, dừng ở cấp trống đầu tiên.
   static void _prefillCascade(
@@ -240,17 +302,50 @@ class _NoQrReportSheetState extends State<NoQrReportSheet> {
     if (positionAA != null) cascade.selectPositionAA(positionAA);
   }
 
-  /// Tải danh sách mọi cấp đang chọn được (song song).
-  static void _loadCascadeLists(FixedAssetManualCascade cascade) {
-    cascade.loadFacs();
+  /// Tải danh sách mọi cấp đang chọn được (song song); cấp trống chỉ có 1
+  /// option thì tự chọn ([_autoPick]).
+  void _loadCascadeLists(FixedAssetManualCascade cascade) {
+    cascade.loadFacs().then(
+      (o) => _autoPick(cascade, FixedAssetManualField.fac, o),
+    );
     final fac = cascade.selectedFac;
     if (fac == null) return;
-    cascade.loadFloors(fac);
+    cascade.loadFloors(fac).then(
+      (o) => _autoPick(cascade, FixedAssetManualField.floor, o),
+    );
     final floor = cascade.selectedFloor;
     if (floor == null) return;
-    cascade.loadPositionA(fac, floor);
+    cascade.loadPositionA(fac, floor).then(
+      (o) => _autoPick(cascade, FixedAssetManualField.positionA, o),
+    );
     final positionA = cascade.selectedPositionA;
-    if (positionA != null) cascade.loadPositionAA(fac, floor, positionA);
+    if (positionA != null) {
+      cascade.loadPositionAA(fac, floor, positionA).then(
+        (o) => _autoPick(cascade, FixedAssetManualField.positionAA, o),
+      );
+    }
+  }
+
+  /// [options] vừa tải của [field] có đúng 1, ô trống, chưa bị xóa tay:
+  /// chọn như người dùng chọn (tải tiếp cấp sau, tự chọn nối tiếp).
+  void _autoPick(
+    FixedAssetManualCascade cascade,
+    FixedAssetManualField field,
+    List<String>? options,
+  ) {
+    if (!mounted || _cascade != cascade) return;
+    final pick = cascade.singleOption(field, options);
+    if (pick == null) return;
+    switch (field) {
+      case FixedAssetManualField.fac:
+        _onFacChanged(pick);
+      case FixedAssetManualField.floor:
+        _onFloorChanged(pick);
+      case FixedAssetManualField.positionA:
+        _onPositionAChanged(pick);
+      case FixedAssetManualField.positionAA:
+        _onPositionAAChanged(pick);
+    }
   }
 
   /// "Đổi": mở 4 dropdown, chọn sẵn vị trí hiện tại.
@@ -290,7 +385,11 @@ class _NoQrReportSheetState extends State<NoQrReportSheet> {
     final c = _cascade;
     if (c == null || !c.selectFac(value)) return;
     _onLocationEdited();
-    if (value != null) c.loadFloors(value);
+    if (value != null) {
+      c.loadFloors(value).then(
+        (o) => _autoPick(c, FixedAssetManualField.floor, o),
+      );
+    }
   }
 
   void _onFloorChanged(String? value) {
@@ -298,7 +397,11 @@ class _NoQrReportSheetState extends State<NoQrReportSheet> {
     if (c == null || !c.selectFloor(value)) return;
     _onLocationEdited();
     final fac = c.selectedFac;
-    if (fac != null && value != null) c.loadPositionA(fac, value);
+    if (fac != null && value != null) {
+      c.loadPositionA(fac, value).then(
+        (o) => _autoPick(c, FixedAssetManualField.positionA, o),
+      );
+    }
   }
 
   void _onPositionAChanged(String? value) {
@@ -308,7 +411,9 @@ class _NoQrReportSheetState extends State<NoQrReportSheet> {
     final fac = c.selectedFac;
     final floor = c.selectedFloor;
     if (fac != null && floor != null && value != null) {
-      c.loadPositionAA(fac, floor, value);
+      c.loadPositionAA(fac, floor, value).then(
+        (o) => _autoPick(c, FixedAssetManualField.positionAA, o),
+      );
     }
   }
 
@@ -367,6 +472,7 @@ class _NoQrReportSheetState extends State<NoQrReportSheet> {
         floor: location.floor,
         positionA: location.positionA,
         positionAA: location.positionAA,
+        pic: _pic,
       );
     } catch (_) {
       error = NoQrStrings.machinesFailed;
@@ -428,6 +534,9 @@ class _NoQrReportSheetState extends State<NoQrReportSheet> {
     FocusScope.of(context).unfocus();
 
     final location = _location;
+    final pic = _pic;
+    // Nút Lưu khóa khi chưa có PIC; phòng hờ.
+    if (pic == null) return;
     if (location == null || _machineMissing) {
       setState(() {
         _submitted = true;
@@ -451,6 +560,7 @@ class _NoQrReportSheetState extends State<NoQrReportSheet> {
 
     final report = NoQrReport(
       location: location,
+      pic: pic,
       machineCode: _machineCode,
       isManualCode: _manualCode,
       note: _noteController.text.trim(),
@@ -500,6 +610,9 @@ class _NoQrReportSheetState extends State<NoQrReportSheet> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
+                      _sectionLabel(NoQrStrings.pic, required: true),
+                      _buildPic(),
+                      const SizedBox(height: 14),
                       _sectionLabel(NoQrStrings.location, required: true),
                       _buildLocation(),
                       const SizedBox(height: 14),
@@ -590,6 +703,21 @@ class _NoQrReportSheetState extends State<NoQrReportSheet> {
               ),
             ),
         ],
+      ),
+    );
+  }
+
+  /// Gợi ý nhỏ dưới một mục (mờ).
+  Widget _hint(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: Text(
+        text,
+        style: TextStyle(
+          color: Colors.white.withValues(alpha: .55),
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+        ),
       ),
     );
   }
@@ -696,6 +824,23 @@ class _NoQrReportSheetState extends State<NoQrReportSheet> {
     );
   }
 
+  // ---------------- PIC ----------------
+
+  /// Dropdown PIC bắt buộc – cùng widget màn chính, không có "Tất cả".
+  /// Nhãn "PIC *" là section label phía trên.
+  Widget _buildPic() {
+    return IgnorePointer(
+      ignoring: _saving,
+      child: FixedAssetPicSelector(
+        pics: widget.pics,
+        selectedEmail: _pic,
+        loading: widget.loadingPics,
+        onChanged: _onPicChanged,
+        allowAll: false,
+      ),
+    );
+  }
+
   // ---------------- Vị trí ----------------
 
   /// Đủ 4 cấp (và không đang đổi): breadcrumb + "Đổi". Còn lại: 4 dropdown
@@ -777,10 +922,14 @@ class _NoQrReportSheetState extends State<NoQrReportSheet> {
             floorFlashKey: _floorFlashKey,
             positionAFlashKey: _positionAFlashKey,
             positionAAFlashKey: _positionAAFlashKey,
-            missingField: _locationAttempted ? _firstMissingSelector : null,
+            missingField: _locationAttempted && !_picMissing
+                ? _firstMissingSelector
+                : null,
             missingTick: _locationTick,
+            enabled: !_picMissing,
           ),
         ),
+        if (_picMissing) _hint(NoQrStrings.picFirst),
         if (_locationError != null) _fieldError(_locationError!),
         if (showError) _fieldError(NoQrStrings.locationRequired),
         if (location != null)
@@ -899,6 +1048,8 @@ class _NoQrReportSheetState extends State<NoQrReportSheet> {
               .toList();
 
     final Widget body;
+    // Chưa có PIC cũng là chưa có vị trí ("Chọn PIC trước" chỉ hiện dưới
+    // dropdown vị trí).
     if (_location == null) {
       body = _pickerMessage(NoQrStrings.machinesNeedLocation);
     } else if (_loadingMachines) {
@@ -952,8 +1103,9 @@ class _NoQrReportSheetState extends State<NoQrReportSheet> {
       );
     }
 
-    // Chưa đủ vị trí: khung mờ, ô tìm khóa (nhập tay vẫn dùng được).
-    final searchEnabled = !_saving && _location != null;
+    // Chưa có PIC / chưa đủ vị trí: khung mờ, ô tìm khóa (nhập tay vẫn
+    // dùng được).
+    final searchEnabled = !_saving && !_picMissing && _location != null;
 
     return Material(
       color: Colors.white.withValues(alpha: .05),
@@ -1134,10 +1286,10 @@ class _NoQrReportSheetState extends State<NoQrReportSheet> {
               const SizedBox(width: 10),
               Expanded(
                 flex: 2,
-                // Luôn bấm được (trừ lúc đang lưu): bấm khi còn thiếu thì
-                // hiện lỗi bắt buộc.
+                // Khóa khi đang lưu / chưa chọn PIC; thiếu mục khác vẫn bấm
+                // được (hiện lỗi bắt buộc).
                 child: FilledButton(
-                  onPressed: _saving ? null : _save,
+                  onPressed: _saving || _picMissing ? null : _save,
                   style: FilledButton.styleFrom(
                     backgroundColor: _amber,
                     foregroundColor: Colors.black87,

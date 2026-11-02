@@ -34,6 +34,9 @@ class FixedAssetAuditCheckResponse {
 
   final String message;
 
+  /// Email PIC của máy (null = máy chưa có PIC).
+  final String? pic;
+
   /// Đang chờ thay QR (backend: QrMismatch = 1 AND ReprintSts = 0). Nguồn
   /// duy nhất cho "chờ thay QR".
   final bool needsQrReprint;
@@ -69,6 +72,7 @@ class FixedAssetAuditCheckResponse {
     required this.actualPositionA,
     required this.actualPositionAA,
     required this.message,
+    this.pic,
   });
 
   factory FixedAssetAuditCheckResponse.fromJson(Map<String, dynamic> json) {
@@ -98,6 +102,13 @@ class FixedAssetAuditCheckResponse {
       actualPositionA: str('actualPositionA'),
       actualPositionAA: str('actualPositionAA'),
       message: str('message'),
+      pic: _optPic(json['pic']),
     );
   }
+}
+
+/// Email PIC từ JSON; rỗng -> null.
+String? _optPic(dynamic value) {
+  final text = value?.toString().trim() ?? '';
+  return text.isEmpty ? null : text;
 }

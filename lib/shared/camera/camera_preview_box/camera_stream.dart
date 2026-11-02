@@ -89,6 +89,7 @@ mixin _CameraStreamMixin on State<CameraPreviewBox> {
   bool get isCameraStarting => _cameraStarting;
 
   bool get _cameraShouldRun =>
+      widget.cameraAllowed &&
       !_routeSuspended &&
       (!widget.enablePowerControl ||
           (_userCameraEnabled && !_lifecycleSuspended));

@@ -6,6 +6,7 @@ import 'package:chuphinh/features/fixed_asset/replace/fixed_asset_replace_contro
 import 'package:chuphinh/features/fixed_asset/replace/fixed_asset_replace_models.dart';
 import 'package:chuphinh/features/fixed_asset/replace/fixed_asset_replace_strings.dart';
 import 'package:chuphinh/features/fixed_asset/replace/fixed_asset_replace_zone_screen.dart';
+import 'package:chuphinh/features/fixed_asset/widgets/fixed_asset_pic_selector.dart';
 import 'package:chuphinh/features/fixed_asset/reprint/widgets/fixed_asset_reprint_card.dart'
     show FixedAssetReprintColors;
 
@@ -53,8 +54,13 @@ class _FixedAssetReplaceScreenState extends State<FixedAssetReplaceScreen> {
     super.dispose();
   }
 
-  void _openZone(FixedAssetReplaceZone zone) {
-    Navigator.push(
+  /// Đã tự pop vì hết máy chờ: chỉ xử lý 1 lần.
+  bool _closing = false;
+
+  /// Khu trả true (khu đã xong, tự pop): tải lại; hết máy chờ thì tự pop
+  /// + snackbar "Không còn máy chờ thay QR".
+  Future<void> _openZone(FixedAssetReplaceZone zone) async {
+    final changed = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
         builder: (_) => FixedAssetReplaceZoneScreen(
@@ -65,6 +71,23 @@ class _FixedAssetReplaceScreenState extends State<FixedAssetReplaceScreen> {
         ),
       ),
     );
+    if (changed != true || !mounted || _closing) return;
+    await _controller.load(silent: true);
+    if (!mounted || _closing) return;
+    final c = _controller;
+    final empty =
+        !c.loading &&
+        c.error == null &&
+        c.floors.isEmpty &&
+        c.unknownZone == null;
+    if (!empty || !(ModalRoute.of(context)?.isCurrent ?? false)) return;
+    _closing = true;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(content: Text(FixedAssetReplaceStrings.noneLeft)),
+      );
+    Navigator.pop(context, true);
   }
 
   // ============================================================
@@ -90,8 +113,10 @@ class _FixedAssetReplaceScreenState extends State<FixedAssetReplaceScreen> {
             children: [
               if (!_controller.loading &&
                   _controller.error == null &&
-                  _controller.tasks.isNotEmpty)
+                  _controller.tasks.isNotEmpty) ...[
+                _buildPicSelector(),
                 _buildFacFilter(),
+              ],
               Expanded(child: _buildContent()),
             ],
           ),
@@ -144,6 +169,22 @@ class _FixedAssetReplaceScreenState extends State<FixedAssetReplaceScreen> {
         ),
         const SizedBox(width: 4),
       ],
+    );
+  }
+
+  /// Dropdown PIC (chung các màn trong phiên), lọc danh sách phía FE.
+  Widget _buildPicSelector() {
+    final pics = _controller.picFilter;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+      child: FixedAssetPicSelector(
+        pics: pics.pics,
+        selectedEmail: pics.selectedEmail,
+        loading: pics.loading,
+        onChanged: pics.select,
+        allCount: pics.allCount,
+        machineUnit: 'máy chờ',
+      ),
     );
   }
 

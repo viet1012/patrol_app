@@ -5,19 +5,33 @@ import 'package:flutter/services.dart';
 
 import 'package:chuphinh/core/models/patrol_group.dart';
 import 'package:chuphinh/shared/camera/camera_preview_box.dart';
+import 'package:chuphinh/features/fixed_asset/replace/fixed_asset_replace_controller.dart'
+    show FixedAssetReplaceScanError;
 import 'package:chuphinh/features/fixed_asset/replace/fixed_asset_replace_strings.dart';
 import 'package:chuphinh/features/fixed_asset/reprint/widgets/fixed_asset_reprint_card.dart'
     show FixedAssetReprintColors;
 
+/// Kết quả màn quét (pop): [done] = quét đúng; [error] = lỗi lưu, camera
+/// đã đóng. Người dùng tự đóng camera: pop null.
+class FixedAssetReplaceScanResult {
+  final bool done;
+  final String? error;
+
+  const FixedAssetReplaceScanResult.done() : done = true, error = null;
+  const FixedAssetReplaceScanResult.failed(String this.error) : done = false;
+}
+
 /// Camera quét toàn màn hình cho một bước thay QR (dùng [CameraPreviewBox]).
 ///
-/// [onScan] kiểm QR: null = đúng (rung + tick, tự đóng, pop true), còn lại
-/// là câu báo lỗi hiện dưới khung, camera vẫn mở. Cùng QR còn trong khung
-/// không báo lặp; đưa QR ra khỏi khung rồi quét lại thì kiểm lại.
+/// [onScan] kiểm QR: null = đúng (rung + tick, tự đóng, pop
+/// [FixedAssetReplaceScanResult.done]); QR sai: báo lỗi trên camera, camera
+/// vẫn mở để quét tiếp; lỗi lưu ([FixedAssetReplaceScanError.apiFailed]):
+/// đóng camera, pop [FixedAssetReplaceScanResult.failed]. Cùng QR còn trong
+/// khung không xử lý lặp; đưa QR ra khỏi khung rồi quét lại thì kiểm lại.
 class FixedAssetReplaceScanScreen extends StatefulWidget {
   /// Đang chờ gì, vd "Quét QR CŨ của A-459 (đang dán A1-2)".
   final String title;
-  final Future<String?> Function(String rawQr) onScan;
+  final Future<FixedAssetReplaceScanError?> Function(String rawQr) onScan;
 
   const FixedAssetReplaceScanScreen({
     super.key,
@@ -63,11 +77,11 @@ class _FixedAssetReplaceScanScreenState
       _busy = true;
       _error = null;
     });
-    String? error;
+    FixedAssetReplaceScanError? error;
     try {
       error = await widget.onScan(qr);
     } catch (e) {
-      error = '$e';
+      error = FixedAssetReplaceScanError('$e', apiFailed: true);
     }
     if (!mounted) return;
     // Cửa sổ chống lặp tính từ lúc kiểm xong (POST có thể lâu).
@@ -75,20 +89,28 @@ class _FixedAssetReplaceScanScreenState
 
     if (error != null) {
       HapticFeedback.heavyImpact();
+      if (error.apiFailed) {
+        // Lỗi lưu: đóng camera, màn "Việc cần làm" báo lỗi + cho quét lại.
+        _success = true; // chặn QR đến trong lúc đóng
+        await _close(FixedAssetReplaceScanResult.failed(error.message));
+        return;
+      }
+      final message = error.message;
       setState(() {
         _busy = false;
-        _error = error;
+        _error = message;
       });
       return;
     }
 
     HapticFeedback.vibrate();
+    SystemSound.play(SystemSoundType.click);
     setState(() {
       _busy = false;
       _success = true;
     });
     await Future<void>.delayed(const Duration(milliseconds: 700));
-    await _close(true);
+    await _close(const FixedAssetReplaceScanResult.done());
   }
 
   Future<void> _toggleTorch() async {
@@ -106,7 +128,8 @@ class _FixedAssetReplaceScanScreenState
     setState(() => _torchOn = next);
   }
 
-  Future<void> _close([bool result = false]) async {
+  /// [result] null = người dùng tự đóng.
+  Future<void> _close([FixedAssetReplaceScanResult? result]) async {
     await _cameraKey.currentState?.sleepCamera();
     if (!mounted) return;
     Navigator.of(context).pop(result);

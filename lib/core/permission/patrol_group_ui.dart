@@ -11,7 +11,7 @@ class PatrolGroupUi {
   final String titleScreen;
   final String recheckTitle;
 
-  /// Các nút (chức năng) group này có ở Home. Fixed Asset không dùng field này.
+  /// Các nút (chức năng) group này có ở Home.
   final Set<PatrolAction> actions;
 
   const PatrolGroupUi({
@@ -76,14 +76,14 @@ const Map<PatrolGroup, PatrolGroupUi> kPatrolGroupUi = {
     prefix: 'Fixed Asset Audit',
     titleScreen: 'Fixed Asset Audit',
     recheckTitle: 'Recheck',
+    // Không theo workflow Patrol, dùng lại action sẵn có (quyền từ AuthMe):
+    // Kiểm kê = before, In lại QR = recheck, Thay QR = after,
+    // Tổng quan = summary (CanSummary).
+    actions: {
+      PatrolAction.before,
+      PatrolAction.recheck,
+      PatrolAction.after,
+      PatrolAction.summary,
+    },
   ),
 };
-
-// Fixed Asset không theo workflow Patrol: BE chưa có action riêng nên
-// map 2 chức năng của nó vào action sẵn có (quyền vẫn lấy từ AuthMe).
-
-/// Quyền mở màn kiểm kê Fixed Asset.
-const kFixedAssetAuditAction = PatrolAction.before;
-
-/// Quyền mở màn in lại QR Fixed Asset.
-const kFixedAssetReprintAction = PatrolAction.recheck;

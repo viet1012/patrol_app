@@ -6,6 +6,7 @@ import 'package:chuphinh/features/fixed_asset/fixed_asset_audit_flow.dart'
     show fixedAssetErrorText;
 import 'package:chuphinh/features/fixed_asset/fixed_asset_location.dart'
     show fixedAssetDash;
+import 'package:chuphinh/features/fixed_asset/fixed_asset_pic_filter.dart';
 import 'package:chuphinh/features/fixed_asset/fixed_asset_qr_parser.dart';
 import 'package:chuphinh/features/fixed_asset/reprint/fixed_asset_reprint_strings.dart';
 
@@ -46,8 +47,11 @@ class FixedAssetReprintItem {
   String get machineCode => row.machineCode;
   bool get isReady => state == FixedAssetReprintQrState.ready;
 
-  /// Lý do cần in lại theo auditMode (NO_QR = không có tem).
-  String get reasonLabel => row.isNoQr
+  /// Mất QR: ghi nhận NO_QR hoặc không có QR cũ (cùng quy tắc tab "Thay QR").
+  bool get isMissingQr => row.isNoQr || !row.hasQrLabel;
+
+  /// Lý do cần in lại: "Mất QR" / "Sai vị trí".
+  String get reasonLabel => isMissingQr
       ? FixedAssetReprintStrings.reasonNoQr
       : FixedAssetReprintStrings.reasonWrongLocation;
 
@@ -76,12 +80,19 @@ class FixedAssetReprintGroup {
   const FixedAssetReprintGroup(this.fac, this.items);
 }
 
-/// State màn "In lại QR": danh sách mọi xưởng, tra Fac + Floor, lọc xưởng /
-/// tìm kiếm / khu vực, chọn.
+/// State màn "In lại QR": danh sách mọi xưởng, tra Fac + Floor, lọc PIC /
+/// xưởng / tìm kiếm / khu vực, chọn.
 class FixedAssetReprintController extends ChangeNotifier {
-  FixedAssetReprintController({this.api = const FixedAssetBackend()});
+  FixedAssetReprintController({this.api = const FixedAssetBackend()}) {
+    // PIC rút từ chính danh sách chờ (không gọi GET /pics).
+    picFilter = FixedAssetPicFilter(api: api, localOnly: true)
+      ..addListener(_onPicChanged);
+  }
 
   final FixedAssetBackend api;
+
+  /// PIC (chung các màn trong phiên); lọc phía FE theo pic của dòng.
+  late final FixedAssetPicFilter picFilter;
 
   bool _disposed = false;
   int _req = 0;
@@ -122,7 +133,14 @@ class FixedAssetReprintController extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    picFilter.dispose();
     super.dispose();
+  }
+
+  /// PIC đổi (ở màn này hoặc màn khác) / danh sách PIC tải xong.
+  void _onPicChanged() {
+    _dropStaleFilters();
+    _notify();
   }
 
   // ------------------------------------------------------------
@@ -131,25 +149,33 @@ class FixedAssetReprintController extends ChangeNotifier {
 
   /// Mọi xưởng (không truyền fac): dữ liệu audit lưu theo xưởng, không theo
   /// nhà máy ở home.
-  Future<void> load() async {
+  ///
+  /// [silent]: kéo xuống để tải lại, giữ danh sách cũ tới khi có kết quả
+  /// (lỗi thì giữ nguyên, không hiện màn lỗi).
+  Future<void> load({bool silent = false}) async {
     final req = ++_req;
-    _loading = true;
-    _error = null;
-    _notify();
+    if (!silent) {
+      _loading = true;
+      _error = null;
+      _notify();
+    }
 
     try {
       final rows = await api.fetchQrMismatch();
       if (_disposed || req != _req) return;
       _items = rows.map(_initialItem).toList(growable: false);
+      // Tính lại danh sách PIC + số máy chờ (notify ở dưới).
+      picFilter.setFromRows(rows);
       final codes = _items.map((e) => e.machineCode).toSet();
       _selected.retainWhere(codes.contains);
+      _error = null;
       _loading = false;
       _dropStaleFilters();
       _notify();
       _resolveLocations(req);
     } catch (error) {
       if (_disposed || req != _req) return;
-      _error = fixedAssetErrorText(error);
+      if (!silent) _error = fixedAssetErrorText(error);
       _loading = false;
       _notify();
     }
@@ -312,36 +338,43 @@ class FixedAssetReprintController extends ChangeNotifier {
   // FILTER + SELECTION (chỉ hiển thị, không đổi dữ liệu gốc)
   // ------------------------------------------------------------
 
+  /// Máy của PIC đang chọn (máy không có PIC chỉ có ở "Tất cả PIC").
+  Iterable<FixedAssetReprintItem> get _picItems =>
+      _items.where((e) => picFilter.matches(e.row.pic));
+
   /// Xưởng có trong dữ liệu (đã biết), sắp theo tên + số máy mỗi xưởng.
   /// Máy chưa rõ xưởng đếm riêng ở [unknownFacCount].
   List<({String fac, int count})> get facCounts {
     final counts = <String, int>{};
-    for (final e in _items) {
+    for (final e in _picItems) {
       if (e.fac.isNotEmpty) counts[e.fac] = (counts[e.fac] ?? 0) + 1;
     }
     final facs = counts.keys.toList()..sort();
     return [for (final f in facs) (fac: f, count: counts[f]!)];
   }
 
-  int get unknownFacCount => _items.where((e) => e.fac.isEmpty).length;
+  /// Số máy của PIC đang chọn (mọi xưởng).
+  int get picItemCount => _picItems.length;
+
+  int get unknownFacCount => _picItems.where((e) => e.fac.isEmpty).length;
 
   bool _inFac(FixedAssetReprintItem e) => _fac == null || e.fac == _fac;
 
   /// Khu vực của xưởng đang lọc.
   List<String> get areas {
     final set = <String>{
-      for (final e in _items)
+      for (final e in _picItems)
         if (_inFac(e) && e.row.positionA.isNotEmpty) e.row.positionA,
     };
     return set.toList()..sort();
   }
 
-  /// Sau lọc xưởng + khu vực + tìm kiếm.
+  /// Sau lọc PIC + xưởng + khu vực + tìm kiếm.
   List<FixedAssetReprintItem> get visibleItems {
     final q = _norm(_search);
     final area = _area;
     return [
-      for (final e in _items)
+      for (final e in _picItems)
         if (_inFac(e) &&
             (area == null || e.row.positionA == area) &&
             (q.isEmpty ||
@@ -402,7 +435,7 @@ class FixedAssetReprintController extends ChangeNotifier {
   /// Xưởng / khu vực đang lọc không còn trong dữ liệu -> về "tất cả".
   void _dropStaleFilters() {
     final fac = _fac;
-    if (fac != null && !_items.any((e) => e.fac == fac)) _fac = null;
+    if (fac != null && !_picItems.any((e) => e.fac == fac)) _fac = null;
     if (_area != null && !areas.contains(_area)) _area = null;
   }
 
@@ -422,6 +455,33 @@ class FixedAssetReprintController extends ChangeNotifier {
     }
     _notify();
   }
+
+  /// Nhóm có máy chọn được (QR mới hợp lệ).
+  bool groupSelectable(FixedAssetReprintGroup group) =>
+      group.items.any((e) => e.isReady);
+
+  /// Mọi máy chọn được của nhóm đều đang chọn.
+  bool isGroupSelected(FixedAssetReprintGroup group) {
+    final ready = group.items.where((e) => e.isReady).toList();
+    return ready.isNotEmpty && ready.every(isSelected);
+  }
+
+  /// Checkbox tiêu đề nhóm: chọn cả nhóm (đã chọn hết thì bỏ chọn cả nhóm).
+  void toggleGroup(FixedAssetReprintGroup group) {
+    final codes = group.items.where((e) => e.isReady).map((e) => e.machineCode);
+    if (isGroupSelected(group)) {
+      _selected.removeAll(codes);
+    } else {
+      _selected.addAll(codes);
+    }
+    _notify();
+  }
+
+  /// Số bộ lọc trong sheet "Lọc" đang áp dụng (xưởng, khu vực, tìm kiếm).
+  int get activeFilterCount =>
+      (_fac != null ? 1 : 0) +
+      (_area != null ? 1 : 0) +
+      (_search.trim().isNotEmpty ? 1 : 0);
 
   /// Bỏ chọn các máy đang hiển thị.
   void clearSelection() {

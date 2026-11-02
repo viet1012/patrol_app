@@ -74,6 +74,15 @@ class CameraPreviewBox extends StatefulWidget {
   final bool enablePowerControl;
   final bool useSwitchPowerControl;
 
+  /// false: màn hình cha chưa cho bật camera (không xin quyền, không mở
+  /// stream; stream đang chạy bị tắt). Khung hiện [blockedPlaceholder], ẩn
+  /// power control. Không đổi lựa chọn bật/tắt dùng chung của user.
+  /// true (mặc định): giữ nguyên hành vi cũ.
+  final bool cameraAllowed;
+
+  /// Nội dung khung camera khi [cameraAllowed] == false.
+  final Widget? blockedPlaceholder;
+
   /// false: không load STT / không mở socket STT (vd. dialog quét QR không
   /// gắn với plant). true (mặc định): giữ nguyên hành vi cũ.
   final bool enableStt;
@@ -97,6 +106,8 @@ class CameraPreviewBox extends StatefulWidget {
     this.enableQrLockAnimation = false,
     this.enablePowerControl = false,
     this.useSwitchPowerControl = false,
+    this.cameraAllowed = true,
+    this.blockedPlaceholder,
     this.enableStt = true,
   });
 
@@ -246,6 +257,13 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
       // _loadStt();
       // _connectSocket();
     }
+
+    if (widget.cameraAllowed != oldWidget.cameraAllowed) {
+      // Như route suspend: chỉ đổi điều kiện chạy, không đổi state dùng chung.
+      if (!widget.cameraAllowed) _invalidateActiveCameraSession();
+      _cameraStartFailed = false;
+      _reconcileCameraPower();
+    }
   }
 
   @override
@@ -339,15 +357,20 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
                         viewType: _viewType,
                         active: _video != null && !_cameraSleeping,
                         scale: widget.enableZoomControls ? 1.0 : _zoom,
-                        inactive: ValueListenableBuilder<_PowerUi>(
-                          valueListenable: _powerStateNotifier,
-                          builder: (context, _, __) => _CameraUnavailableView(
-                            state: cameraPowerState,
-                            enablePowerControl: widget.enablePowerControl,
-                            lifecycleSuspended: _lifecycleSuspended,
-                            onResume: resumeCamera,
-                          ),
-                        ),
+                        inactive: !widget.cameraAllowed &&
+                                widget.blockedPlaceholder != null
+                            ? widget.blockedPlaceholder!
+                            : ValueListenableBuilder<_PowerUi>(
+                                valueListenable: _powerStateNotifier,
+                                builder: (context, _, __) =>
+                                    _CameraUnavailableView(
+                                      state: cameraPowerState,
+                                      enablePowerControl:
+                                          widget.enablePowerControl,
+                                      lifecycleSuspended: _lifecycleSuspended,
+                                      onResume: resumeCamera,
+                                    ),
+                              ),
                       ),
 
                       // Khung căn QR tĩnh: vẽ một lần, không chạy animation.
@@ -505,7 +528,7 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
               ),
             ),
 
-            if (widget.enablePowerControl)
+            if (widget.enablePowerControl && widget.cameraAllowed)
               Positioned(
                 top: 12,
                 right: 12,

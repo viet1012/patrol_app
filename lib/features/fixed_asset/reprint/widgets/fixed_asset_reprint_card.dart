@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
+import 'package:chuphinh/features/fixed_asset/widgets/fixed_asset_pic_chip.dart';
+
 import 'package:chuphinh/features/fixed_asset/reprint/fixed_asset_reprint_controller.dart';
 import 'package:chuphinh/features/fixed_asset/reprint/fixed_asset_reprint_strings.dart';
 
@@ -20,12 +22,21 @@ abstract final class FixedAssetReprintColors {
   static const Color textDisabled = Color(0x66FFFFFF); // trắng 0.4
   static const newQr = Color(0xFF22C55E);
   static const amber = Color(0xFFF59E0B);
+
+  /// Chip lý do: "Sai vị trí" cam, "Mất QR" vàng.
+  static const orange = Color(0xFFFB923C);
+  static const yellow = Color(0xFFFACC15);
   static const surface = Color(0xFF1F2937);
   static const appBar = Color(0xFF121826);
 }
 
-/// Thẻ một máy: checkbox + mã/tên, QR cũ -> QR mới, ảnh QR mới (bấm để xem
-/// lớn), người quét · thời gian.
+/// Thẻ một máy (mobile, 1 tay): bấm cả thẻ = chọn / bỏ chọn; bấm ảnh QR =
+/// xem phóng to.
+/// - Hàng đầu: checkbox + mã / tên máy + chip lý do ("Sai vị trí" cam /
+///   "Mất QR" vàng).
+/// - Dòng nổi bật: "In cho vị trí: Fac / Floor / A / AA" (nội dung QR in ra).
+/// - "QR đang dán: …" chữ nhỏ, mờ (Mất QR: "Chưa có QR").
+/// - Dòng phụ: PIC · người kiểm kê · thời gian.
 class FixedAssetReprintCard extends StatelessWidget {
   final FixedAssetReprintItem item;
   final bool selected;
@@ -50,61 +61,89 @@ class FixedAssetReprintCard extends StatelessWidget {
       if (row.updatedAt != null) _time.format(row.updatedAt!),
     ].join(' · ');
 
+    final String printValue;
+    final Color printColor;
+    switch (item.state) {
+      case FixedAssetReprintQrState.ready:
+        printValue = item.newLocationLabel;
+        printColor = FixedAssetReprintColors.newQr;
+      case FixedAssetReprintQrState.resolving:
+        printValue = FixedAssetReprintStrings.resolvingLocation;
+        printColor = Colors.white70;
+      case FixedAssetReprintQrState.missing:
+        printValue = FixedAssetReprintStrings.missingLocation;
+        printColor = FixedAssetReprintColors.amber;
+    }
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
         onTap: item.isReady ? onToggle : null,
         child: Ink(
-          padding: const EdgeInsets.fromLTRB(4, 10, 10, 10),
-          // Chọn: chỉ viền màu nhấn 0.5, không tô nền đỏ.
+          padding: const EdgeInsets.fromLTRB(4, 8, 10, 10),
+          // Chọn: viền màu nhấn + nền nhấn rất nhạt.
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: .06),
+            color: selected
+                ? FixedAssetReprintColors.coral.withValues(alpha: .07)
+                : Colors.white.withValues(alpha: .06),
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
               color: selected
-                  ? FixedAssetReprintColors.coral.withValues(alpha: .5)
+                  ? FixedAssetReprintColors.coral.withValues(alpha: .6)
                   : Colors.white.withValues(alpha: .14),
+              width: selected ? 1.4 : 1,
             ),
           ),
-          // Cao theo nội dung; checkbox + ảnh QR căn trên.
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Màu tường minh cho mọi trạng thái (không theo theme sáng).
-              Checkbox(
-                value: selected,
-                onChanged: item.isReady ? (_) => onToggle() : null,
-                fillColor: WidgetStateProperty.resolveWith(
-                  (states) => states.contains(WidgetState.selected)
-                      ? FixedAssetReprintColors.coralSoft
-                      : Colors.transparent,
-                ),
-                checkColor: const Color(0xFF111827),
-                side: WidgetStateBorderSide.resolveWith(
-                  (states) => BorderSide(
-                    color: states.contains(WidgetState.disabled)
-                        ? Colors.white.withValues(alpha: .2)
-                        : Colors.white.withValues(alpha: .55),
-                    width: 1.5,
+              // Chỉ hiển thị trạng thái: bấm đâu trên thẻ cũng chọn.
+              IgnorePointer(
+                child: Checkbox(
+                  value: selected,
+                  onChanged: item.isReady ? (_) {} : null,
+                  fillColor: WidgetStateProperty.resolveWith(
+                    (states) => states.contains(WidgetState.selected)
+                        ? FixedAssetReprintColors.coralSoft
+                        : Colors.transparent,
                   ),
+                  checkColor: const Color(0xFF111827),
+                  side: WidgetStateBorderSide.resolveWith(
+                    (states) => BorderSide(
+                      color: states.contains(WidgetState.disabled)
+                          ? Colors.white.withValues(alpha: .2)
+                          : Colors.white.withValues(alpha: .55),
+                      width: 1.5,
+                    ),
+                  ),
+                  visualDensity: VisualDensity.compact,
                 ),
-                visualDensity: VisualDensity.compact,
               ),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
-                      item.machineCode,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w800,
-                      ),
+                    const SizedBox(height: 4),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            item.machineCode,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 15.5,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        _reasonChip(),
+                      ],
                     ),
                     if (row.faName.isNotEmpty)
                       Text(
@@ -113,44 +152,50 @@ class FixedAssetReprintCard extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           color: Colors.white.withValues(alpha: .6),
-                          fontSize: 12,
+                          fontSize: 12.5,
                         ),
                       ),
-                    const SizedBox(height: 6),
-                    _locationLine(
-                      '${FixedAssetReprintStrings.reason}: ',
-                      item.reasonLabel,
-                      FixedAssetReprintColors.amber,
-                    ),
-                    _locationLine(
-                      '${FixedAssetReprintStrings.oldQr}: ',
-                      item.oldLocationLabel,
-                      Colors.redAccent.shade100,
-                      strike: true,
-                    ),
-                    if (item.state == FixedAssetReprintQrState.missing)
-                      _locationLine(
-                        '${FixedAssetReprintStrings.newQr}: ',
-                        FixedAssetReprintStrings.missingLocation,
-                        FixedAssetReprintColors.amber,
-                      )
-                    else
-                      _locationLine(
-                        '→ ${FixedAssetReprintStrings.newQr}: ',
-                        item.state == FixedAssetReprintQrState.resolving
-                            ? FixedAssetReprintStrings.resolvingLocation
-                            : item.newLocationLabel,
-                        FixedAssetReprintColors.newQr,
-                        bold: true,
+                    const SizedBox(height: 5),
+                    FixedAssetPicChip(email: row.pic),
+                    const SizedBox(height: 8),
+                    Text(
+                      '${FixedAssetReprintStrings.printFor}:',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: .55),
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w600,
                       ),
+                    ),
+                    Text(
+                      printValue,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: printColor,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        height: 1.25,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${FixedAssetReprintStrings.currentQr}: '
+                      '${item.isMissingQr ? FixedAssetReprintStrings.noQrYet : item.oldLocationLabel}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: .45),
+                        fontSize: 11.5,
+                      ),
+                    ),
                     if (meta.isNotEmpty) ...[
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 2),
                       Text(
                         meta,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          color: Colors.white.withValues(alpha: .4),
+                          color: Colors.white.withValues(alpha: .45),
                           fontSize: 11,
                         ),
                       ),
@@ -159,7 +204,10 @@ class FixedAssetReprintCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              FixedAssetQrThumb(item: item, onTap: onPreview),
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: FixedAssetQrThumb(item: item, onTap: onPreview),
+              ),
             ],
           ),
         ),
@@ -167,34 +215,26 @@ class FixedAssetReprintCard extends StatelessWidget {
     );
   }
 
-  Widget _locationLine(
-    String label,
-    String value,
-    Color color, {
-    bool strike = false,
-    bool bold = false,
-  }) {
-    return Text.rich(
-      TextSpan(
-        children: [
-          TextSpan(
-            text: label,
-            style: TextStyle(color: Colors.white.withValues(alpha: .55)),
-          ),
-          TextSpan(
-            text: value,
-            style: TextStyle(
-              color: color,
-              fontWeight: bold ? FontWeight.w800 : FontWeight.w600,
-              decoration: strike ? TextDecoration.lineThrough : null,
-              decorationColor: color,
-            ),
-          ),
-        ],
+  /// "Sai vị trí" cam / "Mất QR" vàng.
+  Widget _reasonChip() {
+    final color = item.isMissingQr
+        ? FixedAssetReprintColors.yellow
+        : FixedAssetReprintColors.orange;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: .15),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: .6)),
       ),
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
-      style: const TextStyle(fontSize: 12.5),
+      child: Text(
+        item.reasonLabel,
+        style: TextStyle(
+          color: color,
+          fontSize: 11,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
     );
   }
 }

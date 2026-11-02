@@ -19,16 +19,6 @@ class FixedAssetStatusCard extends StatelessWidget {
   final String? lastAuditedUserName;
   final FixedAssetAuditLocation? mismatchMaster;
 
-  /// [FixedAssetScanStatus.zoneLocked]: "Chuyển Manual" button.
-  final VoidCallback? onSwitchManual;
-
-  /// [FixedAssetScanStatus.needsLocation]: primary "Dùng vị trí {label}"
-  /// (null label = not offered) and secondary "Chuyển Auto".
-  final String? qrLocationLabel;
-  final VoidCallback? onUseQrLocation;
-  final VoidCallback? onDeclineQrLocation; // "Không": bỏ qua vị trí QR
-  final VoidCallback? onSwitchAuto;
-
   /// Máy cần in lại QR: badge "Cần in lại QR".
   final bool needsQrReprint;
 
@@ -37,6 +27,9 @@ class FixedAssetStatusCard extends StatelessWidget {
 
   /// [FixedAssetScanStatus.qrReplaced]: lúc thay QR (reprintAt).
   final DateTime? qrReplacedAt;
+
+  /// Tên PIC của máy khi khác PIC đang chọn: dòng "Máy thuộc PIC …".
+  final String? otherPicName;
 
   const FixedAssetStatusCard({
     super.key,
@@ -48,14 +41,10 @@ class FixedAssetStatusCard extends StatelessWidget {
     this.lastAuditedUserId,
     this.lastAuditedUserName,
     required this.mismatchMaster,
-    this.onSwitchManual,
-    this.qrLocationLabel,
-    this.onDeclineQrLocation,
-    this.onUseQrLocation,
-    this.onSwitchAuto,
     this.needsQrReprint = false,
     this.reprintInfo,
     this.qrReplacedAt,
+    this.otherPicName,
   });
 
   /// "Việt (KVH_IT_Mem_Viet)" / "Việt" / "KVH_IT_Mem_Viet".
@@ -98,7 +87,7 @@ class FixedAssetStatusCard extends StatelessWidget {
         color = Colors.white54;
       case FixedAssetScanStatus.checking:
         primary = machineCode;
-        // MANUAL passes "Đang kiểm tra {code}…"; AUTO keeps the default.
+        // Controller passes "Đang kiểm tra {code}…".
         details.add(
           (message ?? '').isNotEmpty ? message! : 'Checking audit status...',
         );
@@ -175,26 +164,8 @@ class FixedAssetStatusCard extends StatelessWidget {
           color: _amber,
           size: 20,
         );
-      case FixedAssetScanStatus.zoneLocked:
-        // AUTO khóa ở khu vực khác: QR này không được check / lưu.
-        primary = hasCode ? machineCode : 'Khu vực đang khóa';
-        if ((message ?? '').isNotEmpty) details.add(message!);
-        label = 'Khóa khu vực';
-        color = _amber;
-        indicator = const Icon(Icons.lock_rounded, color: _amber, size: 20);
-      case FixedAssetScanStatus.needsLocation:
-        // MANUAL, location not chosen yet: nothing was saved.
-        primary = hasCode ? machineCode : 'Chưa chọn vị trí';
-        if ((message ?? '').isNotEmpty) details.add(message!);
-        label = 'Chọn vị trí';
-        color = _amber;
-        indicator = const Icon(
-          Icons.edit_location_alt_rounded,
-          color: _amber,
-          size: 20,
-        );
       case FixedAssetScanStatus.qrLocationMismatch:
-        // MANUAL: QR khác vị trí đang chọn; chờ xác nhận hoặc đã "Bỏ qua".
+        // QR khác vị trí đang chọn; chờ xác nhận hoặc đã "Bỏ qua".
         primary = machineCode;
         if (faName.isNotEmpty) details.add(faName);
         if ((message ?? '').isNotEmpty) details.add(message!);
@@ -307,9 +278,9 @@ class FixedAssetStatusCard extends StatelessWidget {
     }
 
     final idle = status == FixedAssetScanStatus.idle;
+    final otherPic = otherPicName;
+    if (!idle && otherPic != null) details.add('Máy thuộc PIC $otherPic');
     final failed = status == FixedAssetScanStatus.failed;
-    final zoneLocked = status == FixedAssetScanStatus.zoneLocked;
-    final needsLocation = status == FixedAssetScanStatus.needsLocation;
     // Dòng vị trí "Fac/Floor/A/AA" có thể dài: cho 2 dòng.
     final reprintDetails =
         status == FixedAssetScanStatus.qrLabelNotReplaced ||
@@ -369,7 +340,7 @@ class FixedAssetStatusCard extends StatelessWidget {
                     child: Text(
                       detail,
                       maxLines:
-                          failed || zoneLocked || needsLocation || reprintDetails
+                          failed || reprintDetails
                           ? 2
                           : 1,
                       overflow: TextOverflow.ellipsis,
@@ -385,109 +356,6 @@ class FixedAssetStatusCard extends StatelessWidget {
                   Padding(
                     padding: const EdgeInsets.only(top: 4),
                     child: _reprintTag(),
-                  ),
-                if (needsLocation)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 6),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (qrLocationLabel != null &&
-                            onUseQrLocation != null) ...[
-                          Text.rich(
-                            TextSpan(
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 12.5,
-                                fontWeight: FontWeight.w600,
-                              ),
-                              children: [
-                                const TextSpan(text: 'Dùng vị trí '),
-                                TextSpan(
-                                  text: qrLocationLabel,
-                                  style: const TextStyle(
-                                    color: _amber,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                                const TextSpan(text: ' theo QR để kiểm kê?'),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            children: [
-                              if (onDeclineQrLocation != null) ...[
-                                OutlinedButton(
-                                  onPressed: onDeclineQrLocation,
-                                  style: OutlinedButton.styleFrom(
-                                    foregroundColor: Colors.white70,
-                                    side: BorderSide(
-                                      color: Colors.white.withOpacity(.3),
-                                    ),
-                                    visualDensity: VisualDensity.compact,
-                                    textStyle: const TextStyle(
-                                      fontSize: 12.5,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                  child: const Text('Không'),
-                                ),
-                                const SizedBox(width: 8),
-                              ],
-                              FilledButton(
-                                onPressed: onUseQrLocation,
-                                style: FilledButton.styleFrom(
-                                  backgroundColor: _amber,
-                                  foregroundColor: Colors.black,
-                                  visualDensity: VisualDensity.compact,
-                                  textStyle: const TextStyle(
-                                    fontSize: 12.5,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                                child: const Text('Có'),
-                              ),
-                            ],
-                          ),
-                        ],
-                        if (onSwitchAuto != null)
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: TextButton(
-                              onPressed: onSwitchAuto,
-                              style: TextButton.styleFrom(
-                                foregroundColor: _amber,
-                                visualDensity: VisualDensity.compact,
-                                textStyle: const TextStyle(
-                                  fontSize: 12.5,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                              child: const Text('Chuyển Auto'),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                if (zoneLocked && onSwitchManual != null)
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: TextButton.icon(
-                      onPressed: onSwitchManual,
-                      icon: const Icon(Icons.touch_app_rounded, size: 16),
-                      label: const Text('Chuyển Manual'),
-                      style: TextButton.styleFrom(
-                        foregroundColor: _amber,
-                        visualDensity: VisualDensity.compact,
-                        textStyle: const TextStyle(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
                   ),
                 if ((status == FixedAssetScanStatus.alreadyAudited ||
                         status == FixedAssetScanStatus.qrReprintCleared ||

@@ -4,6 +4,21 @@ import 'package:chuphinh/core/api/fixed_asset_backend.dart';
 import 'package:chuphinh/features/fixed_asset/fixed_asset_audit_flow.dart';
 import 'package:chuphinh/features/fixed_asset/fixed_asset_location.dart';
 
+/// Tự chọn khi danh sách vừa tải có đúng 1 option, ô đang trống
+/// ([hasValue] false) và người dùng chưa tự xóa ô đó ([userCleared]).
+/// Trả option cần chọn, null = không tự chọn. Dùng chung cho 4 dropdown vị
+/// trí ([FixedAssetManualCascade.singleOption]) và dropdown PIC.
+T? fixedAssetAutoPick<T>(
+  List<T>? options, {
+  required bool hasValue,
+  bool userCleared = false,
+}) {
+  if (hasValue || userCleared || options == null || options.length != 1) {
+    return null;
+  }
+  return options.single;
+}
+
 /// State + loaders của cascade MANUAL: Fac -> Floor -> PositionA -> PositionAA.
 ///
 /// Chỉ lo dropdown hierarchy (giữ request token riêng từng level). Việc reset machine list / scan state và load
@@ -27,12 +42,16 @@ class FixedAssetManualCascade {
 
   final bool Function() isDisposed;
 
+  /// Email PIC lọc các danh sách (null = mọi PIC). Màn "Kiểm kê" đặt theo
+  /// dropdown PIC; form máy thiếu QR để null.
+  String? pic;
+
   String? selectedFac;
   String? selectedFloor;
   String? selectedPositionA;
   String? selectedPositionAA;
 
-  /// Fac được cache: chỉ load lần đầu vào MANUAL, tái sử dụng khi toggle.
+  /// Fac được cache: chỉ load một lần khi mở màn hình.
   List<String> facs = const <String>[];
   List<String> floors = const <String>[];
   List<String> positionAs = const <String>[];
@@ -73,8 +92,39 @@ class FixedAssetManualCascade {
 
   bool get needsFacs => facs.isEmpty && !loadingFacs;
 
-  /// Đổi mode: vô hiệu hóa request con, xóa lựa chọn (giữ cache Fac).
-  void resetForModeSwitch() {
+  /// Cấp vừa bị xóa về rỗng (có giá trị -> null): không tự chọn lại cho tới
+  /// khi cấp đó được chọn lại hoặc cấp cha đổi.
+  final Set<FixedAssetManualField> _cleared = <FixedAssetManualField>{};
+
+  String? _selectedOf(FixedAssetManualField field) => switch (field) {
+    FixedAssetManualField.fac => selectedFac,
+    FixedAssetManualField.floor => selectedFloor,
+    FixedAssetManualField.positionA => selectedPositionA,
+    FixedAssetManualField.positionAA => selectedPositionAA,
+  };
+
+  /// Ghi nhận xóa / chọn ở [field]; cấp sau (cha mới) được tự chọn lại.
+  void _trackSelect(FixedAssetManualField field, String? previous, String? value) {
+    if (value == null && previous != null) {
+      _cleared.add(field);
+    } else if (value != null) {
+      _cleared.remove(field);
+    }
+    _cleared.removeWhere((f) => f.index > field.index);
+  }
+
+  /// [options] vừa tải của [field] có đúng 1 và ô đang trống, chưa bị xóa
+  /// tay: option cần tự chọn (caller chọn + tải cấp sau); còn lại null.
+  String? singleOption(FixedAssetManualField field, List<String>? options) =>
+      fixedAssetAutoPick(
+        options,
+        hasValue: _selectedOf(field) != null,
+        userCleared: _cleared.contains(field),
+      );
+
+  /// Đổi PIC: xoá mọi lựa chọn + danh sách; request đang chạy bị bỏ.
+  void clear() {
+    _facReq++;
     _floorReq++;
     _positionAReq++;
     _positionAAReq++;
@@ -83,13 +133,18 @@ class FixedAssetManualCascade {
     selectedFloor = null;
     selectedPositionA = null;
     selectedPositionAA = null;
+
+    facs = const <String>[];
     floors = const <String>[];
     positionAs = const <String>[];
     positionAAs = const <String>[];
 
+    loadingFacs = false;
     loadingFloors = false;
     loadingPositionA = false;
     loadingPositionAA = false;
+
+    _cleared.clear();
   }
 
   // ------------------------------------------------------------
@@ -98,6 +153,7 @@ class FixedAssetManualCascade {
 
   bool selectFac(String? value) {
     if (value == selectedFac) return false;
+    _trackSelect(FixedAssetManualField.fac, selectedFac, value);
 
     // Vô hiệu hóa mọi request con đang chạy.
     _floorReq++;
@@ -121,6 +177,7 @@ class FixedAssetManualCascade {
 
   bool selectFloor(String? value) {
     if (value == selectedFloor) return false;
+    _trackSelect(FixedAssetManualField.floor, selectedFloor, value);
 
     _positionAReq++;
     _positionAAReq++;
@@ -139,6 +196,7 @@ class FixedAssetManualCascade {
 
   bool selectPositionA(String? value) {
     if (value == selectedPositionA) return false;
+    _trackSelect(FixedAssetManualField.positionA, selectedPositionA, value);
 
     _positionAAReq++;
 
@@ -153,6 +211,7 @@ class FixedAssetManualCascade {
 
   bool selectPositionAA(String? value) {
     if (value == selectedPositionAA) return false;
+    _trackSelect(FixedAssetManualField.positionAA, selectedPositionAA, value);
 
     selectedPositionAA = value;
     return true;
@@ -162,19 +221,24 @@ class FixedAssetManualCascade {
   // LOADERS
   // ------------------------------------------------------------
 
+  // [silent] (mọi loader): tải ngầm – không bật loading, lỗi thì giữ danh
+  // sách cũ và không báo.
+
   /// Returns the accepted options, or null when the request failed/stale.
-  Future<List<String>?> loadFacs() async {
+  Future<List<String>?> loadFacs({bool silent = false}) async {
     final req = ++_facReq;
-    loadingFacs = true;
-    onChanged();
+    if (!silent) {
+      loadingFacs = true;
+      onChanged();
+    }
 
     try {
-      final result = await api.fetchFacs();
+      final result = await api.fetchFacs(pic: pic);
       if (isDisposed() || req != _facReq) return null;
       facs = result;
       return result;
     } catch (error) {
-      if (isDisposed() || req != _facReq) return null;
+      if (isDisposed() || req != _facReq || silent) return null;
       facs = const <String>[];
       onError('Load Fac failed: ${fixedAssetErrorText(error)}');
       return null;
@@ -187,18 +251,20 @@ class FixedAssetManualCascade {
   }
 
   /// Returns the accepted options, or null when the request failed/stale.
-  Future<List<String>?> loadFloors(String fac) async {
+  Future<List<String>?> loadFloors(String fac, {bool silent = false}) async {
     final req = _floorReq;
-    loadingFloors = true;
-    onChanged();
+    if (!silent) {
+      loadingFloors = true;
+      onChanged();
+    }
 
     try {
-      final result = await api.fetchFloors(fac: fac);
+      final result = await api.fetchFloors(fac: fac, pic: pic);
       if (isDisposed() || req != _floorReq) return null;
       floors = result;
       return result;
     } catch (error) {
-      if (isDisposed() || req != _floorReq) return null;
+      if (isDisposed() || req != _floorReq || silent) return null;
       floors = const <String>[];
       onError('Load Floor failed: ${fixedAssetErrorText(error)}');
       return null;
@@ -211,21 +277,28 @@ class FixedAssetManualCascade {
   }
 
   /// Returns the accepted options, or null when the request failed/stale.
-  Future<List<String>?> loadPositionA(String fac, String floor) async {
+  Future<List<String>?> loadPositionA(
+    String fac,
+    String floor, {
+    bool silent = false,
+  }) async {
     final req = _positionAReq;
-    loadingPositionA = true;
-    onChanged();
+    if (!silent) {
+      loadingPositionA = true;
+      onChanged();
+    }
 
     try {
       final result = await api.fetchPositionA(
         fac: fac,
         floor: floor,
+        pic: pic,
       );
       if (isDisposed() || req != _positionAReq) return null;
       positionAs = result;
       return result;
     } catch (error) {
-      if (isDisposed() || req != _positionAReq) return null;
+      if (isDisposed() || req != _positionAReq || silent) return null;
       positionAs = const <String>[];
       onError('Load PositionA failed: ${fixedAssetErrorText(error)}');
       return null;
@@ -241,23 +314,27 @@ class FixedAssetManualCascade {
   Future<List<String>?> loadPositionAA(
     String fac,
     String floor,
-    String positionA,
-  ) async {
+    String positionA, {
+    bool silent = false,
+  }) async {
     final req = _positionAAReq;
-    loadingPositionAA = true;
-    onChanged();
+    if (!silent) {
+      loadingPositionAA = true;
+      onChanged();
+    }
 
     try {
       final result = await api.fetchPositionAA(
         fac: fac,
         floor: floor,
         positionA: positionA,
+        pic: pic,
       );
       if (isDisposed() || req != _positionAAReq) return null;
       positionAAs = result;
       return result;
     } catch (error) {
-      if (isDisposed() || req != _positionAAReq) return null;
+      if (isDisposed() || req != _positionAAReq || silent) return null;
       positionAAs = const <String>[];
       onError('Load PositionAA failed: ${fixedAssetErrorText(error)}');
       return null;

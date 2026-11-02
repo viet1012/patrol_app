@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'package:chuphinh/features/fixed_asset/widgets/fixed_asset_pic_chip.dart';
 import 'package:chuphinh/features/fixed_asset/replace/fixed_asset_replace_models.dart';
 import 'package:chuphinh/features/fixed_asset/replace/fixed_asset_replace_strings.dart';
 import 'package:chuphinh/features/fixed_asset/reprint/widgets/fixed_asset_reprint_card.dart'
@@ -99,6 +100,8 @@ class FixedAssetReplaceTaskTile extends StatelessWidget {
                             fontSize: 12.5,
                           ),
                         ),
+                      const SizedBox(height: 5),
+                      FixedAssetPicChip(email: task.row.pic),
                       const SizedBox(height: 4),
                       Text(
                         kindText,

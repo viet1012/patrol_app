@@ -29,6 +29,9 @@ class FixedAssetScanInfo {
   /// reprintAct* / reprintQr* (QR cũ = *_Qr); chỉ dùng khi [needsQrReprint].
   final FixedAssetReprintInfo? reprint;
 
+  /// Email PIC của máy (null = máy chưa có PIC).
+  final String? pic;
+
   const FixedAssetScanInfo({
     required this.machineCode,
     required this.existsInMaster,
@@ -47,6 +50,7 @@ class FixedAssetScanInfo {
     this.reprintSts = false,
     this.reprintAt,
     this.reprint,
+    this.pic,
   });
 
   factory FixedAssetScanInfo.fromJson(Map<String, dynamic> json) {
@@ -70,6 +74,7 @@ class FixedAssetScanInfo {
       reprintSts: parseBool(json['reprintSts']),
       reprintAt: parseDateTime(json['reprintAt']),
       reprint: FixedAssetReprintInfo.fromJson(json),
+      pic: _optPic(json['pic']),
     );
   }
 
@@ -101,4 +106,10 @@ DateTime? parseDateTime(dynamic value) {
     return DateTime(at(0), at(1), at(2), at(3), at(4), at(5));
   }
   return parseDate(value);
+}
+
+/// Email PIC từ JSON; rỗng -> null.
+String? _optPic(dynamic value) {
+  final text = value?.toString().trim() ?? '';
+  return text.isEmpty ? null : text;
 }

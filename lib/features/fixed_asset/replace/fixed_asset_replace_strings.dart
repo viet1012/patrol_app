@@ -48,17 +48,18 @@ abstract final class FixedAssetReplaceStrings {
   static const saving = 'Đang lưu…';
   static const flashUnsupported = 'Máy này không bật được đèn flash';
   static const invalidQr = 'QR không hợp lệ (không đọc được mã máy)';
-  static String otherMachine(String other, String code) =>
-      'QR này của máy $other, không phải $code';
-  static String notOldQr(String oldQr) => 'Đây không phải QR cũ ($oldQr)';
-  static const stillOldQr = 'Vẫn là QR cũ, hãy quét QR mới';
-  static String newQrWrongLocation(String onQr, String act) =>
-      'QR mới in sai vị trí ($onQr), cần in lại QR $act';
-  static String newQrNoLocation(String act) =>
-      'QR không có vị trí, cần in lại QR $act';
+  static String mismatch(String scanned, String expected) =>
+      'QR không khớp: đang quét $scanned, cần $expected';
+
+  // Lỗi lưu bước 2: camera đóng, báo ở màn "Việc cần làm".
   static String saveFailed(String error) =>
-      'Lưu không thành công: $error. Đưa QR ra rồi quét lại';
+      'Lưu không thành công: $error. Bấm bước 2 để quét lại';
   static String notCleared(String message) =>
       'Chưa gỡ được cờ QR${message.isEmpty ? '' : ': $message'}. '
-      'Đưa QR ra rồi quét lại';
+      'Bấm bước 2 để quét lại';
+  static String replaced(String code) => 'Đã thay QR $code';
+  static String replacedNext(String code, String next) =>
+      'Đã thay QR $code · tiếp $next';
+  static String zoneFinished(String zone) => 'Đã xong khu $zone';
+  static const noneLeft = 'Không còn máy chờ thay QR';
 }

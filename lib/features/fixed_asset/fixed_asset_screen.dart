@@ -8,6 +8,8 @@ import 'package:chuphinh/core/models/patrol_group.dart';
 import 'package:chuphinh/core/models/fixed_asset_zone_progress.dart';
 import 'package:chuphinh/features/fixed_asset/fixed_asset_audit_flow.dart';
 import 'package:chuphinh/features/fixed_asset/fixed_asset_controller.dart';
+import 'package:chuphinh/features/fixed_asset/fixed_asset_location.dart';
+import 'package:chuphinh/features/fixed_asset/fixed_asset_pic_filter.dart';
 import 'package:chuphinh/features/fixed_asset/map/fixed_asset_detected_map.dart';
 import 'package:chuphinh/features/fixed_asset/no_qr/no_qr_entry.dart';
 import 'package:chuphinh/features/fixed_asset/no_qr/no_qr_report.dart';
@@ -19,16 +21,15 @@ import 'package:chuphinh/features/fixed_asset/widgets/fixed_asset_location_secti
 import 'package:chuphinh/features/fixed_asset/widgets/fixed_asset_machine_section.dart';
 import 'package:chuphinh/features/fixed_asset/widgets/fixed_asset_manual_selectors.dart';
 import 'package:chuphinh/features/fixed_asset/widgets/fixed_asset_mismatch_dialog.dart';
+import 'package:chuphinh/features/fixed_asset/widgets/fixed_asset_pic_selector.dart';
 import 'package:chuphinh/features/fixed_asset/widgets/fixed_asset_qr_mismatch_dialog.dart';
 import 'package:chuphinh/features/fixed_asset/widgets/fixed_asset_reprint_move_dialog.dart';
 import 'package:chuphinh/features/fixed_asset/widgets/fixed_asset_selector.dart';
 import 'package:chuphinh/features/fixed_asset/widgets/fixed_asset_scan_chip.dart';
 import 'package:chuphinh/features/fixed_asset/widgets/fixed_asset_status_card.dart';
 
-export 'package:chuphinh/features/fixed_asset/fixed_asset_audit_flow.dart'
-    show FixedAssetLocationMode;
-
-/// Màn hình kiểm kê Fixed Asset (AUTO / MANUAL).
+/// Màn hình kiểm kê Fixed Asset: chọn đủ Fac / Floor / PositionA /
+/// PositionAA thì camera mới bật và QR mới được xử lý.
 ///
 /// Screen = composition root: tạo [FixedAssetController], tích hợp camera,
 /// hiển thị dialog/snackbar (cần BuildContext) và ghép các widget con.
@@ -41,12 +42,19 @@ class FixedAssetScreen extends StatefulWidget {
   /// currentLang của app (VI / EN / JA), cho nhập giọng nói.
   final String lang;
 
+  /// Mở sẵn theo PIC (email; ghi vào PIC chung của phiên) và vị trí đủ 4 ô
+  /// (camera bật ngay). null = như bình thường.
+  final String? initialPic;
+  final FixedAssetAuditLocation? initialLocation;
+
   const FixedAssetScreen({
     super.key,
     required this.accountCode,
     this.selectedPlant,
     this.userName = '',
     this.lang = 'VI',
+    this.initialPic,
+    this.initialLocation,
   });
 
   @override
@@ -80,14 +88,23 @@ class _FixedAssetScreenState extends State<FixedAssetScreen>
   final _positionAAFlashKey = GlobalKey<RequiredFieldFlashState>();
   QrDetectionGeometry? _latestQrDetection;
 
-  /// Camera chỉ build một lần: rebuild của màn hình (search, check,
-  /// status...) không rebuild CameraPreviewBox.
-  late final Widget _cameraSection = _buildCameraSection();
+  /// Camera chỉ rebuild khi [FixedAssetController.canScan] đổi: rebuild của
+  /// màn hình (search, check, status...) không rebuild CameraPreviewBox.
+  late final Widget _cameraSection = FixedAssetSelector(
+    listenable: _controller,
+    select: () => _controller.canScan,
+    builder: (context, canScan) => _buildCameraSection(canScan),
+  );
 
   @override
   void initState() {
     super.initState();
 
+    // PIC phải có trước khi tạo controller (controller đọc PIC của phiên).
+    final initialPic = widget.initialPic?.trim() ?? '';
+    if (initialPic.isNotEmpty) {
+      FixedAssetPicSession.selected.value = initialPic;
+    }
     _controller = FixedAssetController(
       accountCode: widget.accountCode,
       userName: widget.userName,
@@ -95,10 +112,8 @@ class _FixedAssetScreenState extends State<FixedAssetScreen>
       confirmQrMismatch: _showQrMismatchDialog,
       confirmReprintMove: _showReprintMoveDialog,
       showError: _showError,
+      showNotice: _showNotice,
       resetQr: () => _cameraKey.currentState?.resetQr(),
-      onZoneUnlocked: _showZoneUnlocked,
-      onManualFieldMissing: (field) =>
-          _flashKeyFor(field).currentState?.flash(scrollTo: true),
       onScanAccepted: (rawQr, machineCode) {
         final detailedMatches = _latestQrDetection?.value == rawQr;
         if (!detailedMatches) _latestQrDetection = null;
@@ -108,9 +123,8 @@ class _FixedAssetScreenState extends State<FixedAssetScreen>
 
     // Summary chạy độc lập, không chặn camera.
     _controller.loadAuditSummary();
-    // Khởi tạo mode ban đầu như lúc chuyển mode (AUTO: zone lock; MANUAL:
-    // tải Fac + nhấp nháy ô trống đầu tiên).
-    _controller.start();
+    // Tải Fac + nhấp nháy ô trống đầu tiên.
+    _controller.start(initialLocation: widget.initialLocation);
     _flashFirstMissingManualField();
 
     WidgetsBinding.instance.addObserver(this);
@@ -146,7 +160,6 @@ class _FixedAssetScreenState extends State<FixedAssetScreen>
     if (state != AppLifecycleState.resumed) return;
     _controller.refreshZoneProgress();
     _controller.loadAuditSummary();
-    _controller.loadZoneLock();
   }
 
   // ============================================================
@@ -162,25 +175,10 @@ class _FixedAssetScreenState extends State<FixedAssetScreen>
     FixedAssetManualField.positionAA => _positionAAFlashKey,
   };
 
-  /// Vào MANUAL: ô trống đầu tiên nhấp nháy một lần (không cuộn). Đợi frame
-  /// sau vì dropdown MANUAL chỉ được build sau khi đổi mode.
-  void _onModeChanged(FixedAssetLocationMode mode) {
-    _controller.setLocationMode(mode);
-    _flashFirstMissingManualField();
-  }
-
-  /// "Không": bỏ gợi ý vị trí từ QR, nhấp nháy + cuộn tới ô trống đầu tiên
-  /// để user tự chọn.
-  void _onDeclineQrLocation() {
-    _controller.declineQrLocation();
-    final field = _controller.firstMissingManualField;
-    if (field != null) _flashKeyFor(field).currentState?.flash(scrollTo: true);
-  }
-
+  /// Mở màn hình: ô trống đầu tiên nhấp nháy một lần (không cuộn).
   void _flashFirstMissingManualField() {
-    if (_controller.isAutoMode) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || _controller.isAutoMode) return;
+      if (!mounted) return;
       final field = _controller.firstMissingManualField;
       if (field != null) _flashKeyFor(field).currentState?.flash();
     });
@@ -188,6 +186,7 @@ class _FixedAssetScreenState extends State<FixedAssetScreen>
 
   void _onQrDetected(String qr) {
     _controller.uxLog('camera detect "$qr"');
+    // Chốt chặn chung (chưa đủ vị trí -> bỏ qua) nằm trong controller.
     _controller.processScannedQr(qr);
   }
 
@@ -230,7 +229,7 @@ class _FixedAssetScreenState extends State<FixedAssetScreen>
     return result == true;
   }
 
-  /// Dialog "QR không khớp vị trí đang chọn" (MANUAL).
+  /// Dialog "QR không khớp vị trí đang chọn".
   /// true = "Vẫn lưu (đánh dấu in lại QR)".
   Future<bool> _showQrMismatchDialog(FixedAssetQrMismatchPrompt prompt) async {
     if (!mounted) {
@@ -267,16 +266,6 @@ class _FixedAssetScreenState extends State<FixedAssetScreen>
     return result == true;
   }
 
-  /// Khu vực AUTO đang khóa vừa xong (controller báo đúng một lần).
-  void _showZoneUnlocked(String positionAA) {
-    if (!mounted) return;
-    CommonUI.showSnackBar(
-      context: context,
-      message: 'Hoàn thành $positionAA ✓, có thể quét khu vực khác.',
-      color: const Color(0xFF16A34A),
-    );
-  }
-
   void _showError(String message) {
     if (!mounted) return;
     CommonUI.showSnackBar(
@@ -286,8 +275,17 @@ class _FixedAssetScreenState extends State<FixedAssetScreen>
     );
   }
 
+  void _showNotice(String message) {
+    if (!mounted) return;
+    CommonUI.showSnackBar(
+      context: context,
+      message: message,
+      color: const Color(0xFF16A34A),
+    );
+  }
+
   /// Form "máy thiếu QR": luôn mở, kể cả chưa đủ vị trí (form tự hiện 4
-  /// dropdown, điền sẵn các cấp đã chọn ở MANUAL). Quét QR tạm dừng trong
+  /// dropdown, điền sẵn các cấp đã chọn). Quét QR tạm dừng trong
   /// lúc form mở. Lưu xong với vị trí khác màn hình: màn hình theo vị trí đó.
   Future<void> _openNoQrSheet({String? machineCode}) async {
     // Sheet đang mở (che màn hình): lần bấm này không tới được đây.
@@ -295,7 +293,7 @@ class _FixedAssetScreenState extends State<FixedAssetScreen>
     final c = _controller;
     final location = c.activeLocation;
     final manual = c.manual;
-    final NoQrLocationDraft? draft = location == null && !c.isAutoMode
+    final NoQrLocationDraft? draft = location == null
         ? (
             fac: manual.selectedFac,
             floor: manual.selectedFloor,
@@ -312,7 +310,11 @@ class _FixedAssetScreenState extends State<FixedAssetScreen>
       saved = await showNoQrReportSheet(
         context: context,
         location: location,
+        // List màn chính đã lọc theo PIC đang chọn = PIC điền sẵn của form.
         machines: location == null ? const [] : c.machines,
+        pics: c.pics,
+        initialPic: c.selectedPicEmail,
+        loadingPics: c.loadingPics,
         initialSelection: draft,
         initialMachineCode: machineCode,
         onSubmit: (report) async {
@@ -356,8 +358,8 @@ class _FixedAssetScreenState extends State<FixedAssetScreen>
   // setState theo controller, chỉ section có giá trị liên quan đổi mới
   // rebuild (camera, AppBar không bao giờ rebuild theo controller).
 
-  /// Map chỉ rebuild khi location hiển thị đổi (AUTO: autoLocation,
-  /// MANUAL: 4 dropdown), không theo summary/machine/search/status.
+  /// Map chỉ rebuild khi 4 dropdown đổi, không theo
+  /// summary/machine/search/status.
   Widget _buildDetectedMap() {
     final c = _controller;
     return FixedAssetSelector<
@@ -372,16 +374,6 @@ class _FixedAssetScreenState extends State<FixedAssetScreen>
       listenable: c,
       select: () {
         // zoneProgress: a new map instance per load (identity compare).
-        if (c.isAutoMode) {
-          final location = c.autoLocation;
-          return (
-            fac: location?.fac,
-            floor: location?.floor,
-            positionA: location?.positionA,
-            positionAA: location?.positionAA,
-            zoneProgress: c.zoneProgress,
-          );
-        }
         final manual = c.manual;
         return (
           fac: manual.selectedFac,
@@ -422,11 +414,10 @@ class _FixedAssetScreenState extends State<FixedAssetScreen>
         lastAuditedUserId: c.lastAuditedUserId,
         lastAuditedUserName: c.lastAuditedUserName,
         mismatchMaster: c.mismatchMaster,
-        qrLocationLabel: c.pendingQrLocationLabel,
-        onDeclineQrLocation: _onDeclineQrLocation,
         needsQrReprint: c.needsQrReprint,
         reprintInfo: c.reprintInfo,
         qrReplacedAt: c.qrReplacedAt,
+        otherPicName: c.scannedOtherPicName,
       ),
       builder: (context, v) => FixedAssetStatusCard(
         status: v.status,
@@ -437,16 +428,10 @@ class _FixedAssetScreenState extends State<FixedAssetScreen>
         lastAuditedUserId: v.lastAuditedUserId,
         lastAuditedUserName: v.lastAuditedUserName,
         mismatchMaster: v.mismatchMaster,
-        onSwitchManual: () => c.setLocationMode(FixedAssetLocationMode.manual),
-        qrLocationLabel: v.qrLocationLabel,
-        onUseQrLocation: c.useLocationFromQr,
-        onDeclineQrLocation: c.declineQrLocation,
         needsQrReprint: v.needsQrReprint,
         reprintInfo: v.reprintInfo,
         qrReplacedAt: v.qrReplacedAt,
-        onSwitchAuto: c.autoModeEnabled
-            ? () => c.setLocationMode(FixedAssetLocationMode.auto)
-            : null,
+        otherPicName: v.otherPicName,
       ),
     );
   }
@@ -467,19 +452,23 @@ class _FixedAssetScreenState extends State<FixedAssetScreen>
         summary: c.auditSummary,
         loading: c.loadingAuditSummary,
         error: c.auditSummaryError,
+        picName: c.selectedPicEmail == null
+            ? null
+            : c.picNameOf(c.selectedPicEmail!),
       ),
       builder: (context, v) => FixedAssetAuditProgressCard(
         summary: v.summary,
         loading: v.loading,
         error: v.error,
         onRetry: c.loadAuditSummary,
+        picName: v.picName,
       ),
     );
   }
 
-  /// Location + MANUAL cascade phụ thuộc ~20 field (mode, auto location,
-  /// 4 dropdown + list + loading): rebuild theo mọi notify cho chắc chắn
-  /// đúng; section nhẹ, không chứa map/machine list.
+  /// Cascade phụ thuộc ~13 field (4 dropdown + list + loading): rebuild
+  /// theo mọi notify cho chắc chắn đúng; section nhẹ, không chứa
+  /// map/machine list.
   Widget _buildLocationSection() {
     final c = _controller;
     return ListenableBuilder(
@@ -487,19 +476,14 @@ class _FixedAssetScreenState extends State<FixedAssetScreen>
       builder: (context, _) {
         final manual = c.manual;
         return FixedAssetLocationSection(
-          locationMode: c.locationMode,
-          autoLocation: c.autoLocation,
-          autoUnmappedActual: c.autoUnmappedActual,
-          autoLocationMismatch: c.autoLocationMismatch,
-          // Số theo kỳ từ zone-progress; chưa có thì số cũ.
-          machineCount: c.displayMachineCount,
-          auditedMachineCount: c.displayAuditedCount,
-          onModeChanged: _onModeChanged,
-          showModeToggle: c.autoModeEnabled,
-          lockedZone: c.lockedZone,
-          lockedZoneProgress: c.lockedZoneProgress,
-          zoneLockUnverified: c.isZoneLockUnverified,
-          resumedFromLock: c.isResumedFromLock,
+          picSelector: FixedAssetPicSelector(
+            pics: c.pics,
+            selectedEmail: c.selectedPicEmail,
+            loading: c.loadingPics,
+            onChanged: c.onPicChanged,
+            // PIC bắt buộc chọn trước vị trí.
+            allowAll: false,
+          ),
           manualSelectors: FixedAssetManualSelectors(
             selectedFac: manual.selectedFac,
             selectedFloor: manual.selectedFloor,
@@ -521,8 +505,9 @@ class _FixedAssetScreenState extends State<FixedAssetScreen>
             floorFlashKey: _floorFlashKey,
             positionAFlashKey: _positionAFlashKey,
             positionAAFlashKey: _positionAAFlashKey,
-            missingField: c.manualMissingField,
-            missingTick: c.manualMissingTick,
+            // Chưa đủ vị trí: ô cần chọn tiếp được làm nổi bật.
+            missingField: c.firstMissingManualField,
+            enabled: c.hasPic,
           ),
         );
       },
@@ -641,7 +626,9 @@ class _FixedAssetScreenState extends State<FixedAssetScreen>
     );
   }
 
-  Widget _buildCameraSection() {
+  /// [canScan] false: camera không bật (không xin quyền / mở stream), khung
+  /// hiện hướng dẫn chọn vị trí; true: bật camera, quét như bình thường.
+  Widget _buildCameraSection(bool canScan) {
     return SizedBox(
       width: 340,
       height: 340,
@@ -659,6 +646,8 @@ class _FixedAssetScreenState extends State<FixedAssetScreen>
           enableQrLockAnimation: true,
           enablePowerControl: true,
           useSwitchPowerControl: true,
+          cameraAllowed: canScan,
+          blockedPlaceholder: const _ChooseLocationPlaceholder(),
           showQrNumber: false,
           // Fixed Asset draws its own parsed, colour-coded chip.
           showQrBadge: false,
@@ -667,62 +656,12 @@ class _FixedAssetScreenState extends State<FixedAssetScreen>
     );
   }
 
-  /// Overlays above the (never rebuilt) camera: the parsed scan chip, the
-  /// "no QR" link under the scan frame and, in MANUAL without a full
-  /// location, a light "choose a location" veil. Pointer events pass
-  /// through to the camera controls (except on the link).
+  /// Overlay above the camera: the parsed scan chip. Pointer events pass
+  /// through to the camera controls.
   Widget _buildCameraOverlays() {
     final c = _controller;
     return Stack(
       children: [
-        Positioned.fill(
-          child: FixedAssetSelector(
-            listenable: c,
-            select: () => !c.isAutoMode && c.manual.selectedLocation == null,
-            builder: (context, needsLocation) => IgnorePointer(
-              child: AnimatedOpacity(
-                opacity: needsLocation ? 1 : 0,
-                duration: const Duration(milliseconds: 200),
-                child: Container(
-                  color: Colors.black.withValues(alpha: 0.35),
-                  alignment: Alignment.center,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xCC111827),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: const Color(0xFFF59E0B).withValues(alpha: .7),
-                      ),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.edit_location_alt_rounded,
-                          color: Color(0xFFF59E0B),
-                          size: 18,
-                        ),
-                        SizedBox(width: 6),
-                        Text(
-                          'Chọn vị trí trước khi quét',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 13.5,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
         Positioned(
           top: 12,
           left: 12,
@@ -756,7 +695,7 @@ class _FixedAssetScreenState extends State<FixedAssetScreen>
       dimension: displaySize,
       child: FittedBox(
         fit: BoxFit.contain,
-        // Same camera instance (built once); only the overlays rebuild.
+        // Same camera instance (GlobalKey); only the overlays rebuild.
         child: SizedBox.square(
           dimension: 340,
           child: Stack(
@@ -766,6 +705,39 @@ class _FixedAssetScreenState extends State<FixedAssetScreen>
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Khung camera khi chưa chọn đủ vị trí (camera chưa bật).
+class _ChooseLocationPlaceholder extends StatelessWidget {
+  const _ChooseLocationPlaceholder();
+
+  static const Color _amber = Color(0xFFF59E0B);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: const Color(0xFF111827),
+      alignment: Alignment.center,
+      padding: const EdgeInsets.all(28),
+      child: const Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.edit_location_alt_rounded, color: _amber, size: 44),
+          SizedBox(height: 12),
+          Text(
+            'Chọn Fac / Floor / PositionA / PositionAA để bật camera',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              height: 1.35,
+            ),
+          ),
+        ],
       ),
     );
   }

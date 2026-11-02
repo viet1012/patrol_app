@@ -10,7 +10,7 @@ import 'package:chuphinh/features/fixed_asset/no_qr/no_qr_strings.dart';
 /// đã ghi máy thiếu QR trong phiên. Icon ⚠ cuối dòng mở form máy thiếu QR.
 /// Không gọi API.
 class FixedAssetMachineSection extends StatefulWidget {
-  /// false khi chưa có location (AUTO chưa scan / MANUAL chưa chọn đủ).
+  /// false khi chưa chọn đủ location.
   final bool visible;
   final List<FixedAssetMachine> machines;
   final bool loading;
@@ -318,6 +318,19 @@ class _FixedAssetMachineSectionState extends State<FixedAssetMachineSection> {
                     style: TextStyle(
                       color: Colors.white.withOpacity(.62),
                       fontSize: 12,
+                    ),
+                  ),
+                ],
+                // Máy đã dời (vị trí hiệu lực khác MASTER).
+                if (machine.isMoved && machine.masterLocation.isNotEmpty) ...[
+                  const SizedBox(height: 1),
+                  Text(
+                    'Master: ${machine.masterLocation}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: _amber.withOpacity(.7),
+                      fontSize: 11,
                     ),
                   ),
                 ],

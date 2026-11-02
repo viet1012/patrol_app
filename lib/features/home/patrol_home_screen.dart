@@ -25,6 +25,9 @@ import 'package:chuphinh/features/fixed_asset/replace/fixed_asset_replace_string
 import 'package:chuphinh/features/fixed_asset/reprint/fixed_asset_reprint_badge.dart';
 import 'package:chuphinh/features/fixed_asset/reprint/fixed_asset_reprint_screen.dart';
 import 'package:chuphinh/features/fixed_asset/reprint/fixed_asset_reprint_strings.dart';
+import 'package:chuphinh/features/fixed_asset/summary/fixed_asset_summary_nav.dart';
+import 'package:chuphinh/features/fixed_asset/summary/fixed_asset_summary_screen.dart';
+import 'package:chuphinh/features/fixed_asset/summary/fixed_asset_summary_strings.dart';
 import 'package:chuphinh/core/models/auth_me.dart';
 import 'package:chuphinh/core/models/group_access.dart';
 import 'package:chuphinh/core/models/hse_patrol_team_model.dart';
@@ -532,9 +535,22 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
           : const [];
     }
 
-    return PatrolGroup.values
-        .where((g) => _accessOf(g).any)
-        .toList(growable: false);
+    return PatrolGroup.values.where(_hasAnyButton).toList(growable: false);
+  }
+
+  /// Có quyền ít nhất một nút group thực sự hiện (theo [PatrolGroupUi
+  /// .actions]); không thì ẩn cả card.
+  bool _hasAnyButton(PatrolGroup group) {
+    final ui = kPatrolGroupUi[group];
+    if (ui == null) return false;
+    return ui.actions.any(_accessOf(group).can);
+  }
+
+  /// Badge số máy chờ thay QR chỉ hiện ở "In lại QR" (recheck) và "Thay QR"
+  /// (after): không có quyền nào trong hai thì không tải.
+  bool get _canSeeReprintCount {
+    final access = _accessOf(PatrolGroup.FixedAsset);
+    return access.recheck || access.after;
   }
 
   Widget _buildGroupList() {
@@ -720,48 +736,63 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
     final prefix = ui.prefix;
     final titleScreen = ui.titleScreen;
 
-    // Fixed Asset không thuộc workflow Patrol: kiểm kê + in lại QR.
-    if (group == PatrolGroup.FixedAsset) {
-      return Padding(
-        padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
-        child: Column(
-          children: [
-            _patrolButton(
-              number: '1)',
-              title: FixedAssetStrings.menuTitle,
-              color: color,
-              enabled: access.can(kFixedAssetAuditAction),
-              onTap: _openFixedAsset,
-            ),
-            const SizedBox(height: 16),
-            _patrolButton(
-              number: '2)',
-              title: FixedAssetReprintStrings.menuTitle,
-              color: color,
-              enabled: access.can(kFixedAssetReprintAction),
-              onTap: _openFixedAssetReprint,
-              badge: FixedAssetReprintBadge(
-                color: color,
-                count: _reprintCount,
-              ),
-            ),
-            const SizedBox(height: 16),
-            // Badge = số máy chờ thay QR (needsQrReprint: QrMismatch = 1 AND
-            // ReprintSts = 0). Thay QR = quét lưu kiểm kê -> quyền kiểm kê.
-            _patrolButton(
-              number: '3)',
-              title: FixedAssetReplaceStrings.menuTitle,
-              color: color,
-              enabled: access.can(kFixedAssetAuditAction),
-              onTap: _openFixedAssetReplace,
-              badge: FixedAssetReprintBadge(
-                color: color,
-                count: _reprintCount,
-              ),
-            ),
-          ],
+    // Chỉ render nút group có; số thứ tự đánh theo nút thực sự hiện ra.
+    // Không quyền: nút mờ + ổ khóa (bấm báo không có quyền), không badge.
+    final buttons = <Widget>[];
+    void addButton(
+      PatrolAction action,
+      String title,
+      VoidCallback onTap, {
+      Widget? badge,
+    }) {
+      if (!ui.actions.contains(action)) return;
+      final enabled = access.can(action);
+      if (buttons.isNotEmpty) buttons.add(const SizedBox(height: 16));
+      buttons.add(
+        _patrolButton(
+          number: '${(buttons.length ~/ 2) + 1})',
+          title: title,
+          color: color,
+          enabled: enabled,
+          onTap: onTap,
+          badge: enabled ? badge : null,
         ),
       );
+    }
+
+    Widget column() => Padding(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
+      child: Column(children: buttons),
+    );
+
+    // Fixed Asset: 1) Kiểm kê (before) → 2) In lại QR (recheck) → 3) Thay QR
+    // (after) → 4) Tổng quan (summary). Badge 2 + 3 = số máy chờ thay QR
+    // (needsQrReprint).
+    if (group == PatrolGroup.FixedAsset) {
+      final badge = FixedAssetReprintBadge(color: color, count: _reprintCount);
+      addButton(
+        PatrolAction.before,
+        FixedAssetStrings.menuTitle,
+        _openFixedAsset,
+      );
+      addButton(
+        PatrolAction.recheck,
+        FixedAssetReprintStrings.menuTitle,
+        _openFixedAssetReprint,
+        badge: badge,
+      );
+      addButton(
+        PatrolAction.after,
+        FixedAssetReplaceStrings.menuTitle,
+        _openFixedAssetReplace,
+        badge: badge,
+      );
+      addButton(
+        PatrolAction.summary,
+        FixedAssetSummaryStrings.menuTitle,
+        _openFixedAssetSummary,
+      );
+      return column();
     }
 
     // SPC (tất cả nhà máy): chỉ xem Data Table.
@@ -778,56 +809,28 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
       );
     }
 
-    // Chỉ render nút group có; số thứ tự đánh theo nút thực sự hiện ra.
-    final buttons = <Widget>[];
-    void addButton(
-      PatrolAction action,
-      String title,
-      bool enabled,
-      VoidCallback onTap,
-    ) {
-      if (!ui.actions.contains(action)) return;
-      if (buttons.isNotEmpty) buttons.add(const SizedBox(height: 16));
-      buttons.add(
-        _patrolButton(
-          number: '${(buttons.length ~/ 2) + 1})',
-          title: title,
-          color: color,
-          enabled: enabled,
-          onTap: onTap,
-        ),
-      );
-    }
-
     addButton(
       PatrolAction.before,
       '$prefix Before',
-      access.before,
       () => _openBefore(group, titleScreen),
     );
     addButton(
       PatrolAction.after,
       'Action After',
-      access.after,
       () => _openAfter(group, titleScreen),
     );
     addButton(
       PatrolAction.recheck,
       ui.recheckTitle,
-      access.recheck,
       () => _openRecheck(group, titleScreen),
     );
     addButton(
       PatrolAction.summary,
       'Data Table',
-      access.summary,
       () => _openSummary(group),
     );
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
-      child: Column(children: buttons),
-    );
+    return column();
   }
 
   Widget _patrolButton({
@@ -923,7 +926,15 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
   void _openFixedAssetReprint() {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => const FixedAssetReprintScreen()),
+      MaterialPageRoute(
+        builder: (_) => FixedAssetReprintScreen(
+          // Cho nút "Mở Thay QR" sau khi in.
+          accountCode: widget.accountCode,
+          selectedPlant: selectedFactory,
+          userName: _employeeName,
+          lang: currentLang,
+        ),
+      ),
     ).then((_) => _fetchReprintCount());
   }
 
@@ -942,8 +953,26 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
     ).then((_) => _fetchReprintCount());
   }
 
+  /// "Tổng quan": tổng quan kỳ → danh sách PIC → chi tiết PIC.
+  void _openFixedAssetSummary() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => FixedAssetSummaryScreen(
+          nav: FixedAssetSummaryNav(
+            accountCode: widget.accountCode,
+            selectedPlant: selectedFactory,
+            userName: _employeeName,
+            lang: currentLang,
+          ),
+        ),
+      ),
+    ).then((_) => _fetchReprintCount());
+  }
+
   /// Tải số máy cần in lại QR cho badge. Lỗi: giữ số cũ.
   Future<void> _fetchReprintCount() async {
+    if (!_canSeeReprintCount) return;
     _reprintFetched = true;
     final requestId = ++_reprintRequestId;
     try {

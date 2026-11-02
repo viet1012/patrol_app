@@ -1,0 +1,117 @@
+/// Chuỗi hiển thị mục "Tổng quan" (summary) Fixed Asset (tiếng Việt cố định, gom một
+/// chỗ như các màn Fixed Asset khác).
+abstract final class FixedAssetSummaryStrings {
+  static const menuTitle = 'Tổng hợp';
+
+  // Tổng hợp (B)
+  static const overviewTitle = 'Tổng hợp kiểm kê';
+
+  /// "Quý 4/2026 · tháng 2/3"; ngoài quý chỉ tên quý.
+  static String periodMonth(String period, int month) =>
+      month > 0 ? '$period · tháng $month/3' : period;
+  static const refresh = 'Làm mới';
+
+  static const audited = 'Đã kiểm kê';
+  static const planTodayTitle = 'Kế hoạch đến hôm nay';
+  static const remaining = 'Còn lại';
+  static const pendingQr = 'Chờ thay QR';
+  static String auditedOf(int audited, int total) => '$audited/$total máy';
+  static String machines(int count) => '$count máy';
+  static String planTodayMachines(int count) => 'Kế hoạch hôm nay $count máy';
+
+  /// "Chậm n máy" / "Vượt n máy" / "Đúng tiến độ".
+  static String pace(int behind, int ahead) => behind > 0
+      ? 'Chậm $behind máy'
+      : (ahead > 0 ? 'Vượt $ahead máy' : onSchedule);
+  static const onSchedule = 'Đúng tiến độ';
+  static String monthNeed(int count) => 'tháng này cần thêm $count máy';
+  static const pendingQrHint = 'Bấm để mở 3) Thay QR';
+
+  /// "Tiến độ theo PIC · Quý 4/2026".
+  static String picProgressTitle(String period) => 'Tiến độ theo PIC · $period';
+  static const picProgressUnassigned = 'Chưa có PIC';
+
+  static const sortMachines = 'Số máy';
+  static const sortBehindPlan = 'Thiếu so KH';
+
+  static const colPic = 'PIC';
+  static const colMachines = 'Máy';
+  static String colMonth(int month) => 'Tháng $month';
+  static String colMonthCurrent(int month) => 'Tháng $month · tháng này';
+  static const colBehindPlan = 'Thiếu so KH';
+
+  /// Thiếu so KH: "−n"; 0 thì "—".
+  static String behindPlan(int count) => count > 0 ? '−$count' : '—';
+
+  static const noData = 'Chưa có dữ liệu kỳ này';
+
+  // Chi tiết PIC (C)
+  static const statAudited = 'Đã kiểm';
+  static const statPendingQr = 'Chờ thay QR';
+  static const machineUnit = 'máy';
+  static const tabZones = 'Theo khu';
+  static String tabZonesCount(int count) => 'Theo khu ($count)';
+  static String tabMachines(int count) => 'Danh sách máy ($count)';
+  static const noZones = 'Không có khu nào';
+  static const close = 'Đóng';
+
+  // Bảng "Theo khu"
+  static const onlyUnfinishedZones = 'Chỉ khu chưa xong';
+  static const noZoneMatch = 'Không có khu phù hợp';
+  static const searchZone = 'Tìm khu…';
+  static String zoneCount(int count) => '$count khu';
+
+  /// Dòng tên header PIC: " · {email} · {n} khu" (chưa có số khu thì bỏ).
+  static String picMeta(String email, int? zones) =>
+      ' · $email${zones == null ? '' : ' · ${zoneCount(zones)}'}';
+  static const colZone = 'Khu';
+  static const colProgress = 'Tiến độ';
+  static const colPercent = '%';
+  static const colRemaining = 'Còn lại';
+  static const colMoved = 'Lệch vị trí';
+
+  /// Header nhóm: "{Fac} · {Tầng}".
+  static String groupTitle(String fac, String floor) => '$fac · $floor';
+
+  // Bảng máy (khu / toàn bộ PIC)
+  static const colMachineCode = 'Mã máy';
+  static const colMachineName = 'Tên máy';
+  static const colStatus = 'Trạng thái';
+  static const colAuditor = 'Người kiểm';
+  static const colTime = 'Thời gian';
+  static const colQrMaster = 'Vị trí QR/Master';
+  static const colNote = 'Ghi chú';
+  static String qrAt(String location) => 'QR: $location';
+  static String masterAt(String location) => 'Master: $location';
+
+  static const filterAll = 'Tất cả';
+  static const filterUnaudited = 'Chưa kiểm';
+  static const filterAudited = 'Đã kiểm';
+  static const filterAbnormal = 'Bất thường';
+  static String filterCount(String label, int count) => '$label ($count)';
+
+  static const chipUnaudited = 'Chưa kiểm';
+  static const chipAudited = 'Đã kiểm';
+  static const chipMoved = 'Lệch vị trí';
+  static const chipPendingQr = 'Chờ thay QR';
+
+  static const searchMachine = 'Tìm mã / tên máy…';
+  static const allZones = 'Tất cả khu';
+  static const noMachine = 'Không có máy phù hợp';
+
+  static const loadFailed = 'Không tải được dữ liệu';
+  static const retry = 'Thử lại';
+
+  /// 64.0 -> "64", 64.5 -> "64.5", 64.27 -> "64.3".
+  static String formatNumber(double value) {
+    final rounded = (value * 10).round() / 10;
+    return rounded == rounded.roundToDouble()
+        ? rounded.toInt().toString()
+        : rounded.toStringAsFixed(1);
+  }
+
+  static String percent(double value) => '${formatNumber(value)}%';
+
+  /// Luôn 1 số lẻ: 64 -> "64.0%".
+  static String percent1(double value) => '${value.toStringAsFixed(1)}%';
+}

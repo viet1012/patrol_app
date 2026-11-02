@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:dropdown_search/dropdown_search.dart';
 import 'package:flutter/material.dart';
 
 import 'package:chuphinh/shared/widgets/common_searchable_dropdown.dart';
@@ -35,10 +36,13 @@ class FixedAssetManualSelectors extends StatelessWidget {
   final GlobalKey<RequiredFieldFlashState> positionAFlashKey;
   final GlobalKey<RequiredFieldFlashState> positionAAFlashKey;
 
-  /// First empty dropdown after a scan without location: red border, and a
-  /// ~300 ms shake on each new [missingTick].
+  /// First empty dropdown while the location is incomplete (camera off):
+  /// amber border, and a ~300 ms shake on each new [missingTick].
   final FixedAssetManualField? missingField;
   final int missingTick;
+
+  /// false (chưa chọn PIC): khoá cả 4 dropdown.
+  final bool enabled;
 
   const FixedAssetManualSelectors({
     super.key,
@@ -64,9 +68,32 @@ class FixedAssetManualSelectors extends StatelessWidget {
     required this.positionAAFlashKey,
     this.missingField,
     this.missingTick = 0,
+    this.enabled = true,
   });
 
   static const Color _accent = Color(0xFF4DD0E1);
+
+  /// Opacity của ô bị khoá (xem [_dropdown]).
+  static const double _disabledOpacity = .45;
+
+  /// Màu icon dropdown dùng chung (PIC + 4 ô vị trí): accent khi bật, trắng
+  /// mờ ~0.35 khi khoá. [dimmedBy]: opacity cha đã áp lên ô khoá, được bù
+  /// lại để icon vẫn thấy rõ.
+  static Color dropdownIconColor({required bool enabled, double dimmedBy = 1}) =>
+      enabled
+      ? _accent
+      : Colors.white.withOpacity((.35 / dimmedBy).clamp(0.0, 1.0));
+
+  /// Mũi tên dropdown dùng chung (kích thước nút giữ 40 như mặc định).
+  static DropdownButtonProps dropdownButton({
+    required bool enabled,
+    double dimmedBy = 1,
+  }) => DropdownButtonProps(
+    icon: const Icon(Icons.keyboard_arrow_down_rounded),
+    iconSize: 26,
+    padding: const EdgeInsets.all(7),
+    color: dropdownIconColor(enabled: enabled, dimmedBy: dimmedBy),
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -81,7 +108,7 @@ class FixedAssetManualSelectors extends StatelessWidget {
                 label: 'Fac',
                 value: selectedFac,
                 items: facs,
-                enabled: true,
+                enabled: enabled,
                 loading: loadingFacs,
                 onChanged: onFacChanged,
               ),
@@ -94,7 +121,7 @@ class FixedAssetManualSelectors extends StatelessWidget {
                 label: 'Floor',
                 value: selectedFloor,
                 items: floors,
-                enabled: selectedFac != null,
+                enabled: enabled && selectedFac != null,
                 loading: loadingFloors,
                 onChanged: onFloorChanged,
               ),
@@ -111,7 +138,7 @@ class FixedAssetManualSelectors extends StatelessWidget {
                 label: 'PositionA',
                 value: selectedPositionA,
                 items: positionAs,
-                enabled: selectedFloor != null,
+                enabled: enabled && selectedFloor != null,
                 loading: loadingPositionA,
                 onChanged: onPositionAChanged,
               ),
@@ -124,7 +151,7 @@ class FixedAssetManualSelectors extends StatelessWidget {
                 label: 'PositionAA',
                 value: selectedPositionAA,
                 items: positionAAs,
-                enabled: selectedPositionA != null,
+                enabled: enabled && selectedPositionA != null,
                 loading: loadingPositionAA,
                 onChanged: onPositionAAChanged,
               ),
@@ -181,13 +208,17 @@ class FixedAssetManualSelectors extends StatelessWidget {
         IgnorePointer(
           ignoring: !active,
           child: Opacity(
-            opacity: enabled ? 1 : .45,
+            opacity: enabled ? 1 : _disabledOpacity,
             child: CommonSearchableDropdown(
               label: label,
               selectedValue: value,
               items: items,
               allowAddNew: false,
               onChanged: onChanged,
+              dropdownButtonProps: dropdownButton(
+                enabled: enabled,
+                dimmedBy: _disabledOpacity,
+              ),
             ),
           ),
         ),
@@ -205,7 +236,7 @@ class FixedAssetManualSelectors extends StatelessWidget {
   }
 }
 
-/// While [isMissing]: a red border plus a ~300 ms shake on each new
+/// While [isMissing]: an amber border plus a ~300 ms shake on each new
 /// [missingTick]. Flash / scroll-into-view is [RequiredFieldFlash]'s job.
 class _AttentionField extends StatefulWidget {
   final Widget child;
@@ -224,7 +255,7 @@ class _AttentionField extends StatefulWidget {
 
 class _AttentionFieldState extends State<_AttentionField>
     with SingleTickerProviderStateMixin {
-  static const Color _error = Colors.redAccent;
+  static const Color _highlight = Color(0xFFF59E0B);
 
   late final AnimationController _shake = AnimationController(
     vsync: this,
@@ -255,7 +286,7 @@ class _AttentionFieldState extends State<_AttentionField>
         final dx = _shake.isAnimating
             ? 4 * (1 - s) * math.sin(s * math.pi * 6)
             : 0.0;
-        final Color? border = widget.isMissing ? _error : null;
+        final Color? border = widget.isMissing ? _highlight : null;
         return Transform.translate(
           offset: Offset(dx, 0),
           child: Stack(

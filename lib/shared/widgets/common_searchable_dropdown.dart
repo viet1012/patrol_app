@@ -25,6 +25,11 @@ class CommonSearchableDropdown extends StatelessWidget {
   ////////////////////////////////////////////////////////////
   final bool showSearchBox;
 
+  ////////////////////////////////////////////////////////////
+  /// DROPDOWN BUTTON (mũi tên bên phải)
+  ////////////////////////////////////////////////////////////
+  final DropdownButtonProps dropdownButtonProps;
+
   const CommonSearchableDropdown({
     super.key,
     required this.label,
@@ -34,6 +39,7 @@ class CommonSearchableDropdown extends StatelessWidget {
     this.isRequired = false,
     this.allowAddNew = true,
     this.showSearchBox = true,
+    this.dropdownButtonProps = const DropdownButtonProps(),
   });
 
   @override
@@ -200,6 +206,8 @@ class CommonSearchableDropdown extends StatelessWidget {
           /// SELECTED
           ////////////////////////////////////////////////////////////
           selectedItem: cleanSelectedValue,
+
+          dropdownButtonProps: dropdownButtonProps,
 
           ////////////////////////////////////////////////////////////
           /// DECORATION
