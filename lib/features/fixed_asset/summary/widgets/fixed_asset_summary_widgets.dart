@@ -386,25 +386,39 @@ class _FixedAssetPicProgressTableState
     );
   }
 
-  /// Mobile: tiêu đề + nút sort (chỉ icon), chú thích hôm nay ([inQuarter]),
-  /// list PIC 2 dòng.
+  /// Lề ngang của item mobile; hàng trục dùng cùng lề để khớp thanh.
+  static const double _compactSide = 4;
+
+  /// Mobile: tiêu đề + nút sort (chỉ icon), hàng trục tháng (+ pill ngày tại
+  /// planPct), chú thích kế hoạch ([inQuarter]), list PIC 2 dòng.
   Widget _buildCompact(
     List<FixedAssetSummaryPicRow> visible, {
     required bool inQuarter,
   }) {
     final plan = inQuarter ? (widget.planPct / 100).clamp(0.0, 1.0) : null;
+    final period = widget.period;
     return FixedAssetSummaryCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _toolbar(),
+          const SizedBox(height: 6),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: _compactSide),
+            child: _CompactAxis(
+              months: [for (var i = 1; i <= 3; i++) period.monthOf(i)],
+              current: period.monthIndexOf(widget.today),
+              plan: plan,
+              dateLabel: DateFormat('dd/MM').format(widget.today),
+            ),
+          ),
           if (inQuarter) ...[
             const SizedBox(height: 4),
             Row(
               children: [
                 Container(
                   width: 2,
-                  height: 12,
+                  height: 10,
                   decoration: BoxDecoration(
                     color: FixedAssetSummaryColors.today,
                     borderRadius: BorderRadius.circular(1),
@@ -413,22 +427,19 @@ class _FixedAssetPicProgressTableState
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
-                    FixedAssetSummaryStrings.todayLegend(
-                      DateFormat('dd/MM').format(widget.today),
-                      widget.planPct,
-                    ),
+                    FixedAssetSummaryStrings.planTodayLegend(widget.planPct),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       color: FixedAssetSummaryColors.muted,
-                      fontSize: 12,
+                      fontSize: 11,
                     ),
                   ),
                 ),
               ],
             ),
           ],
-          const SizedBox(height: 6),
+          const SizedBox(height: 4),
           if (visible.isEmpty)
             SizedBox(
               height: _rowHeight * 1.5,
@@ -456,7 +467,10 @@ class _FixedAssetPicProgressTableState
       child: InkWell(
         onTap: r.pic == null ? null : () => widget.onOpen(r),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 9),
+          padding: const EdgeInsets.symmetric(
+            horizontal: _compactSide,
+            vertical: 9,
+          ),
           decoration: BoxDecoration(
             border: Border(
               bottom: BorderSide(color: Colors.white.withValues(alpha: .06)),
@@ -843,6 +857,225 @@ class FixedAssetQuarterProgressBar extends StatelessWidget {
       ],
     );
   }
+}
+
+/// Màu % (mobile): 0% xám muted, > 0 accent, 100% xanh lá.
+Color fixedAssetPctColor(double pct) => pct >= 100
+    ? FixedAssetSummaryColors.green
+    : (pct > 0 ? FixedAssetSummaryColors.accent : FixedAssetSummaryColors.muted);
+
+/// Timeline quý gọn (mobile): nhãn "T10 · T11 · T12" giữa từng 1/3 (tháng
+/// hiện tại accent đậm, không nền), thanh [pct] + vạch mờ chia tháng + vạch
+/// xanh dương "hôm nay" tại [planPct] (quý không chứa [today] thì không vẽ).
+class FixedAssetQuarterTimeline extends StatelessWidget {
+  final double pct;
+  final double planPct;
+  final FixedAssetPeriod period;
+  final DateTime today;
+
+  const FixedAssetQuarterTimeline({
+    super.key,
+    required this.pct,
+    required this.planPct,
+    required this.period,
+    required this.today,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final current = period.monthIndexOf(today);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            for (var i = 1; i <= 3; i++)
+              Expanded(
+                child: Text(
+                  FixedAssetSummaryStrings.monthShort(period.monthOf(i)),
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: i == current
+                        ? FixedAssetSummaryColors.accent
+                        : FixedAssetSummaryColors.muted,
+                    fontSize: 12,
+                    fontWeight: i == current
+                        ? FontWeight.w900
+                        : FontWeight.w600,
+                  ),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 2),
+        _CompactPicBar(
+          pct: pct,
+          plan: current > 0 ? (planPct / 100).clamp(0.0, 1.0) : null,
+        ),
+      ],
+    );
+  }
+}
+
+/// Hàng trục tháng (mobile, trên list PIC; cùng bề rộng thanh của item):
+/// nhãn "T10 · T11 · T12" giữa từng 1/3 (tháng [current] accent đậm), vạch
+/// mờ chia tháng tại 1/3, 2/3; pill ngày xanh dương có mũi chỉ xuống, tâm tại
+/// [plan] (0–1, clamp trong mép; null = không vẽ). Nhãn tháng bị pill chồng
+/// thì ẩn.
+class _CompactAxis extends StatelessWidget {
+  final List<int> months;
+  final int current;
+  final double? plan;
+  final String dateLabel;
+
+  const _CompactAxis({
+    required this.months,
+    required this.current,
+    required this.plan,
+    required this.dateLabel,
+  });
+
+  static const double _pillHeight = 18;
+  static const double _arrow = 4;
+  static const double _height = _pillHeight + _arrow;
+  static const double _pillPadding = 6;
+  static const TextStyle _pillStyle = TextStyle(
+    color: Colors.white,
+    fontSize: 11,
+    fontWeight: FontWeight.w800,
+    height: 1,
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    final base = DefaultTextStyle.of(context).style;
+    final scaler = MediaQuery.textScalerOf(context);
+    return SizedBox(
+      height: _height,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final width = constraints.maxWidth;
+          final segment = width / 3;
+          final plan = this.plan;
+          (double, double)? pill;
+          double? x;
+          if (plan != null) {
+            x = width * plan;
+            final pillWidth =
+                _textWidth(dateLabel, base.merge(_pillStyle), scaler) +
+                _pillPadding * 2 +
+                2;
+            final left = (x - pillWidth / 2)
+                .clamp(0.0, math.max(0.0, width - pillWidth))
+                .toDouble();
+            pill = (left, left + pillWidth);
+          }
+          return Stack(
+            clipBehavior: Clip.none,
+            children: [
+              for (final f in const [1 / 3, 2 / 3])
+                Positioned(
+                  left: width * f - .5,
+                  width: 1,
+                  top: 0,
+                  bottom: 0,
+                  child: ColoredBox(
+                    color: Colors.white.withValues(alpha: .12),
+                  ),
+                ),
+              for (var i = 0; i < 3; i++)
+                () {
+                  final isCurrent = i + 1 == current;
+                  final style = base.merge(
+                    TextStyle(
+                      color: isCurrent
+                          ? FixedAssetSummaryColors.accent
+                          : FixedAssetSummaryColors.muted,
+                      fontSize: 11,
+                      fontWeight: isCurrent
+                          ? FontWeight.w900
+                          : FontWeight.w600,
+                    ),
+                  );
+                  final text = FixedAssetSummaryStrings.monthShort(months[i]);
+                  final textWidth = _textWidth(text, style, scaler) + 2;
+                  final left = segment * i + (segment - textWidth) / 2;
+                  final hidden =
+                      pill != null &&
+                      left < pill.$2 + 2 &&
+                      left + textWidth > pill.$1 - 2;
+                  if (hidden) return const SizedBox.shrink();
+                  return Positioned(
+                    left: left,
+                    width: textWidth,
+                    top: 0,
+                    height: _pillHeight,
+                    child: Center(
+                      child: Text(
+                        text,
+                        maxLines: 1,
+                        softWrap: false,
+                        style: style,
+                      ),
+                    ),
+                  );
+                }(),
+              if (pill != null && x != null) ...[
+                Positioned(
+                  left: pill.$1,
+                  width: pill.$2 - pill.$1,
+                  top: 0,
+                  height: _pillHeight,
+                  child: Container(
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: FixedAssetSummaryColors.today,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      dateLabel,
+                      maxLines: 1,
+                      softWrap: false,
+                      style: _pillStyle,
+                    ),
+                  ),
+                ),
+                // Mũi chỉ xuống đúng tại planPct (giữ trong mép trục).
+                Positioned(
+                  left:
+                      x.clamp(_arrow, math.max(_arrow, width - _arrow))
+                          .toDouble() -
+                      _arrow,
+                  width: _arrow * 2,
+                  top: _pillHeight - .5,
+                  height: _arrow + .5,
+                  child: const CustomPaint(painter: _ArrowDownPainter()),
+                ),
+              ],
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// Tam giác nhỏ chỉ xuống, màu "hôm nay".
+class _ArrowDownPainter extends CustomPainter {
+  const _ArrowDownPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final path = Path()
+      ..moveTo(0, 0)
+      ..lineTo(size.width, 0)
+      ..lineTo(size.width / 2, size.height)
+      ..close();
+    canvas.drawPath(path, Paint()..color = FixedAssetSummaryColors.today);
+  }
+
+  @override
+  bool shouldRepaint(_ArrowDownPainter old) => false;
 }
 
 /// Thanh tiến độ PIC mobile: nền + phần [pct] accent, vạch mờ chia 3 tháng,
@@ -1396,13 +1629,14 @@ class FixedAssetSkeletonRows extends StatelessWidget {
   }
 }
 
-/// Ô tìm gọn (cao 32) cho thanh trên card bảng; nút xóa theo text đang gõ
-/// (không đợi debounce, không rebuild bảng).
+/// Ô tìm gọn (cao [height], mặc định 32) cho thanh trên card bảng; nút xóa
+/// theo text đang gõ (không đợi debounce, không rebuild bảng).
 class FixedAssetCompactSearchField extends StatelessWidget {
   final TextEditingController controller;
   final String hint;
   final ValueChanged<String> onChanged;
   final VoidCallback onClear;
+  final double height;
 
   const FixedAssetCompactSearchField({
     super.key,
@@ -1410,6 +1644,7 @@ class FixedAssetCompactSearchField extends StatelessWidget {
     required this.hint,
     required this.onChanged,
     required this.onClear,
+    this.height = 32,
   });
 
   @override
@@ -1421,7 +1656,7 @@ class FixedAssetCompactSearchField extends StatelessWidget {
       ),
     );
     return SizedBox(
-      height: 32,
+      height: height,
       child: TextField(
         controller: controller,
         onChanged: onChanged,
@@ -1443,9 +1678,9 @@ class FixedAssetCompactSearchField extends StatelessWidget {
             size: 16,
             color: Colors.white.withValues(alpha: .6),
           ),
-          prefixIconConstraints: const BoxConstraints(
+          prefixIconConstraints: BoxConstraints(
             minWidth: 32,
-            minHeight: 32,
+            minHeight: height,
           ),
           suffixIcon: ValueListenableBuilder<TextEditingValue>(
             valueListenable: controller,

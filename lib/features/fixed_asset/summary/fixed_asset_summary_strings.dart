@@ -59,9 +59,9 @@ abstract final class FixedAssetSummaryStrings {
   static const picProgressTitleShort = 'Tiến độ theo PIC';
   static const sortTooltip = 'Sắp xếp';
 
-  /// Chú thích vạch kế hoạch (mobile): "Hôm nay 03/11 · KH 36.7%".
-  static String todayLegend(String date, double planPct) =>
-      'Hôm nay $date · KH ${percent(planPct)}';
+  /// Chú thích vạch kế hoạch (mobile): "Kế hoạch đến hôm nay: 36.7%".
+  static String planTodayLegend(double planPct) =>
+      'Kế hoạch đến hôm nay: ${percent(planPct)}';
 
   /// "9/251 · 3.6%" (phần sau số đã kiểm).
   static String picOfPct(int total, double pct) =>
@@ -89,11 +89,31 @@ abstract final class FixedAssetSummaryStrings {
   static const tabZones = 'Theo khu';
   static String tabZonesCount(int count) => 'Theo khu ($count)';
   static String tabMachines(int count) => 'Danh sách máy ($count)';
+
+  // Mobile (< 600 px)
+  static String tabMachinesShort(int count) => 'Máy ($count)';
+
+  /// Nhãn tháng rút gọn trên timeline: "T11".
+  static String monthShort(int month) => 'T$month';
+
+  /// "· 27 khu".
+  static String zoneCountDot(int count) => ' · ${zoneCount(count)}';
+
+  /// "{a}" + "/251 · 3.6%" (phần sau số đã kiểm).
+  static String ofPct(int total, double pct) => '/$total · ${percent(pct)}';
+
+  /// "9" + "/251 máy · " + "3.6%".
+  static String ofMachines(int total) => '/$total máy · ';
+  static String remainingShort(int count) => 'Còn $count';
+  static String movedShort(int count) => 'Lệch $count';
   static const noZones = 'Không có khu nào';
   static const close = 'Đóng';
 
   // Bảng "Theo khu"
   static const onlyUnfinishedZones = 'Chỉ khu chưa xong';
+
+  /// Chip lọc mobile (cùng nghĩa [onlyUnfinishedZones]).
+  static const unfinishedChip = 'Chưa xong';
   static const noZoneMatch = 'Không có khu phù hợp';
   static const searchZone = 'Tìm khu…';
   static String zoneCount(int count) => '$count khu';

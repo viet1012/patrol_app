@@ -444,6 +444,15 @@ class FixedAssetPicMachinesViewState extends State<FixedAssetPicMachinesView>
         text: FixedAssetSummaryStrings.noMachine,
       );
     }
+    // Mobile: bảng 7 cột (tối thiểu ~700 px) phải cuộn ngang -> item 2 dòng.
+    if (MediaQuery.sizeOf(context).width < 600) {
+      return ListView.builder(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.only(bottom: 12),
+        itemCount: rows.length,
+        itemBuilder: (context, index) => _mobileItem(rows[index]),
+      );
+    }
     // Dòng 36; có Người kiểm 2 dòng (MSNV + tên) thì 40.
     return FixedAssetSummaryTable(
       columns: _columns,
@@ -479,6 +488,96 @@ class FixedAssetPicMachinesViewState extends State<FixedAssetPicMachinesView>
         color: Colors.white.withValues(alpha: .75),
       ),
     ];
+  }
+
+  /// Item mobile 2 dòng: mã (đậm) + tên (mờ, "…") | chip trạng thái; dòng
+  /// nhỏ: người kiểm · thời gian · vị trí QR/Master (cam) · ghi chú.
+  Widget _mobileItem(FixedAssetPicMachine m) {
+    final auditedAt = m.auditedAt;
+    final locations = [
+      if (m.qrMismatch) FixedAssetSummaryStrings.qrAt(fixedAssetDash(m.qrLocation)),
+      if (m.isMoved)
+        FixedAssetSummaryStrings.masterAt(fixedAssetDash(m.masterLocation)),
+    ];
+    final info = [
+      if (m.auditUserName.isNotEmpty) m.auditUserName,
+      if (auditedAt != null) _time.format(auditedAt),
+    ];
+    final note = m.note.trim();
+    final muted = Colors.white.withValues(alpha: .55);
+    final hasLine2 = info.isNotEmpty || locations.isNotEmpty || note.isNotEmpty;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        border: Border(
+          bottom: BorderSide(color: Colors.white.withValues(alpha: .06)),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Text(
+                m.machineCode,
+                maxLines: 1,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 14.5,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  fixedAssetDash(m.machineName),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: .7),
+                    fontSize: 13.5,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              // Tối đa ~45% bề rộng; nhiều chip thì thu nhỏ.
+              ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: MediaQuery.sizeOf(context).width * .45,
+                ),
+                child: _statusChips(m),
+              ),
+            ],
+          ),
+          if (hasLine2) ...[
+            const SizedBox(height: 3),
+            Text.rich(
+              TextSpan(
+                children: [
+                  TextSpan(text: info.join(' · ')),
+                  if (locations.isNotEmpty)
+                    TextSpan(
+                      text:
+                          '${info.isEmpty ? '' : ' · '}${locations.join(' · ')}',
+                      style: const TextStyle(
+                        color: FixedAssetSummaryColors.orange,
+                      ),
+                    ),
+                  if (note.isNotEmpty)
+                    TextSpan(
+                      text:
+                          '${info.isEmpty && locations.isEmpty ? '' : ' · '}$note',
+                    ),
+                ],
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: muted, fontSize: 12.5),
+            ),
+          ],
+        ],
+      ),
+    );
   }
 
   /// MSNV (nhỏ, mờ) trên, họ tên dưới; thiếu MSNV thì chỉ họ tên.

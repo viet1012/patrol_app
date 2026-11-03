@@ -153,6 +153,10 @@ class _FixedAssetSummaryPicScreenState
   static const double _narrowWidth = 700;
   static const double _maxWidth = 1600;
 
+  /// Dưới bề rộng này: layout mobile (header 3 dòng, ô số dọc, list khu 2
+  /// tầng, tab "Máy").
+  static const double _mobileWidth = 600;
+
   /// Tab đang chọn: 0 = Theo khu, 1 = Danh sách máy.
   int _tab = 0;
 
@@ -204,6 +208,7 @@ class _FixedAssetSummaryPicScreenState
       body: LayoutBuilder(
         builder: (context, constraints) {
           final narrow = constraints.maxWidth < _narrowWidth;
+          final mobile = constraints.maxWidth < _mobileWidth;
           final showPanel =
               panelZone != null && constraints.maxWidth >= _panelWidth;
           // Cùng một segmented cho 2 tab: mỗi tab đặt nó ở thanh trên của
@@ -223,7 +228,9 @@ class _FixedAssetSummaryPicScreenState
               ),
               (
                 Icons.view_list_rounded,
-                FixedAssetSummaryStrings.tabMachines(pic.total),
+                mobile
+                    ? FixedAssetSummaryStrings.tabMachinesShort(pic.total)
+                    : FixedAssetSummaryStrings.tabMachines(pic.total),
               ),
             ],
           );
@@ -232,7 +239,7 @@ class _FixedAssetSummaryPicScreenState
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _cachedHeader(pic),
+                _cachedHeader(pic, mobile),
                 const SizedBox(height: 12),
                 // Chỉ bảng cuộn bên trong card; card cao tới hết màn.
                 Expanded(
@@ -246,6 +253,7 @@ class _FixedAssetSummaryPicScreenState
                           loading: _loading,
                           error: _error,
                           narrow: narrow,
+                          mobile: mobile,
                           leading: segmented,
                           onRetry: () => _load(),
                           onRefresh: () => _refreshAll(silent: true),
@@ -325,15 +333,183 @@ class _FixedAssetSummaryPicScreenState
         child: child,
       );
 
-  /// Widget header dùng lại nguyên instance khi [_detail] không
+  /// Widget header dùng lại nguyên instance khi [_detail] / [mobile] không
   /// đổi: Flutter bỏ qua rebuild khi setState vì tab / panel / khu.
-  Widget _cachedHeader(FixedAssetSummaryPic pic) {
-    final key = _detail;
+  Widget _cachedHeader(FixedAssetSummaryPic pic, bool mobile) {
+    final key = (_detail, mobile);
     if (_header == null || _headerFor != key) {
       _headerFor = key;
-      _header = RepaintBoundary(child: _buildHeader(pic));
+      _header = RepaintBoundary(
+        child: mobile ? _buildMobileHeader(pic) : _buildHeader(pic),
+      );
     }
     return _header!;
+  }
+
+  /// Header mobile: avatar + tên · email + "· n khu" · "{a}/{t} máy · {pct}%"
+  /// lớn · timeline T10 · T11 · T12 (vạch hôm nay) · 3 ô số dọc.
+  Widget _buildMobileHeader(FixedAssetSummaryPic pic) {
+    const accent = FixedAssetSummaryColors.accent;
+    const muted = FixedAssetSummaryColors.muted;
+    final zones = _detail?.zones;
+    final moved = zones?.fold<int>(0, (s, z) => s + (z.movedCount ?? 0));
+    final stats = [
+      _statVertical(
+        FixedAssetSummaryStrings.statAudited,
+        '${pic.audited}/${pic.total}',
+        Colors.white,
+      ),
+      _statVertical(
+        FixedAssetSummaryStrings.colMoved,
+        moved == null ? '—' : '$moved',
+        (moved ?? 0) > 0 ? FixedAssetSummaryColors.orange : Colors.white,
+      ),
+      _statVertical(
+        FixedAssetSummaryStrings.statPendingQr,
+        '${pic.pendingQr}',
+        pic.pendingQr > 0 ? FixedAssetSummaryColors.orange : Colors.white,
+      ),
+    ];
+    return _card(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              FixedAssetPicAvatar(name: pic.name, color: accent, size: 32),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  pic.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              Flexible(
+                child: Text(
+                  pic.email,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: muted, fontSize: 12.5),
+                ),
+              ),
+              if (zones != null)
+                Text(
+                  FixedAssetSummaryStrings.zoneCountDot(zones.length),
+                  maxLines: 1,
+                  style: const TextStyle(color: muted, fontSize: 12.5),
+                ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text.rich(
+            TextSpan(
+              children: [
+                TextSpan(
+                  text: '${pic.audited}',
+                  style: const TextStyle(
+                    color: accent,
+                    fontSize: 24,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                TextSpan(
+                  text: FixedAssetSummaryStrings.ofMachines(pic.total),
+                  style: const TextStyle(
+                    color: muted,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                TextSpan(
+                  text: FixedAssetSummaryStrings.percent(pic.pct),
+                  style: const TextStyle(
+                    color: accent,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
+            ),
+            maxLines: 1,
+          ),
+          const SizedBox(height: 8),
+          FixedAssetQuarterTimeline(
+            pct: pic.pct,
+            planPct: pic.planPct,
+            period: widget.period,
+            today: DateTime.now(),
+          ),
+          const SizedBox(height: 10),
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (var i = 0; i < stats.length; i++) ...[
+                  if (i > 0) const SizedBox(width: 8),
+                  Expanded(child: stats[i]),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Ô số dọc (mobile): nhãn nhỏ muted trên (tối đa 2 dòng, không cắt), số
+  /// lớn dưới.
+  Widget _statVertical(String label, String value, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: .05),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: FixedAssetSummaryColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            maxLines: 2,
+            style: const TextStyle(
+              color: FixedAssetSummaryColors.muted,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              height: 1.2,
+            ),
+          ),
+          const Spacer(),
+          const SizedBox(height: 2),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              value,
+              maxLines: 1,
+              style: TextStyle(
+                color: color,
+                fontSize: 18,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   /// Header (~120 px): avatar | tên · email · n khu | "{a}/{t} máy · {pct}%";
@@ -655,6 +831,10 @@ class _ZonesTab extends StatefulWidget {
 
   /// < 700 px: thanh trên 2 hàng, ẩn cột Còn lại.
   final bool narrow;
+
+  /// < 600 px: thanh trên 3 hàng (tab | tìm | toggle căn phải), list 2 tầng
+  /// không header cột.
+  final bool mobile;
   final Widget leading;
   final VoidCallback onRetry;
   final Future<void> Function() onRefresh;
@@ -665,6 +845,7 @@ class _ZonesTab extends StatefulWidget {
     required this.loading,
     required this.error,
     required this.narrow,
+    this.mobile = false,
     required this.leading,
     required this.onRetry,
     required this.onRefresh,
@@ -792,7 +973,30 @@ class _ZonesTabState extends State<_ZonesTab> {
           bottom: BorderSide(color: FixedAssetSummaryColors.border),
         ),
       ),
-      child: widget.narrow
+      child: widget.mobile
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                widget.leading,
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: FixedAssetCompactSearchField(
+                        controller: _searchController,
+                        hint: FixedAssetSummaryStrings.searchZone,
+                        onChanged: _onSearchChanged,
+                        onClear: _clearSearch,
+                        height: 40,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    _unfinishedChip(),
+                  ],
+                ),
+              ],
+            )
+          : widget.narrow
           ? Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -816,6 +1020,53 @@ class _ZonesTabState extends State<_ZonesTab> {
                 toggle,
               ],
             ),
+    );
+  }
+
+  /// Mobile: nút lọc "Chưa xong" tự vẽ (không màu theme) cao 40, bo 8 như ô
+  /// tìm, thay switch "Chỉ khu chưa xong". Tắt: nền trong suốt, viền như ô
+  /// tìm, icon / chữ muted; bật: nền accent 0.15, viền + icon / chữ accent
+  /// đậm.
+  Widget _unfinishedChip() {
+    const accent = FixedAssetSummaryColors.accent;
+    final on = _onlyUnfinished;
+    final color = on ? accent : FixedAssetSummaryColors.muted;
+    final radius = BorderRadius.circular(8);
+    return Material(
+      color: Colors.transparent,
+      borderRadius: radius,
+      child: InkWell(
+        borderRadius: radius,
+        onTap: () => setState(() => _onlyUnfinished = !_onlyUnfinished),
+        child: Container(
+          height: 40,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: on ? accent.withValues(alpha: .15) : Colors.transparent,
+            borderRadius: radius,
+            // Tắt: cùng màu viền ô tìm (FixedAssetCompactSearchField).
+            border: Border.all(
+              color: on ? accent : accent.withValues(alpha: .35),
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.filter_list_rounded, size: 18, color: color),
+              const SizedBox(width: 6),
+              Text(
+                FixedAssetSummaryStrings.unfinishedChip,
+                maxLines: 1,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 13.5,
+                  fontWeight: on ? FontWeight.w800 : FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -908,12 +1159,29 @@ class _ZonesTabState extends State<_ZonesTab> {
             z,
       ];
       if (zones.isEmpty) continue;
-      rows.add(_groupRow(key, all));
+      final mobile = widget.mobile;
+      rows.add(mobile ? _mobileGroupRow(key, all) : _groupRow(key, all));
       if (!_collapsedGroups.contains(key)) {
         for (final zone in zones) {
-          rows.add(_zoneRow(zone));
+          rows.add(mobile ? _mobileZoneRow(zone) : _zoneRow(zone));
         }
       }
+    }
+
+    // Mobile: không header cột, dòng cao theo nội dung, không cuộn ngang.
+    if (widget.mobile) {
+      return rows.isEmpty
+          ? const FixedAssetSummaryMessage(
+              icon: Icons.search_off_rounded,
+              color: Colors.white54,
+              text: FixedAssetSummaryStrings.noZoneMatch,
+            )
+          : ListView.builder(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.only(bottom: 12),
+              itemCount: rows.length,
+              itemBuilder: (context, index) => rows[index],
+            );
     }
 
     Text label(String text) => Text(
@@ -1046,6 +1314,209 @@ class _ZonesTabState extends State<_ZonesTab> {
             FixedAssetSummaryStrings.percent(pct),
             maxLines: 1,
             style: style.copyWith(color: FixedAssetSummaryColors.accent),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Nội dung 2 tầng mobile: [title] | "a/t · pct%" (màu theo %); thanh
+  /// full width + "Còn n" (+ chip "Lệch n").
+  Widget _mobileTwoLines({
+    required Widget title,
+    required int audited,
+    required int total,
+    required double pct,
+    required int remaining,
+    required int moved,
+    required double barHeight,
+    required bool bold,
+  }) {
+    final pctColor = fixedAssetPctColor(pct);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Expanded(child: title),
+            const SizedBox(width: 8),
+            Text.rich(
+              TextSpan(
+                text: '$audited',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: bold ? FontWeight.w900 : FontWeight.w800,
+                ),
+                children: [
+                  TextSpan(
+                    text: FixedAssetSummaryStrings.ofPct(total, pct),
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: .5),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+              maxLines: 1,
+              softWrap: false,
+              style: const TextStyle(fontSize: 13.5),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Row(
+          children: [
+            Expanded(
+              child: FixedAssetPlanProgressBar(
+                pct: pct,
+                color: pctColor == FixedAssetSummaryColors.muted
+                    ? FixedAssetSummaryColors.accent
+                    : pctColor,
+                height: barHeight,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              FixedAssetSummaryStrings.remainingShort(remaining),
+              style: TextStyle(
+                color: pctColor == FixedAssetSummaryColors.green
+                    ? FixedAssetSummaryColors.green
+                    : FixedAssetSummaryColors.muted,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            if (moved > 0) ...[
+              const SizedBox(width: 6),
+              FixedAssetSummaryChip(
+                text: FixedAssetSummaryStrings.movedShort(moved),
+                color: FixedAssetSummaryColors.orange,
+              ),
+            ],
+          ],
+        ),
+      ],
+    );
+  }
+
+  /// Dòng nhóm mobile: "▾ Fac · Tầng · n khu" | "a/t · pct%", thanh nhóm;
+  /// nền tối hơn, bấm thu gọn / mở.
+  Widget _mobileGroupRow(String key, List<FixedAssetSummaryZone> zones) {
+    final total = zones.fold<int>(0, (s, z) => s + z.total);
+    final audited = zones.fold<int>(0, (s, z) => s + z.audited);
+    final moved = zones.fold<int>(0, (s, z) => s + (z.movedCount ?? 0));
+    final pct = total <= 0 ? 0.0 : audited * 100 / total;
+    final collapsed = _collapsedGroups.contains(key);
+    return Material(
+      color: Colors.black.withValues(alpha: .18),
+      child: InkWell(
+        onTap: () => setState(() {
+          if (!_collapsedGroups.remove(key)) _collapsedGroups.add(key);
+        }),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(8, 8, _side, 8),
+          child: _mobileTwoLines(
+            title: Row(
+              children: [
+                Icon(
+                  collapsed
+                      ? Icons.arrow_right_rounded
+                      : Icons.arrow_drop_down_rounded,
+                  size: 20,
+                  color: FixedAssetSummaryColors.accent,
+                ),
+                Flexible(
+                  child: Text.rich(
+                    TextSpan(
+                      children: [
+                        TextSpan(
+                          text: FixedAssetSummaryStrings.groupTitle(
+                            fixedAssetDash(zones.first.fac),
+                            fixedAssetDash(zones.first.floor),
+                          ),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14.5,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        TextSpan(
+                          text: FixedAssetSummaryStrings.zoneCountDot(
+                            zones.length,
+                          ),
+                          style: const TextStyle(
+                            color: FixedAssetSummaryColors.muted,
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+            audited: audited,
+            total: total,
+            pct: pct,
+            remaining: (total - audited).clamp(0, total),
+            moved: moved,
+            barHeight: 5,
+            bold: true,
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Dòng khu mobile: tên (lùi theo nhóm) + check nếu xong | "a/t · pct%";
+  /// thanh + "Còn n" (+ "Lệch n"). Bấm mở bảng máy của khu.
+  Widget _mobileZoneRow(FixedAssetSummaryZone zone) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => widget.onOpenZone(zone),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(28, 9, _side, 9),
+          decoration: BoxDecoration(
+            border: Border(
+              bottom: BorderSide(color: Colors.white.withValues(alpha: .05)),
+            ),
+          ),
+          child: _mobileTwoLines(
+            title: Row(
+              children: [
+                Flexible(
+                  child: Text(
+                    fixedAssetDash(zone.label),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                if (_zoneDone(zone)) ...[
+                  const SizedBox(width: 6),
+                  const Icon(
+                    Icons.check_circle_rounded,
+                    size: 14,
+                    color: FixedAssetSummaryColors.green,
+                  ),
+                ],
+              ],
+            ),
+            audited: zone.audited,
+            total: zone.total,
+            pct: zone.pct,
+            remaining: zone.remaining,
+            moved: zone.movedCount ?? 0,
+            barHeight: 6,
+            bold: false,
           ),
         ),
       ),
