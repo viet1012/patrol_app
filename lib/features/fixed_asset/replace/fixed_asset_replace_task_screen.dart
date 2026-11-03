@@ -13,8 +13,8 @@ import 'package:chuphinh/features/fixed_asset/reprint/widgets/fixed_asset_reprin
 class _ReplaceStep {
   final String title;
 
-  /// Phần sau badge trên header camera, vd "của A-1000 (A3-3)".
-  final String scanSubject;
+  /// Phần sau mã máy trên thẻ thông tin camera, vd "· đang dán tại A6-3".
+  final String scanPlace;
   final DateTime? doneAt;
 
   /// Không làm được ở đây (vd chưa rõ vị trí thực tế); null = làm được.
@@ -26,7 +26,7 @@ class _ReplaceStep {
 
   const _ReplaceStep({
     required this.title,
-    required this.scanSubject,
+    required this.scanPlace,
     required this.doneAt,
     required this.onScan,
     required this.isNew,
@@ -105,10 +105,7 @@ class _FixedAssetReplaceTaskScreenState
     final name = userName.trim().isEmpty ? userId : userName.trim();
     final newStep = _ReplaceStep(
       title: FixedAssetReplaceStrings.stepNew(task.actShort),
-      scanSubject: FixedAssetReplaceStrings.scanNewSubject(
-        task.machineCode,
-        task.actShort,
-      ),
+      scanPlace: FixedAssetReplaceStrings.placeNew(task.actShort),
       doneAt: controller.doneAt(task),
       blockedReason: task.location == null
           ? FixedAssetReplaceStrings.unknownAct
@@ -125,10 +122,7 @@ class _FixedAssetReplaceTaskScreenState
     return [
       _ReplaceStep(
         title: FixedAssetReplaceStrings.stepOld(task.oldQrShort),
-        scanSubject: FixedAssetReplaceStrings.scanOldSubject(
-          task.machineCode,
-          task.oldQrShort,
-        ),
+        scanPlace: FixedAssetReplaceStrings.placeOld(task.oldQrShort),
         doneAt: controller.oldScannedAt(task),
         onScan: (raw) async => controller.scanOldQr(task, raw),
         isNew: false,
@@ -141,6 +135,7 @@ class _FixedAssetReplaceTaskScreenState
     if (_cameraOpen) return;
     _cameraOpen = true;
     setState(() => _saveError = null);
+    final twoSteps = task.kind != FixedAssetReplaceKind.missingQr;
     final result = await Navigator.push<FixedAssetReplaceScanResult>(
       context,
       MaterialPageRoute(
@@ -148,7 +143,13 @@ class _FixedAssetReplaceTaskScreenState
           kind: step.isNew
               ? FixedAssetReplaceQrKind.newQr
               : FixedAssetReplaceQrKind.oldQr,
-          subject: step.scanSubject,
+          machineCode: task.machineCode,
+          place: step.scanPlace,
+          showSteps: twoSteps,
+          oldQrScanned:
+              step.isNew && twoSteps && controller.oldScannedAt(task) != null
+              ? task.oldQrShort
+              : null,
           onScan: step.onScan,
         ),
       ),

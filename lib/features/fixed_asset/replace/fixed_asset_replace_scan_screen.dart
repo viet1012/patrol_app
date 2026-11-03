@@ -21,20 +21,31 @@ class FixedAssetReplaceScanResult {
   const FixedAssetReplaceScanResult.failed(String this.error) : done = false;
 }
 
-/// Loại QR đang quét: nhãn + màu chung cho badge header, viền khung và
-/// hướng dẫn.
+/// Loại QR đang quét: nhãn + màu chung cho badge header, thanh bước, viền
+/// khung, hướng dẫn; [guide] = dòng giải thích trên thẻ thông tin.
 enum FixedAssetReplaceQrKind {
-  newQr(FixedAssetReplaceStrings.qrNew, Color(0xFF43A047)),
-  oldQr(FixedAssetReplaceStrings.qrOld, Color(0xFFFB8C00));
+  newQr(
+    FixedAssetReplaceStrings.qrNew,
+    Color(0xFF43A047),
+    FixedAssetReplaceStrings.newQrGuide,
+  ),
+  oldQr(
+    FixedAssetReplaceStrings.qrOld,
+    Color(0xFFFB8C00),
+    FixedAssetReplaceStrings.oldQrGuide,
+  );
 
   final String label;
   final Color color;
+  final String guide;
 
-  const FixedAssetReplaceQrKind(this.label, this.color);
+  const FixedAssetReplaceQrKind(this.label, this.color, this.guide);
 }
 
 /// Camera quét toàn màn hình cho một bước thay QR (dùng [CameraPreviewBox]).
-/// Header "Quét [badge] {subject}"; viền khung + hướng dẫn theo màu [kind].
+/// Từ trên xuống: header "Quét [badge]" · thanh bước ① QR CŨ ── ② QR MỚI
+/// ([showSteps]) · khung vuông (≤ 55% chiều cao) · thẻ thông tin máy ·
+/// hướng dẫn. Viền khung + hướng dẫn theo màu [kind].
 ///
 /// [onScan] kiểm QR: null = đúng (rung + tick, tự đóng, pop
 /// [FixedAssetReplaceScanResult.done]); QR sai: báo lỗi trên camera, camera
@@ -43,15 +54,25 @@ enum FixedAssetReplaceQrKind {
 /// khung không xử lý lặp; đưa QR ra khỏi khung rồi quét lại thì kiểm lại.
 class FixedAssetReplaceScanScreen extends StatefulWidget {
   final FixedAssetReplaceQrKind kind;
+  final String machineCode;
 
-  /// Phần sau badge, vd "của A-459 (đang dán A1-2)".
-  final String subject;
+  /// Sau mã máy trên thẻ thông tin, vd "· đang dán tại A6-3".
+  final String place;
+
+  /// Luồng 2 bước (Sai QR): hiện thanh bước; Mất QR (chỉ QR mới): ẩn.
+  final bool showSteps;
+
+  /// Bước QR mới sau khi đã quét QR cũ: mã cũ rút gọn; null = không hiện.
+  final String? oldQrScanned;
   final Future<FixedAssetReplaceScanError?> Function(String rawQr) onScan;
 
   const FixedAssetReplaceScanScreen({
     super.key,
     required this.kind,
-    required this.subject,
+    required this.machineCode,
+    required this.place,
+    this.showSteps = false,
+    this.oldQrScanned,
     required this.onScan,
   });
 
@@ -154,61 +175,225 @@ class _FixedAssetReplaceScanScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black,
+      // Nền xám tối để thẻ thông tin (đen mờ) nổi là "tối hơn nền".
+      backgroundColor: FixedAssetReprintColors.appBar,
       body: SafeArea(
-        child: Column(
-          children: [
-            _buildTopBar(),
-            Expanded(
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final size = math.min(
-                    constraints.maxWidth,
-                    constraints.maxHeight,
-                  );
-                  return Center(
-                    child: SizedBox.square(
-                      dimension: size,
-                      child: Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          CameraPreviewBox(
-                            key: _cameraKey,
-                            size: size,
-                            type: PatrolGroup.AssetUpdate.name,
-                            patrolGroup: PatrolGroup.AssetUpdate,
-                            qrOnly: true,
-                            enableZoomControls: true,
-                            enableStt: false,
-                            showQrNumber: false,
-                            showQrBadge: false,
-                            onQrDetected: _onQr,
-                          ),
-                          // Viền khung quét theo màu loại QR.
-                          IgnorePointer(
-                            child: Container(
-                              width: size,
-                              height: size,
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(
-                                  color: widget.kind.color,
-                                  width: 2,
-                                ),
-                              ),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            // Khung vuông, cao tối đa ~55% vùng màn; phần còn lại cho thanh
+            // bước + thẻ thông tin + hướng dẫn (iPhone 16 không cần cuộn).
+            final size = math.min(
+              constraints.maxWidth,
+              constraints.maxHeight * .55,
+            );
+            return Column(
+              children: [
+                _buildTopBar(),
+                if (widget.showSteps) _buildStepBar(),
+                SizedBox.square(
+                  dimension: size,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      CameraPreviewBox(
+                        key: _cameraKey,
+                        size: size,
+                        type: PatrolGroup.AssetUpdate.name,
+                        patrolGroup: PatrolGroup.AssetUpdate,
+                        qrOnly: true,
+                        enableZoomControls: true,
+                        enableStt: false,
+                        showQrNumber: false,
+                        showQrBadge: false,
+                        onQrDetected: _onQr,
+                      ),
+                      // Viền khung quét theo màu loại QR.
+                      IgnorePointer(
+                        child: Container(
+                          width: size,
+                          height: size,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: widget.kind.color,
+                              width: 2,
                             ),
                           ),
-                          if (_success) _buildSuccess(),
-                        ],
+                        ),
                       ),
-                    ),
-                  );
-                },
-              ),
-            ),
-            _buildMessage(),
-          ],
+                      if (_success) _buildSuccess(),
+                    ],
+                  ),
+                ),
+                // Màn thấp hơn dự kiến thì cuộn thẻ, không tràn.
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+                    child: _buildInfoCard(),
+                  ),
+                ),
+                _buildMessage(),
+              ],
+            );
+          },
         ),
+      ),
+    );
+  }
+
+  /// "① QR CŨ ── ② QR MỚI": bước hiện tại tô màu loại QR + chữ đậm; bước
+  /// xong check xám sáng; bước chưa tới viền mờ.
+  Widget _buildStepBar() {
+    const doneColor = Color(0xFFCBD5E1);
+    Widget step(int number, FixedAssetReplaceQrKind kind) {
+      final active = kind == widget.kind;
+      final done =
+          kind == FixedAssetReplaceQrKind.oldQr &&
+          widget.kind == FixedAssetReplaceQrKind.newQr;
+      final color = active
+          ? kind.color
+          : done
+          ? doneColor
+          : Colors.white.withValues(alpha: .35);
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 22,
+            height: 22,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: active ? kind.color : Colors.transparent,
+              border: Border.all(color: color, width: 1.5),
+            ),
+            child: done
+                ? const Icon(Icons.check_rounded, size: 14, color: doneColor)
+                : Text(
+                    '$number',
+                    style: TextStyle(
+                      color: active ? Colors.white : color,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            kind.label,
+            style: TextStyle(
+              color: color,
+              fontSize: 13.5,
+              fontWeight: active ? FontWeight.w900 : FontWeight.w600,
+            ),
+          ),
+        ],
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          step(1, FixedAssetReplaceQrKind.oldQr),
+          Container(
+            width: 32,
+            height: 1.5,
+            margin: const EdgeInsets.symmetric(horizontal: 10),
+            color: Colors.white.withValues(alpha: .25),
+          ),
+          step(2, FixedAssetReplaceQrKind.newQr),
+        ],
+      ),
+    );
+  }
+
+  /// Thẻ máy: "A-077 · đang dán tại A6-3", giải thích theo bước, và (bước
+  /// QR mới) "Đã quét QR cũ: …".
+  Widget _buildInfoCard() {
+    final scanned = widget.oldQrScanned;
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: .35),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.white.withValues(alpha: .08)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.precision_manufacturing_rounded,
+                size: 20,
+                color: Colors.white.withValues(alpha: .75),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text.rich(
+                  TextSpan(
+                    children: [
+                      TextSpan(
+                        text: widget.machineCode,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      TextSpan(
+                        text: ' ${widget.place}',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: .75),
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            widget.kind.guide,
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: .6),
+              fontSize: 14,
+              height: 1.35,
+            ),
+          ),
+          if (scanned != null) ...[
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Icon(
+                  Icons.check_circle_rounded,
+                  size: 16,
+                  color: FixedAssetReplaceQrKind.newQr.color,
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    FixedAssetReplaceStrings.oldQrScanned(scanned),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: .7),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -225,25 +410,19 @@ class _FixedAssetReplaceScanScreenState
           ),
           const SizedBox(width: 10),
           Expanded(
-            child: Text.rich(
-              TextSpan(
-                children: [
-                  const TextSpan(text: '${FixedAssetReplaceStrings.scan} '),
-                  WidgetSpan(
-                    alignment: PlaceholderAlignment.middle,
-                    child: _QrKindBadge(kind: widget.kind),
+            child: Row(
+              children: [
+                const Text(
+                  FixedAssetReplaceStrings.scan,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w900,
                   ),
-                  TextSpan(text: ' ${widget.subject}'),
-                ],
-              ),
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 17,
-                fontWeight: FontWeight.w900,
-                height: 1.25,
-              ),
+                ),
+                const SizedBox(width: 8),
+                _QrKindBadge(kind: widget.kind),
+              ],
             ),
           ),
           const SizedBox(width: 10),
