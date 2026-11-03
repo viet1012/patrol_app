@@ -21,7 +21,20 @@ class FixedAssetReplaceScanResult {
   const FixedAssetReplaceScanResult.failed(String this.error) : done = false;
 }
 
+/// Loại QR đang quét: nhãn + màu chung cho badge header, viền khung và
+/// hướng dẫn.
+enum FixedAssetReplaceQrKind {
+  newQr(FixedAssetReplaceStrings.qrNew, Color(0xFF43A047)),
+  oldQr(FixedAssetReplaceStrings.qrOld, Color(0xFFFB8C00));
+
+  final String label;
+  final Color color;
+
+  const FixedAssetReplaceQrKind(this.label, this.color);
+}
+
 /// Camera quét toàn màn hình cho một bước thay QR (dùng [CameraPreviewBox]).
+/// Header "Quét [badge] {subject}"; viền khung + hướng dẫn theo màu [kind].
 ///
 /// [onScan] kiểm QR: null = đúng (rung + tick, tự đóng, pop
 /// [FixedAssetReplaceScanResult.done]); QR sai: báo lỗi trên camera, camera
@@ -29,13 +42,16 @@ class FixedAssetReplaceScanResult {
 /// đóng camera, pop [FixedAssetReplaceScanResult.failed]. Cùng QR còn trong
 /// khung không xử lý lặp; đưa QR ra khỏi khung rồi quét lại thì kiểm lại.
 class FixedAssetReplaceScanScreen extends StatefulWidget {
-  /// Đang chờ gì, vd "Quét QR CŨ của A-459 (đang dán A1-2)".
-  final String title;
+  final FixedAssetReplaceQrKind kind;
+
+  /// Phần sau badge, vd "của A-459 (đang dán A1-2)".
+  final String subject;
   final Future<FixedAssetReplaceScanError?> Function(String rawQr) onScan;
 
   const FixedAssetReplaceScanScreen({
     super.key,
-    required this.title,
+    required this.kind,
+    required this.subject,
     required this.onScan,
   });
 
@@ -168,6 +184,20 @@ class _FixedAssetReplaceScanScreenState
                             showQrBadge: false,
                             onQrDetected: _onQr,
                           ),
+                          // Viền khung quét theo màu loại QR.
+                          IgnorePointer(
+                            child: Container(
+                              width: size,
+                              height: size,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                  color: widget.kind.color,
+                                  width: 2,
+                                ),
+                              ),
+                            ),
+                          ),
                           if (_success) _buildSuccess(),
                         ],
                       ),
@@ -195,8 +225,17 @@ class _FixedAssetReplaceScanScreenState
           ),
           const SizedBox(width: 10),
           Expanded(
-            child: Text(
-              widget.title,
+            child: Text.rich(
+              TextSpan(
+                children: [
+                  const TextSpan(text: '${FixedAssetReplaceStrings.scan} '),
+                  WidgetSpan(
+                    alignment: PlaceholderAlignment.middle,
+                    child: _QrKindBadge(kind: widget.kind),
+                  ),
+                  TextSpan(text: ' ${widget.subject}'),
+                ],
+              ),
               maxLines: 3,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(
@@ -297,8 +336,20 @@ class _FixedAssetReplaceScanScreenState
         ],
       );
     } else {
-      child = Text(
-        FixedAssetReplaceStrings.scanHint,
+      child = Text.rich(
+        TextSpan(
+          children: [
+            const TextSpan(text: FixedAssetReplaceStrings.scanHintPrefix),
+            TextSpan(
+              text: widget.kind.label,
+              style: TextStyle(
+                color: widget.kind.color,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const TextSpan(text: FixedAssetReplaceStrings.scanHintSuffix),
+          ],
+        ),
         textAlign: TextAlign.center,
         style: TextStyle(
           color: Colors.white.withValues(alpha: .8),
@@ -326,6 +377,108 @@ class _FixedAssetReplaceScanScreenState
       ),
       alignment: Alignment.center,
       child: child,
+    );
+  }
+}
+
+/// Badge "QR MỚI" / "QR CŨ": nền màu [kind], icon QR + chữ trắng đậm. Khi
+/// mở màn hoặc đổi [kind]: pulse 3 lần trong 2 s (scale 1.0↔1.08 + glow
+/// cùng màu) rồi đứng yên; bỏ animation nếu hệ thống tắt animation.
+class _QrKindBadge extends StatefulWidget {
+  final FixedAssetReplaceQrKind kind;
+
+  const _QrKindBadge({required this.kind});
+
+  @override
+  State<_QrKindBadge> createState() => _QrKindBadgeState();
+}
+
+class _QrKindBadgeState extends State<_QrKindBadge>
+    with SingleTickerProviderStateMixin {
+  static const int _pulses = 3;
+
+  late final AnimationController _pulse = AnimationController(
+    vsync: this,
+    duration: const Duration(seconds: 2),
+  );
+  bool _started = false;
+
+  void _play() {
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _pulse.value = 0;
+      return;
+    }
+    _pulse.forward(from: 0);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_started) return;
+    _started = true;
+    _play();
+  }
+
+  @override
+  void didUpdateWidget(_QrKindBadge old) {
+    super.didUpdateWidget(old);
+    if (old.kind != widget.kind) _play();
+  }
+
+  @override
+  void dispose() {
+    _pulse.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final color = widget.kind.color;
+    final badge = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Icon(Icons.qr_code_2_rounded, size: 16, color: Colors.white),
+        const SizedBox(width: 4),
+        Text(
+          widget.kind.label,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 15,
+            fontWeight: FontWeight.w900,
+            height: 1.2,
+          ),
+        ),
+      ],
+    );
+    final animate = !MediaQuery.disableAnimationsOf(context);
+    return AnimatedBuilder(
+      animation: _pulse,
+      child: badge,
+      builder: (context, child) {
+        // 0 → 1 → 0, lặp [_pulses] lần trong suốt animation.
+        final t = animate && _pulse.isAnimating
+            ? (1 - math.cos(_pulse.value * _pulses * 2 * math.pi)) / 2
+            : 0.0;
+        return Transform.scale(
+          scale: 1 + .08 * t,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: BorderRadius.circular(999),
+              boxShadow: [
+                if (t > 0)
+                  BoxShadow(
+                    color: color.withValues(alpha: .7 * t),
+                    blurRadius: 14 * t,
+                    spreadRadius: 2 * t,
+                  ),
+              ],
+            ),
+            child: child,
+          ),
+        );
+      },
     );
   }
 }

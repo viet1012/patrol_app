@@ -11,25 +11,66 @@ abstract final class FixedAssetSummaryStrings {
       month > 0 ? '$period · tháng $month/3' : period;
   static const refresh = 'Làm mới';
 
-  static const audited = 'Đã kiểm kê';
-  static const planTodayTitle = 'Kế hoạch đến hôm nay';
-  static const remaining = 'Còn lại';
-  static const pendingQr = 'Chờ thay QR';
-  static String auditedOf(int audited, int total) => '$audited/$total máy';
-  static String machines(int count) => '$count máy';
-  static String planTodayMachines(int count) => 'Kế hoạch hôm nay $count máy';
+  // Hàng KPI
+  static const quarterProgress = 'Tiến độ quý';
+  static String auditedOfSuffix(int total) => ' / $total máy';
 
-  /// "Chậm n máy" / "Vượt n máy" / "Đúng tiến độ".
-  static String pace(int behind, int ahead) => behind > 0
-      ? 'Chậm $behind máy'
-      : (ahead > 0 ? 'Vượt $ahead máy' : onSchedule);
+  /// "Kế hoạch đến hôm nay: 329 (37%)".
+  static String planToday(int machines, double planPct) =>
+      'Kế hoạch đến hôm nay: $machines (${formatNumber(planPct)}%)';
+  static String behindChip(int count) => 'Chậm $count máy';
+  static String aheadChip(int count) => 'Vượt $count máy';
   static const onSchedule = 'Đúng tiến độ';
-  static String monthNeed(int count) => 'tháng này cần thêm $count máy';
-  static const pendingQrHint = 'Bấm để mở 3) Thay QR';
+  static const donutTooltip =
+      'Cung mờ: kế hoạch đến hôm nay\nCung màu: đã kiểm kê';
+
+  /// "Mục tiêu tháng 11"; ngoài quý không có số tháng.
+  static String monthTarget(int? month) =>
+      month == null ? 'Mục tiêu tháng' : 'Mục tiêu tháng $month';
+  static String monthNeedSuffix(String date) => ' máy cần kiểm trước $date';
+  static const monthReached = 'Đã đạt chỉ tiêu tháng';
+
+  static const quarterRemaining = 'Còn lại cả quý';
+  static const unauditedSuffix = ' máy chưa kiểm';
+
+  /// "≈ 20 máy/ngày · còn 28 ngày".
+  static String perDay(int perDay, int days) =>
+      '≈ $perDay máy/ngày · còn $days ngày';
+
+  /// "≈ 15 máy/ngày đến 31/12 · còn 59 ngày".
+  static String perDayUntil(int perDay, String date, int days) =>
+      '≈ $perDay máy/ngày đến $date · còn $days ngày';
+
+  static const pendingQr = 'Chờ thay QR';
+  static const pendingQrHint = 'Bấm để xem danh sách';
+
+  /// Hàng gọn mobile: "{n} máy chờ thay QR".
+  static const pendingQrSuffix = ' máy chờ thay QR';
+  static const noValue = '—';
+
+  /// "30/11".
+  static String dayMonth(DateTime d) =>
+      '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}';
 
   /// "Tiến độ theo PIC · Quý 4/2026".
   static String picProgressTitle(String period) => 'Tiến độ theo PIC · $period';
+
+  /// Mobile: app bar đã có tên quý.
+  static const picProgressTitleShort = 'Tiến độ theo PIC';
+  static const sortTooltip = 'Sắp xếp';
+
+  /// Chú thích vạch kế hoạch (mobile): "Hôm nay 03/11 · KH 36.7%".
+  static String todayLegend(String date, double planPct) =>
+      'Hôm nay $date · KH ${percent(planPct)}';
+
+  /// "9/251 · 3.6%" (phần sau số đã kiểm).
+  static String picOfPct(int total, double pct) =>
+      '/$total · ${percent1(pct)}';
   static const picProgressUnassigned = 'Chưa có PIC';
+
+  /// Tooltip vạch hôm nay: "Hôm nay 03/11 · kế hoạch 45.2%".
+  static String todayTooltip(String date, double planPct) =>
+      'Hôm nay $date · kế hoạch ${percent(planPct)}';
 
   static const sortMachines = 'Số máy';
   static const sortBehindPlan = 'Thiếu so KH';
@@ -38,10 +79,6 @@ abstract final class FixedAssetSummaryStrings {
   static const colMachines = 'Máy';
   static String colMonth(int month) => 'Tháng $month';
   static String colMonthCurrent(int month) => 'Tháng $month · tháng này';
-  static const colBehindPlan = 'Thiếu so KH';
-
-  /// Thiếu so KH: "−n"; 0 thì "—".
-  static String behindPlan(int count) => count > 0 ? '−$count' : '—';
 
   static const noData = 'Chưa có dữ liệu kỳ này';
 

@@ -345,7 +345,6 @@ class FixedAssetSummaryPic {
   double get diff => pct - planPct;
 
   int get planMachines => fixedAssetPlanMachines(planPct, total);
-  int get behindMachines => fixedAssetBehindMachines(planPct, total, audited);
   int get aheadMachines => fixedAssetAheadMachines(planPct, total, audited);
 
   /// /summary/pics không trả planPct (kế hoạch theo ngày, chung mọi PIC):

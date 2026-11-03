@@ -40,11 +40,17 @@ abstract final class FixedAssetReplaceStrings {
       'Khu $positionAA đã thay xong QR';
 
   // Camera.
-  static String scanOldTitle(String code, String oldQr) =>
-      'Quét QR CŨ của $code (đang dán $oldQr)';
-  static String scanNewTitle(String code, String act) =>
-      'Quét QR MỚI của $code ($act)';
-  static const scanHint = 'Đưa QR vào giữa khung';
+  // Header: "Quét" + badge loại QR + "của A-1000 (A3-3)".
+  static const scan = 'Quét';
+  static const qrNew = 'QR MỚI';
+  static const qrOld = 'QR CŨ';
+  static String scanOldSubject(String code, String oldQr) =>
+      'của $code (đang dán $oldQr)';
+  static String scanNewSubject(String code, String act) => 'của $code ($act)';
+
+  // Hướng dẫn: "Đưa " + loại QR (tô màu) + " vào giữa khung".
+  static const scanHintPrefix = 'Đưa ';
+  static const scanHintSuffix = ' vào giữa khung';
   static const saving = 'Đang lưu…';
   static const flashUnsupported = 'Máy này không bật được đèn flash';
   static const invalidQr = 'QR không hợp lệ (không đọc được mã máy)';

@@ -13,8 +13,8 @@ import 'package:chuphinh/features/fixed_asset/reprint/widgets/fixed_asset_reprin
 class _ReplaceStep {
   final String title;
 
-  /// Tiêu đề camera (đang chờ quét gì).
-  final String scanTitle;
+  /// Phần sau badge trên header camera, vd "của A-1000 (A3-3)".
+  final String scanSubject;
   final DateTime? doneAt;
 
   /// Không làm được ở đây (vd chưa rõ vị trí thực tế); null = làm được.
@@ -26,7 +26,7 @@ class _ReplaceStep {
 
   const _ReplaceStep({
     required this.title,
-    required this.scanTitle,
+    required this.scanSubject,
     required this.doneAt,
     required this.onScan,
     required this.isNew,
@@ -105,7 +105,7 @@ class _FixedAssetReplaceTaskScreenState
     final name = userName.trim().isEmpty ? userId : userName.trim();
     final newStep = _ReplaceStep(
       title: FixedAssetReplaceStrings.stepNew(task.actShort),
-      scanTitle: FixedAssetReplaceStrings.scanNewTitle(
+      scanSubject: FixedAssetReplaceStrings.scanNewSubject(
         task.machineCode,
         task.actShort,
       ),
@@ -125,7 +125,7 @@ class _FixedAssetReplaceTaskScreenState
     return [
       _ReplaceStep(
         title: FixedAssetReplaceStrings.stepOld(task.oldQrShort),
-        scanTitle: FixedAssetReplaceStrings.scanOldTitle(
+        scanSubject: FixedAssetReplaceStrings.scanOldSubject(
           task.machineCode,
           task.oldQrShort,
         ),
@@ -145,7 +145,10 @@ class _FixedAssetReplaceTaskScreenState
       context,
       MaterialPageRoute(
         builder: (_) => FixedAssetReplaceScanScreen(
-          title: step.scanTitle,
+          kind: step.isNew
+              ? FixedAssetReplaceQrKind.newQr
+              : FixedAssetReplaceQrKind.oldQr,
+          subject: step.scanSubject,
           onScan: step.onScan,
         ),
       ),

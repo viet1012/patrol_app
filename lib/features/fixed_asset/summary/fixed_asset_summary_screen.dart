@@ -109,6 +109,7 @@ class _FixedAssetSummaryScreenState extends State<FixedAssetSummaryScreen> {
   }
 
   static const double _desktopWidth = 900;
+  static const double _mobileWidth = 600;
 
   void _openPic(FixedAssetSummaryPic pic) {
     Navigator.push(
@@ -229,40 +230,49 @@ class _FixedAssetSummaryScreenState extends State<FixedAssetSummaryScreen> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final width = constraints.maxWidth;
-        final side = width >= 600 ? 24.0 : 16.0;
-        return _buildList(overview, width - side * 2, side);
+        final mobile = width < _mobileWidth;
+        final side = mobile ? 16.0 : 24.0;
+        return _buildList(overview, width - side * 2, side, mobile);
       },
     );
   }
 
-  /// [width]: bề rộng nội dung (đã trừ padding).
+  /// [width]: bề rộng nội dung (đã trừ padding). [mobile]: màn < 600 px.
   Widget _buildList(
     FixedAssetSummaryOverview overview,
     double width,
     double side,
+    bool mobile,
   ) {
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
       padding: EdgeInsets.fromLTRB(side, 12, side, 24),
       children: [
-        _buildGrid(overview, width),
+        mobile ? _buildMobileGrid(overview) : _buildGrid(overview, width),
         const SizedBox(height: 10),
-        _buildPicProgress(overview, width),
+        _buildPicProgress(overview, width, mobile),
       ],
     );
   }
 
-  /// "Tiến độ theo PIC · Quý q/yyyy": bảng 1 cột từ picRows (bỏ dòng tổng)
-  /// + planPct của /summary.
-  Widget _buildPicProgress(FixedAssetSummaryOverview o, double width) {
+  /// "Tiến độ theo PIC · Quý q/yyyy" (mobile: bỏ tên quý, dạng list): từ
+  /// picRows (bỏ dòng tổng) + planPct của /summary.
+  Widget _buildPicProgress(
+    FixedAssetSummaryOverview o,
+    double width,
+    bool mobile,
+  ) {
     final byEmail = {for (final p in _pics ?? const []) p.email: p};
     return FixedAssetPicProgressTable(
-      title: FixedAssetSummaryStrings.picProgressTitle(_period.label),
+      title: mobile
+          ? FixedAssetSummaryStrings.picProgressTitleShort
+          : FixedAssetSummaryStrings.picProgressTitle(_period.label),
       rows: [for (final r in o.picRows) if (!r.isTotal) r],
       planPct: o.planPct,
       period: _period,
       today: o.today,
       wide: width >= _desktopWidth,
+      compact: mobile,
       nameOf: (r) => r.pic == null
           ? FixedAssetSummaryStrings.picProgressUnassigned
           : (byEmail[r.pic]?.name ?? FixedAssetPic.nameOf(r.pic!)),
@@ -284,46 +294,116 @@ class _FixedAssetSummaryScreenState extends State<FixedAssetSummaryScreen> {
     );
   }
 
-  /// Máy còn cần kiểm trong tháng hiện tại: max(0, mục tiêu cuối tháng −
-  /// đã kiểm). Ngoài quý: theo mục tiêu cuối quý (trước quý: tháng 1).
-  int _monthNeed(FixedAssetSummaryOverview o) {
-    final index = _period.monthIndexOf(o.today);
-    final target = o.monthTargetMachines(
-      index > 0 ? index : (o.today.isBefore(_period.monthStart(1)) ? 1 : 3),
-    );
-    return target > o.audited ? target - o.audited : 0;
+  /// Số ngày từ [today] đến [end], gồm cả hôm nay (ngày dương lịch).
+  static int _daysLeft(DateTime today, DateTime end) =>
+      DateTime.utc(end.year, end.month, end.day)
+          .difference(DateTime.utc(today.year, today.month, today.day))
+          .inDays +
+      1;
+
+  /// Máy đã kiểm trong tháng thứ [index] của quý: dòng tổng picRows, không
+  /// có thì cộng các dòng PIC; backend chưa trả số tháng -> null.
+  int? _monthAudited(FixedAssetSummaryOverview o, int index) {
+    final month = _period.monthOf(index);
+    int? of(FixedAssetSummaryPicRow r) {
+      for (final m in r.months) {
+        if (m.month == month) return m.audited;
+      }
+      final byOrder = r.months.length >= index ? r.months[index - 1] : null;
+      return byOrder?.month == null ? byOrder?.audited : null;
+    }
+
+    for (final r in o.picRows) {
+      if (r.isTotal) return of(r);
+    }
+    int? sum;
+    for (final r in o.picRows) {
+      final value = of(r);
+      if (value != null) sum = (sum ?? 0) + value;
+    }
+    return sum;
   }
 
-  /// 4 ô KPI: Đã kiểm kê · Kế hoạch đến hôm nay · Còn lại · Chờ thay QR.
-  /// ≥ 900 px: 1 hàng 4 ô; nhỏ hơn: lưới 2×2.
-  Widget _buildGrid(FixedAssetSummaryOverview o, double width) {
-    final behind = o.behindMachines;
-    final paceColor = behind > 0
+  /// KPI mobile (< 600 px): Tiến độ quý full width (chip dưới cột chữ) ·
+  /// Mục tiêu tháng | Còn lại cả quý (dòng phụ tối đa 2 dòng) · hàng gọn
+  /// "n máy chờ thay QR".
+  Widget _buildMobileGrid(FixedAssetSummaryOverview o) {
+    final index = _period.monthIndexOf(o.today);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _quarterTile(o, inQuarter: index > 0, mobile: true),
+        const SizedBox(height: 8),
+        IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(child: _monthTile(o, index, wrap: true)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _remainingTile(o, inQuarter: index > 0, wrap: true),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 8),
+        _pendingQrRow(o),
+      ],
+    );
+  }
+
+  /// Hàng gọn mobile: icon QR + "n máy chờ thay QR" + chevron; bấm mở danh
+  /// sách Thay QR.
+  Widget _pendingQrRow(FixedAssetSummaryOverview o) {
+    final color = o.pendingQr > 0
         ? FixedAssetSummaryColors.orange
         : FixedAssetSummaryColors.green;
+    return FixedAssetSummaryCard(
+      onTap: _openReplace,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      child: Row(
+        children: [
+          Icon(Icons.qr_code_2_rounded, size: 18, color: color),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text.rich(
+              TextSpan(
+                text: '${o.pendingQr}',
+                style: TextStyle(color: color, fontWeight: FontWeight.w900),
+                children: const [
+                  TextSpan(
+                    text: FixedAssetSummaryStrings.pendingQrSuffix,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 14),
+            ),
+          ),
+          const Icon(
+            Icons.chevron_right_rounded,
+            size: 20,
+            color: Colors.white38,
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 4 ô KPI: Tiến độ quý · Mục tiêu tháng · Còn lại cả quý · Chờ thay QR.
+  /// ≥ 900 px: 1 hàng 4 ô; nhỏ hơn: lưới 2×2. Quý không chứa hôm nay: bỏ
+  /// kế hoạch / chip, mục tiêu tháng "—", bỏ dòng máy/ngày.
+  Widget _buildGrid(FixedAssetSummaryOverview o, double width) {
+    final index = _period.monthIndexOf(o.today);
     final tiles = [
-      _tile(
-        icon: Icons.task_alt_rounded,
-        label: FixedAssetSummaryStrings.audited,
-        value: FixedAssetSummaryStrings.percent(o.pct),
-        detail: FixedAssetSummaryStrings.auditedOf(o.audited, o.total),
-        color: FixedAssetSummaryColors.accent,
-      ),
-      _tile(
-        icon: Icons.trending_up_rounded,
-        label: FixedAssetSummaryStrings.planTodayTitle,
-        value: FixedAssetSummaryStrings.machines(o.planMachines),
-        detail: FixedAssetSummaryStrings.pace(behind, o.aheadMachines),
-        color: Colors.white,
-        detailColor: paceColor,
-      ),
-      _tile(
-        icon: Icons.pending_actions_rounded,
-        label: FixedAssetSummaryStrings.remaining,
-        value: '${o.remaining}',
-        detail: FixedAssetSummaryStrings.monthNeed(_monthNeed(o)),
-        color: Colors.white,
-      ),
+      _quarterTile(o, inQuarter: index > 0),
+      _monthTile(o, index),
+      _remainingTile(o, inQuarter: index > 0),
       _tile(
         icon: Icons.qr_code_2_rounded,
         label: FixedAssetSummaryStrings.pendingQr,
@@ -356,69 +436,262 @@ class _FixedAssetSummaryScreenState extends State<FixedAssetSummaryScreen> {
     );
   }
 
+  /// Ô "Tiến độ quý": donut 2 lớp (kế hoạch mờ + đã kiểm accent), "a / t máy",
+  /// kế hoạch đến hôm nay, chip Chậm / Vượt / Đúng tiến độ (|chênh| ≤ 1%).
+  /// Ngoài quý: chỉ lớp đã kiểm, bỏ kế hoạch và chip. [mobile]: ô full width,
+  /// chip dưới cùng cột chữ thay vì cạnh tiêu đề.
+  Widget _quarterTile(
+    FixedAssetSummaryOverview o, {
+    required bool inQuarter,
+    bool mobile = false,
+  }) {
+    Widget? chip;
+    if (inQuarter) {
+      final (text, color) = o.diff.abs() <= 1
+          ? (FixedAssetSummaryStrings.onSchedule, FixedAssetSummaryColors.muted)
+          : o.behindMachines > 0
+          ? (
+              FixedAssetSummaryStrings.behindChip(o.behindMachines),
+              FixedAssetSummaryColors.behind,
+            )
+          : (
+              FixedAssetSummaryStrings.aheadChip(o.aheadMachines),
+              FixedAssetSummaryColors.green,
+            );
+      chip = FixedAssetSummaryChip(text: text, color: color);
+    }
+    // Donut 72 cao hơn nội dung ô chuẩn (~62) nên padding dọc 7 thay vì 12,
+    // giữ chiều cao hàng (mobile: ô riêng một hàng, padding 12).
+    return FixedAssetSummaryCard(
+      padding: EdgeInsets.symmetric(horizontal: 12, vertical: mobile ? 12 : 7),
+      child: Row(
+        children: [
+          FixedAssetPlanDonut(
+            pct: o.pct,
+            planPct: inQuarter ? o.planPct : null,
+            tooltip: inQuarter ? FixedAssetSummaryStrings.donutTooltip : null,
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _header(
+                  FixedAssetSummaryStrings.quarterProgress,
+                  trailing: mobile ? null : chip,
+                ),
+                const SizedBox(height: 2),
+                _value(
+                  '${o.audited}',
+                  suffix: FixedAssetSummaryStrings.auditedOfSuffix(o.total),
+                ),
+                if (inQuarter)
+                  _detail(
+                    FixedAssetSummaryStrings.planToday(
+                      o.planMachines,
+                      o.planPct,
+                    ),
+                  ),
+                if (mobile && chip != null) ...[
+                  const SizedBox(height: 6),
+                  chip,
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Ô "Mục tiêu tháng": máy còn cần kiểm để đạt mục tiêu lũy kế cuối tháng
+  /// thứ [index], ≈ máy/ngày đến hết tháng, thanh đã kiểm trong tháng / chỉ
+  /// tiêu tháng. [index] = 0 (ngoài quý): "—". [wrap]: xem [_tile].
+  Widget _monthTile(
+    FixedAssetSummaryOverview o,
+    int index, {
+    bool wrap = false,
+  }) {
+    const icon = Icons.flag_rounded;
+    if (index == 0) {
+      return _tile(
+        icon: icon,
+        label: FixedAssetSummaryStrings.monthTarget(null),
+        value: FixedAssetSummaryStrings.noValue,
+        wrap: wrap,
+      );
+    }
+    final end = _period.monthEnd(index);
+    final target = o.monthTargetMachines(index);
+    final need = target > o.audited ? target - o.audited : 0;
+    final days = _daysLeft(o.today, end);
+    final quota = target - o.monthTargetMachines(index - 1);
+    final done = _monthAudited(o, index);
+    return _tile(
+      icon: icon,
+      label: FixedAssetSummaryStrings.monthTarget(_period.monthOf(index)),
+      value: '$need',
+      suffix: FixedAssetSummaryStrings.monthNeedSuffix(
+        FixedAssetSummaryStrings.dayMonth(end),
+      ),
+      detail: need == 0
+          ? FixedAssetSummaryStrings.monthReached
+          : FixedAssetSummaryStrings.perDay((need / days).ceil(), days),
+      progress: done == null || quota <= 0 ? null : done / quota,
+      wrap: wrap,
+    );
+  }
+
+  /// Ô "Còn lại cả quý": máy chưa kiểm, ≈ máy/ngày đến cuối quý (ngoài quý
+  /// bỏ dòng này). [wrap]: xem [_tile].
+  Widget _remainingTile(
+    FixedAssetSummaryOverview o, {
+    required bool inQuarter,
+    bool wrap = false,
+  }) {
+    final end = _period.monthEnd(3);
+    final days = _daysLeft(o.today, end);
+    return _tile(
+      icon: Icons.pending_actions_rounded,
+      label: FixedAssetSummaryStrings.quarterRemaining,
+      value: '${o.remaining}',
+      suffix: FixedAssetSummaryStrings.unauditedSuffix,
+      detail: inQuarter
+          ? FixedAssetSummaryStrings.perDayUntil(
+              (o.remaining / days).ceil(),
+              FixedAssetSummaryStrings.dayMonth(end),
+              days,
+            )
+          : null,
+      wrap: wrap,
+    );
+  }
+
+  static final _labelStyle = TextStyle(
+    color: Colors.white.withValues(alpha: .7),
+    fontSize: 12,
+    fontWeight: FontWeight.w700,
+  );
+
+  /// Tiêu đề ô: [icon] (tùy chọn) + nhãn một dòng + [trailing].
+  static Widget _header(String label, {IconData? icon, Widget? trailing}) {
+    return Row(
+      children: [
+        if (icon != null) ...[
+          Icon(icon, size: 15, color: Colors.white.withValues(alpha: .6)),
+          const SizedBox(width: 5),
+        ],
+        Expanded(
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: _labelStyle,
+          ),
+        ),
+        if (trailing != null) ...[const SizedBox(width: 6), trailing],
+      ],
+    );
+  }
+
+  /// Số lớn 23 px + [suffix] nhỏ muted cùng dòng ([maxLines] 2: suffix được
+  /// xuống dòng).
+  static Widget _value(
+    String value, {
+    String? suffix,
+    Color color = Colors.white,
+    int maxLines = 1,
+  }) {
+    return Text.rich(
+      TextSpan(
+        text: value,
+        style: TextStyle(
+          color: color,
+          fontSize: 23,
+          fontWeight: FontWeight.w900,
+          height: 1.15,
+        ),
+        children: [
+          if (suffix != null)
+            TextSpan(
+              text: suffix,
+              style: const TextStyle(
+                color: FixedAssetSummaryColors.muted,
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+        ],
+      ),
+      maxLines: maxLines,
+      overflow: TextOverflow.ellipsis,
+    );
+  }
+
+  /// Dòng phụ 12 px muted. [wrap]: tối đa 2 dòng, không ellipsis.
+  static Widget _detail(String text, {bool wrap = false}) => Text(
+    text,
+    maxLines: wrap ? 2 : 1,
+    overflow: wrap ? TextOverflow.clip : TextOverflow.ellipsis,
+    style: const TextStyle(color: FixedAssetSummaryColors.muted, fontSize: 12),
+  );
+
+  /// Ô chuẩn ~84 px: padding 12, tiêu đề một dòng, số 23 px (+ [suffix]),
+  /// dòng phụ 12 px. [progress] (0–1): thanh 3 px lấy chỗ từ padding dưới nên
+  /// chiều cao ô không đổi. [wrap] (mobile, ô hẹp): số + suffix và dòng phụ
+  /// được xuống tối đa 2 dòng.
   Widget _tile({
     required IconData icon,
     required String label,
     required String value,
-    required String detail,
-    required Color color,
-    Color? detailColor,
+    String? suffix,
+    String? detail,
+    Color color = Colors.white,
+    double? progress,
     VoidCallback? onTap,
+    bool wrap = false,
   }) {
-    // Gọn ~84 px: padding 12, icon + nhãn một dòng, số 23 px, dòng phụ 12 px.
     return FixedAssetSummaryCard(
       onTap: onTap,
-      padding: const EdgeInsets.all(12),
+      padding: progress == null
+          ? const EdgeInsets.all(12)
+          : const EdgeInsets.fromLTRB(12, 12, 12, 5),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Row(
-            children: [
-              Icon(icon, size: 15, color: Colors.white.withValues(alpha: .6)),
-              const SizedBox(width: 5),
-              Expanded(
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: .7),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
+          _header(
+            label,
+            icon: icon,
+            trailing: onTap == null
+                ? null
+                : const Icon(
+                    Icons.chevron_right_rounded,
+                    size: 18,
+                    color: Colors.white38,
                   ),
-                ),
-              ),
-              if (onTap != null)
-                const Icon(
-                  Icons.chevron_right_rounded,
-                  size: 18,
-                  color: Colors.white38,
-                ),
-            ],
           ),
           const SizedBox(height: 2),
-          Text(
+          _value(
             value,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: color,
-              fontSize: 23,
-              fontWeight: FontWeight.w900,
-              height: 1.15,
-            ),
+            suffix: suffix,
+            color: color,
+            maxLines: wrap ? 2 : 1,
           ),
-          Text(
-            detail,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: detailColor ?? Colors.white.withValues(alpha: .55),
-              fontSize: 12,
-              fontWeight: detailColor == null ? null : FontWeight.w700,
+          if (detail != null) _detail(detail, wrap: wrap),
+          if (progress != null) ...[
+            const SizedBox(height: 4),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(999),
+              child: LinearProgressIndicator(
+                value: progress.clamp(0.0, 1.0),
+                minHeight: 3,
+                backgroundColor: Colors.white.withValues(alpha: .10),
+                color: FixedAssetSummaryColors.accent,
+              ),
             ),
-          ),
+          ],
         ],
       ),
     );

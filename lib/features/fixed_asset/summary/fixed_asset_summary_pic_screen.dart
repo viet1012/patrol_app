@@ -232,7 +232,7 @@ class _FixedAssetSummaryPicScreenState
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _cachedHeader(pic, narrow),
+                _cachedHeader(pic),
                 const SizedBox(height: 12),
                 // Chỉ bảng cuộn bên trong card; card cao tới hết màn.
                 Expanded(
@@ -325,23 +325,22 @@ class _FixedAssetSummaryPicScreenState
         child: child,
       );
 
-  /// Widget header dùng lại nguyên instance khi [_detail] / [narrow] không
+  /// Widget header dùng lại nguyên instance khi [_detail] không
   /// đổi: Flutter bỏ qua rebuild khi setState vì tab / panel / khu.
-  Widget _cachedHeader(FixedAssetSummaryPic pic, bool narrow) {
-    final key = (_detail, narrow);
+  Widget _cachedHeader(FixedAssetSummaryPic pic) {
+    final key = _detail;
     if (_header == null || _headerFor != key) {
       _headerFor = key;
-      _header = RepaintBoundary(child: _buildHeader(pic, narrow));
+      _header = RepaintBoundary(child: _buildHeader(pic));
     }
     return _header!;
   }
 
   /// Header (~120 px): avatar | tên · email · n khu | "{a}/{t} máy · {pct}%";
-  /// thanh quý; 4 ô số (1 hàng; [narrow]: lưới 2×2).
-  Widget _buildHeader(FixedAssetSummaryPic pic, bool narrow) {
+  /// thanh quý; 3 ô số chia đều 1 hàng.
+  Widget _buildHeader(FixedAssetSummaryPic pic) {
     const accent = FixedAssetSummaryColors.accent;
     final muted = Colors.white.withValues(alpha: .55);
-    final behind = pic.behindMachines;
     final zones = _detail?.zones;
     final moved = zones?.fold<int>(0, (s, z) => s + (z.movedCount ?? 0));
     final stats = [
@@ -349,11 +348,6 @@ class _FixedAssetSummaryPicScreenState
         FixedAssetSummaryStrings.statAudited,
         '${pic.audited}/${pic.total}',
         Colors.white,
-      ),
-      _stat(
-        FixedAssetSummaryStrings.colBehindPlan,
-        behind > 0 ? '$behind' : '—',
-        behind > 0 ? FixedAssetSummaryColors.orange : muted,
       ),
       _stat(
         FixedAssetSummaryStrings.colMoved,
@@ -366,14 +360,6 @@ class _FixedAssetSummaryPicScreenState
         pic.pendingQr > 0 ? FixedAssetSummaryColors.orange : Colors.white,
       ),
     ];
-    Widget row(List<Widget> items) => Row(
-      children: [
-        for (var i = 0; i < items.length; i++) ...[
-          if (i > 0) const SizedBox(width: 8),
-          Expanded(child: items[i]),
-        ],
-      ],
-    );
     return _card(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Column(
@@ -455,12 +441,14 @@ class _FixedAssetSummaryPicScreenState
             today: DateTime.now(),
           ),
           const SizedBox(height: 10),
-          if (narrow) ...[
-            row(stats.sublist(0, 2)),
-            const SizedBox(height: 8),
-            row(stats.sublist(2)),
-          ] else
-            row(stats),
+          Row(
+            children: [
+              for (var i = 0; i < stats.length; i++) ...[
+                if (i > 0) const SizedBox(width: 8),
+                Expanded(child: stats[i]),
+              ],
+            ],
+          ),
         ],
       ),
     );
