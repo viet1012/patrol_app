@@ -4,7 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:chuphinh/shared/animations/glow_title.dart';
 
 class AppVersionText extends StatelessWidget {
-  const AppVersionText({super.key});
+  /// false: glow cố định, không animate.
+  final bool animate;
+
+  const AppVersionText({super.key, this.animate = true});
 
   Future<String> _getVersion() async {
     final info = await PackageInfo.fromPlatform();
@@ -19,7 +22,7 @@ class AppVersionText extends StatelessWidget {
       future: _getVersion(),
       builder: (_, snap) {
         final text = snap.data ?? 'V...';
-        return EmbossGlowTitle(text: text, fontSize: 13);
+        return EmbossGlowTitle(text: text, fontSize: 13, animate: animate);
       },
     );
   }

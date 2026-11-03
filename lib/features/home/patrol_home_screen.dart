@@ -7,13 +7,13 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:chuphinh/features/home/widgets/language_flag_button.dart';
+import 'package:chuphinh/features/home/widgets/patrol_header_title.dart';
 import 'package:chuphinh/features/patrol/after/after_overview_screen.dart';
 import 'package:chuphinh/shared/animations/call_to_action_arrow.dart';
-import 'package:chuphinh/shared/animations/glow_title.dart';
+import 'package:chuphinh/shared/animations/radar_icon.dart';
 import 'package:chuphinh/core/network/dio_client.dart';
 import 'package:chuphinh/core/api/hse_master_service.dart';
 import 'package:chuphinh/shared/widgets/animated_glass_action_button.dart';
-import 'package:chuphinh/shared/widgets/app_version_text.dart';
 import 'package:chuphinh/shared/widgets/common_ui_helper.dart';
 import 'package:chuphinh/shared/utils/plant_constants.dart';
 import 'package:chuphinh/core/models/patrol_group.dart';
@@ -47,7 +47,8 @@ class PatrolHomeScreen extends StatefulWidget {
   State<PatrolHomeScreen> createState() => _PatrolHomeScreenState();
 }
 
-class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
+class _PatrolHomeScreenState extends State<PatrolHomeScreen>
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   // ============================================================
   // STATE
   // ============================================================
@@ -88,6 +89,16 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
   // Chỉ dùng để chặn init trùng trong trường hợp widget bị gắn lại bất thường.
   bool _initializing = false;
 
+  /// Controller duy nhất cho radar 5 card + vạch quét nút QR (12s / vòng).
+  /// Không setState theo animation: chỉ CustomPaint nhận repaint.
+  late final AnimationController _radarController = AnimationController(
+    vsync: this,
+    duration: const Duration(seconds: 12),
+  );
+
+  bool _appResumed = true;
+  bool _reduceMotion = false;
+
   // ============================================================
   // CONSTANT UI
   // ============================================================
@@ -113,6 +124,7 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
 
     // Cho frame đầu tiên render trước, sau đó mới bắt đầu tải.
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -120,6 +132,35 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
         _initializeScreen();
       }
     });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _reduceMotion = MediaQuery.disableAnimationsOf(context);
+    _syncRadar();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _appResumed = state == AppLifecycleState.resumed;
+    _syncRadar();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _radarController.dispose();
+    super.dispose();
+  }
+
+  /// App bị ẩn hoặc tắt animation -> dừng. Route bị che: TickerMode tự dừng.
+  void _syncRadar() {
+    if (_appResumed && !_reduceMotion) {
+      if (!_radarController.isAnimating) _radarController.repeat();
+    } else {
+      _radarController.stop();
+    }
   }
 
   // ============================================================
@@ -330,9 +371,9 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
         : null;
 
     return Scaffold(
-      appBar: const PreferredSize(
-        preferredSize: Size.fromHeight(50),
-        child: _PatrolAppBar(),
+      appBar: PreferredSize(
+        preferredSize: const Size.fromHeight(50),
+        child: _PatrolAppBar(animation: _radarController),
       ),
       body: DecoratedBox(
         decoration: const BoxDecoration(gradient: _pageGradient),
@@ -575,7 +616,11 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
         return RepaintBoundary(
           child: _PatrolEntryAnimation(
             index: index,
-            child: _patrolGroupCard(group: group, ui: kPatrolGroupUi[group]!),
+            child: _patrolGroupCard(
+              group: group,
+              ui: kPatrolGroupUi[group]!,
+              index: index,
+            ),
           ),
         );
       },
@@ -597,6 +642,7 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
               child: QrScanGlassButton(
                 onTap: _openQrScannerDialog,
                 duration: const Duration(milliseconds: 900),
+                scanAnimation: _radarController,
               ),
             ),
         ],
@@ -659,6 +705,7 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
   Widget _patrolGroupCard({
     required PatrolGroup group,
     required PatrolGroupUi ui,
+    required int index,
   }) {
     final expanded = expandedGroup == group;
     final color = ui.color;
@@ -684,7 +731,13 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
               padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 22),
               child: Row(
                 children: [
-                  Icon(ui.icon, color: color, size: 26),
+                  RadarIcon(
+                    icon: ui.icon,
+                    color: color,
+                    animation: _radarController,
+                    phase: index * .2,
+                    expanded: expanded,
+                  ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
@@ -1100,7 +1153,10 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen> {
 // ============================================================
 
 class _PatrolAppBar extends StatelessWidget {
-  const _PatrolAppBar();
+  /// Controller 12s dùng chung với radar card.
+  final Animation<double> animation;
+
+  const _PatrolAppBar({required this.animation});
 
   @override
   Widget build(BuildContext context) {
@@ -1108,26 +1164,7 @@ class _PatrolAppBar extends StatelessWidget {
       centerTitle: true,
       backgroundColor: _PatrolHomeScreenState._appBarColor,
       elevation: 0,
-      title: RepaintBoundary(
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Image.asset(
-              'assets/flags/favicon.png',
-              width: 40,
-              height: 40,
-              filterQuality: FilterQuality.medium,
-              fit: BoxFit.contain,
-              cacheWidth: 80,
-              cacheHeight: 80,
-            ),
-            const SizedBox(width: 8),
-            EmbossGlowTitle(text: 'S-PATROL'),
-            const SizedBox(width: 8),
-            AppVersionText(),
-          ],
-        ),
-      ),
+      title: RepaintBoundary(child: PatrolHeaderTitle(animation: animation)),
     );
   }
 }

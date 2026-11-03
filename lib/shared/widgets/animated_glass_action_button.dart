@@ -2,6 +2,8 @@ import 'dart:math' as math;
 import 'dart:ui';
 import 'package:flutter/material.dart';
 
+import 'package:chuphinh/shared/animations/radar_icon.dart';
+
 class AnimatedGlassActionButton extends StatefulWidget {
   final VoidCallback? onTap;
   final IconData icon;
@@ -135,6 +137,10 @@ class QrScanGlassButton extends StatefulWidget {
   final Color lineColor;
   final Duration duration;
 
+  /// Controller dùng chung (12s) của màn cha. Có giá trị -> vẽ vạch quét
+  /// mảnh bằng [ScanLinePainter] thay cho vạch quét nội bộ.
+  final Animation<double>? scanAnimation;
+
   /// Border animation
   final Color borderColor;
   final double borderWidth;
@@ -151,6 +157,7 @@ class QrScanGlassButton extends StatefulWidget {
     this.backgroundColor,
     this.lineColor = const Color(0xFF7CF8D6),
     this.duration = const Duration(milliseconds: 1400),
+    this.scanAnimation,
     this.borderColor = const Color(0xFF7CF8D6),
     this.borderWidth = 1.4,
   });
@@ -245,7 +252,21 @@ class _QrScanGlassButtonState extends State<QrScanGlassButton>
                                 : widget.iconColor.withOpacity(0.4),
                           ),
 
-                          // 2️⃣ Scan line chạy lên/xuống (dài hơn icon)
+                          // 2️⃣ Scan line chạy lên/xuống
+                          if (widget.scanAnimation != null)
+                            Positioned.fill(
+                              child: IgnorePointer(
+                                child: RepaintBoundary(
+                                  child: CustomPaint(
+                                    painter: ScanLinePainter(
+                                      animation: widget.scanAnimation!,
+                                      color: widget.lineColor,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            )
+                          else
                           Positioned.fill(
                             child: IgnorePointer(
                               child: AnimatedBuilder(
