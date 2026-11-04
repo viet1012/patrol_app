@@ -268,7 +268,13 @@ class _FixedAssetPicProgressTableState
   _PicSort _sort = _PicSort.machines;
 
   static const double _rowHeight = 44;
-  static const double _headerHeight = 38;
+
+  /// Hàng nhãn cột (PIC, Máy, tháng, Đã kiểm, %).
+  static const double _labelHeight = 30;
+
+  /// Dải trên header chứa pill ngày (chỉ khi quý chứa hôm nay) — tách riêng
+  /// để pill không bao giờ đè nhãn tháng.
+  static const double _pillBand = 22;
 
   int _behindOf(FixedAssetSummaryPicRow r) =>
       fixedAssetBehindMachines(widget.planPct, r.total, r.audited);
@@ -336,7 +342,6 @@ class _FixedAssetPicProgressTableState
               DateFormat('dd/MM').format(widget.today),
               widget.planPct,
             ),
-            textScaler: MediaQuery.textScalerOf(context),
           )
         : null;
 
@@ -376,7 +381,7 @@ class _FixedAssetPicProgressTableState
               if (today != null)
                 Positioned.fill(
                   child: _cells(
-                    bar: _TodayMarker(mark: today, headerHeight: _headerHeight),
+                    bar: _TodayMarker(mark: today, pillBand: _pillBand),
                   ),
                 ),
             ],
@@ -633,7 +638,9 @@ class _FixedAssetPicProgressTableState
     final base = DefaultTextStyle.of(context).style;
     final scaler = MediaQuery.textScalerOf(context);
     return Container(
-      height: _headerHeight,
+      height: _labelHeight + (today != null ? _pillBand : 0),
+      // Pill ngày nằm ở dải trên (vẽ bởi _TodayMarker), nhãn cột ở dải dưới.
+      padding: EdgeInsets.only(top: today != null ? _pillBand : 0),
       decoration: BoxDecoration(
         border: Border(
           bottom: BorderSide(color: Colors.white.withValues(alpha: .12)),
@@ -642,13 +649,15 @@ class _FixedAssetPicProgressTableState
       child: _cells(
         pic: label(FixedAssetSummaryStrings.colPic),
         machines: label(FixedAssetSummaryStrings.colMachines),
-        // Nhãn tháng căn giữa từng 1/3. Tháng hiện tại không đủ chỗ thì bỏ
-        // " · tháng này". Chỉ tháng chứa pill hôm nay mới bị đẩy tránh pill.
+        // Nhãn tháng căn giữa từng 1/3, luôn hiển thị. Tháng hiện tại không
+        // đủ chỗ thì bỏ " · tháng này". Tháng chứa vạch hôm nay được đẩy né
+        // vạch (pill đã ở dải riêng phía trên nên không còn chồng).
         bar: LayoutBuilder(
           builder: (context, constraints) {
             final width = constraints.maxWidth;
             final segment = width / 3;
-            final pill = today?.rangeIn(width, base);
+            final lineX = today == null ? null : width * today.fraction;
+            final pill = lineX == null ? null : (lineX - 1, lineX + 1);
             final pillMonth = today == null
                 ? -1
                 : (today.fraction * 3).floor().clamp(0, 2);
@@ -920,8 +929,8 @@ class FixedAssetQuarterTimeline extends StatelessWidget {
 /// Hàng trục tháng (mobile, trên list PIC; cùng bề rộng thanh của item):
 /// nhãn "T10 · T11 · T12" giữa từng 1/3 (tháng [current] accent đậm), vạch
 /// mờ chia tháng tại 1/3, 2/3; pill ngày xanh dương có mũi chỉ xuống, tâm tại
-/// [plan] (0–1, clamp trong mép; null = không vẽ). Nhãn tháng bị pill chồng
-/// thì ẩn.
+/// [plan] (0–1, clamp trong mép; null = không vẽ). Pill ở dải riêng phía
+/// trên, nhãn tháng luôn hiện ở hàng dưới và chỉ né vạch hôm nay.
 class _CompactAxis extends StatelessWidget {
   final List<int> months;
   final int current;
@@ -937,7 +946,11 @@ class _CompactAxis extends StatelessWidget {
 
   static const double _pillHeight = 18;
   static const double _arrow = 4;
-  static const double _height = _pillHeight + _arrow;
+
+  /// Dải pill (pill + mũi) phía trên; hàng nhãn tháng riêng phía dưới để
+  /// pill không bao giờ che nhãn tháng.
+  static const double _pillBand = _pillHeight + _arrow;
+  static const double _monthHeight = 16;
   static const double _pillPadding = 6;
   static const TextStyle _pillStyle = TextStyle(
     color: Colors.white,
@@ -950,8 +963,9 @@ class _CompactAxis extends StatelessWidget {
   Widget build(BuildContext context) {
     final base = DefaultTextStyle.of(context).style;
     final scaler = MediaQuery.textScalerOf(context);
+    final top = plan != null ? _pillBand : 0.0;
     return SizedBox(
-      height: _height,
+      height: top + _monthHeight,
       child: LayoutBuilder(
         builder: (context, constraints) {
           final width = constraints.maxWidth;
@@ -977,10 +991,24 @@ class _CompactAxis extends StatelessWidget {
                 Positioned(
                   left: width * f - .5,
                   width: 1,
-                  top: 0,
+                  top: top,
                   bottom: 0,
                   child: ColoredBox(
                     color: Colors.white.withValues(alpha: .12),
+                  ),
+                ),
+              // Vạch hôm nay nối từ mũi pill xuống qua hàng tháng.
+              if (x != null)
+                Positioned(
+                  left: (x - 1).clamp(0.0, math.max(0.0, width - 2)),
+                  width: 2,
+                  top: top,
+                  bottom: 0,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: FixedAssetSummaryColors.today,
+                      borderRadius: BorderRadius.circular(1),
+                    ),
                   ),
                 ),
               for (var i = 0; i < 3; i++)
@@ -999,17 +1027,22 @@ class _CompactAxis extends StatelessWidget {
                   );
                   final text = FixedAssetSummaryStrings.monthShort(months[i]);
                   final textWidth = _textWidth(text, style, scaler) + 2;
-                  final left = segment * i + (segment - textWidth) / 2;
-                  final hidden =
-                      pill != null &&
-                      left < pill.$2 + 2 &&
-                      left + textWidth > pill.$1 - 2;
-                  if (hidden) return const SizedBox.shrink();
+                  var left = segment * i + (segment - textWidth) / 2;
+                  // Luôn hiện nhãn tháng; chỉ đẩy né vạch hôm nay trong 1/3.
+                  if (x != null) {
+                    left = _avoidRange(
+                      left,
+                      textWidth,
+                      segment * i + 2,
+                      segment * (i + 1) - 2,
+                      (x - 1, x + 1),
+                    );
+                  }
                   return Positioned(
                     left: left,
                     width: textWidth,
-                    top: 0,
-                    height: _pillHeight,
+                    top: top,
+                    height: _monthHeight,
                     child: Center(
                       child: Text(
                         text,
@@ -1225,44 +1258,30 @@ class _TodayMark {
   final double fraction;
   final String label;
   final String tooltip;
-  final TextScaler textScaler;
 
   static const labelStyle = TextStyle(
     color: Colors.white,
     fontSize: 12,
     fontWeight: FontWeight.w800,
+    height: 1.2,
   );
-  static const padding = EdgeInsets.symmetric(horizontal: 6, vertical: 2);
+  static const padding = EdgeInsets.symmetric(horizontal: 7, vertical: 2);
 
   const _TodayMark({
     required this.fraction,
     required this.label,
     required this.tooltip,
-    required this.textScaler,
   });
-
-  /// Khoảng (left, right) ước lượng của pill (căn giữa theo vạch, giữ trong
-  /// [width]) — chỉ để nhãn tháng né; pill thật tự co theo nội dung.
-  /// [base] = DefaultTextStyle để đo cùng font với Text.
-  (double, double) rangeIn(double width, TextStyle base) {
-    final pillWidth =
-        _textWidth(label, base.merge(labelStyle), textScaler) +
-        padding.horizontal +
-        2;
-    final left = (width * fraction - pillWidth / 2)
-        .clamp(0.0, math.max(0.0, width - pillWidth))
-        .toDouble();
-    return (left, left + pillWidth);
-  }
 }
 
-/// Vạch dọc xanh dương nét đứt từ giữa header xuống hết các dòng + pill ngày ở
-/// header; hover vạch / pill hiện tooltip.
+/// Pill ngày ở dải trên header (cao [pillBand], tách khỏi hàng nhãn tháng)
+/// + vạch dọc xanh dương nét đứt từ ngay dưới pill xuống hết các dòng; hover
+/// vạch / pill hiện tooltip.
 class _TodayMarker extends StatelessWidget {
   final _TodayMark mark;
-  final double headerHeight;
+  final double pillBand;
 
-  const _TodayMarker({required this.mark, required this.headerHeight});
+  const _TodayMarker({required this.mark, required this.pillBand});
 
   @override
   Widget build(BuildContext context) {
@@ -1270,7 +1289,7 @@ class _TodayMarker extends StatelessWidget {
       builder: (context, constraints) {
         final width = constraints.maxWidth;
         final x = width * mark.fraction;
-        final top = headerHeight / 2;
+        final top = pillBand - 2;
         return Stack(
           clipBehavior: Clip.none,
           children: [
@@ -1297,7 +1316,7 @@ class _TodayMarker extends StatelessWidget {
               left: 0,
               right: 0,
               top: 0,
-              height: headerHeight,
+              height: pillBand,
               child: CustomSingleChildLayout(
                 delegate: _CenterClampLayout(x),
                 child: Tooltip(
