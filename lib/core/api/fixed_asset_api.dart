@@ -1,5 +1,9 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:dio/dio.dart';
 
+import 'package:chuphinh/core/api/api_config.dart';
 import 'package:chuphinh/core/models/fixed_asset_audit_check_response.dart';
 import 'package:chuphinh/core/models/fixed_asset_audit_save_response.dart';
 import 'package:chuphinh/core/models/fixed_asset_audit_summary.dart';
@@ -29,6 +33,16 @@ class FixedAssetLookupException implements Exception {
 
 class FixedAssetApi {
   static const String _base = '/api/fixed-assets';
+
+  /// Ảnh tối đa backend nhận (part "photo" của POST /audit).
+  static const int maxPhotoBytes = 5 * 1024 * 1024;
+
+  /// URL xem ảnh máy (photo3 của POST /audit); tên file có thể có dấu cách.
+  /// Chụp lại có thể giữ cùng tên: [version] (?v=) để Image.network không
+  /// lấy ảnh cũ trong cache.
+  static String photoUrl(String name, {required DateTime version}) =>
+      '${ApiConfig.baseUrl}/images/FixedAsset/${Uri.encodeComponent(name)}'
+      '?v=${version.millisecondsSinceEpoch}';
 
   // Backend Fixed Asset cố định scope KVH ở phía server: không API nào
   // nhận/cần div từ frontend.
@@ -447,36 +461,55 @@ class FixedAssetApi {
     // NO_QR: máy không có tem -> đánh dấu in tem; null không gửi.
     bool? needsQrReprint,
     // Tab "3) Thay QR", bước quét QR mới: cho phép gỡ cờ; null không gửi.
+    // true: gửi multipart/form-data (part "data" = body JSON, kèm [photo]).
     bool? qrReplace,
     // Email PIC (form máy thiếu QR); null không gửi.
     String? pic,
+    // JPEG chụp lúc quét QR mới (chỉ khi qrReplace = true); null không gửi.
+    Uint8List? photo,
   }) async {
     try {
+      final fields = <String, dynamic>{
+        'fac': fac,
+        'floor': floor,
+        'positionA': positionA,
+        'positionAA': positionAA,
+        'machineCode': machineCode,
+        'userId': userId,
+        'userName': userName,
+        'note': note,
+        'confirmLocationMismatch': confirmLocationMismatch,
+        if (mode != null) 'mode': mode,
+        if (qrFloor != null) 'qrFloor': qrFloor,
+        if (qrPositionA != null) 'qrPositionA': qrPositionA,
+        if (qrPositionAA != null) 'qrPositionAA': qrPositionAA,
+        if (qrLocationMismatch != null)
+          'qrLocationMismatch': qrLocationMismatch,
+        if (needsQrReprint != null) 'needsQrReprint': needsQrReprint,
+        if (qrReplace != null) 'qrReplace': qrReplace,
+        if (pic != null) 'pic': pic,
+      };
+
+      // Chỉ luồng Thay QR gửi multipart; các luồng khác vẫn JSON. Multipart
+      // gồm 2 part: "data" (body JSON như bản JSON) + "photo" (nếu có).
+      final Object data = qrReplace == true
+          ? FormData.fromMap({
+              'data': MultipartFile.fromString(
+                jsonEncode(fields),
+                contentType: DioMediaType('application', 'json'),
+              ),
+              if (photo != null && photo.isNotEmpty)
+                'photo': MultipartFile.fromBytes(
+                  photo,
+                  filename: 'photo.jpg',
+                  contentType: DioMediaType('image', 'jpeg'),
+                ),
+            })
+          : fields;
+
       // Dùng DioClient.dio trực tiếp (không qua _retry): POST này INSERT
       // record, retry khi receiveTimeout có thể tạo record trùng.
-      final Response res = await DioClient.dio.post(
-        '$_base/audit',
-        data: {
-          'fac': fac,
-          'floor': floor,
-          'positionA': positionA,
-          'positionAA': positionAA,
-          'machineCode': machineCode,
-          'userId': userId,
-          'userName': userName,
-          'note': note,
-          'confirmLocationMismatch': confirmLocationMismatch,
-          if (mode != null) 'mode': mode,
-          if (qrFloor != null) 'qrFloor': qrFloor,
-          if (qrPositionA != null) 'qrPositionA': qrPositionA,
-          if (qrPositionAA != null) 'qrPositionAA': qrPositionAA,
-          if (qrLocationMismatch != null)
-            'qrLocationMismatch': qrLocationMismatch,
-          if (needsQrReprint != null) 'needsQrReprint': needsQrReprint,
-          if (qrReplace != null) 'qrReplace': qrReplace,
-          if (pic != null) 'pic': pic,
-        },
-      );
+      final Response res = await DioClient.dio.post('$_base/audit', data: data);
 
       // DioClient chỉ throw khi status >= 500, nên tự kiểm tra 4xx.
       final status = res.statusCode ?? 0;

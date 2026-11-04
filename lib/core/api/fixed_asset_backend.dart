@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:chuphinh/core/models/fixed_asset_audit_check_response.dart';
 import 'package:chuphinh/core/models/fixed_asset_audit_save_response.dart';
 import 'package:chuphinh/core/models/fixed_asset_audit_summary.dart';
@@ -125,6 +127,7 @@ class FixedAssetBackend {
     bool? needsQrReprint,
     bool? qrReplace,
     String? pic,
+    Uint8List? photo,
   }) => FixedAssetApi.saveAudit(
     fac: fac,
     floor: floor,
@@ -143,6 +146,7 @@ class FixedAssetBackend {
     needsQrReprint: needsQrReprint,
     qrReplace: qrReplace,
     pic: pic,
+    photo: photo,
   );
 
   Future<List<FixedAssetMachine>> fetchMachines({

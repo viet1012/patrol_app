@@ -19,9 +19,9 @@ class _ReplaceStep {
 
   /// Không làm được ở đây (vd chưa rõ vị trí thực tế); null = làm được.
   final String? blockedReason;
-  final Future<FixedAssetReplaceScanError?> Function(String rawQr) onScan;
+  final FixedAssetReplaceOnScan onScan;
 
-  /// Bước quét QR mới (bước cuối, gọi API hoàn tất).
+  /// Bước quét QR mới (bước cuối, gọi API hoàn tất, chụp ảnh kèm).
   final bool isNew;
 
   const _ReplaceStep({
@@ -110,11 +110,12 @@ class _FixedAssetReplaceTaskScreenState
       blockedReason: task.location == null
           ? FixedAssetReplaceStrings.unknownAct
           : null,
-      onScan: (raw) => controller.scanNewQr(
+      onScan: (raw, photo) => controller.scanNewQr(
         task,
         raw,
         userId: userId,
         userName: name,
+        photo: photo,
       ),
       isNew: true,
     );
@@ -124,7 +125,8 @@ class _FixedAssetReplaceTaskScreenState
         title: FixedAssetReplaceStrings.stepOld(task.oldQrShort),
         scanPlace: FixedAssetReplaceStrings.placeOld(task.oldQrShort),
         doneAt: controller.oldScannedAt(task),
-        onScan: (raw) async => controller.scanOldQr(task, raw),
+        onScan: (raw, _) async =>
+            FixedAssetReplaceScanOutcome(controller.scanOldQr(task, raw)),
         isNew: false,
       ),
       newStep,
@@ -146,6 +148,7 @@ class _FixedAssetReplaceTaskScreenState
           machineCode: task.machineCode,
           place: step.scanPlace,
           showSteps: twoSteps,
+          capturePhoto: step.isNew,
           oldQrScanned:
               step.isNew && twoSteps && controller.oldScannedAt(task) != null
               ? task.oldQrShort

@@ -54,6 +54,10 @@ class FixedAssetAuditSaveResponse {
   /// field nào: dòng NO_QR / không cần in lại).
   final FixedAssetReprintInfo? reprint;
 
+  /// Ảnh gửi kèm (luồng Thay QR) đã lưu; [photo3] = tên file ảnh.
+  final bool photoSaved;
+  final String? photo3;
+
   const FixedAssetAuditSaveResponse({
     required this.success,
     required this.saved,
@@ -81,6 +85,8 @@ class FixedAssetAuditSaveResponse {
     this.actualPositionA = '',
     this.actualPositionAA = '',
     this.reprint,
+    this.photoSaved = false,
+    this.photo3,
   });
 
   factory FixedAssetAuditSaveResponse.fromJson(Map<String, dynamic> json) {
@@ -113,6 +119,8 @@ class FixedAssetAuditSaveResponse {
       actualPositionA: str('actualPositionA'),
       actualPositionAA: str('actualPositionAA'),
       reprint: FixedAssetReprintInfo.fromJson(json),
+      photoSaved: parseBool(json['photoSaved']),
+      photo3: str('photo3').isEmpty ? null : str('photo3'),
     );
   }
 }

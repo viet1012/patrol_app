@@ -235,6 +235,50 @@ mixin _CaptureMixin
     _notifyImagesChanged();
   }
 
+  /// Chụp nguyên frame video hiện tại (không crop, không flash, không thêm
+  /// vào [images]) thành JPEG, cạnh dài ≤ [maxEdge]. Frame được vẽ ra canvas
+  /// ĐỒNG BỘ ngay khi gọi (gọi trong onQrDetected = frame vừa đọc được QR),
+  /// chỉ phần encode chạy async. null = camera chưa sẵn sàng / lỗi.
+  Future<Uint8List?> captureFrameJpeg({
+    int maxEdge = 1600,
+    double quality = 0.8,
+  }) {
+    try {
+      final video = _video;
+      if (video == null || _cameraSleeping) return Future.value(null);
+
+      final target = _fitInsideMaxEdge(
+        sourceWidth: video.videoWidth,
+        sourceHeight: video.videoHeight,
+        maxEdge: maxEdge,
+      );
+      if (target.width <= 0 || target.height <= 0) return Future.value(null);
+
+      final canvas = html.CanvasElement(
+        width: target.width,
+        height: target.height,
+      );
+      canvas.context2D.drawImageScaled(
+        video,
+        0,
+        0,
+        target.width.toDouble(),
+        target.height.toDouble(),
+      );
+
+      return _canvasToJpegBytes(canvas, quality: quality).then<Uint8List?>(
+        (bytes) => bytes == null || bytes.isEmpty ? null : bytes,
+        onError: (Object error) {
+          debugPrint('captureFrameJpeg encode error: $error');
+          return null;
+        },
+      );
+    } catch (error) {
+      debugPrint('captureFrameJpeg error: $error');
+      return Future.value(null);
+    }
+  }
+
   Future<void> _takePhoto() async {
     if (_cameraSleeping || _cameraStarting) return;
     if (_isCapturing || _video == null) return;

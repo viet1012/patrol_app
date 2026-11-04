@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import 'package:chuphinh/core/api/fixed_asset_api.dart' show FixedAssetApi;
 import 'package:chuphinh/core/api/fixed_asset_backend.dart';
 import 'package:chuphinh/core/models/fixed_asset_audit_save_response.dart';
 import 'package:chuphinh/features/fixed_asset/fixed_asset_audit_flow.dart'
@@ -18,6 +19,27 @@ class FixedAssetReplaceScanError {
   final bool apiFailed;
 
   const FixedAssetReplaceScanError(this.message, {this.apiFailed = false});
+}
+
+/// Kết quả một lần quét: [error] null = đúng. Bước QR mới thành công:
+/// [photoUrl] = ảnh đã lưu (photoSaved); [photoFailed] = chụp / lưu ảnh lỗi.
+class FixedAssetReplaceScanOutcome {
+  final FixedAssetReplaceScanError? error;
+  final String? photoUrl;
+  final bool photoFailed;
+
+  const FixedAssetReplaceScanOutcome([this.error])
+    : photoUrl = null,
+      photoFailed = false;
+
+  const FixedAssetReplaceScanOutcome.photo(String this.photoUrl)
+    : error = null,
+      photoFailed = false;
+
+  const FixedAssetReplaceScanOutcome.photoFailed()
+    : error = null,
+      photoUrl = null,
+      photoFailed = true;
 }
 
 /// Nhóm theo PositionA thực tế: các khu AA bên trong.
@@ -269,31 +291,42 @@ class FixedAssetReplaceController extends ChangeNotifier {
 
   /// Bước QR mới: kiểm ở FE (đúng máy, không phải QR cũ, vị trí = *_Act) rồi
   /// POST /audit (MANUAL, vị trí chọn = *_Act). Chỉ tính xong khi backend gỡ
-  /// cờ. Không hỏi "Máy đã dời?". null = xong; QR sai: camera quét tiếp;
-  /// POST lỗi / chưa gỡ cờ: [FixedAssetReplaceScanError.apiFailed].
-  Future<FixedAssetReplaceScanError?> scanNewQr(
+  /// cờ. Không hỏi "Máy đã dời?". error null = xong; QR sai: camera quét
+  /// tiếp; POST lỗi / chưa gỡ cờ: [FixedAssetReplaceScanError.apiFailed].
+  ///
+  /// [photo]: JPEG chụp lúc đọc được QR; gửi kèm (multipart) khi QR hợp lệ.
+  /// Chụp lỗi / quá 5MB: vẫn gửi, không kèm ảnh.
+  Future<FixedAssetReplaceScanOutcome> scanNewQr(
     FixedAssetReplaceTask task,
     String rawQr, {
     required String userId,
     required String userName,
+    Future<Uint8List?>? photo,
   }) async {
     final location = task.location;
     if (location == null) {
-      return const FixedAssetReplaceScanError(
-        FixedAssetReplaceStrings.unknownAct,
-        apiFailed: true,
+      return const FixedAssetReplaceScanOutcome(
+        FixedAssetReplaceScanError(
+          FixedAssetReplaceStrings.unknownAct,
+          apiFailed: true,
+        ),
       );
     }
 
     final qr = parseFixedAssetQr(rawQr);
     if (qr.machineCode.isEmpty) {
-      return const FixedAssetReplaceScanError(FixedAssetReplaceStrings.invalidQr);
+      return const FixedAssetReplaceScanOutcome(
+        FixedAssetReplaceScanError(FixedAssetReplaceStrings.invalidQr),
+      );
     }
     if (!task.isMachine(qr.machineCode) ||
         task.isOldQr(qr) ||
         !task.qrMatchesAct(qr)) {
-      return _mismatch(qr, task, task.actShort);
+      return FixedAssetReplaceScanOutcome(_mismatch(qr, task, task.actShort));
     }
+
+    final photoBytes = await _photoBytes(photo);
+    if (_disposed) return const FixedAssetReplaceScanOutcome();
 
     final qrCheck = fixedAssetManualQrCheck(qr, location);
     final FixedAssetAuditSaveResponse result;
@@ -314,31 +347,66 @@ class FixedAssetReplaceController extends ChangeNotifier {
         qrPositionAA: qrCheck.positionAA,
         qrLocationMismatch: false,
         qrReplace: true,
+        photo: photoBytes,
       );
     } catch (error) {
-      return FixedAssetReplaceScanError(
-        FixedAssetReplaceStrings.saveFailed(fixedAssetErrorText(error)),
-        apiFailed: true,
+      return FixedAssetReplaceScanOutcome(
+        FixedAssetReplaceScanError(
+          FixedAssetReplaceStrings.saveFailed(fixedAssetErrorText(error)),
+          apiFailed: true,
+        ),
       );
     }
-    if (_disposed) return null;
+    if (_disposed) return const FixedAssetReplaceScanOutcome();
 
     // Backend: vẫn là tem cũ -> QR sai, quét tiếp.
-    if (result.qrLabelNotReplaced) return _mismatch(qr, task, task.actShort);
+    if (result.qrLabelNotReplaced) {
+      return FixedAssetReplaceScanOutcome(_mismatch(qr, task, task.actShort));
+    }
     final cleared =
         (result.saved || result.alreadyAudited) &&
         !result.needsQrReprint &&
         !result.requiresConfirmation &&
         !result.pendingQrReplace;
     if (!cleared) {
-      return FixedAssetReplaceScanError(
-        FixedAssetReplaceStrings.notCleared(result.message.trim()),
-        apiFailed: true,
+      return FixedAssetReplaceScanOutcome(
+        FixedAssetReplaceScanError(
+          FixedAssetReplaceStrings.notCleared(result.message.trim()),
+          apiFailed: true,
+        ),
       );
     }
-    _doneAt[task.code] = DateTime.now();
+    final receivedAt = DateTime.now();
+    _doneAt[task.code] = receivedAt;
     _notify();
-    return null;
+    final photo3 = result.photo3;
+    // ?v= = lúc nhận response (không dùng updatedAt: có thể chỉ là ngày /
+    // bản ghi cũ khi alreadyAudited, chụp lại vẫn ra URL trùng).
+    return result.photoSaved && photo3 != null
+        ? FixedAssetReplaceScanOutcome.photo(
+            FixedAssetApi.photoUrl(photo3, version: receivedAt),
+          )
+        : const FixedAssetReplaceScanOutcome.photoFailed();
+  }
+
+  /// Ảnh chụp lúc quét; null = không có / lỗi / quá giới hạn backend.
+  static Future<Uint8List?> _photoBytes(Future<Uint8List?>? photo) async {
+    if (photo == null) return null;
+    try {
+      final bytes = await photo.timeout(
+        const Duration(seconds: 3),
+        onTimeout: () => null,
+      );
+      if (bytes == null || bytes.isEmpty) return null;
+      if (bytes.length > FixedAssetApi.maxPhotoBytes) {
+        debugPrint('Replace QR photo too large: ${bytes.length} bytes');
+        return null;
+      }
+      return bytes;
+    } catch (error) {
+      debugPrint('Replace QR photo error: $error');
+      return null;
+    }
   }
 
   /// "QR không khớp: đang quét {mã · AA}, cần {mã · [expected]}".

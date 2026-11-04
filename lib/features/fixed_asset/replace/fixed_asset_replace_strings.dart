@@ -57,6 +57,8 @@ abstract final class FixedAssetReplaceStrings {
   static const scanHintPrefix = 'Đưa ';
   static const scanHintSuffix = ' vào giữa khung';
   static const saving = 'Đang lưu…';
+  static const photoSaved = 'Đã chụp ảnh';
+  static const photoFailed = 'Không lưu được ảnh';
   static const flashUnsupported = 'Máy này không bật được đèn flash';
   static const invalidQr = 'QR không hợp lệ (không đọc được mã máy)';
   static String mismatch(String scanned, String expected) =>

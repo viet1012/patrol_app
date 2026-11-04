@@ -6,7 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:chuphinh/core/models/patrol_group.dart';
 import 'package:chuphinh/shared/camera/camera_preview_box.dart';
 import 'package:chuphinh/features/fixed_asset/replace/fixed_asset_replace_controller.dart'
-    show FixedAssetReplaceScanError;
+    show FixedAssetReplaceScanError, FixedAssetReplaceScanOutcome;
 import 'package:chuphinh/features/fixed_asset/replace/fixed_asset_replace_strings.dart';
 import 'package:chuphinh/features/fixed_asset/reprint/widgets/fixed_asset_reprint_card.dart'
     show FixedAssetReprintColors;
@@ -20,6 +20,14 @@ class FixedAssetReplaceScanResult {
   const FixedAssetReplaceScanResult.done() : done = true, error = null;
   const FixedAssetReplaceScanResult.failed(String this.error) : done = false;
 }
+
+/// Kiểm một QR quét được; [photo] = JPEG chụp đúng lúc đọc được QR (null =
+/// bước này không chụp).
+typedef FixedAssetReplaceOnScan =
+    Future<FixedAssetReplaceScanOutcome> Function(
+      String rawQr,
+      Future<Uint8List?>? photo,
+    );
 
 /// Loại QR đang quét: nhãn + màu chung cho badge header, thanh bước, viền
 /// khung, hướng dẫn; [guide] = dòng giải thích trên thẻ thông tin.
@@ -47,11 +55,15 @@ enum FixedAssetReplaceQrKind {
 /// ([showSteps]) · khung vuông (≤ 55% chiều cao) · thẻ thông tin máy ·
 /// hướng dẫn. Viền khung + hướng dẫn theo màu [kind].
 ///
-/// [onScan] kiểm QR: null = đúng (rung + tick, tự đóng, pop
+/// [onScan] kiểm QR: error null = đúng (rung + tick, tự đóng, pop
 /// [FixedAssetReplaceScanResult.done]); QR sai: báo lỗi trên camera, camera
 /// vẫn mở để quét tiếp; lỗi lưu ([FixedAssetReplaceScanError.apiFailed]):
 /// đóng camera, pop [FixedAssetReplaceScanResult.failed]. Cùng QR còn trong
 /// khung không xử lý lặp; đưa QR ra khỏi khung rồi quét lại thì kiểm lại.
+///
+/// [capturePhoto] (bước QR mới): chụp frame lúc đọc được QR, gửi kèm qua
+/// [onScan]. Lưu được ảnh: thumbnail + "Đã chụp ảnh" trên thẻ thông tin
+/// ~1.5 s rồi đóng; không lưu được: snackbar "Không lưu được ảnh", vẫn đi tiếp.
 class FixedAssetReplaceScanScreen extends StatefulWidget {
   final FixedAssetReplaceQrKind kind;
   final String machineCode;
@@ -64,7 +76,10 @@ class FixedAssetReplaceScanScreen extends StatefulWidget {
 
   /// Bước QR mới sau khi đã quét QR cũ: mã cũ rút gọn; null = không hiện.
   final String? oldQrScanned;
-  final Future<FixedAssetReplaceScanError?> Function(String rawQr) onScan;
+
+  /// Chụp ảnh lúc đọc được QR (chỉ bước QR mới).
+  final bool capturePhoto;
+  final FixedAssetReplaceOnScan onScan;
 
   const FixedAssetReplaceScanScreen({
     super.key,
@@ -73,6 +88,7 @@ class FixedAssetReplaceScanScreen extends StatefulWidget {
     required this.place,
     this.showSteps = false,
     this.oldQrScanned,
+    this.capturePhoto = false,
     required this.onScan,
   });
 
@@ -90,6 +106,11 @@ class _FixedAssetReplaceScanScreenState
   /// nằm trong khung: bỏ qua.
   static const Duration _repeatWindow = Duration(seconds: 2);
 
+  /// Thời gian giữ tick xong trước khi đóng; có ảnh (hoặc báo lỗi ảnh) thì
+  /// giữ lâu hơn để kịp thấy.
+  static const Duration _successHold = Duration(milliseconds: 700);
+  static const Duration _photoHold = Duration(milliseconds: 1500);
+
   String? _lastQr;
   DateTime? _lastAt;
 
@@ -97,6 +118,9 @@ class _FixedAssetReplaceScanScreenState
   bool _success = false;
   String? _error;
   bool _torchOn = false;
+
+  /// Ảnh đã lưu (bước QR mới), hiện thumbnail trên thẻ thông tin.
+  String? _photoUrl;
 
   Future<void> _onQr(String raw) async {
     final qr = raw.trim();
@@ -110,17 +134,27 @@ class _FixedAssetReplaceScanScreenState
     _lastAt = now;
     if (repeat || _busy) return;
 
+    // Vẽ frame ra canvas ngay (đồng bộ, trước await đầu tiên) = frame vừa
+    // đọc được QR; encode JPEG chạy song song với kiểm QR.
+    final photo = widget.capturePhoto
+        ? _cameraKey.currentState?.captureFrameJpeg() ??
+              Future<Uint8List?>.value(null)
+        : null;
+
     setState(() {
       _busy = true;
       _error = null;
     });
-    FixedAssetReplaceScanError? error;
+    FixedAssetReplaceScanOutcome outcome;
     try {
-      error = await widget.onScan(qr);
+      outcome = await widget.onScan(qr, photo);
     } catch (e) {
-      error = FixedAssetReplaceScanError('$e', apiFailed: true);
+      outcome = FixedAssetReplaceScanOutcome(
+        FixedAssetReplaceScanError('$e', apiFailed: true),
+      );
     }
     if (!mounted) return;
+    final error = outcome.error;
     // Cửa sổ chống lặp tính từ lúc kiểm xong (POST có thể lâu).
     _lastAt = DateTime.now();
 
@@ -142,12 +176,31 @@ class _FixedAssetReplaceScanScreenState
 
     HapticFeedback.vibrate();
     SystemSound.play(SystemSoundType.click);
+    if (outcome.photoFailed) _showPhotoFailed();
     setState(() {
       _busy = false;
       _success = true;
+      _photoUrl = outcome.photoUrl;
     });
-    await Future<void>.delayed(const Duration(milliseconds: 700));
+    await Future<void>.delayed(
+      outcome.photoUrl != null || outcome.photoFailed
+          ? _photoHold
+          : _successHold,
+    );
     await _close(const FixedAssetReplaceScanResult.done());
+  }
+
+  /// Không chặn luồng: chỉ báo, máy vẫn tính đã thay QR.
+  void _showPhotoFailed() {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(
+          content: Text(FixedAssetReplaceStrings.photoFailed),
+          behavior: SnackBarBehavior.floating,
+          duration: Duration(seconds: 2),
+        ),
+      );
   }
 
   Future<void> _toggleTorch() async {
@@ -309,10 +362,11 @@ class _FixedAssetReplaceScanScreenState
     );
   }
 
-  /// Thẻ máy: "A-077 · đang dán tại A6-3", giải thích theo bước, và (bước
-  /// QR mới) "Đã quét QR cũ: …".
+  /// Thẻ máy: "A-077 · đang dán tại A6-3", giải thích theo bước, (bước
+  /// QR mới) "Đã quét QR cũ: …", và sau khi lưu ảnh: thumbnail "Đã chụp ảnh".
   Widget _buildInfoCard() {
     final scanned = widget.oldQrScanned;
+    final photoUrl = _photoUrl;
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -393,8 +447,67 @@ class _FixedAssetReplaceScanScreenState
               ],
             ),
           ],
+          if (photoUrl != null) ...[
+            const SizedBox(height: 10),
+            _buildPhoto(photoUrl),
+          ],
         ],
       ),
+    );
+  }
+
+  /// Thumbnail ảnh vừa lưu + "Đã chụp ảnh".
+  Widget _buildPhoto(String url) {
+    const size = 56.0;
+    final dpr = MediaQuery.devicePixelRatioOf(context);
+    return Row(
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: SizedBox.square(
+            dimension: size,
+            child: Image.network(
+              url,
+              fit: BoxFit.cover,
+              cacheWidth: (size * dpr * 1.5).round(),
+              frameBuilder: (context, child, frame, sync) {
+                if (sync || frame != null) return child;
+                return ColoredBox(
+                  color: Colors.white.withValues(alpha: .08),
+                  child: Icon(
+                    Icons.image_outlined,
+                    size: 22,
+                    color: Colors.white.withValues(alpha: .4),
+                  ),
+                );
+              },
+              errorBuilder: (_, _, _) => ColoredBox(
+                color: Colors.white.withValues(alpha: .08),
+                child: Icon(
+                  Icons.broken_image_outlined,
+                  size: 22,
+                  color: Colors.white.withValues(alpha: .4),
+                ),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Icon(
+          Icons.photo_camera_rounded,
+          size: 18,
+          color: FixedAssetReplaceQrKind.newQr.color,
+        ),
+        const SizedBox(width: 6),
+        const Text(
+          FixedAssetReplaceStrings.photoSaved,
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 14,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ],
     );
   }
 
