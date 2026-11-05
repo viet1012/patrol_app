@@ -175,10 +175,7 @@ class _FixedAssetReplaceScanScreenState
 
     // Vẽ frame ra canvas ngay (đồng bộ, trước await đầu tiên) = frame vừa
     // đọc được QR; encode JPEG chạy song song với kiểm QR.
-    final photo = widget.capturePhoto
-        ? _cameraKey.currentState?.captureFrameJpeg() ??
-              Future<Uint8List?>.value(null)
-        : null;
+    final photo = widget.capturePhoto ? _captureFrame() : null;
 
     setState(() {
       _busy = true;
@@ -221,12 +218,54 @@ class _FixedAssetReplaceScanScreenState
       _success = true;
       _photoUrl = outcome.photoUrl;
     });
-    await Future<void>.delayed(
-      outcome.photoUrl != null || outcome.photoFailed
-          ? _photoHold
-          : _successHold,
-    );
+    // Chỉ đóng camera khi đã có bytes ảnh / chụp lỗi (tối đa
+    // [_photoWaitMax]), chạy song song với thời gian giữ tick.
+    await Future.wait<void>([
+      Future<void>.delayed(
+        outcome.photoUrl != null || outcome.photoFailed
+            ? _photoHold
+            : _successHold,
+      ),
+      if (photo != null)
+        photo
+            .timeout(_photoWaitMax, onTimeout: () => null)
+            .then<void>((_) {}, onError: (Object _) {}),
+    ]);
     await _close(const FixedAssetReplaceScanResult.done());
+  }
+
+  /// Tối đa chờ ảnh trước khi đóng camera.
+  static const Duration _photoWaitMax = Duration(milliseconds: 300);
+
+  /// Chụp frame video ĐỒNG BỘ ngay trong callback detect (= frame vừa decode,
+  /// trước mọi await / dừng scanner / đóng camera); encode JPEG chạy async.
+  Future<Uint8List?> _captureFrame() {
+    final tag = widget.kind == FixedAssetReplaceQrKind.oldQr
+        ? 'before'
+        : 'after';
+    debugPrint('[FA-PHOTO] $tag capture start');
+    final camera = _cameraKey.currentState;
+    if (camera == null) {
+      debugPrint('[FA-PHOTO] $tag capture fail(no camera state)');
+      return Future<Uint8List?>.value(null);
+    }
+    return camera.captureFrameJpeg().then<Uint8List?>(
+      (bytes) {
+        if (bytes == null || bytes.isEmpty) {
+          debugPrint(
+            '[FA-PHOTO] $tag capture fail(no frame: camera not ready/'
+            'sleeping or encode error)',
+          );
+          return null;
+        }
+        debugPrint('[FA-PHOTO] $tag capture ok(${bytes.length} bytes)');
+        return bytes;
+      },
+      onError: (Object error) {
+        debugPrint('[FA-PHOTO] $tag capture fail($error)');
+        return null;
+      },
+    );
   }
 
   /// Không chặn luồng: chỉ báo, máy vẫn tính đã thay QR.

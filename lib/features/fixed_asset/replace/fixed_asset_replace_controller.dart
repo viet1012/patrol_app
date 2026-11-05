@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import 'package:chuphinh/core/api/fixed_asset_api.dart' show FixedAssetApi;
@@ -43,6 +45,16 @@ class FixedAssetReplaceScanOutcome {
     : error = null,
       photoUrl = null,
       photoFailed = true;
+}
+
+/// Ảnh bước QR cũ đã chụp nhưng chưa có auditId; [done] = kết quả upload.
+class _PendingBeforePhoto {
+  final Uint8List bytes;
+  final String userId;
+  final String qr;
+  final Completer<bool> done = Completer<bool>();
+
+  _PendingBeforePhoto(this.bytes, this.userId, this.qr);
 }
 
 /// Nhóm theo PositionA thực tế: các khu AA bên trong.
@@ -103,6 +115,10 @@ class FixedAssetReplaceController extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    for (final pending in _pendingBefore.values) {
+      if (!pending.done.isCompleted) pending.done.complete(true);
+    }
+    _pendingBefore.clear();
     picFilter.dispose();
     super.dispose();
   }
@@ -136,6 +152,7 @@ class FixedAssetReplaceController extends ChangeNotifier {
           .toList(growable: false);
       // Tính lại danh sách PIC + số máy chờ.
       picFilter.setFromRows(_tasks.map((t) => t.row));
+      _flushPendingBefore();
       _error = null;
       _loading = false;
       if (_fac != null && !facs.contains(_fac)) _fac = null;
@@ -301,27 +318,93 @@ class FixedAssetReplaceController extends ChangeNotifier {
     required String userId,
     required String rawQr,
   }) async {
-    final auditId = task.row.auditId;
-    if (auditId == null) {
-      debugPrint('Replace QR before photo ${task.machineCode}: no auditId, skip');
+    final bytes = await _photoBytes(photo);
+    if (bytes == null) {
+      debugPrint('[FA-PHOTO] before upload fail(no photo bytes)');
       return true;
     }
-    final bytes = await _photoBytes(photo);
-    if (bytes == null) return true;
+    final qr = FixedAssetApi.cleanRawQr(rawQr);
+    final auditId = _auditIdOf(task);
+    if (auditId == null) {
+      // Chưa có auditId: giữ bytes, upload ngay khi lần tải sau có id.
+      debugPrint(
+        '[FA-PHOTO] before upload pending(no auditId yet for '
+        '${task.machineCode}, ${bytes.length} bytes kept)',
+      );
+      _pendingBefore.remove(task.code)?.done.complete(true);
+      final pending = _PendingBeforePhoto(bytes, userId, qr);
+      _pendingBefore[task.code] = pending;
+      unawaited(load(silent: true));
+      return pending.done.future;
+    }
+    return _postBeforePhoto(task.machineCode, auditId, bytes, userId, qr);
+  }
+
+  /// Ảnh bước QR cũ chờ auditId (theo [FixedAssetReplaceTask.code]).
+  final Map<String, _PendingBeforePhoto> _pendingBefore =
+      <String, _PendingBeforePhoto>{};
+
+  /// auditId mới nhất của máy (danh sách vừa tải, rồi tới dòng của [task]).
+  String? _auditIdOf(FixedAssetReplaceTask task) {
+    String? valid(String? id) =>
+        id == null || id.trim().isEmpty ? null : id.trim();
+    for (final t in _tasks) {
+      if (t.code != task.code) continue;
+      final id = valid(t.row.auditId);
+      if (id != null) return id;
+    }
+    return valid(task.row.auditId);
+  }
+
+  /// Sau mỗi lần tải: upload các ảnh đang chờ đã có auditId.
+  void _flushPendingBefore() {
+    if (_pendingBefore.isEmpty) return;
+    for (final t in _tasks) {
+      final pending = _pendingBefore[t.code];
+      if (pending == null) continue;
+      final auditId = _auditIdOf(t);
+      if (auditId == null) continue;
+      _pendingBefore.remove(t.code);
+      unawaited(
+        _postBeforePhoto(
+          t.machineCode,
+          auditId,
+          pending.bytes,
+          pending.userId,
+          pending.qr,
+        ).then(pending.done.complete),
+      );
+    }
+  }
+
+  /// POST /audits/{auditId}/photo?type=before&qr=...; lỗi thử lại 1 lần.
+  Future<bool> _postBeforePhoto(
+    String machineCode,
+    String auditId,
+    Uint8List bytes,
+    String userId,
+    String qr,
+  ) async {
     for (var attempt = 1; attempt <= 2; attempt++) {
+      debugPrint(
+        '[FA-PHOTO] before upload start #$attempt '
+        '(auditId=$auditId, machine=$machineCode, qr="$qr", '
+        '${bytes.length} bytes)',
+      );
       try {
         await api.uploadAuditPhoto(
           auditId: auditId,
           userId: userId,
           photo: bytes,
           type: FixedAssetApi.photoTypeBefore,
-          qr: rawQr,
+          qr: qr,
         );
+        debugPrint('[FA-PHOTO] before upload ok (auditId=$auditId)');
         return true;
       } catch (error) {
         debugPrint(
-          'Replace QR before photo upload #$attempt failed: '
-          '${fixedAssetErrorText(error)}',
+          '[FA-PHOTO] before upload fail(#$attempt: '
+          '${fixedAssetErrorText(error)})',
         );
       }
     }

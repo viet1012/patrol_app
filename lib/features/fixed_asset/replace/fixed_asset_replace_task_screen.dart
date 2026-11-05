@@ -131,6 +131,9 @@ class _FixedAssetReplaceTaskScreenState
         onScan: (raw, photo) async {
           final error = controller.scanOldQr(task, raw);
           // Đúng QR cũ: upload ảnh ngầm (type=before), không chờ.
+          if (error == null && photo == null) {
+            debugPrint('[FA-PHOTO] before capture fail(not captured)');
+          }
           if (error == null && photo != null) {
             unawaited(_uploadBeforePhoto(photo, userId, raw));
           }
