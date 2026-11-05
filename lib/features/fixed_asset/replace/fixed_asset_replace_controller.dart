@@ -292,6 +292,42 @@ class FixedAssetReplaceController extends ChangeNotifier {
     return null;
   }
 
+  /// Ảnh lúc quét đúng QR cũ: POST /audits/{auditId}/photo type=before.
+  /// Lỗi thử lại 1 lần. false = vẫn lỗi (caller báo nhỏ); không có id / không
+  /// có frame: bỏ qua (true).
+  Future<bool> uploadBeforePhoto(
+    FixedAssetReplaceTask task,
+    Future<Uint8List?> photo, {
+    required String userId,
+    required String rawQr,
+  }) async {
+    final auditId = task.row.auditId;
+    if (auditId == null) {
+      debugPrint('Replace QR before photo ${task.machineCode}: no auditId, skip');
+      return true;
+    }
+    final bytes = await _photoBytes(photo);
+    if (bytes == null) return true;
+    for (var attempt = 1; attempt <= 2; attempt++) {
+      try {
+        await api.uploadAuditPhoto(
+          auditId: auditId,
+          userId: userId,
+          photo: bytes,
+          type: FixedAssetApi.photoTypeBefore,
+          qr: rawQr,
+        );
+        return true;
+      } catch (error) {
+        debugPrint(
+          'Replace QR before photo upload #$attempt failed: '
+          '${fixedAssetErrorText(error)}',
+        );
+      }
+    }
+    return false;
+  }
+
   /// Bước QR mới: kiểm ở FE (đúng máy, không phải QR cũ, vị trí = *_Act) rồi
   /// POST /audit (MANUAL, vị trí chọn = *_Act). Chỉ tính xong khi backend gỡ
   /// cờ. Không hỏi "Máy đã dời?". error null = xong; QR sai: camera quét
@@ -351,6 +387,7 @@ class FixedAssetReplaceController extends ChangeNotifier {
         qrLocationMismatch: false,
         qrReplace: true,
         photo: photoBytes,
+        qrRaw: rawQr,
       );
     } catch (error) {
       final text = fixedAssetErrorText(error);

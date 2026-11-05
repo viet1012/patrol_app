@@ -59,6 +59,7 @@ abstract final class FixedAssetReplaceStrings {
   static const saving = 'Đang lưu…';
   static const photoSaved = 'Đã chụp ảnh';
   static const photoFailed = 'Không lưu được ảnh';
+  static const beforePhotoFailed = 'Không lưu được ảnh QR cũ';
   static const flashUnsupported = 'Máy này không bật được đèn flash';
   static const invalidQr = 'QR không phải mã máy';
   static const multipleQr = 'Đưa 1 mã vào giữa khung';

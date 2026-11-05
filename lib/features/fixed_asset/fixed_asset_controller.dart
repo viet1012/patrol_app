@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/widgets.dart';
 
+import 'package:chuphinh/core/api/fixed_asset_api.dart' show FixedAssetApi;
 import 'package:chuphinh/core/api/fixed_asset_backend.dart';
 import 'package:chuphinh/core/models/fixed_asset_audit_check_response.dart';
 import 'package:chuphinh/core/models/fixed_asset_audit_save_response.dart';
@@ -272,6 +273,9 @@ class FixedAssetController extends ChangeNotifier {
   /// (kể cả re-POST sau xác nhận) để upload.
   final Map<int, Future<Uint8List?>> _photoByScan =
       <int, Future<Uint8List?>>{};
+
+  /// QR thô của từng pipeline (gửi kèm upload ảnh).
+  final Map<int, String> _rawQrByScan = <int, String>{};
 
   /// Scan hiện tại đã lưu với qrLocationMismatch = true.
   bool _qrReprintSaved = false;
@@ -991,6 +995,7 @@ class FixedAssetController extends ChangeNotifier {
       _qrCheckByScan.remove(generation);
       _reprintByScan.remove(generation);
       _photoByScan.remove(generation);
+      _rawQrByScan.remove(generation);
       if (_activeScan == generation) {
         _activeScan = null;
         _processingRawQr = null;
@@ -1034,6 +1039,7 @@ class FixedAssetController extends ChangeNotifier {
     String machineCode,
     String auditId,
     Future<Uint8List?> photoFuture,
+    String? rawQr,
   ) async {
     final photo = await photoFuture;
     if (photo == null || photo.isEmpty) {
@@ -1046,6 +1052,8 @@ class FixedAssetController extends ChangeNotifier {
           auditId: auditId,
           userId: accountCode.trim(),
           photo: photo,
+          type: FixedAssetApi.photoTypeAudit,
+          qr: rawQr,
         );
         uxLog('photo $machineCode uploaded (audit $auditId)');
         return;
@@ -1070,7 +1078,10 @@ class FixedAssetController extends ChangeNotifier {
 
     // Chụp trước mọi await: frame vừa đọc được QR.
     final photo = _captureScanPhoto();
-    if (photo != null) _photoByScan[generation] = photo;
+    if (photo != null) {
+      _photoByScan[generation] = photo;
+      _rawQrByScan[generation] = rawQr;
+    }
     _notifyScanAccepted(rawQr, machineCode);
 
     // Vị trí in trên QR phải trùng vị trí đang chọn (trước bước MASTER).
@@ -1403,8 +1414,9 @@ class FixedAssetController extends ChangeNotifier {
     }
     if (auditId != null) {
       final photo = _photoByScan.remove(generation);
+      final rawQr = _rawQrByScan.remove(generation);
       if (photo != null) {
-        unawaited(_uploadScanPhoto(machineCode, auditId, photo));
+        unawaited(_uploadScanPhoto(machineCode, auditId, photo, rawQr));
       }
     }
 

@@ -467,7 +467,10 @@ class FixedAssetApi {
     String? pic,
     // JPEG chụp lúc quét QR mới (chỉ khi qrReplace = true); null không gửi.
     Uint8List? photo,
+    // Nội dung QR thô vừa quét (Thay QR bước QR mới); null không gửi.
+    String? qrRaw,
   }) async {
+    final cleanQr = qrRaw == null ? '' : cleanRawQr(qrRaw);
     try {
       final fields = <String, dynamic>{
         'fac': fac,
@@ -488,6 +491,7 @@ class FixedAssetApi {
         if (needsQrReprint != null) 'needsQrReprint': needsQrReprint,
         if (qrReplace != null) 'qrReplace': qrReplace,
         if (pic != null) 'pic': pic,
+        if (cleanQr.isNotEmpty) 'qrRaw': cleanQr,
       };
 
       // Chỉ luồng Thay QR gửi multipart; các luồng khác vẫn JSON. Multipart
@@ -525,18 +529,34 @@ class FixedAssetApi {
     }
   }
 
-  /// Ảnh máy chụp lúc quét (kiểm kê) cho bản ghi [auditId]: multipart
-  /// part "file". Không retry ở đây (caller tự quyết).
+  /// Loại ảnh POST /audits/{id}/photo: ảnh kiểm kê / ảnh QR cũ trước khi thay.
+  static const String photoTypeAudit = 'audit';
+  static const String photoTypeBefore = 'before';
+
+  /// QR thô gửi backend: bỏ ký tự điều khiển, trim (không cắt về mã máy).
+  static String cleanRawQr(String raw) =>
+      raw.replaceAll(RegExp(r'[\x00-\x1F\x7F]'), '').trim();
+
+  /// Ảnh máy chụp lúc quét cho bản ghi [auditId]: multipart part "file",
+  /// [type] = [photoTypeAudit] | [photoTypeBefore], [qr] = QR thô vừa quét
+  /// (query, Dio URL-encode). Không retry ở đây (caller tự quyết).
   static Future<void> uploadAuditPhoto({
     required String auditId,
     required String userId,
     required Uint8List photo,
+    required String type,
+    String? qr,
   }) async {
+    final cleanQr = qr == null ? '' : cleanRawQr(qr);
     Response res;
     try {
       res = await DioClient.dio.post(
         '$_base/audits/${Uri.encodeComponent(auditId)}/photo',
-        queryParameters: {'userId': userId},
+        queryParameters: {
+          'userId': userId,
+          'type': type,
+          if (cleanQr.isNotEmpty) 'qr': cleanQr,
+        },
         data: FormData.fromMap({
           'file': MultipartFile.fromBytes(
             photo,

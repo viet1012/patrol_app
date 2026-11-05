@@ -43,6 +43,10 @@ class FixedAssetQrMismatch {
   /// Email PIC lúc kiểm kê; null = máy không có PIC / API cũ chưa trả.
   final String? pic;
 
+  /// Id bản ghi audit (POST /audits/{id}/photo, ảnh QR cũ type=before);
+  /// null = API chưa trả.
+  final String? auditId;
+
   const FixedAssetQrMismatch({
     required this.machineCode,
     required this.faName,
@@ -62,6 +66,7 @@ class FixedAssetQrMismatch {
     this.reprintSts = false,
     this.reprintAt,
     this.pic,
+    this.auditId,
   });
 
   factory FixedAssetQrMismatch.fromJson(Map<String, dynamic> json) {
@@ -95,6 +100,7 @@ class FixedAssetQrMismatch {
       reprintSts: reprintSts,
       reprintAt: parseDateTime(json['reprintAt']),
       pic: opt('pic'),
+      auditId: opt('auditId') ?? opt('id'),
     );
   }
 

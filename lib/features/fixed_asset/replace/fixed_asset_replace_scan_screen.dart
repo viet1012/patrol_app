@@ -79,7 +79,8 @@ class FixedAssetReplaceScanScreen extends StatefulWidget {
   /// Bước QR mới sau khi đã quét QR cũ: mã cũ rút gọn; null = không hiện.
   final String? oldQrScanned;
 
-  /// Chụp ảnh lúc đọc được QR (chỉ bước QR mới).
+  /// Chụp ảnh lúc đọc được QR, gửi qua [onScan] (QR cũ: upload ngầm
+  /// type=before; QR mới: gửi kèm save).
   final bool capturePhoto;
   final FixedAssetReplaceOnScan onScan;
 

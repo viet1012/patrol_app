@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -125,12 +128,41 @@ class _FixedAssetReplaceTaskScreenState
         title: FixedAssetReplaceStrings.stepOld(task.oldQrShort),
         scanPlace: FixedAssetReplaceStrings.placeOld(task.oldQrShort),
         doneAt: controller.oldScannedAt(task),
-        onScan: (raw, _) async =>
-            FixedAssetReplaceScanOutcome(controller.scanOldQr(task, raw)),
+        onScan: (raw, photo) async {
+          final error = controller.scanOldQr(task, raw);
+          // Đúng QR cũ: upload ảnh ngầm (type=before), không chờ.
+          if (error == null && photo != null) {
+            unawaited(_uploadBeforePhoto(photo, userId, raw));
+          }
+          return FixedAssetReplaceScanOutcome(error);
+        },
         isNew: false,
       ),
       newStep,
     ];
+  }
+
+  /// Lỗi (đã thử lại 1 lần): snackbar nhỏ, không chặn bước QR mới.
+  Future<void> _uploadBeforePhoto(
+    Future<Uint8List?> photo,
+    String userId,
+    String rawQr,
+  ) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final ok = await controller.uploadBeforePhoto(
+      task,
+      photo,
+      userId: userId,
+      rawQr: rawQr,
+    );
+    if (ok || !messenger.mounted) return;
+    messenger.showSnackBar(
+      const SnackBar(
+        content: Text(FixedAssetReplaceStrings.beforePhotoFailed),
+        behavior: SnackBarBehavior.floating,
+        duration: Duration(seconds: 2),
+      ),
+    );
   }
 
   Future<void> _openCamera(BuildContext context, _ReplaceStep step) async {
@@ -148,7 +180,7 @@ class _FixedAssetReplaceTaskScreenState
           machineCode: task.machineCode,
           place: step.scanPlace,
           showSteps: twoSteps,
-          capturePhoto: step.isNew,
+          capturePhoto: true,
           oldQrScanned:
               step.isNew && twoSteps && controller.oldScannedAt(task) != null
               ? task.oldQrShort

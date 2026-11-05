@@ -128,6 +128,7 @@ class FixedAssetBackend {
     bool? qrReplace,
     String? pic,
     Uint8List? photo,
+    String? qrRaw,
   }) => FixedAssetApi.saveAudit(
     fac: fac,
     floor: floor,
@@ -147,17 +148,22 @@ class FixedAssetBackend {
     qrReplace: qrReplace,
     pic: pic,
     photo: photo,
+    qrRaw: qrRaw,
   );
 
-  /// Ảnh máy (kiểm kê) cho bản ghi audit vừa lưu.
+  /// Ảnh máy cho bản ghi audit; [type] "audit" | "before"; [qr] = QR thô.
   Future<void> uploadAuditPhoto({
     required String auditId,
     required String userId,
     required Uint8List photo,
+    required String type,
+    String? qr,
   }) => FixedAssetApi.uploadAuditPhoto(
     auditId: auditId,
     userId: userId,
     photo: photo,
+    type: type,
+    qr: qr,
   );
 
   Future<List<FixedAssetMachine>> fetchMachines({
