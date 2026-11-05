@@ -119,6 +119,15 @@ class _FixedAssetScreenState extends State<FixedAssetScreen>
         if (!detailedMatches) _latestQrDetection = null;
         _cameraKey.currentState?.showAcceptedQrLock(rawQr, machineCode);
       },
+      // Cùng cách chụp ảnh ở Thay QR: frame của camera đang mở.
+      capturePhoto: () =>
+          _cameraKey.currentState?.captureFrameJpeg(
+            maxEdge: 1280,
+            quality: .75,
+          ) ??
+          Future.value(),
+      showScanNotice: (message) =>
+          _cameraKey.currentState?.showQrNotice(message),
     );
 
     // Summary chạy độc lập, không chặn camera.
@@ -187,7 +196,12 @@ class _FixedAssetScreenState extends State<FixedAssetScreen>
   void _onQrDetected(String qr) {
     _controller.uxLog('camera detect "$qr"');
     // Chốt chặn chung (chưa đủ vị trí -> bỏ qua) nằm trong controller.
-    _controller.processScannedQr(qr);
+    final camera = _cameraKey.currentState;
+    _controller.processScannedQr(
+      qr,
+      candidates: camera?.lastQrCandidates ?? const [],
+      engine: camera?.lastQrEngine ?? '',
+    );
   }
 
   void _onQrDetectedDetailed(QrDetectionGeometry detection) {

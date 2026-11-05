@@ -1,8 +1,11 @@
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart' show kDebugMode;
+import 'package:flutter/gestures.dart'
+    show GestureBinding, PointerScrollEvent, PointerSignalEvent;
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
+import 'package:flutter/services.dart' show HardwareKeyboard;
 
 import 'package:chuphinh/core/models/fixed_asset_zone_progress.dart';
 import 'package:chuphinh/features/fixed_asset/map/floor_map_data.dart';
@@ -381,6 +384,11 @@ class FloorMapWidget extends StatefulWidget {
   /// [zoomedInScale]. Null keeps [imageFade] at every zoom.
   final double? zoomedInImageFade;
 
+  /// Map nằm trong trang cuộn: không InteractiveViewer, lăn chuột / 1 ngón
+  /// luôn cuộn trang. Chỉ Ctrl/Cmd + lăn chuột hoặc 2 ngón mới zoom/kéo
+  /// (khi [enableZoom]).
+  final bool inlineGestures;
+
   const FloorMapWidget({
     super.key,
     required this.data,
@@ -398,6 +406,7 @@ class FloorMapWidget extends StatefulWidget {
     this.extraRotationDeg = 0,
     this.zoomedInImageFade,
     this.zoneProgress,
+    this.inlineGestures = false,
   });
 
   /// Viewer scale above which the full-floor view counts as zoomed in:
@@ -777,22 +786,134 @@ class _FloorMapWidgetState extends State<FloorMapWidget>
     });
   }
 
+  // ------------------------------------------------------------
+  // INLINE (map trong trang cuộn)
+  // ------------------------------------------------------------
+
+  /// Viewport hiện tại của map inline (cho zoom/kéo tự xử lý).
+  Size _inlineViewport = Size.zero;
+
+  /// Gesture 2 ngón đang zoom/kéo: focal + scale lần update trước.
+  bool _inlineScaling = false;
+  Offset _inlineFocal = Offset.zero;
+  double _inlineScale = 1;
+
+  /// Scale quanh [focal] theo [factor] rồi kéo [pan]; kẹp như
+  /// InteractiveViewer (scale 1..maxScale, bản vẽ luôn phủ viewport).
+  void _applyInlineTransform({
+    Offset focal = Offset.zero,
+    double factor = 1,
+    Offset pan = Offset.zero,
+  }) {
+    final viewport = _inlineViewport;
+    if (viewport.isEmpty) return;
+    final current = _transformationController.value;
+    final s0 = current.getMaxScaleOnAxis();
+    final t0 = current.getTranslation();
+    final s = (s0 * factor).clamp(1.0, widget.maxScale).toDouble();
+    final f = s / s0;
+    final tx = (focal.dx - (focal.dx - t0.x) * f + pan.dx)
+        .clamp(viewport.width - viewport.width * s, 0.0)
+        .toDouble();
+    final ty = (focal.dy - (focal.dy - t0.y) * f + pan.dy)
+        .clamp(viewport.height - viewport.height * s, 0.0)
+        .toDouble();
+    _userAdjustedView = true;
+    _transformationController.value = Matrix4.diagonal3Values(s, s, 1)
+      ..setTranslationRaw(tx, ty, 0);
+  }
+
+  /// Không giữ Ctrl/Cmd: không đăng ký -> Scrollable của trang nhận cuộn.
+  void _onInlinePointerSignal(PointerSignalEvent event) {
+    if (event is! PointerScrollEvent) return;
+    final keys = HardwareKeyboard.instance;
+    if (!keys.isControlPressed && !keys.isMetaPressed) return;
+    GestureBinding.instance.pointerSignalResolver.register(event, (e) {
+      final scroll = e as PointerScrollEvent;
+      if (scroll.scrollDelta.dy == 0) return;
+      _applyInlineTransform(
+        focal: scroll.localPosition,
+        factor: math.exp(-scroll.scrollDelta.dy / 200),
+      );
+    });
+  }
+
+  /// 1 ngón: bỏ qua (drag dọc của trang thắng trước nhờ slop nhỏ hơn).
+  void _onInlineScaleStart(ScaleStartDetails details) {
+    if (details.pointerCount < 2) return;
+    _beginInlineScale(details.localFocalPoint);
+  }
+
+  void _beginInlineScale(Offset focal) {
+    _inlineScaling = true;
+    _inlineFocal = focal;
+    _inlineScale = 1;
+    _onInteractionStart(ScaleStartDetails(localFocalPoint: focal));
+  }
+
+  void _onInlineScaleUpdate(ScaleUpdateDetails details) {
+    if (details.pointerCount < 2) return;
+    if (!_inlineScaling) {
+      // Ngón thứ 2 đặt xuống sau: bắt đầu từ đây.
+      _beginInlineScale(details.localFocalPoint);
+      _inlineScale = details.scale;
+      return;
+    }
+    _applyInlineTransform(
+      focal: details.localFocalPoint,
+      factor: details.scale / _inlineScale,
+      pan: details.localFocalPoint - _inlineFocal,
+    );
+    _inlineFocal = details.localFocalPoint;
+    _inlineScale = details.scale;
+  }
+
+  void _onInlineScaleEnd(ScaleEndDetails details) {
+    if (!_inlineScaling) return;
+    _inlineScaling = false;
+    _onInteractionEnd(details);
+  }
+
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
         _maybeAutoFocus(constraints.biggest);
+        if (widget.inlineGestures) {
+          _inlineViewport = constraints.biggest;
+          return _buildInlineViewer();
+        }
         return _buildViewer();
       },
     );
   }
 
-  Widget _buildViewer() {
-    final displayAspect = floorMapDisplayAspectRatio(
-      widget.data,
-      extraRotationDeg: widget.extraRotationDeg,
+  /// Cùng nội dung + transform như [_buildViewer] nhưng không
+  /// InteractiveViewer (nó luôn giữ PointerScrollEvent, chặn cuộn trang).
+  Widget _buildInlineViewer() {
+    final transformed = ClipRect(
+      child: AnimatedBuilder(
+        animation: _transformationController,
+        builder: (context, child) => Transform(
+          transform: _transformationController.value,
+          child: child,
+        ),
+        child: _buildViewerContent(),
+      ),
     );
+    if (!widget.enableZoom) return transformed;
+    return Listener(
+      onPointerSignal: _onInlinePointerSignal,
+      child: GestureDetector(
+        onScaleStart: _onInlineScaleStart,
+        onScaleUpdate: _onInlineScaleUpdate,
+        onScaleEnd: _onInlineScaleEnd,
+        child: transformed,
+      ),
+    );
+  }
 
+  Widget _buildViewer() {
     return InteractiveViewer(
       transformationController: _transformationController,
       minScale: 1,
@@ -805,23 +926,28 @@ class _FloorMapWidgetState extends State<FloorMapWidget>
       clipBehavior: Clip.hardEdge,
       onInteractionStart: _onInteractionStart,
       onInteractionEnd: _onInteractionEnd,
-      // Floor is fitted and centred in the full viewport, so a viewport with a
-      // different aspect (fullscreen) shows no dead band at the edges once
-      // zoomed.
-      child: RepaintBoundary(
-        child: Center(
-          child: AspectRatio(
-            aspectRatio: displayAspect,
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                return _buildRotationFrame(
-                  displaySize: Size(
-                    constraints.maxWidth,
-                    constraints.maxHeight,
-                  ),
-                );
-              },
-            ),
+      child: _buildViewerContent(),
+    );
+  }
+
+  // Floor is fitted and centred in the full viewport, so a viewport with a
+  // different aspect (fullscreen) shows no dead band at the edges once
+  // zoomed.
+  Widget _buildViewerContent() {
+    final displayAspect = floorMapDisplayAspectRatio(
+      widget.data,
+      extraRotationDeg: widget.extraRotationDeg,
+    );
+    return RepaintBoundary(
+      child: Center(
+        child: AspectRatio(
+          aspectRatio: displayAspect,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return _buildRotationFrame(
+                displaySize: Size(constraints.maxWidth, constraints.maxHeight),
+              );
+            },
           ),
         ),
       ),

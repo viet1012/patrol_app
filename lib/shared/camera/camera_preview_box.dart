@@ -87,6 +87,11 @@ class CameraPreviewBox extends StatefulWidget {
   /// gắn với plant). true (mặc định): giữ nguyên hành vi cũ.
   final bool enableStt;
 
+  /// Số frame liên tiếp phải đọc ra cùng một giá trị QR (trong
+  /// [qrStableWindow]) mới nhận. 1 (mặc định) + null: giữ hành vi cũ.
+  final int qrStableFrames;
+  final Duration? qrStableWindow;
+
   const CameraPreviewBox({
     super.key,
     this.size = 320,
@@ -109,6 +114,8 @@ class CameraPreviewBox extends StatefulWidget {
     this.cameraAllowed = true,
     this.blockedPlaceholder,
     this.enableStt = true,
+    this.qrStableFrames = 1,
+    this.qrStableWindow,
   });
 
   @override
@@ -309,6 +316,7 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
     _showQrGuideNotifier.dispose();
     _qrWarningStateNotifier.dispose();
     _qrWarningMessageNotifier.dispose();
+    _qrNoticeTimer?.cancel();
     _sttNotifier.dispose();
     _hwZoomNotifier.dispose();
     _qrLoadingNotifier.dispose();

@@ -5,6 +5,8 @@ import 'package:flutter/services.dart';
 
 import 'package:chuphinh/core/models/patrol_group.dart';
 import 'package:chuphinh/shared/camera/camera_preview_box.dart';
+import 'package:chuphinh/features/fixed_asset/fixed_asset_qr_parser.dart'
+    show fixedAssetPickFrameQr, normalizeMachineCode, parseFixedAssetQr;
 import 'package:chuphinh/features/fixed_asset/replace/fixed_asset_replace_controller.dart'
     show FixedAssetReplaceScanError, FixedAssetReplaceScanOutcome;
 import 'package:chuphinh/features/fixed_asset/replace/fixed_asset_replace_strings.dart';
@@ -122,17 +124,53 @@ class _FixedAssetReplaceScanScreenState
   /// Ảnh đã lưu (bước QR mới), hiện thumbnail trên thẻ thông tin.
   String? _photoUrl;
 
+  /// Lần đầu thấy từng mã (log thời gian tới lúc nhận).
+  final Map<String, DateTime> _firstSeenAt = <String, DateTime>{};
+
   Future<void> _onQr(String raw) async {
-    final qr = raw.trim();
+    var qr = raw.trim();
     if (qr.isEmpty || _success || !mounted) return;
 
     final now = DateTime.now();
+    final camera = _cameraKey.currentState;
+    final expected = normalizeMachineCode(widget.machineCode);
+    bool isKnown(String code) => code.isNotEmpty && code == expected;
+
+    // Frame nhiều mã: ưu tiên mã máy đang thay gần tâm nhất.
+    final pick = fixedAssetPickFrameQr(
+      qr,
+      camera?.lastQrCandidates ?? const [],
+      isKnown,
+    );
+    if (pick.ambiguous) {
+      HapticFeedback.heavyImpact();
+      setState(() => _error = FixedAssetReplaceStrings.multipleQr);
+      return;
+    }
+    qr = pick.rawQr.trim();
+    final code = parseFixedAssetQr(qr).machineCode;
+
+    // Mọi mã nhận ngay ở lần đọc đầu (kiểm đúng máy / QR ở onScan).
+    _firstSeenAt.removeWhere(
+      (_, at) => now.difference(at) > const Duration(seconds: 10),
+    );
+    if (code.isNotEmpty) _firstSeenAt.putIfAbsent(code, () => now);
+
     final lastAt = _lastAt;
     final repeat =
         qr == _lastQr && lastAt != null && now.difference(lastAt) < _repeatWindow;
     _lastQr = qr;
     _lastAt = now;
     if (repeat || _busy) return;
+
+    final firstSeen = _firstSeenAt.remove(code) ?? now;
+    final engine = camera?.lastQrEngine ?? '';
+    debugPrint(
+      '[FA-REPLACE] accepted ${code.isEmpty ? qr : code} after '
+      '${now.difference(firstSeen).inMilliseconds} ms '
+      '(${isKnown(code) ? 'expected machine' : 'other machine'}, '
+      'decoder=${engine.isEmpty ? 'unknown' : engine})',
+    );
 
     // Vẽ frame ra canvas ngay (đồng bộ, trước await đầu tiên) = frame vừa
     // đọc được QR; encode JPEG chạy song song với kiểm QR.

@@ -18,6 +18,10 @@ class QrDetectionGeometry {
   });
 }
 
+/// Một mã trong frame có nhiều mã: [distance] = khoảng cách tới tâm khung
+/// / nửa đường chéo (0 = đúng tâm, 1 = góc).
+typedef QrFrameCandidate = ({String text, double distance});
+
 class _QrLockData {
   final String label;
   final QrDetectionGeometry? geometry;

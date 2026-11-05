@@ -6,7 +6,11 @@ mixin _QrScanMixin on State<CameraPreviewBox>, _CameraStreamMixin {
   /// Do CameraPreviewBoxState tạo (giữ vsync tại State).
   AnimationController get _qrLockController;
 
-  static const Duration _qrDedupe = Duration(milliseconds: 900);
+  /// Chỉ chặn trùng theo thời gian. Ngắn hơn DUPLICATE_COOLDOWN_MS (900) của
+  /// JS: lần JS gửi lại cùng mã sau 900 ms luôn qua được (bằng 900 thì lệch
+  /// vài ms lúc nhận event là bị chặn, màn hình không bao giờ thấy lần đọc
+  /// thứ 2).
+  static const Duration _qrDedupe = Duration(milliseconds: 750);
 
   // =========================
   // QR scanning (JS ZXing)
@@ -38,6 +42,42 @@ mixin _QrScanMixin on State<CameraPreviewBox>, _CameraStreamMixin {
   DateTime? _latestQrGeometryAt;
   final ValueNotifier<_QrLockData?> _qrLockNotifier =
       ValueNotifier<_QrLockData?>(null);
+
+  /// Mọi mã (kèm khoảng cách tới tâm) của lần detect camera gần nhất khi
+  /// frame có > 1 mã; rỗng = chỉ một mã / không biết (nhập tay, ảnh upload).
+  List<QrFrameCandidate> _latestQrCandidates = const [];
+  List<QrFrameCandidate> get lastQrCandidates => _latestQrCandidates;
+
+  /// Decoder đọc được lần detect camera gần nhất: BarcodeDetector / ZXing /
+  /// jsQR; '' = không rõ (nhập tay, ảnh upload, JS cũ).
+  String _latestQrEngine = '';
+  String get lastQrEngine => _latestQrEngine;
+
+  static String _engineName(String engine) => switch (engine) {
+    'native' => 'BarcodeDetector',
+    'zxing' => 'ZXing',
+    'jsqr' => 'jsQR',
+    _ => engine,
+  };
+
+  /// Thông báo của màn hình cha trên camera ([showQrNotice]): trạng thái
+  /// "reading"/"clear" của scanner không xoá nó trước khi hết giờ.
+  Timer? _qrNoticeTimer;
+  bool get _qrNoticeActive => _qrNoticeTimer?.isActive ?? false;
+
+  /// Banner lỗi ngắn trên camera (vd. "QR không phải mã máy"), tự ẩn sau
+  /// [duration].
+  void showQrNotice(
+    String message, {
+    Duration duration = const Duration(milliseconds: 2500),
+  }) {
+    if (!mounted) return;
+    _qrNoticeTimer?.cancel();
+    _setQrWarning(_QrWarningState.error, message);
+    _qrNoticeTimer = Timer(duration, () {
+      if (mounted) _hideQrWarning();
+    });
+  }
 
   @override
   void _setQrWarning(_QrWarningState state, [String message = '']) {
@@ -92,10 +132,14 @@ mixin _QrScanMixin on State<CameraPreviewBox>, _CameraStreamMixin {
     String rawQr, {
     bool haptic = true,
     QrDetectionGeometry? geometry,
+    List<QrFrameCandidate> candidates = const [],
+    String engine = '',
   }) {
     if (!mounted) return;
 
     final qr = rawQr.trim();
+    _latestQrCandidates = candidates;
+    _latestQrEngine = engine;
 
     if (qr.isEmpty) return;
 
@@ -114,13 +158,14 @@ mixin _QrScanMixin on State<CameraPreviewBox>, _CameraStreamMixin {
     final now = DateTime.now();
 
     if (_isDuplicateQr(qr, now)) {
+      debugPrint('[QR] drop $qr reason=cameraDuplicateWithin${_qrDedupe.inMilliseconds}ms');
       return;
     }
 
     _lastDetectedQr = qr;
     _lastDetectedQrAt = now;
 
-    _hideQrWarning();
+    if (!_qrNoticeActive) _hideQrWarning();
 
     if (_showQrGuideNotifier.value) {
       _showQrGuideNotifier.value = false;
@@ -272,6 +317,7 @@ mixin _QrScanMixin on State<CameraPreviewBox>, _CameraStreamMixin {
     _hideQrWarning();
 
     try {
+      _applyQrScanOptions();
       /*
      * JS chỉ đọc video hiện có.
      * JS không được gọi getUserMedia.
@@ -295,6 +341,22 @@ mixin _QrScanMixin on State<CameraPreviewBox>, _CameraStreamMixin {
       if (mounted) {
         _qrLoading = false;
       }
+    }
+  }
+
+  /// Gửi tuỳ chọn ổn định frame của màn này cho JS (loop dùng chung: mỗi
+  /// lần start đặt lại). JS cũ trong cache không có hàm: bỏ qua.
+  void _applyQrScanOptions() {
+    try {
+      if (!js_util.hasProperty(html.window, 'setQrScanOptions')) return;
+      js_util.callMethod<void>(html.window, 'setQrScanOptions', [
+        js_util.jsify({
+          'stableFrames': widget.qrStableFrames,
+          'stableWindowMs': widget.qrStableWindow?.inMilliseconds ?? 0,
+        }),
+      ]);
+    } catch (error) {
+      debugPrint('setQrScanOptions warning: $error');
     }
   }
 
@@ -375,6 +437,9 @@ mixin _QrScanMixin on State<CameraPreviewBox>, _CameraStreamMixin {
     final detail = _parseJsEventDetail(event);
     if (detail == null) return;
 
+    // Thông báo của màn hình cha đang hiện: giữ tới hết giờ.
+    if (_qrNoticeActive) return;
+
     final status = detail['status']?.toString().trim().toLowerCase() ?? '';
     final message = detail['message']?.toString().trim() ?? '';
 
@@ -439,14 +504,34 @@ mixin _QrScanMixin on State<CameraPreviewBox>, _CameraStreamMixin {
       return;
     }
 
-    debugPrint('QR detected from camera: $text');
+    debugPrint(
+      'QR detected from camera: $text (${_engineName(detail['engine']?.toString() ?? '')})',
+    );
     final geometry = _geometryFromJsDetail(text, detail);
     if (geometry != null) {
       _latestQrGeometry = geometry;
       _latestQrGeometryAt = DateTime.now();
     }
 
-    _acceptDetectedQr(text, geometry: geometry);
+    // Chỉ có khi frame có > 1 mã.
+    final rawCandidates = detail['candidates'];
+    final candidates = <QrFrameCandidate>[
+      if (rawCandidates is List)
+        for (final c in rawCandidates)
+          if (c is Map && (c['text']?.toString().trim() ?? '').isNotEmpty)
+            (
+              text: c['text'].toString().trim(),
+              distance:
+                  double.tryParse(c['distance']?.toString() ?? '') ?? 1,
+            ),
+    ];
+
+    _acceptDetectedQr(
+      text,
+      geometry: geometry,
+      candidates: candidates,
+      engine: _engineName(detail['engine']?.toString().trim() ?? ''),
+    );
   }
 
   QrDetectionGeometry? _geometryFromJsDetail(

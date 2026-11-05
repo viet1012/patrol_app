@@ -525,6 +525,38 @@ class FixedAssetApi {
     }
   }
 
+  /// Ảnh máy chụp lúc quét (kiểm kê) cho bản ghi [auditId]: multipart
+  /// part "file". Không retry ở đây (caller tự quyết).
+  static Future<void> uploadAuditPhoto({
+    required String auditId,
+    required String userId,
+    required Uint8List photo,
+  }) async {
+    Response res;
+    try {
+      res = await DioClient.dio.post(
+        '$_base/audits/${Uri.encodeComponent(auditId)}/photo',
+        queryParameters: {'userId': userId},
+        data: FormData.fromMap({
+          'file': MultipartFile.fromBytes(
+            photo,
+            filename: 'photo.jpg',
+            contentType: DioMediaType('image', 'jpeg'),
+          ),
+        }),
+      );
+    } on DioException catch (e) {
+      throw Exception(
+        _serverMessage(e.response?.data) ?? DioErrorHandler.handle(e),
+      );
+    }
+
+    final status = res.statusCode ?? 0;
+    if (status < 200 || status >= 300) {
+      throw Exception(_serverMessage(res.data) ?? 'Server error $status');
+    }
+  }
+
   static String? _serverMessage(dynamic data) {
     if (data is Map) {
       final message = (data['message'] ?? data['error'])?.toString().trim();

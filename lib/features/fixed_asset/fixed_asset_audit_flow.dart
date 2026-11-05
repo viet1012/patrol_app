@@ -285,6 +285,11 @@ bool fixedAssetIsMissingQrLocationError(String message) {
   return lower.contains('qrfloor') && lower.contains('required');
 }
 
+/// Lỗi 400 "không có trong danh sách" (máy không thuộc danh sách kiểm kê):
+/// báo trên camera, không lưu, quét lại được.
+bool fixedAssetIsNotInListError(String message) =>
+    message.toLowerCase().contains('không có trong danh sách');
+
 String fixedAssetErrorText(Object error) {
   return error.toString().replaceFirst('Exception: ', '');
 }

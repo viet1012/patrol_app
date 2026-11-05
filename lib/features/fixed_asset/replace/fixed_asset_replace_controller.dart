@@ -4,7 +4,10 @@ import 'package:chuphinh/core/api/fixed_asset_api.dart' show FixedAssetApi;
 import 'package:chuphinh/core/api/fixed_asset_backend.dart';
 import 'package:chuphinh/core/models/fixed_asset_audit_save_response.dart';
 import 'package:chuphinh/features/fixed_asset/fixed_asset_audit_flow.dart'
-    show fixedAssetErrorText, fixedAssetManualQrCheck;
+    show
+        fixedAssetErrorText,
+        fixedAssetIsNotInListError,
+        fixedAssetManualQrCheck;
 import 'package:chuphinh/features/fixed_asset/fixed_asset_location.dart';
 import 'package:chuphinh/features/fixed_asset/fixed_asset_pic_filter.dart';
 import 'package:chuphinh/features/fixed_asset/fixed_asset_qr_parser.dart';
@@ -350,10 +353,14 @@ class FixedAssetReplaceController extends ChangeNotifier {
         photo: photoBytes,
       );
     } catch (error) {
+      final text = fixedAssetErrorText(error);
+      // 400 "không có trong danh sách": báo trên camera, quét lại được.
       return FixedAssetReplaceScanOutcome(
         FixedAssetReplaceScanError(
-          FixedAssetReplaceStrings.saveFailed(fixedAssetErrorText(error)),
-          apiFailed: true,
+          fixedAssetIsNotInListError(text)
+              ? text
+              : FixedAssetReplaceStrings.saveFailed(text),
+          apiFailed: !fixedAssetIsNotInListError(text),
         ),
       );
     }

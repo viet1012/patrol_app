@@ -58,6 +58,10 @@ class FixedAssetAuditSaveResponse {
   final bool photoSaved;
   final String? photo3;
 
+  /// Id bản ghi audit vừa lưu (POST /audits/{id}/photo); null = backend
+  /// không trả.
+  final String? auditId;
+
   const FixedAssetAuditSaveResponse({
     required this.success,
     required this.saved,
@@ -87,6 +91,7 @@ class FixedAssetAuditSaveResponse {
     this.reprint,
     this.photoSaved = false,
     this.photo3,
+    this.auditId,
   });
 
   factory FixedAssetAuditSaveResponse.fromJson(Map<String, dynamic> json) {
@@ -121,6 +126,7 @@ class FixedAssetAuditSaveResponse {
       reprint: FixedAssetReprintInfo.fromJson(json),
       photoSaved: parseBool(json['photoSaved']),
       photo3: str('photo3').isEmpty ? null : str('photo3'),
+      auditId: str('auditId').isEmpty ? null : str('auditId'),
     );
   }
 }

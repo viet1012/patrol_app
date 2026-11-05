@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
-import 'package:flutter/foundation.dart' show ValueListenable;
+import 'package:flutter/foundation.dart'
+    show ValueListenable, defaultTargetPlatform;
 import 'package:flutter/material.dart';
 
 import 'package:chuphinh/core/models/fixed_asset_zone_progress.dart';
@@ -143,28 +144,53 @@ class _FixedAssetDetectedMapState extends State<FixedAssetDetectedMap> {
                   child: SizedBox(
                     width: width,
                     height: height,
-                    child: FloorMapWidget(
-                      data: selection.map,
-                      selectedParentZone: selection.parentZoneCode,
-                      selectedChildZone: selection.childZoneCode,
-                      // Embedded view shows only the resolved parent context;
-                      // the expanded dialog keeps the full floor.
-                      focusParentZone: selection.parentZoneCode,
-                      // Fitted once per map/parent; manual pan/zoom kept.
-                      autoFocusParent: zoomToParent,
-                      focusPadding: 0.35,
-                      enableZoom: widget.enableZoom,
-                      // Hidden map, or covered by the dialog: stop the
-                      // highlight ticker (no wasted frames); it resumes
-                      // when shown again.
-                      enablePolygonAnimation:
-                          widget.enablePolygonAnimation &&
-                          !_collapsed &&
-                          !_expanded,
-                      onZoneTap: widget.onZoneTap,
-                      imageFade: 0.40,
-                      spotlightFade: 0.30,
-                      zoneProgress: widget.zoneProgress,
+                    // Bấm map (ngoài zone khi có chọn zone) = mở toàn màn hình.
+                    child: MouseRegion(
+                      cursor: SystemMouseCursors.click,
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () => _showExpandedMap(context, selection),
+                        child: Stack(
+                          children: <Widget>[
+                            Positioned.fill(
+                              child: FloorMapWidget(
+                                data: selection.map,
+                                selectedParentZone: selection.parentZoneCode,
+                                selectedChildZone: selection.childZoneCode,
+                                // Embedded view shows only the resolved parent
+                                // context; the expanded dialog keeps the full
+                                // floor.
+                                focusParentZone: selection.parentZoneCode,
+                                // Fitted once per map/parent; manual pan/zoom
+                                // kept.
+                                autoFocusParent: zoomToParent,
+                                focusPadding: 0.35,
+                                enableZoom: widget.enableZoom,
+                                // Trong trang cuộn: lăn chuột / 1 ngón cuộn
+                                // trang; Ctrl + lăn / 2 ngón mới zoom.
+                                inlineGestures: true,
+                                // Hidden map, or covered by the dialog: stop
+                                // the highlight ticker (no wasted frames); it
+                                // resumes when shown again.
+                                enablePolygonAnimation:
+                                    widget.enablePolygonAnimation &&
+                                    !_collapsed &&
+                                    !_expanded,
+                                onZoneTap: widget.onZoneTap,
+                                imageFade: 0.40,
+                                spotlightFade: 0.30,
+                                zoneProgress: widget.zoneProgress,
+                              ),
+                            ),
+                            if (widget.enableZoom)
+                              const Positioned(
+                                right: 6,
+                                bottom: 6,
+                                child: _InlineMapHint(),
+                              ),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -296,6 +322,38 @@ class _ExpandedMapViewState extends State<_ExpandedMapView> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Gợi ý nhỏ mờ ở góc map inline (không nhận chạm).
+class _InlineMapHint extends StatelessWidget {
+  const _InlineMapHint();
+
+  @override
+  Widget build(BuildContext context) {
+    final touch = switch (defaultTargetPlatform) {
+      TargetPlatform.android || TargetPlatform.iOS => true,
+      _ => false,
+    };
+    return IgnorePointer(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.35),
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Text(
+          touch
+              ? '2 ngón để phóng to'
+              : 'Ctrl + cuộn để phóng to · bấm để mở lớn',
+          style: TextStyle(
+            color: Colors.white.withValues(alpha: 0.6),
+            fontSize: 10.5,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
       ),
     );
   }

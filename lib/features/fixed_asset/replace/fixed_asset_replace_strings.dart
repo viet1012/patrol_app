@@ -60,7 +60,8 @@ abstract final class FixedAssetReplaceStrings {
   static const photoSaved = 'Đã chụp ảnh';
   static const photoFailed = 'Không lưu được ảnh';
   static const flashUnsupported = 'Máy này không bật được đèn flash';
-  static const invalidQr = 'QR không hợp lệ (không đọc được mã máy)';
+  static const invalidQr = 'QR không phải mã máy';
+  static const multipleQr = 'Đưa 1 mã vào giữa khung';
   static String mismatch(String scanned, String expected) =>
       'QR không khớp: đang quét $scanned, cần $expected';
 

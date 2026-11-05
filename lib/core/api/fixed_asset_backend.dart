@@ -149,6 +149,17 @@ class FixedAssetBackend {
     photo: photo,
   );
 
+  /// Ảnh máy (kiểm kê) cho bản ghi audit vừa lưu.
+  Future<void> uploadAuditPhoto({
+    required String auditId,
+    required String userId,
+    required Uint8List photo,
+  }) => FixedAssetApi.uploadAuditPhoto(
+    auditId: auditId,
+    userId: userId,
+    photo: photo,
+  );
+
   Future<List<FixedAssetMachine>> fetchMachines({
     required String fac,
     required String floor,

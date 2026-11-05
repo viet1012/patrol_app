@@ -221,8 +221,7 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen>
           : null;
 
       final access = GroupAccess.mapOf(authMe);
-      final autoExpand =
-          patrolTeam != null && access[PatrolGroup.Patrol]!.any;
+      final autoExpand = patrolTeam != null && access[PatrolGroup.Patrol]!.any;
 
       setState(() {
         _access = access;
@@ -877,11 +876,7 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen>
       ui.recheckTitle,
       () => _openRecheck(group, titleScreen),
     );
-    addButton(
-      PatrolAction.summary,
-      'Data Table',
-      () => _openSummary(group),
-    );
+    addButton(PatrolAction.summary, 'Data Table', () => _openSummary(group));
 
     return column();
   }

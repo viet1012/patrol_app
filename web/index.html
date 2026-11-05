@@ -72,17 +72,31 @@
        * 130 ms ~= 7–8 lần decode/giây.
        * Nhanh đủ cho trải nghiệm thực tế nhưng không quá nóng máy.
        */
-      const FAST_INTERVAL_MS = 90;
+      const FAST_INTERVAL_MS = 120;
 
       /*
-       * Hard mode mở rộng ROI và tăng kích thước decode.
+       * Hard mode: ZXing TRY_HARDER + jsQR attemptBoth (chậm hơn).
        */
-      const HARD_INTERVAL_MS = 135;
+      const HARD_INTERVAL_MS = 150;
 
       /*
-       * Sau khoảng thời gian này không tìm thấy QR thì chuyển hard mode.
+       * Fast không đọc được liên tục quá khoảng này mới chuyển hard. Trước
+       * đây 1350 ms tính từ lúc mở loop: camera mở trước khi đưa QR vào nên
+       * gần như luôn ở hard ngay từ đầu.
        */
-      const SWITCH_TO_HARD_AFTER_MS = 1350;
+      const SWITCH_TO_HARD_AFTER_MS = 3000;
+
+      /*
+       * Hard tối đa khoảng này rồi quay lại fast (QR chưa vào khung thì không
+       * kẹt ở hard mãi); đọc được thì về fast ngay.
+       */
+      const HARD_MAX_MS = 3000;
+
+      /*
+       * Vùng giữa giải mã trước; không đọc được mới thử full frame.
+       */
+      const CENTER_ROI_SCALE = 0.7;
+      const FULL_ROI_SCALE = 1;
 
       /*
        * Sau khi bắt được QR, giữ hard một khoảng ngắn rồi về fast.
@@ -100,16 +114,16 @@
       const REQUIRED_STABLE_COUNT = 1;
 
       /*
-       * ROI ở giữa camera.
+       * Màn hình có thể đổi qua window.setQrScanOptions trước startQrLoop
+       * (vd. Fixed Asset: 2 frame liên tiếp trong 500 ms). Mặc định giữ
+       * hành vi cũ.
        */
-      const FAST_ROI_SCALE = 0.76;
-      const HARD_ROI_SCALE = 0.96;
+      const DEFAULT_STABLE_WINDOW_MS = 0;
 
       /*
-       * Giới hạn kích thước frame decode.
+       * Giới hạn kích thước frame decode (cạnh dài), cả fast và hard.
        */
-      const FAST_MAX_SCAN_EDGE = 768;
-      const HARD_MAX_SCAN_EDGE = 1024;
+      const SCAN_MAX_EDGE = 640;
 
       /*
        * Ảnh upload tối đa.
@@ -151,6 +165,11 @@
 
       let stableText = "";
       let stableCount = 0;
+      let stableAt = 0;
+
+      let requiredStableCount = REQUIRED_STABLE_COUNT;
+      /* 0 = không giới hạn khoảng cách giữa 2 frame. */
+      let stableWindowMs = DEFAULT_STABLE_WINDOW_MS;
 
       let candidateFrames = 0;
       let candidateStartedAt = 0;
@@ -302,12 +321,7 @@
         };
       }
 
-      function getCropRect(videoWidth, videoHeight) {
-        const roiScale =
-          mode === "hard"
-            ? HARD_ROI_SCALE
-            : FAST_ROI_SCALE;
-
+      function getCropRect(videoWidth, videoHeight, roiScale) {
         const cropWidth = Math.max(
           1,
           Math.floor(videoWidth * roiScale)
@@ -332,11 +346,8 @@
           : FAST_INTERVAL_MS;
       }
 
-      function currentMaxScanEdge() {
-        return mode === "hard"
-          ? HARD_MAX_SCAN_EDGE
-          : FAST_MAX_SCAN_EDGE;
-      }
+      /* Lúc vào mode hiện tại (đếm 3 s fast -> hard, hard -> fast). */
+      let modeSince = 0;
 
       function switchMode(nextMode) {
         if (nextMode !== "fast" && nextMode !== "hard") {
@@ -348,6 +359,7 @@
         }
 
         mode = nextMode;
+        modeSince = now();
 
         console.debug("[QR] mode =", mode);
       }
@@ -373,12 +385,53 @@
           barcodeDetector ??= new window.BarcodeDetector({ formats: ["qr_code"] });
           const barcodes = await barcodeDetector.detect(targetCanvas);
 
+          const valid = [];
           for (const barcode of barcodes || []) {
             const text = normalizeQr(barcode?.rawValue);
-            if (isValidQrText(text)) {
+            if (isValidQrText(text)) valid.push({ barcode, text });
+          }
+
+          /*
+           * Một mã (thường gặp): như cũ, không tính thêm gì.
+           */
+          if (valid.length === 1) {
+            const { barcode, text } = valid[0];
+            const corners = pointsOf(barcode?.cornerPoints);
+            return withGeometry ? { text, corners } : text;
+          }
+
+          /*
+           * Nhiều mã: mã gần tâm khung nhất là kết quả chính; candidates =
+           * mọi mã + khoảng cách tới tâm (chia nửa đường chéo, 0..1) để màn
+           * hình tự chọn theo danh sách máy.
+           */
+          if (valid.length > 1) {
+            const cx = targetCanvas.width / 2;
+            const cy = targetCanvas.height / 2;
+            const halfDiagonal = Math.hypot(cx, cy) || 1;
+            const found = valid.map(({ barcode, text }) => {
               const corners = pointsOf(barcode?.cornerPoints);
-              return withGeometry ? { text, corners } : text;
-            }
+              const box = barcode?.boundingBox;
+              const centerX = corners.length
+                ? corners.reduce((s, p) => s + p.x, 0) / corners.length
+                : Number(box?.x ?? 0) + Number(box?.width ?? 0) / 2;
+              const centerY = corners.length
+                ? corners.reduce((s, p) => s + p.y, 0) / corners.length
+                : Number(box?.y ?? 0) + Number(box?.height ?? 0) / 2;
+              return {
+                text,
+                corners,
+                distance:
+                  Math.hypot(centerX - cx, centerY - cy) / halfDiagonal
+              };
+            });
+            found.sort((a, b) => a.distance - b.distance);
+            const { text, corners } = found[0];
+            const candidates = found.map(({ text, distance }) => ({
+              text,
+              distance
+            }));
+            return withGeometry ? { text, corners, candidates } : text;
           }
         } catch (_) {
           barcodeDetectorUnavailable = true;
@@ -859,6 +912,10 @@
       // CAMERA FRAME DECODE
       // ============================================================
 
+      /*
+       * Vùng giữa ~70% trước (QR thường ở giữa, nhỏ hơn = nhanh hơn); không
+       * đọc được mới thử full frame. Cả hai downscale cạnh dài ≤ 640 px.
+       */
       async function decodeCameraFrame(video) {
         const videoWidth = video.videoWidth || 0;
         const videoHeight = video.videoHeight || 0;
@@ -870,15 +927,60 @@
           };
         }
 
+        const center = await decodeRegion(
+          video,
+          videoWidth,
+          videoHeight,
+          CENTER_ROI_SCALE,
+          true
+        );
+        if (center.text) {
+          return center;
+        }
+
+        /*
+         * Full frame: fast chỉ dùng decoder nhanh (native / ZXing); jsQR chỉ
+         * ở hard.
+         */
+        const full = await decodeRegion(
+          video,
+          videoWidth,
+          videoHeight,
+          FULL_ROI_SCALE,
+          mode === "hard"
+        );
+        if (full.text) {
+          return full;
+        }
+
+        return {
+          text: "",
+          engine: "",
+          candidate: Boolean(center.candidate || full.candidate)
+        };
+      }
+
+      /*
+       * [allowJsQr]: thử jsQR khi native / ZXing không đọc được (fast:
+       * dontInvert; hard: attemptBoth).
+       */
+      async function decodeRegion(
+        video,
+        videoWidth,
+        videoHeight,
+        roiScale,
+        allowJsQr
+      ) {
         const crop = getCropRect(
           videoWidth,
-          videoHeight
+          videoHeight,
+          roiScale
         );
 
         const targetSize = resizeInsideMaxEdge(
           crop.sw,
           crop.sh,
-          currentMaxScanEdge()
+          SCAN_MAX_EDGE
         );
 
         if (
@@ -964,8 +1066,12 @@
           };
         }
 
-        const jsQrResult = mode === "hard"
-          ? decodeCanvasWithJsQr(targetCanvas, "attemptBoth", true)
+        const jsQrResult = allowJsQr
+          ? decodeCanvasWithJsQr(
+              targetCanvas,
+              mode === "hard" ? "attemptBoth" : "dontInvert",
+              true
+            )
           : { text: "", corners: [] };
 
         if (jsQrResult.text) {
@@ -998,6 +1104,7 @@
       function resetStability() {
         stableText = "";
         stableCount = 0;
+        stableAt = 0;
       }
 
       function acceptStableText(text) {
@@ -1006,15 +1113,38 @@
           return false;
         }
 
-        if (stableText === text) {
+        const timestamp = now();
+        const withinWindow =
+          stableWindowMs <= 0 || timestamp - stableAt <= stableWindowMs;
+
+        if (stableText === text && withinWindow) {
           stableCount += 1;
         } else {
           stableText = text;
           stableCount = 1;
         }
+        stableAt = timestamp;
 
-        return stableCount >= REQUIRED_STABLE_COUNT;
+        return stableCount >= requiredStableCount;
       }
+
+      /*
+       * Tuỳ chọn quét theo màn hình, gọi trước startQrLoop:
+       * { stableFrames, stableWindowMs }. Thiếu field = mặc định cũ.
+       */
+      window.setQrScanOptions = function (options) {
+        const frames = Number(options?.stableFrames);
+        const windowMs = Number(options?.stableWindowMs);
+        requiredStableCount =
+          Number.isFinite(frames) && frames >= 1
+            ? Math.floor(frames)
+            : REQUIRED_STABLE_COUNT;
+        stableWindowMs =
+          Number.isFinite(windowMs) && windowMs > 0
+            ? windowMs
+            : DEFAULT_STABLE_WINDOW_MS;
+        resetStability();
+      };
 
       function shouldEmit(text) {
         const timestamp = now();
@@ -1066,6 +1196,8 @@
         try {
           dispatchCameraResult(normalized, "", {
             corners: result?.corners || [],
+            candidates: result?.candidates || [],
+            engine: result?.engine || "",
             sourceWidth: result?.sourceWidth || 0,
             sourceHeight: result?.sourceHeight || 0,
             cropX: result?.cropX || 0,
@@ -1097,17 +1229,27 @@
       function updateAdaptiveMode() {
         const timestamp = now();
 
-        const referenceTime =
-          lastSuccessAt > 0
-            ? lastSuccessAt
-            : scanStartedAt;
+        if (mode === "fast") {
+          /*
+           * Fast không đọc được liên tục > 3 s (tính từ lần đọc được gần
+           * nhất / lúc vào fast) mới chuyển hard.
+           */
+          const referenceTime = Math.max(
+            lastSuccessAt,
+            scanStartedAt,
+            modeSince
+          );
+          if (timestamp - referenceTime > SWITCH_TO_HARD_AFTER_MS) {
+            switchMode("hard");
+          }
+          return;
+        }
 
-        if (
-          mode === "fast" &&
-          timestamp - referenceTime >
-            SWITCH_TO_HARD_AFTER_MS
-        ) {
-          switchMode("hard");
+        /*
+         * Hard quá lâu vẫn chưa đọc được (QR chưa vào khung): về fast.
+         */
+        if (timestamp - modeSince > HARD_MAX_MS) {
+          switchMode("fast");
         }
       }
 
@@ -1220,6 +1362,7 @@
           emissionLocked = false;
 
           mode = "fast";
+          modeSince = now();
           scanStartedAt = now();
           lastSuccessAt = 0;
           lastAttemptAt = 0;

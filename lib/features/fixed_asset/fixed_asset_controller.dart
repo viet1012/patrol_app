@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/widgets.dart';
@@ -17,6 +18,7 @@ import 'package:chuphinh/features/fixed_asset/fixed_asset_location.dart';
 import 'package:chuphinh/features/fixed_asset/fixed_asset_manual_cascade.dart';
 import 'package:chuphinh/features/fixed_asset/fixed_asset_pic_filter.dart';
 import 'package:chuphinh/features/fixed_asset/fixed_asset_qr_parser.dart';
+import 'package:chuphinh/features/fixed_asset/fixed_asset_strings.dart';
 
 /// State + điều phối nghiệp vụ của màn hình Fixed Asset (scan, audit, save,
 /// machine list, summary; cascade MANUAL ở [FixedAssetManualCascade]).
@@ -39,6 +41,8 @@ class FixedAssetController extends ChangeNotifier {
     this.showNotice,
     required this.resetQr,
     this.onScanAccepted,
+    this.capturePhoto,
+    this.showScanNotice,
     this.api = const FixedAssetBackend(),
     this.masterMismatchDialogEnabled = FixedAssetFeatures.masterMismatchDialog,
   }) {
@@ -67,6 +71,14 @@ class FixedAssetController extends ChangeNotifier {
   final ValueChanged<String>? showNotice;
   final VoidCallback resetQr;
   final void Function(String rawQr, String machineCode)? onScanAccepted;
+
+  /// Chụp frame camera đang mở đúng lúc nhận QR (JPEG; null = không lấy được
+  /// frame). null = không chụp. Lưu audit thành công thì upload ngầm.
+  final Future<Uint8List?> Function()? capturePhoto;
+
+  /// Thông báo ngắn trên camera (QR không phải mã máy, nhiều mã trong
+  /// khung, máy không có trong danh sách). null = bỏ qua.
+  final ValueChanged<String>? showScanNotice;
 
   /// Endpoint Fixed Asset (thay được trong test).
   final FixedAssetBackend api;
@@ -219,6 +231,14 @@ class FixedAssetController extends ChangeNotifier {
   String? _shortRepeatQr;
   static const Duration _cancelRepeatWindow = Duration(milliseconds: 1200);
 
+  /// Sau khi nhận 1 mã: bỏ qua mọi kết quả quét trong [_acceptCooldown].
+  DateTime? _acceptedAt;
+  static const Duration _acceptCooldown = Duration(milliseconds: 800);
+
+  /// Mã máy vừa lưu (saved): quét lại cùng mã thì bỏ qua. Reset khi đổi
+  /// vị trí ([_clearScanState]).
+  String? _lastSavedCode;
+
   /// Location [_machines] was loaded for (null while loading / on error /
   /// cleared): the MANUAL local check only trusts a list of this location.
   FixedAssetAuditLocation? _machinesLocation;
@@ -247,6 +267,11 @@ class FixedAssetController extends ChangeNotifier {
   /// pipeline: vị trí thực tế đang ghi nhận + tem hiện tại của máy chờ in lại.
   final Map<int, FixedAssetReprintInfo> _reprintByScan =
       <int, FixedAssetReprintInfo>{};
+
+  /// Ảnh chụp lúc nhận QR của từng pipeline, chờ POST /audit lưu thành công
+  /// (kể cả re-POST sau xác nhận) để upload.
+  final Map<int, Future<Uint8List?>> _photoByScan =
+      <int, Future<Uint8List?>>{};
 
   /// Scan hiện tại đã lưu với qrLocationMismatch = true.
   bool _qrReprintSaved = false;
@@ -699,6 +724,11 @@ class FixedAssetController extends ChangeNotifier {
     _reprintInfo = null;
     _scannedPic = null;
     if (_lastSeenQr != null) _lastSeenAt = DateTime.now();
+    _acceptedAt = null;
+    _lastSavedCode = null;
+    _lastSavedAt = null;
+    _savedNoticeAt = null;
+    _firstSeenAt.clear();
     _scanChipText = null;
     resetQr();
   }
@@ -765,23 +795,60 @@ class FixedAssetController extends ChangeNotifier {
     _notify();
   }
 
-  Future<void> processScannedQr(String rawQr) async {
-    final qr = rawQr.trim();
+  /// Mã máy đã chuẩn hoá của list máy đang tải sẵn (vị trí + PIC đang chọn);
+  /// tính lại khi list đổi.
+  List<FixedAssetMachine>? _knownCodesFor;
+  Set<String> _knownCodes = const {};
+
+  bool _isKnownMachine(String machineCode) {
+    if (machineCode.isEmpty) return false;
+    final location = activeLocation;
+    if (location == null || !_machinesReadyFor(location)) return false;
+    if (!identical(_knownCodesFor, _machines)) {
+      _knownCodesFor = _machines;
+      _knownCodes = {
+        for (final m in _machines) normalizeMachineCode(m.machineCode),
+      }..remove('');
+    }
+    return _knownCodes.contains(machineCode);
+  }
+
+  /// Banner "đã kiểm kê" của mã vừa lưu: tối đa 1 lần / [_savedNoticeGap].
+  DateTime? _lastSavedAt;
+  DateTime? _savedNoticeAt;
+  static const Duration _savedNoticeGap = Duration(seconds: 3);
+
+  /// Mọi nhánh bỏ qua kết quả quét đều log, để thấy mã bị chặn ở đâu.
+  void _drop(String code, String reason) {
+    debugPrint('[FA-SCAN] drop $code reason=$reason');
+  }
+
+  /// Lần đầu thấy từng mã (log thời gian tới lúc nhận).
+  final Map<String, DateTime> _firstSeenAt = <String, DateTime>{};
+
+  /// [candidates]: mọi mã + khoảng cách tới tâm khi frame có > 1 mã
+  /// (mã gần tâm nhất = [rawQr]); [engine]: decoder đọc được (log).
+  Future<void> processScannedQr(
+    String rawQr, {
+    List<({String text, double distance})> candidates = const [],
+    String engine = '',
+  }) async {
+    var qr = rawQr.trim();
     _scanLog('received "$qr"');
     if (qr.isEmpty || _disposed) {
-      _scanLog('skip: empty or disposed');
+      _drop(qr, 'emptyOrDisposed');
       return;
     }
 
     // Chốt chặn chung (camera + nhập tay): chưa chọn đủ 4 ô vị trí thì bỏ
     // qua, không audit-check / save / scan-info.
     if (!canScan) {
-      _scanLog('skip: location not selected');
+      _drop(qr, 'locationNotSelected');
       return;
     }
 
     if (isQrScanPaused) {
-      _scanLog('skip: paused (${_qrScanPauseReasons.join(', ')})');
+      _drop(qr, 'paused(${_qrScanPauseReasons.join(', ')})');
       return;
     }
 
@@ -791,7 +858,7 @@ class FixedAssetController extends ChangeNotifier {
     // camera's repeated detections of the same code (the chip still
     // flashes: the scan was received).
     if (_confirmOpen) {
-      uxLog('skip "$qr": waiting confirmation of $_confirmCode');
+      _drop(qr, 'confirmDialogOpen($_confirmCode)');
       _flashScanChip();
       return;
     }
@@ -803,10 +870,62 @@ class FixedAssetController extends ChangeNotifier {
         _lastSeenQr = qr;
         _lastSeenAt = now;
       }
-      _scanLog('skip: pipeline busy (processing "$_processingRawQr")');
+      _drop(qr, 'busySaving($_processingRawQr)');
       _flashScanChip();
       return;
     }
+
+    // Vừa nhận 1 mã: bỏ qua mọi kết quả trong [_acceptCooldown].
+    final acceptedAt = _acceptedAt;
+    if (acceptedAt != null && now.difference(acceptedAt) < _acceptCooldown) {
+      _drop(qr, 'cooldown');
+      return;
+    }
+
+    // Frame nhiều mã: ưu tiên mã gần tâm nhất có trong list tải sẵn; chỉ
+    // bỏ qua khi ≥ 2 mã trong list gần tâm như nhau.
+    final pick = fixedAssetPickFrameQr(qr, candidates, _isKnownMachine);
+    if (pick.ambiguous) {
+      _drop(qr, 'ambiguous');
+      showScanNotice?.call(FixedAssetStrings.multipleQr);
+      return;
+    }
+    qr = pick.rawQr.trim();
+
+    // Không khớp mẫu mã máy (URL / nội dung khác): bỏ qua, báo ngắn.
+    final qrData = parseFixedAssetQr(qr);
+    final machineCode = qrData.machineCode;
+    if (machineCode.isEmpty) {
+      _drop(qr, 'notMachine');
+      showScanNotice?.call(FixedAssetStrings.notMachineQr);
+      return;
+    }
+
+    // Trùng mã vừa lưu: không lưu lại, báo "đã kiểm kê lúc HH:mm" trên
+    // camera (tối đa 1 lần / 3 s).
+    if (machineCode == _lastSavedCode) {
+      _drop(machineCode, 'duplicateLastSaved');
+      _setScanChip(qr);
+      final noticeAt = _savedNoticeAt;
+      final savedAt = _lastSavedAt;
+      if (savedAt != null &&
+          (noticeAt == null || now.difference(noticeAt) >= _savedNoticeGap)) {
+        _savedNoticeAt = now;
+        showScanNotice?.call(
+          FixedAssetStrings.alreadySavedAt(machineCode, savedAt),
+        );
+      }
+      return;
+    }
+
+    _firstSeenAt.removeWhere(
+      (_, at) => now.difference(at) > const Duration(seconds: 10),
+    );
+    _firstSeenAt.putIfAbsent(machineCode, () => now);
+
+    // Mọi mã hợp lệ nhận ngay ở lần đọc đầu (an toàn dựa vào audit-check +
+    // BE kiểm tra master); [known] chỉ để log.
+    final known = _isKnownMachine(machineCode);
 
     // Chặn detect lặp của cùng một QR đang nằm trong khung camera.
     // Mỗi lần detect lặp sẽ gia hạn cửa sổ, nên chỉ khi QR rời khung
@@ -824,7 +943,7 @@ class FixedAssetController extends ChangeNotifier {
     _lastSeenAt = now;
 
     if (isRepeat) {
-      _scanLog('skip: repeat within ${_repeatScanWindow.inSeconds}s');
+      _drop(machineCode, 'repeatInFrame(${repeatWindow.inMilliseconds}ms)');
       // Status kept; the chip flashes so the user sees it was received.
       _setScanChip(qr);
       return;
@@ -835,24 +954,14 @@ class FixedAssetController extends ChangeNotifier {
     _uxScanStart = _uxClock.elapsed;
     uxLog('received "$qr" #$generation');
     _setScanChip(qr);
-    final qrData = parseFixedAssetQr(qr);
-    final machineCode = qrData.machineCode;
-
-    final String? invalidMessage = machineCode.isEmpty
-        ? 'Invalid machine QR'
-        : null;
-
-    if (invalidMessage != null) {
-      _scanLog('skip: invalid ($invalidMessage)');
-      _scannedCode = machineCode;
-      _scannedFaName = '';
-      _mismatchMaster = null;
-      _scanStatus = FixedAssetScanStatus.failed;
-      _statusMessage = invalidMessage;
-      _notify();
-      resetQr();
-      return;
-    }
+    _acceptedAt = now;
+    final firstSeen = _firstSeenAt.remove(machineCode) ?? now;
+    debugPrint(
+      '[FA-SCAN] accepted $machineCode after '
+      '${now.difference(firstSeen).inMilliseconds} ms '
+      '(${known ? 'in list' : 'not in list'}, '
+      'decoder=${engine.isEmpty ? 'unknown' : engine})',
+    );
 
     // Một pipeline duy nhất cho toàn bộ CHECK -> (CONFIRM) -> SAVE.
     _activeScan = generation;
@@ -881,6 +990,7 @@ class FixedAssetController extends ChangeNotifier {
       // Chỉ pipeline này tự trả cờ.
       _qrCheckByScan.remove(generation);
       _reprintByScan.remove(generation);
+      _photoByScan.remove(generation);
       if (_activeScan == generation) {
         _activeScan = null;
         _processingRawQr = null;
@@ -906,6 +1016,46 @@ class FixedAssetController extends ChangeNotifier {
     }
   }
 
+  /// Lỗi chụp không bao giờ chặn pipeline audit: null = bỏ qua ảnh.
+  Future<Uint8List?>? _captureScanPhoto() {
+    final capture = capturePhoto;
+    if (capture == null) return null;
+    try {
+      return capture().catchError((Object _) => null);
+    } catch (error) {
+      uxLog('photo capture failed: $error');
+      return null;
+    }
+  }
+
+  /// Upload ngầm (không chặn quét tiếp); lỗi thử lại 1 lần, vẫn lỗi thì báo
+  /// nhỏ, audit vẫn giữ. Không lấy được frame: bỏ qua.
+  Future<void> _uploadScanPhoto(
+    String machineCode,
+    String auditId,
+    Future<Uint8List?> photoFuture,
+  ) async {
+    final photo = await photoFuture;
+    if (photo == null || photo.isEmpty) {
+      uxLog('photo $machineCode: no frame, skip');
+      return;
+    }
+    for (var attempt = 1; attempt <= 2; attempt++) {
+      try {
+        await api.uploadAuditPhoto(
+          auditId: auditId,
+          userId: accountCode.trim(),
+          photo: photo,
+        );
+        uxLog('photo $machineCode uploaded (audit $auditId)');
+        return;
+      } catch (error) {
+        uxLog('photo upload #$attempt failed: ${fixedAssetErrorText(error)}');
+      }
+    }
+    showError(FixedAssetStrings.photoUploadFailed(machineCode));
+  }
+
   Future<void> _runManualScan(
     String machineCode,
     int generation, {
@@ -918,6 +1068,9 @@ class FixedAssetController extends ChangeNotifier {
       return;
     }
 
+    // Chụp trước mọi await: frame vừa đọc được QR.
+    final photo = _captureScanPhoto();
+    if (photo != null) _photoByScan[generation] = photo;
     _notifyScanAccepted(rawQr, machineCode);
 
     // Vị trí in trên QR phải trùng vị trí đang chọn (trước bước MASTER).
@@ -1236,6 +1389,23 @@ class FixedAssetController extends ChangeNotifier {
       );
     } catch (error) {
       saveError = error;
+    }
+
+    // Insert mới: upload ảnh của pipeline ngầm (kể cả khi scan đã stale /
+    // màn đã đóng, vì record đã vào backend).
+    final auditId = response != null && response.saved
+        ? response.auditId
+        : null;
+    if (response != null && response.saved) {
+      _lastSavedCode = machineCode;
+      _lastSavedAt = DateTime.now();
+      _savedNoticeAt = null;
+    }
+    if (auditId != null) {
+      final photo = _photoByScan.remove(generation);
+      if (photo != null) {
+        unawaited(_uploadScanPhoto(machineCode, auditId, photo));
+      }
     }
 
     if (_disposed) return;
@@ -1585,7 +1755,14 @@ class FixedAssetController extends ChangeNotifier {
     _reprintInfo = result == null || !_qrReprintSaved
         ? null
         : _reprintFromResponse(result);
-    if (result == null) {
+    if (result == null && fixedAssetIsNotInListError(errorText)) {
+      // 400 "không có trong danh sách": không lưu, báo rõ trên camera,
+      // quét lại được ngay khi đưa QR ra rồi vào lại.
+      _scanStatus = FixedAssetScanStatus.failed;
+      _statusMessage = errorText;
+      _shortRepeatQr = _processingRawQr;
+      showScanNotice?.call(errorText);
+    } else if (result == null) {
       _scanStatus = FixedAssetScanStatus.failed;
       _statusMessage = fixedAssetIsMissingQrLocationError(errorText)
           ? 'Không đọc được vị trí trên QR, quét lại'
