@@ -698,22 +698,29 @@ Mục này đối chiếu code FE với tài liệu BE (`patrol_be/README.md`, a
 | `MachineAiAlertCard`, `_AiHeader` (`machine_ai_alert_card.dart`) | Không dùng; `MachineAiRiskHistoryPanel` vẫn giữ. |
 | `features/machine_ai/ai_analysis_toggle.dart` | File đã bị comment toàn bộ. |
 | Khối `DioClient` cũ bị comment ở đầu `dio_client.dart` | Code đã comment. |
+| Import, field, hằng và method private không dùng: `_needManualSelect`, `_oldPIC`, `_isLoadingName`, `_loadingMacId`, `_lastGood*`, `showGlassDialog` (bản riêng của màn Before), `getPlants`, `normalizeGroup`, `_revertToLastGood`, … | Cảnh báo `unused_*` của analyzer. |
+| Phần dựng `Uri` chỉ để log trong `PatrolPivotApi` / `PatrolReportApi` | Interceptor của `DioClient` đã log URL đầy đủ. |
+| `test/fixed_asset_zone_lock_test.dart` | Gọi API controller không còn tồn tại, không compile được. |
+
+**Dọn lint** (không đổi logic):
+
+- `Color.withOpacity(x)` → `withValues(alpha: x)`: 475 chỗ. `withValues` giữ alpha dạng số thực thay vì làm tròn 8 bit, nên khác biệt màu không nhìn thấy được.
+- Bỏ so sánh null luôn sai và 3 import không dùng trong `translator.dart`. File này được sinh tự động nên đã sửa cả template trong `tool/generate_translator.dart`.
 
 **Giữ lại, cần quyết định thêm:**
 
-- **Zone lock:** `FixedAssetApi.fetchZoneLock`, `FixedAssetBackend.fetchZoneLock`, `fixed_asset_zone_lock.dart`.
-  - Không UI nào gọi, nhưng `test/fixed_asset_zone_lock_test.dart` còn import.
-  - Test này **đã hỏng từ trước**: nó gọi `loadZoneLock`, `autoLocation`, `setLocationMode` mà controller không còn.
-  - Đề xuất: xóa cả test lẫn code zone-lock khi chốt bỏ chế độ AUTO.
+- **Zone lock:** `FixedAssetApi.fetchZoneLock`, `FixedAssetBackend.fetchZoneLock`, `fixed_asset_zone_lock.dart`. Không UI nào gọi. Đề xuất xóa khi chốt bỏ chế độ AUTO.
 - **`FixedAssetSummaryNav.openAudit`:** chưa ai gọi, nhưng `FixedAssetScreen` đã có sẵn `initialPic`/`initialLocation` cho nó. Có vẻ là chức năng đang làm dở.
-- **Nhiều field private không dùng** (warning `unused_field`), ví dụ `_needManualSelect`, `_oldPIC`, `_comment`/`_counterMeasure` ở `PatrolBeforeScreen`. Nên dọn riêng, mỗi file kiểm tra lại UI.
-- **`RedoDetailPage` tự viết lại logic `update_at`**, trùng với `updateAfterReportApi`. Có thể gộp, nhưng việc này là refactor chứ không chỉ xóa code chết.
+- **Field không dùng nhưng xóa sẽ đổi luồng code:**
+  - `_comment` / `_counterMeasure` (`PatrolBeforeScreen`): được gán trong timer debounce.
+  - `_enableCamera` (`RedoDetailPage`): đi kèm đoạn chờ 200ms trước snackbar.
+- **`RedoDetailPage` tự viết lại request `update_at`**, trùng với `updateAfterReportApi`. Request gửi đi giống nhau, nhưng khi gặp lỗi mạng/5xx thì nội dung snackbar `'Server error: $e'` sẽ khác, nên chưa gộp.
+- **`capture.dart`: `if (blob == null)`**. Analyzer báo luôn sai, nhưng `toBlob` của trình duyệt vẫn có thể trả null, nên giữ làm chốt chặn lúc chạy.
+- **Test hỏng từ trước:** `fixed_asset_manual_confirm_test.dart`, `fixed_asset_manual_location_test.dart`, `fixed_asset_machine_section_test.dart`. Các file này dùng chữ ký cũ của `FixedAssetBackend` và `setLocationMode` / `zoneLockEnabled` không còn tồn tại, nên `flutter test` chưa chạy sạch. Cần cập nhật, hoặc xóa nếu chỉ còn test chế độ AUTO.
 
 ### 11.5 Khác
 
 - **CI không thay `__APP_VERSION__`**, nên cơ chế tự reload khi có bản mới có thể không chạy với bản deploy từ CI (chưa chắc).
 - **Version lệch nhau:** `ApiConfig.version` là `V1.9.4`, còn `pubspec.yaml` là `1.0.2`.
 - **`dart:js_util`:** `flutter analyze` báo không tìm thấy (`camera_preview_box.dart`); lỗi này có từ trước.
-- **Chưa chắc chắn:**
-  - Chú thích của `NoQrReportSheet` nhắc "lý do, 1–3 ảnh" nhưng form thực tế không có hai trường này.
-  - Tài liệu BE ghi `update_at` → `Pro_Done` do server đặt; điều này khớp với việc FE không gửi `atStatus`.
+- **Đã xác nhận với tài liệu BE:** `update_at` → `Pro_Done` do server đặt; điều này khớp với việc FE không gửi `atStatus`.
