@@ -41,11 +41,6 @@ class _PatrolRiskSummaryPageState extends State<PatrolRiskSummaryPage> {
   late DateTime _fromDate;
   late DateTime _toDate;
 
-  // last good
-  List<RiskSummary> _lastGoodItems = const [];
-  DateTime? _lastGoodFrom;
-  DateTime? _lastGoodTo;
-
   bool _noData = false;
   String _noDataMsg = '';
 
@@ -160,10 +155,6 @@ class _PatrolRiskSummaryPageState extends State<PatrolRiskSummaryPage> {
       setState(() {
         _loading = false;
         _items = res;
-
-        _lastGoodItems = res;
-        _lastGoodFrom = _fromDate;
-        _lastGoodTo = _toDate;
       });
     } catch (e) {
       if (!mounted) return;
@@ -230,27 +221,6 @@ class _PatrolRiskSummaryPageState extends State<PatrolRiskSummaryPage> {
 
     widget.onDateChanged?.call(_fromDate, _toDate);
     _fetch(); // ✅ quan trọng
-  }
-
-  void _revertToLastGood() {
-    if (_lastGoodFrom == null ||
-        _lastGoodTo == null ||
-        _lastGoodItems.isEmpty) {
-      return;
-    }
-
-    setState(() {
-      _fromDate = _lastGoodFrom!;
-      _toDate = _lastGoodTo!;
-
-      _items = _lastGoodItems;
-      _noData = false;
-      _noDataMsg = '';
-      _error = null;
-    });
-
-    // ✅ sync parent lại theo lastGood
-    widget.onDateChanged?.call(_fromDate, _toDate);
   }
 
   @override

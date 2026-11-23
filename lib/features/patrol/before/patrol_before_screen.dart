@@ -93,7 +93,6 @@ class _PatrolBeforeScreenState extends State<PatrolBeforeScreen> {
   Timer? _counterDebounce;
 
   String? _employeeName;
-  bool _isLoadingName = false;
 
   // ? QA states
   String? _qaFreq; // dùng chung key frequency_often...
@@ -101,7 +100,6 @@ class _PatrolBeforeScreenState extends State<PatrolBeforeScreen> {
   String? _qaImpact; // 1 l?a ch?n
 
   bool _isLoadingMachineInfo = false;
-  String? _loadingMacId;
 
   HseMachineInfo? _qrFallbackMachine;
 
@@ -197,7 +195,6 @@ class _PatrolBeforeScreenState extends State<PatrolBeforeScreen> {
     if (empCode.isEmpty) return null;
 
     if (!mounted) return null;
-    setState(() => _isLoadingName = true);
 
     try {
       final name = await HseMasterService.fetchEmployeeName(empCode);
@@ -213,7 +210,6 @@ class _PatrolBeforeScreenState extends State<PatrolBeforeScreen> {
       return null;
     } finally {
       if (!mounted) return null;
-      setState(() => _isLoadingName = false);
     }
   }
 

@@ -40,8 +40,6 @@ class EditBeforeScreen extends StatefulWidget {
 }
 
 class _EditBeforeScreenState extends State<EditBeforeScreen> {
-  String? _selectedPlant;
-
   String? _filterArea;
   String? _filterRisk;
 
@@ -76,8 +74,6 @@ class _EditBeforeScreenState extends State<EditBeforeScreen> {
   @override
   void initState() {
     super.initState();
-
-    _selectedPlant = widget.selectedPlant;
 
     _loadReport();
   }

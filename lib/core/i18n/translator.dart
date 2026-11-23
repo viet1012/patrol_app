@@ -1,8 +1,5 @@
 import 'package:flutter/widgets.dart';
 import 'package:chuphinh/l10n/app_localizations.dart';
-import 'package:chuphinh/l10n/app_localizations_en.dart';
-import 'package:chuphinh/l10n/app_localizations_vi.dart';
-import 'package:chuphinh/l10n/app_localizations_ja.dart';
 
 extension TranslateExtension on String {
 

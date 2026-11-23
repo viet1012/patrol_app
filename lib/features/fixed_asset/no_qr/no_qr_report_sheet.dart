@@ -70,8 +70,8 @@ Future<NoQrReport?> showNoQrReportSheet({
 }
 
 /// Form ghi máy không có / không quét được QR: vị trí (đủ 4 cấp: breadcrumb
-/// + "Đổi"; thiếu: 4 dropdown), mã máy (chọn từ danh sách hoặc nhập tay),
-/// lý do, 1-3 ảnh, ghi chú.
+/// + "Đổi"; thiếu: 4 dropdown), PIC, mã máy (chọn từ danh sách hoặc nhập
+/// tay), ghi chú.
 ///
 /// Lỗi bắt buộc chỉ hiện sau lần bấm "Lưu" đầu tiên khi còn thiếu (nút Lưu
 /// luôn bấm được). Pop report sau khi lưu, null = "Hủy". API chỉ dùng để tải
@@ -504,7 +504,7 @@ class _NoQrReportSheetState extends State<NoQrReportSheet> {
   }
 
   // ============================================================
-  // MÁY / ẢNH / LƯU
+  // MÁY / LƯU
   // ============================================================
 
   void _setManualCode(bool manual) {

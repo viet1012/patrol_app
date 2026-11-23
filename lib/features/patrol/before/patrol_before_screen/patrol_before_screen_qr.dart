@@ -84,12 +84,6 @@ extension _PatrolBeforeScreenQr on _PatrolBeforeScreenState {
     }
   }
 
-  List<String> getPlants() {
-    final plants = _facByPlantCache.keys.toList(growable: false);
-    plants.sort();
-    return plants;
-  }
-
   List<String> getGroupsByPlant() {
     final plant = _selectedPlant;
     if (plant == null || plant.trim().isEmpty) {
@@ -110,10 +104,6 @@ extension _PatrolBeforeScreenQr on _PatrolBeforeScreenState {
   List<String> getMachineByArea(String plant, String fac, String area) {
     return _machineByPlantFacAreaCache[_cacheKey3(plant, fac, area)] ??
         const <String>[];
-  }
-
-  String normalizeGroup(String? group) {
-    return group == null ? '' : group.replaceAll(' ', '').trim();
   }
 
   String _extractMacIdFromQr(String qr) {
@@ -405,7 +395,6 @@ extension _PatrolBeforeScreenQr on _PatrolBeforeScreenState {
 
     setState(() {
       _isLoadingMachineInfo = true;
-      _loadingMacId = macId;
     });
 
     try {
@@ -463,7 +452,6 @@ extension _PatrolBeforeScreenQr on _PatrolBeforeScreenState {
 
       setState(() {
         _isLoadingMachineInfo = false;
-        _loadingMacId = null;
       });
     }
   }

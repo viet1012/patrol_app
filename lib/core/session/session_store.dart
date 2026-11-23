@@ -50,7 +50,6 @@ class SessionStore {
 
   static const _kAccount = 'account_code';
   static const _kPassword = 'account_password';
-  static const _kPlant = 'selected_plant';
 
   // ================= SAVE =================
   static Future<void> saveCreds({

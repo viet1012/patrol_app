@@ -67,7 +67,6 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen>
 
   String _employeeName = '';
   HsePatrolTeamModel? _autoTeam;
-  bool _needManualSelect = true;
   bool _qrHandled = false;
 
   /// Quyền theo group, tính 1 lần sau khi tải AuthMe.
@@ -235,7 +234,6 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen>
 
         _autoTeam = patrolTeam;
         expandedGroup = autoExpand ? PatrolGroup.Patrol : null;
-        _needManualSelect = patrolTeam == null;
 
         errorMessage = null;
         isLoading = false;
@@ -548,7 +546,6 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen>
     setState(() {
       selectedFactory = value;
       _autoTeam = null;
-      _needManualSelect = true;
 
       // Group đang mở bị ẩn ở plant mới -> quay về Patrol (nếu Patrol hiện).
       final visible = _visibleGroups;
@@ -678,7 +675,6 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen>
       setState(() {
         expandedGroup = null;
         _autoTeam = null;
-        _needManualSelect = true;
       });
       return;
     }
@@ -692,7 +688,6 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen>
     setState(() {
       expandedGroup = group;
       _autoTeam = team;
-      _needManualSelect = team == null;
     });
 
     if (group == PatrolGroup.FixedAsset && !_reprintFetched) {

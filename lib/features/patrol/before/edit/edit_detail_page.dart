@@ -34,8 +34,6 @@ class EditDetailPage extends StatefulWidget {
 }
 
 class _EditDetailPageState extends State<EditDetailPage> {
-  final GlobalKey<CameraEditBoxState> _cameraKey =
-      GlobalKey<CameraEditBoxState>();
 
   final TextEditingController _commentCtrl = TextEditingController();
   final TextEditingController _counterCtrl = TextEditingController();

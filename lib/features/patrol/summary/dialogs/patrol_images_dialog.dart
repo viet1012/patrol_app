@@ -7,13 +7,8 @@ import 'package:chuphinh/shared/widgets/common_ui_helper.dart';
 import 'package:chuphinh/core/models/patrol_report_model.dart';
 
 class _PatrolDialogTheme {
-  static const Color background = Color(0xFF07111F);
-  static const Color surface = Color(0xB31A2A40);
-  static const Color surfaceAlt = Color(0x8F21344E);
-  static const Color surfaceSoft = Color(0x732A405C);
 
   static const Color primary = Color(0xFF93E4FF);
-  static const Color primaryStrong = Color(0xFF38BDF8);
   static const Color text = Color(0xFFF8FAFC);
   static const Color subText = Color(0xFFA9B8CA);
 
@@ -783,7 +778,6 @@ class _RiskTotalCard extends StatelessWidget {
 
     final Color mainColor = CommonUI.riskColor(r);
 
-    final Color bg = mainColor.withOpacity(.10);
     final Color border = mainColor.withOpacity(.72);
 
     return Container(

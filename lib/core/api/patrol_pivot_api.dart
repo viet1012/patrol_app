@@ -22,12 +22,7 @@ class PatrolPivotApi {
     };
 
     try {
-      final uri = Uri.parse(
-        '${DioClient.dio.options.baseUrl}$endpoint',
-      ).replace(queryParameters: {'plant': plant, 'type': type});
-
       debugPrint('➡️ FETCH PIVOT');
-      debugPrint('URL    : $uri');
       debugPrint('PARAMS : $queryParameters');
 
       final res = await DioClient.get(

@@ -53,7 +53,6 @@ class _AfterReportScreenState extends State<AfterReportScreen>
   static const String emptyLabel = '';
   Future<List<String>>? _futurePics;
   String? _selectedPIC; // UI selected
-  String? _oldPIC;
 
   PatrolReportModel? _report;
   bool _loading = true;
@@ -162,8 +161,6 @@ class _AfterReportScreenState extends State<AfterReportScreen>
         _currentPIC = currentPic;
         _selectedPIC = currentPic;
         _selectedAssignPIC = assignPic;
-
-        _oldPIC = currentPic;
 
         // Nên fallback về dueDate nếu chưa từng revise.
         _selectedDueDate = picked.dueDateUpdatedAt ?? picked.dueDate;
@@ -1017,11 +1014,6 @@ class _AfterReportScreenState extends State<AfterReportScreen>
             /// SAVE
             ////////////////////////////////////////////////////////////
             await _onSaveAssign();
-
-            ////////////////////////////////////////////////////////////
-            /// COMMIT
-            ////////////////////////////////////////////////////////////
-            _oldPIC = _selectedAssignPIC;
           },
         );
       },
@@ -1080,9 +1072,6 @@ class _AfterReportScreenState extends State<AfterReportScreen>
 
             // ✅ user confirm -> gọi save
             await _onSavePic();
-
-            // nếu save OK thì commit old
-            _oldPIC = _selectedPIC;
           },
         );
       },

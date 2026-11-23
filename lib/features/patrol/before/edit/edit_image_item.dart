@@ -1,7 +1,5 @@
-import 'dart:typed_data';
 import 'dart:ui';
 
-import 'package:chuphinh/features/patrol/before/edit/camera_edit_box.dart';
 import 'package:flutter/material.dart';
 
 import 'package:chuphinh/core/api/api_config.dart';
@@ -35,9 +33,7 @@ class EditImageItem extends StatefulWidget {
 
 class _EditImageItemState extends State<EditImageItem> {
   bool _loading = false;
-  List<Uint8List> _newImages = [];
 
-  final GlobalKey<CameraEditBoxState> _cameraKey = GlobalKey();
 
   String get imageUrl => '${ApiConfig.baseUrl}/images/${widget.imageName}';
   static const int maxTotalImages = 2;

@@ -48,7 +48,6 @@ class _RedoDetailPageState extends State<RedoDetailPage> {
   final TextEditingController _commentCtrl = TextEditingController();
   final TextEditingController _msnvCtrl = TextEditingController();
   String? _employeeName;
-  bool _isLoadingName = false;
   Timer? _debounce;
 
   // ✅ PIC dropdown
@@ -56,7 +55,6 @@ class _RedoDetailPageState extends State<RedoDetailPage> {
   Future<List<String>>? _futurePics;
   String? _selectedPIC; // UI selected
   String? _oldPIC;
-  String? _hseJudge; // "OK" | "NG"
 
   DateTime? _selectedDueDate;
   int? _dueDateUpdateCount;
@@ -1168,7 +1166,6 @@ class _RedoDetailPageState extends State<RedoDetailPage> {
     if (empCode.isEmpty) return null;
 
     if (!mounted) return null;
-    setState(() => _isLoadingName = true);
 
     try {
       final name = await HseMasterService.fetchEmployeeName(empCode);
@@ -1184,7 +1181,6 @@ class _RedoDetailPageState extends State<RedoDetailPage> {
       return null;
     } finally {
       if (!mounted) return null;
-      setState(() => _isLoadingName = false);
     }
   }
 

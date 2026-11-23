@@ -1,6 +1,6 @@
 part of '../camera_preview_box.dart';
 
-enum _QrWarningState { hidden, reading, unreadable, error }
+enum _QrWarningState { hidden, unreadable, error }
 
 enum CameraPowerState { starting, on, stopping, off, error }
 

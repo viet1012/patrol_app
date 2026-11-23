@@ -242,7 +242,6 @@ class _AiMiniSwitch extends StatelessWidget {
   static const double _trackH = 22;
   static const double _thumbSz = 16;
   static const double _pad = 3;
-  static const double _travel = _trackW - _thumbSz - _pad * 2;
 
   static const Color _colorOn = Color(0xFF16A34A);
   static const Color _colorOff = Color(0xFF4B5563);

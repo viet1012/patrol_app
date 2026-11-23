@@ -59,15 +59,6 @@ class PatrolReportApi {
     addIfNotEmpty('toD', toD);
 
     try {
-      final uri = Uri.parse('${DioClient.dio.options.baseUrl}$endpoint')
-          .replace(
-            queryParameters: queryParams.map(
-              (key, value) => MapEntry(key, value.toString()),
-            ),
-          );
-
-      debugPrint('➡️ API CALL: $uri');
-
       final response = await DioClient.get(
         endpoint,
         queryParameters: queryParams,
