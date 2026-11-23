@@ -55,7 +55,7 @@ class FixedAssetQrMismatchDialog extends StatelessWidget {
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(18),
-        side: BorderSide(color: _violet.withOpacity(.6)),
+        side: BorderSide(color: _violet.withValues(alpha: .6)),
       ),
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 420),
@@ -98,7 +98,7 @@ class FixedAssetQrMismatchDialog extends StatelessWidget {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: Colors.white.withOpacity(.65),
+                    color: Colors.white.withValues(alpha: .65),
                     fontSize: 13,
                   ),
                 ),
@@ -108,15 +108,15 @@ class FixedAssetQrMismatchDialog extends StatelessWidget {
               Container(
                 clipBehavior: Clip.antiAlias,
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(.03),
+                  color: Colors.white.withValues(alpha: .03),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.white.withOpacity(.15)),
+                  border: Border.all(color: Colors.white.withValues(alpha: .15)),
                 ),
                 child: Column(
                   children: [
                     _headerRow(),
                     for (final r in rows) ...[
-                      Divider(height: 1, color: Colors.white.withOpacity(.08)),
+                      Divider(height: 1, color: Colors.white.withValues(alpha: .08)),
                       _rowWidget(r),
                     ],
                   ],
@@ -127,7 +127,7 @@ class FixedAssetQrMismatchDialog extends StatelessWidget {
                 'Các mục tô đỏ trên QR khác vị trí đang chọn. Kết quả kiểm kê '
                 'vẫn được lưu và máy này sẽ được đánh dấu cần in lại QR.',
                 style: TextStyle(
-                  color: Colors.white.withOpacity(.8),
+                  color: Colors.white.withValues(alpha: .8),
                   fontSize: 13,
                   height: 1.35,
                 ),
@@ -147,9 +147,9 @@ class FixedAssetQrMismatchDialog extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
-        color: color.withOpacity(.12),
+        color: color.withValues(alpha: .12),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: color.withOpacity(.5)),
+        border: Border.all(color: color.withValues(alpha: .5)),
       ),
       child: Row(
         children: [
@@ -189,7 +189,7 @@ class FixedAssetQrMismatchDialog extends StatelessWidget {
         children: [
           const SizedBox(width: _labelW),
           Expanded(
-            child: Text('ĐANG CHỌN', style: s(Colors.white.withOpacity(.55))),
+            child: Text('ĐANG CHỌN', style: s(Colors.white.withValues(alpha: .55))),
           ),
           Expanded(child: Text('TRÊN QR', style: s(_violet))),
           const SizedBox(width: _iconW),
@@ -204,7 +204,7 @@ class FixedAssetQrMismatchDialog extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        color: wrong ? _red.withOpacity(.14) : Colors.transparent,
+        color: wrong ? _red.withValues(alpha: .14) : Colors.transparent,
         border: Border(
           left: BorderSide(color: wrong ? _red : Colors.transparent, width: 3),
         ),
@@ -217,7 +217,7 @@ class FixedAssetQrMismatchDialog extends StatelessWidget {
             child: Text(
               r.label,
               style: TextStyle(
-                color: wrong ? _red : Colors.white.withOpacity(.55),
+                color: wrong ? _red : Colors.white.withValues(alpha: .55),
                 fontSize: 12,
                 fontWeight: wrong ? FontWeight.w800 : FontWeight.w600,
               ),
@@ -226,7 +226,7 @@ class FixedAssetQrMismatchDialog extends StatelessWidget {
           Expanded(
             child: _value(
               fixedAssetDash(r.selected ?? ''),
-              color: r.comparable ? Colors.white : Colors.white.withOpacity(.6),
+              color: r.comparable ? Colors.white : Colors.white.withValues(alpha: .6),
               bold: wrong,
             ),
           ),
@@ -237,7 +237,7 @@ class FixedAssetQrMismatchDialog extends StatelessWidget {
                   ? _red
                   : (r.comparable
                         ? Colors.white
-                        : Colors.white.withOpacity(.4)),
+                        : Colors.white.withValues(alpha: .4)),
               bold: wrong,
               big: wrong,
             ),
@@ -249,7 +249,7 @@ class FixedAssetQrMismatchDialog extends StatelessWidget {
                 : ok
                 ? Icon(
                     Icons.check_rounded,
-                    color: _green.withOpacity(.8),
+                    color: _green.withValues(alpha: .8),
                     size: 16,
                   )
                 : null,
@@ -288,7 +288,7 @@ class FixedAssetQrMismatchDialog extends StatelessWidget {
             onPressed: () => Navigator.of(context).pop(false),
             style: OutlinedButton.styleFrom(
               foregroundColor: Colors.white,
-              side: BorderSide(color: Colors.white.withOpacity(.3)),
+              side: BorderSide(color: Colors.white.withValues(alpha: .3)),
               minimumSize: const Size.fromHeight(52),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),

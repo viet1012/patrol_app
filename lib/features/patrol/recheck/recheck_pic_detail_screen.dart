@@ -465,7 +465,7 @@ class _RecheckPicDetailScreenState extends State<RecheckPicDetailScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
 
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(.25),
+        color: Colors.black.withValues(alpha: .25),
 
         borderRadius: BorderRadius.circular(12),
       ),
@@ -592,7 +592,7 @@ class _RecheckPicDetailScreenState extends State<RecheckPicDetailScreen> {
             dataRowHeight: 64,
 
             headingRowColor: MaterialStateProperty.all(
-              Colors.white.withOpacity(.10),
+              Colors.white.withValues(alpha: .10),
             ),
 
             headingTextStyle: const TextStyle(
@@ -682,7 +682,7 @@ class _RecheckPicDetailScreenState extends State<RecheckPicDetailScreen> {
     return DataRow(
       color: MaterialStateProperty.resolveWith<Color?>((_) {
         if (isSelected) {
-          return Colors.amber.withOpacity(.20);
+          return Colors.amber.withValues(alpha: .20);
         }
 
         return null;
@@ -772,7 +772,7 @@ class _RecheckPicDetailScreenState extends State<RecheckPicDetailScreen> {
       height: 34,
 
       child: Material(
-        color: Colors.white.withOpacity(.10),
+        color: Colors.white.withValues(alpha: .10),
 
         borderRadius: BorderRadius.circular(9),
 
@@ -836,7 +836,7 @@ class _RecheckPicDetailScreenState extends State<RecheckPicDetailScreen> {
 
         overflow: TextOverflow.ellipsis,
 
-        style: TextStyle(color: Colors.white.withOpacity(.85), fontSize: 12),
+        style: TextStyle(color: Colors.white.withValues(alpha: .85), fontSize: 12),
       ),
     );
   }
@@ -854,11 +854,11 @@ class _RecheckPicDetailScreenState extends State<RecheckPicDetailScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
 
           decoration: BoxDecoration(
-            color: color.withOpacity(.12),
+            color: color.withValues(alpha: .12),
 
             borderRadius: BorderRadius.circular(8),
 
-            border: Border.all(color: color.withOpacity(.35)),
+            border: Border.all(color: color.withValues(alpha: .35)),
           ),
 
           child: Text(
@@ -957,7 +957,7 @@ class _RecheckPicDetailScreenState extends State<RecheckPicDetailScreen> {
           // ====================================================
           Row(
             children: [
-              Icon(icon, size: 11, color: color.withOpacity(.85)),
+              Icon(icon, size: 11, color: color.withValues(alpha: .85)),
 
               const SizedBox(width: 4),
 
@@ -968,7 +968,7 @@ class _RecheckPicDetailScreenState extends State<RecheckPicDetailScreen> {
                   overflow: TextOverflow.ellipsis,
 
                   style: TextStyle(
-                    color: color.withOpacity(.80),
+                    color: color.withValues(alpha: .80),
 
                     fontSize: 9,
 

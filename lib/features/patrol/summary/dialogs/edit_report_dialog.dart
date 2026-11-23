@@ -351,9 +351,9 @@ class _EditReportDialogState extends State<EditReportDialog> {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.20),
+        color: Colors.black.withValues(alpha: 0.20),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withOpacity(0.10)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
       ),
       child: Column(
         children: [
@@ -542,9 +542,9 @@ class _EditReportDialogState extends State<EditReportDialog> {
                 child: Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.06),
+                    color: Colors.white.withValues(alpha: 0.06),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.white.withOpacity(0.10)),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
                   ),
                   child: Row(
                     children: [
@@ -561,10 +561,10 @@ class _EditReportDialogState extends State<EditReportDialog> {
                         height: 50,
                         alignment: Alignment.center,
                         decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.25),
+                          color: Colors.black.withValues(alpha: 0.25),
                           shape: BoxShape.circle, // 👈 QUAN TRỌNG
                           border: Border.all(
-                            color: Colors.white.withOpacity(0.15),
+                            color: Colors.white.withValues(alpha: 0.15),
                           ),
                         ),
                         child: Text(
@@ -658,7 +658,7 @@ class _EditReportDialogState extends State<EditReportDialog> {
             hintText: 'Enter $title',
             hintStyle: const TextStyle(color: Colors.white38),
             filled: true,
-            fillColor: Colors.white.withOpacity(0.05),
+            fillColor: Colors.white.withValues(alpha: 0.05),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
               borderSide: BorderSide.none,
@@ -757,7 +757,7 @@ class _EditReportDialogState extends State<EditReportDialog> {
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.greenAccent.withOpacity(0.18)),
+        border: Border.all(color: Colors.greenAccent.withValues(alpha: 0.18)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -822,9 +822,9 @@ class _EditReportDialogState extends State<EditReportDialog> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
+        color: Colors.white.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.white.withOpacity(0.08)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1091,12 +1091,12 @@ class _EditReportDialogState extends State<EditReportDialog> {
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
-                border: Border.all(color: Colors.white.withOpacity(0.10)),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
                 boxShadow: [
                   BoxShadow(
                     blurRadius: 24,
                     spreadRadius: 2,
-                    color: Colors.black.withOpacity(0.35),
+                    color: Colors.black.withValues(alpha: 0.35),
                   ),
                 ],
               ),
@@ -1163,7 +1163,7 @@ class _EditReportDialogState extends State<EditReportDialog> {
 
                   const SizedBox(height: 8),
 
-                  Divider(color: Colors.white.withOpacity(0.08), height: 1),
+                  Divider(color: Colors.white.withValues(alpha: 0.08), height: 1),
 
                   ////////////////////////////////////////////////////////////
                   /// BODY
@@ -1219,7 +1219,7 @@ class _EditReportDialogState extends State<EditReportDialog> {
               Positioned.fill(
                 child: Container(
                   decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(.50),
+                    color: Colors.black.withValues(alpha: .50),
                     borderRadius: BorderRadius.circular(18),
                   ),
                   child: Center(
@@ -1232,11 +1232,11 @@ class _EditReportDialogState extends State<EditReportDialog> {
                         color: const Color(0xFF0F172A),
                         borderRadius: BorderRadius.circular(18),
                         border: Border.all(
-                          color: Colors.white.withOpacity(.12),
+                          color: Colors.white.withValues(alpha: .12),
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(.35),
+                            color: Colors.black.withValues(alpha: .35),
                             blurRadius: 24,
                             offset: const Offset(0, 10),
                           ),

@@ -467,7 +467,7 @@ class _AfterReportListScreenState extends State<AfterReportListScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
 
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(.25),
+        color: Colors.black.withValues(alpha: .25),
 
         borderRadius: BorderRadius.circular(12),
       ),
@@ -582,7 +582,7 @@ class _AfterReportListScreenState extends State<AfterReportListScreen> {
             dataRowHeight: 60,
 
             headingRowColor: MaterialStateProperty.all(
-              Colors.white.withOpacity(.10),
+              Colors.white.withValues(alpha: .10),
             ),
 
             headingTextStyle: const TextStyle(
@@ -638,7 +638,7 @@ class _AfterReportListScreenState extends State<AfterReportListScreen> {
     return DataRow(
       color: MaterialStateProperty.resolveWith<Color?>((_) {
         if (isSelected) {
-          return Colors.amber.withOpacity(.20);
+          return Colors.amber.withValues(alpha: .20);
         }
 
         return null;
@@ -670,7 +670,7 @@ class _AfterReportListScreenState extends State<AfterReportListScreen> {
       height: 32,
 
       child: Material(
-        color: Colors.white.withOpacity(.10),
+        color: Colors.white.withValues(alpha: .10),
 
         borderRadius: BorderRadius.circular(8),
 
@@ -727,7 +727,7 @@ class _AfterReportListScreenState extends State<AfterReportListScreen> {
         maxLines: 3,
         overflow: TextOverflow.ellipsis,
 
-        style: TextStyle(color: Colors.white.withOpacity(.85)),
+        style: TextStyle(color: Colors.white.withValues(alpha: .85)),
       ),
     );
   }
@@ -745,7 +745,7 @@ class _AfterReportListScreenState extends State<AfterReportListScreen> {
           risk,
 
           style: TextStyle(
-            color: color.withOpacity(.90),
+            color: color.withValues(alpha: .90),
 
             fontWeight: FontWeight.bold,
           ),
@@ -813,7 +813,7 @@ class _AfterReportListScreenState extends State<AfterReportListScreen> {
 
           Row(
             children: [
-              Icon(icon, size: 11, color: color.withOpacity(.8)),
+              Icon(icon, size: 11, color: color.withValues(alpha: .8)),
 
               const SizedBox(width: 3),
 
@@ -824,7 +824,7 @@ class _AfterReportListScreenState extends State<AfterReportListScreen> {
                   overflow: TextOverflow.ellipsis,
 
                   style: TextStyle(
-                    color: color.withOpacity(.75),
+                    color: color.withValues(alpha: .75),
 
                     fontSize: 9,
 

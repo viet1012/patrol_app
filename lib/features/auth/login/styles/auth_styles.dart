@@ -42,7 +42,7 @@ class AuthStyles {
       enabledBorder: showOutlineBorder
           ? OutlineInputBorder(
               borderRadius: BorderRadius.circular(borderRadius),
-              borderSide: BorderSide(color: Colors.white.withOpacity(.08)),
+              borderSide: BorderSide(color: Colors.white.withValues(alpha: .08)),
             )
           : emptyBorder,
       focusedBorder: showOutlineBorder

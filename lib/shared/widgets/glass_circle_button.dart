@@ -27,7 +27,7 @@ class GlassCircleButton extends StatelessWidget {
           boxShadow: [
             // 🌫 Outer soft shadow
             BoxShadow(
-              color: Colors.black.withOpacity(0.25),
+              color: Colors.black.withValues(alpha: 0.25),
               blurRadius: 20,
               offset: const Offset(0, 12),
             ),
@@ -48,8 +48,8 @@ class GlassCircleButton extends StatelessWidget {
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                       colors: [
-                        Colors.white.withOpacity(0.35),
-                        Colors.white.withOpacity(0.10),
+                        Colors.white.withValues(alpha: 0.35),
+                        Colors.white.withValues(alpha: 0.10),
                       ],
                     ),
                   ),
@@ -64,7 +64,7 @@ class GlassCircleButton extends StatelessWidget {
                     center: const Alignment(-0.4, -0.4),
                     radius: 1.1,
                     colors: [
-                      Colors.white.withOpacity(0.35),
+                      Colors.white.withValues(alpha: 0.35),
                       Colors.transparent,
                     ],
                   ),
@@ -76,7 +76,7 @@ class GlassCircleButton extends StatelessWidget {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   border: Border.all(
-                    color: Colors.white.withOpacity(0.55),
+                    color: Colors.white.withValues(alpha: 0.55),
                     width: 1.5,
                   ),
                 ),

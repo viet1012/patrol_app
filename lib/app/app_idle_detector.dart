@@ -86,7 +86,7 @@ class _AppIdleDetectorState extends State<AppIdleDetector> {
                   width: 64,
                   height: 64,
                   decoration: BoxDecoration(
-                    color: Colors.orange.withOpacity(.12),
+                    color: Colors.orange.withValues(alpha: .12),
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(

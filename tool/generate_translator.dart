@@ -47,9 +47,6 @@ void main() async {
   final buffer = StringBuffer('''
 import 'package:flutter/widgets.dart';
 import 'package:chuphinh/l10n/app_localizations.dart';
-import 'package:chuphinh/l10n/app_localizations_en.dart';
-import 'package:chuphinh/l10n/app_localizations_vi.dart';
-import 'package:chuphinh/l10n/app_localizations_ja.dart';
 
 extension TranslateExtension on String {
 
@@ -109,7 +106,6 @@ extension TranslateExtension on String {
   // -----------------------------------------
   String _trLocale(String key, Locale locale, {Map<String, dynamic>? params}) {
     final t = lookupAppLocalizations(locale);
-    if (t == null) return key;
 
     switch (key) {
 ''');

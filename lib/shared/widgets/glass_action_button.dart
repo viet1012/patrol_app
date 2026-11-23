@@ -35,9 +35,9 @@ class GlassActionButton extends StatelessWidget {
           decoration: BoxDecoration(
             color:
                 backgroundColor ??
-                Colors.white.withOpacity(enabled ? 0.08 : 0.04),
+                Colors.white.withValues(alpha: enabled ? 0.08 : 0.04),
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: Colors.white.withOpacity(0.12)),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -45,7 +45,7 @@ class GlassActionButton extends StatelessWidget {
               Icon(
                 icon,
                 size: size,
-                color: enabled ? iconColor : iconColor.withOpacity(0.4),
+                color: enabled ? iconColor : iconColor.withValues(alpha: 0.4),
               ),
 
               if (label != null) ...[
@@ -53,7 +53,7 @@ class GlassActionButton extends StatelessWidget {
                 Text(
                   label!,
                   style: TextStyle(
-                    color: enabled ? iconColor : iconColor.withOpacity(0.4),
+                    color: enabled ? iconColor : iconColor.withValues(alpha: 0.4),
                     fontWeight: FontWeight.w600,
                   ),
                 ),

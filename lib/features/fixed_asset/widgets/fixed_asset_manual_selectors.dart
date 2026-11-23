@@ -82,7 +82,7 @@ class FixedAssetManualSelectors extends StatelessWidget {
   static Color dropdownIconColor({required bool enabled, double dimmedBy = 1}) =>
       enabled
       ? _accent
-      : Colors.white.withOpacity((.35 / dimmedBy).clamp(0.0, 1.0));
+      : Colors.white.withValues(alpha: (.35 / dimmedBy).clamp(0.0, 1.0));
 
   /// Mũi tên dropdown dùng chung (kích thước nút giữ 40 như mặc định).
   static DropdownButtonProps dropdownButton({

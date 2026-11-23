@@ -206,16 +206,16 @@ class _FixedAssetMachineSectionState extends State<FixedAssetMachineSection> {
           isDense: true,
           hintText: 'Search machine...',
           hintStyle: TextStyle(
-            color: Colors.white.withOpacity(.5),
+            color: Colors.white.withValues(alpha: .5),
             fontSize: 13,
           ),
           filled: true,
-          fillColor: Colors.white.withOpacity(.08),
+          fillColor: Colors.white.withValues(alpha: .08),
           contentPadding: const EdgeInsets.symmetric(horizontal: 8),
           prefixIcon: Icon(
             Icons.search_rounded,
             size: 18,
-            color: Colors.white.withOpacity(.6),
+            color: Colors.white.withValues(alpha: .6),
           ),
           prefixIconConstraints: const BoxConstraints(
             minWidth: 34,
@@ -228,7 +228,7 @@ class _FixedAssetMachineSectionState extends State<FixedAssetMachineSection> {
                   child: Icon(
                     Icons.close_rounded,
                     size: 16,
-                    color: Colors.white.withOpacity(.7),
+                    color: Colors.white.withValues(alpha: .7),
                   ),
                 )
               : null,
@@ -238,7 +238,7 @@ class _FixedAssetMachineSectionState extends State<FixedAssetMachineSection> {
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: _accent.withOpacity(.35)),
+            borderSide: BorderSide(color: _accent.withValues(alpha: .35)),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
@@ -283,13 +283,13 @@ class _FixedAssetMachineSectionState extends State<FixedAssetMachineSection> {
       // Cần in tem: nền + viền tím riêng để nổi giữa các dòng.
       decoration: BoxDecoration(
         color: reprint
-            ? _violet.withOpacity(.10)
-            : Colors.white.withOpacity(.05),
+            ? _violet.withValues(alpha: .10)
+            : Colors.white.withValues(alpha: .05),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: reprint
-              ? _violet.withOpacity(.55)
-              : Colors.white.withOpacity(.12),
+              ? _violet.withValues(alpha: .55)
+              : Colors.white.withValues(alpha: .12),
         ),
       ),
       child: Row(
@@ -316,7 +316,7 @@ class _FixedAssetMachineSectionState extends State<FixedAssetMachineSection> {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      color: Colors.white.withOpacity(.62),
+                      color: Colors.white.withValues(alpha: .62),
                       fontSize: 12,
                     ),
                   ),
@@ -329,7 +329,7 @@ class _FixedAssetMachineSectionState extends State<FixedAssetMachineSection> {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      color: _amber.withOpacity(.7),
+                      color: _amber.withValues(alpha: .7),
                       fontSize: 11,
                     ),
                   ),
@@ -351,7 +351,7 @@ class _FixedAssetMachineSectionState extends State<FixedAssetMachineSection> {
               onPressed: () => onReportNoQr(machine.machineCode),
               icon: const Icon(Icons.warning_amber_rounded),
               iconSize: 18,
-              color: _amber.withOpacity(.85),
+              color: _amber.withValues(alpha: .85),
               visualDensity: VisualDensity.compact,
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
@@ -365,9 +365,9 @@ class _FixedAssetMachineSectionState extends State<FixedAssetMachineSection> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
-        color: _violet.withOpacity(.15),
+        color: _violet.withValues(alpha: .15),
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: _violet.withOpacity(.6)),
+        border: Border.all(color: _violet.withValues(alpha: .6)),
       ),
       child: const Row(
         mainAxisSize: MainAxisSize.min,
@@ -392,9 +392,9 @@ class _FixedAssetMachineSectionState extends State<FixedAssetMachineSection> {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(.05),
+        color: Colors.white.withValues(alpha: .05),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withOpacity(.12)),
+        border: Border.all(color: Colors.white.withValues(alpha: .12)),
       ),
       child: Row(
         children: [
@@ -406,7 +406,7 @@ class _FixedAssetMachineSectionState extends State<FixedAssetMachineSection> {
             child: Text(
               message,
               style: TextStyle(
-                color: Colors.white.withOpacity(.65),
+                color: Colors.white.withValues(alpha: .65),
                 fontSize: 12.5,
               ),
             ),

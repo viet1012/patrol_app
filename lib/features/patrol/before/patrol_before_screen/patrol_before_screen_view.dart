@@ -70,7 +70,7 @@ extension _PatrolBeforeScreenView on _PatrolBeforeScreenState {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.12),
+                  color: Colors.white.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
@@ -490,7 +490,7 @@ extension _PatrolBeforeScreenView on _PatrolBeforeScreenState {
                                               Text(
                                                 'commentHint'.tr(context),
                                                 style: TextStyle(
-                                                  color: Colors.red.withOpacity(
+                                                  color: Colors.red.withValues(alpha: 
                                                     .6,
                                                   ),
                                                   fontSize: 14,
@@ -501,13 +501,13 @@ extension _PatrolBeforeScreenView on _PatrolBeforeScreenState {
                                               Icon(
                                                 Icons.star_rounded,
                                                 size: 14,
-                                                color: Colors.red.withOpacity(
+                                                color: Colors.red.withValues(alpha: 
                                                   .6,
                                                 ),
                                               ),
                                             ],
                                           ),
-                                          fillColor: Colors.green.withOpacity(
+                                          fillColor: Colors.green.withValues(alpha: 
                                             .08,
                                           ),
                                           border: OutlineInputBorder(
@@ -515,7 +515,7 @@ extension _PatrolBeforeScreenView on _PatrolBeforeScreenState {
                                               14,
                                             ),
                                             borderSide: BorderSide(
-                                              color: Colors.white.withOpacity(
+                                              color: Colors.white.withValues(alpha: 
                                                 .35,
                                               ),
                                             ),
@@ -527,7 +527,7 @@ extension _PatrolBeforeScreenView on _PatrolBeforeScreenState {
                                             borderSide: BorderSide(
                                               color: const Color(
                                                 0xFF90E14D,
-                                              ).withOpacity(.25),
+                                              ).withValues(alpha: .25),
                                             ),
                                           ),
                                           focusedBorder: OutlineInputBorder(
@@ -537,7 +537,7 @@ extension _PatrolBeforeScreenView on _PatrolBeforeScreenState {
                                             borderSide: BorderSide(
                                               color: const Color(
                                                 0xFF90E14D,
-                                              ).withOpacity(.45),
+                                              ).withValues(alpha: .45),
                                             ),
                                           ),
                                           contentPadding: const EdgeInsets.all(
@@ -595,7 +595,7 @@ extension _PatrolBeforeScreenView on _PatrolBeforeScreenState {
                                   child: Material(
                                     elevation: 8,
                                     borderRadius: BorderRadius.circular(12),
-                                    color: Colors.black.withOpacity(.5),
+                                    color: Colors.black.withValues(alpha: .5),
                                     child: ConstrainedBox(
                                       constraints: BoxConstraints(
                                         maxWidth: constraints.maxWidth,
@@ -719,11 +719,11 @@ extension _PatrolBeforeScreenView on _PatrolBeforeScreenState {
                                             context,
                                           ),
                                           filled: true,
-                                          fillColor: Colors.green.withOpacity(
+                                          fillColor: Colors.green.withValues(alpha: 
                                             .08,
                                           ),
                                           hintStyle: TextStyle(
-                                            color: Colors.white.withOpacity(.6),
+                                            color: Colors.white.withValues(alpha: .6),
                                             fontSize: 14,
                                             fontWeight: FontWeight.bold,
                                           ),
@@ -732,7 +732,7 @@ extension _PatrolBeforeScreenView on _PatrolBeforeScreenState {
                                               14,
                                             ),
                                             borderSide: BorderSide(
-                                              color: Colors.white.withOpacity(
+                                              color: Colors.white.withValues(alpha: 
                                                 .35,
                                               ),
                                             ),
@@ -744,7 +744,7 @@ extension _PatrolBeforeScreenView on _PatrolBeforeScreenState {
                                             borderSide: BorderSide(
                                               color: const Color(
                                                 0xFF90E14D,
-                                              ).withOpacity(.25),
+                                              ).withValues(alpha: .25),
                                             ),
                                           ),
                                           focusedBorder: OutlineInputBorder(
@@ -754,7 +754,7 @@ extension _PatrolBeforeScreenView on _PatrolBeforeScreenState {
                                             borderSide: BorderSide(
                                               color: const Color(
                                                 0xFF90E14D,
-                                              ).withOpacity(.45),
+                                              ).withValues(alpha: .45),
                                             ),
                                           ),
                                           contentPadding: const EdgeInsets.all(
@@ -803,7 +803,7 @@ extension _PatrolBeforeScreenView on _PatrolBeforeScreenState {
                                   child: Material(
                                     elevation: 8,
                                     borderRadius: BorderRadius.circular(12),
-                                    color: Colors.black.withOpacity(.5),
+                                    color: Colors.black.withValues(alpha: .5),
                                     child: ConstrainedBox(
                                       constraints: BoxConstraints(
                                         maxWidth: constraints.maxWidth,
@@ -908,7 +908,7 @@ extension _PatrolBeforeScreenView on _PatrolBeforeScreenState {
                         },
                         backgroundColor: const Color(
                           0xFF22C55E,
-                        ).withOpacity(.4),
+                        ).withValues(alpha: .4),
                         iconColor: Colors.white,
                       ),
                     ],

@@ -91,7 +91,7 @@ class CommonSearchableDropdown extends StatelessWidget {
                       Icon(
                         Icons.search_off_rounded,
                         size: 40,
-                        color: Colors.white.withOpacity(0.5),
+                        color: Colors.white.withValues(alpha: 0.5),
                       ),
 
                       const SizedBox(height: 12),
@@ -100,7 +100,7 @@ class CommonSearchableDropdown extends StatelessWidget {
                         "No data found",
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.7),
+                          color: Colors.white.withValues(alpha: 0.7),
                           fontSize: 14,
                           fontWeight: FontWeight.w500,
                         ),
@@ -120,12 +120,12 @@ class CommonSearchableDropdown extends StatelessWidget {
                     ? "search_or_add_new".tr(context)
                     : "search".tr(context),
                 filled: true,
-                fillColor: Colors.white.withOpacity(0.1),
+                fillColor: Colors.white.withValues(alpha: 0.1),
                 prefixIcon: Icon(
                   Icons.search_rounded,
-                  color: Colors.white.withOpacity(0.7),
+                  color: Colors.white.withValues(alpha: 0.7),
                 ),
-                hintStyle: TextStyle(color: Colors.white.withOpacity(0.6)),
+                hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.6)),
                 contentPadding: const EdgeInsets.symmetric(
                   horizontal: 14,
                   vertical: 12,
@@ -151,7 +151,7 @@ class CommonSearchableDropdown extends StatelessWidget {
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(12),
                   color: isSelected
-                      ? Colors.white.withOpacity(0.12)
+                      ? Colors.white.withValues(alpha: 0.12)
                       : Colors.transparent,
                 ),
                 child: AutoSizeText(
@@ -218,17 +218,17 @@ class CommonSearchableDropdown extends StatelessWidget {
               hintMaxLines: 1,
               floatingLabelBehavior: FloatingLabelBehavior.never,
               filled: true,
-              fillColor: Colors.white.withOpacity(0.08),
+              fillColor: Colors.white.withValues(alpha: 0.08),
 
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(14),
-                borderSide: BorderSide(color: Colors.white.withOpacity(0.35)),
+                borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.35)),
               ),
 
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(14),
                 borderSide: BorderSide(
-                  color: const Color(0xFF4DD0E1).withOpacity(0.45),
+                  color: const Color(0xFF4DD0E1).withValues(alpha: 0.45),
                 ),
               ),
 
@@ -243,7 +243,7 @@ class CommonSearchableDropdown extends StatelessWidget {
               contentPadding: const EdgeInsets.fromLTRB(12, 14, 12, 12),
 
               hintStyle: TextStyle(
-                color: Colors.white.withOpacity(0.6),
+                color: Colors.white.withValues(alpha: 0.6),
                 fontSize: 14,
               ),
             ),
@@ -260,13 +260,13 @@ class CommonSearchableDropdown extends StatelessWidget {
             FontWeight fontWeight;
 
             if (isEmpty && isRequired) {
-              textColor = Colors.red.withOpacity(.6);
+              textColor = Colors.red.withValues(alpha: .6);
               fontWeight = FontWeight.w600;
             } else if (!isEmpty) {
               textColor = Colors.white;
               fontWeight = FontWeight.bold;
             } else {
-              textColor = Colors.white.withOpacity(0.6);
+              textColor = Colors.white.withValues(alpha: 0.6);
               fontWeight = FontWeight.w500;
             }
 
@@ -294,7 +294,7 @@ class CommonSearchableDropdown extends StatelessWidget {
                   Icon(
                     Icons.star_rounded,
                     size: 14,
-                    color: Colors.red.withOpacity(.6),
+                    color: Colors.red.withValues(alpha: .6),
                   ),
                 ],
               ],

@@ -51,15 +51,15 @@ class _ChristmasTitleState extends State<ChristmasTitle>
                   horizontal: 32,
                 ),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.15),
+                  color: Colors.white.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(24),
                   border: Border.all(
-                    color: Colors.white.withOpacity(0.3),
+                    color: Colors.white.withValues(alpha: 0.3),
                     width: 1.5,
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.3),
+                      color: Colors.black.withValues(alpha: 0.3),
                       blurRadius: 8,
                       offset: const Offset(0, 4),
                     ),
@@ -163,7 +163,7 @@ class SnowPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = Colors.white.withOpacity(0.7);
+    final paint = Paint()..color = Colors.white.withValues(alpha: 0.7);
 
     for (var flake in flakes) {
       final offset = Offset(flake.x * size.width, flake.y * size.height);

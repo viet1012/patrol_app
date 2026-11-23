@@ -30,12 +30,12 @@ class CommonUI {
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: [
-              Colors.white.withOpacity(0.08),
-              Colors.white.withOpacity(0.03),
+              Colors.white.withValues(alpha: 0.08),
+              Colors.white.withValues(alpha: 0.03),
             ],
           ),
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: Colors.white.withOpacity(0.12)),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
         ),
         child: Row(
           children: [
@@ -165,8 +165,8 @@ class CommonUI {
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(20),
-                color: Colors.black.withOpacity(0.55),
-                border: Border.all(color: Colors.white.withOpacity(0.15)),
+                color: Colors.black.withValues(alpha: 0.55),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -176,7 +176,7 @@ class CommonUI {
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: iconColor.withOpacity(0.15),
+                      color: iconColor.withValues(alpha: 0.15),
                     ),
                     child: Icon(icon, color: iconColor, size: 42),
                   ),
@@ -209,7 +209,7 @@ class CommonUI {
                     width: 150,
                     child: ElevatedButton(
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.white.withOpacity(0.9),
+                        backgroundColor: Colors.white.withValues(alpha: 0.9),
                         foregroundColor: Colors.black,
                         elevation: 0,
                         padding: const EdgeInsets.symmetric(vertical: 12),
@@ -300,8 +300,8 @@ class CommonUI {
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(20),
-                color: Colors.black.withOpacity(0.55),
-                border: Border.all(color: Colors.white.withOpacity(0.15)),
+                color: Colors.black.withValues(alpha: 0.55),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -310,7 +310,7 @@ class CommonUI {
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: iconColor.withOpacity(0.15),
+                      color: iconColor.withValues(alpha: 0.15),
                     ),
                     child: Icon(icon, color: iconColor, size: 42),
                   ),
@@ -336,7 +336,7 @@ class CommonUI {
                       Expanded(
                         child: ElevatedButton(
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.white.withOpacity(0.15),
+                            backgroundColor: Colors.white.withValues(alpha: 0.15),
                             foregroundColor: Colors.white,
                             elevation: 0,
                             padding: const EdgeInsets.symmetric(vertical: 12),
@@ -355,7 +355,7 @@ class CommonUI {
                       Expanded(
                         child: ElevatedButton(
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: confirmColor.withOpacity(0.95),
+                            backgroundColor: confirmColor.withValues(alpha: 0.95),
                             foregroundColor: Colors.white,
                             elevation: 0,
                             padding: const EdgeInsets.symmetric(vertical: 12),
@@ -418,12 +418,12 @@ class CommonUI {
                   vertical: 28,
                 ),
                 decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.55),
+                  color: Colors.black.withValues(alpha: 0.55),
                   borderRadius: BorderRadius.circular(22),
-                  border: Border.all(color: Colors.white.withOpacity(0.15)),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.45),
+                      color: Colors.black.withValues(alpha: 0.45),
                       blurRadius: 24,
                       offset: const Offset(0, 12),
                     ),
@@ -437,7 +437,7 @@ class CommonUI {
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: iconColor.withOpacity(0.15),
+                        color: iconColor.withValues(alpha: 0.15),
                       ),
                       child: Icon(icon, color: iconColor, size: 48),
                     ),
@@ -477,7 +477,7 @@ class CommonUI {
                         style: ElevatedButton.styleFrom(
                           elevation: 0,
                           padding: const EdgeInsets.symmetric(vertical: 14),
-                          backgroundColor: Colors.white.withOpacity(0.9),
+                          backgroundColor: Colors.white.withValues(alpha: 0.9),
                           foregroundColor: Colors.black,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(16),
@@ -507,7 +507,7 @@ class CommonUI {
                     //     style: ElevatedButton.styleFrom(
                     //       elevation: 0,
                     //       padding: const EdgeInsets.symmetric(vertical: 14),
-                    //       backgroundColor: Colors.white.withOpacity(0.9),
+                    //       backgroundColor: Colors.white.withValues(alpha: 0.9),
                     //       foregroundColor: Colors.black,
                     //       shape: RoundedRectangleBorder(
                     //         borderRadius: BorderRadius.circular(16),
@@ -567,9 +567,9 @@ class CommonUI {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
               decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.45),
+                color: Colors.black.withValues(alpha: 0.45),
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: Colors.white.withOpacity(0.15)),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -578,7 +578,7 @@ class CommonUI {
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: iconColor.withOpacity(0.15),
+                      color: iconColor.withValues(alpha: 0.15),
                     ),
                     child: Icon(icon, color: iconColor, size: 48),
                   ),
@@ -680,8 +680,8 @@ class CommonUI {
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(20),
-                color: Colors.black.withOpacity(0.55),
-                border: Border.all(color: Colors.white.withOpacity(0.15)),
+                color: Colors.black.withValues(alpha: 0.55),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -690,7 +690,7 @@ class CommonUI {
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: Colors.redAccent.withOpacity(0.15),
+                      color: Colors.redAccent.withValues(alpha: 0.15),
                     ),
                     child: const Icon(
                       Icons.lock_outline,
@@ -718,7 +718,7 @@ class CommonUI {
                     width: double.infinity,
                     child: ElevatedButton(
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.white.withOpacity(0.9),
+                        backgroundColor: Colors.white.withValues(alpha: 0.9),
                         foregroundColor: Colors.black,
                         elevation: 0,
                         padding: const EdgeInsets.symmetric(vertical: 14),

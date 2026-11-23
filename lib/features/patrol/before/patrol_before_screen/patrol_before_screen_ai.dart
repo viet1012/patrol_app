@@ -2,7 +2,7 @@ part of '../patrol_before_screen.dart';
 
 extension _PatrolBeforeScreenAi on _PatrolBeforeScreenState {
   Future<void> _translateAiSummaryToJp() async {
-    final vi = _machineAiSummary?.summaryVi?.trim();
+    final vi = _machineAiSummary?.summaryVi.trim();
 
     if (vi == null || vi.isEmpty) return;
     if (_summaryJp != null && _summaryJp!.isNotEmpty) return;

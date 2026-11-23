@@ -5,7 +5,7 @@ class DueDateUtils {
 
   static Color getDueDateColor(DateTime? dueDate) {
     if (dueDate == null) {
-      return Colors.white.withOpacity(0.85);
+      return Colors.white.withValues(alpha: 0.85);
     }
 
     final now = DateTime.now();
@@ -22,7 +22,7 @@ class DueDateUtils {
       return Colors.orangeAccent;
     } else {
       // ⚪ Bình thường
-      return Colors.white.withOpacity(0.85);
+      return Colors.white.withValues(alpha: 0.85);
     }
   }
 }

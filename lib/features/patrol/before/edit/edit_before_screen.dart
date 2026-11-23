@@ -119,7 +119,7 @@ class _EditBeforeScreenState extends State<EditBeforeScreen> {
                       vertical: 2,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.12),
+                      color: Colors.white.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
@@ -225,7 +225,7 @@ class _EditBeforeScreenState extends State<EditBeforeScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.25),
+        color: Colors.black.withValues(alpha: 0.25),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -316,7 +316,7 @@ class _EditBeforeScreenState extends State<EditBeforeScreen> {
           headingRowHeight: 46,
           dataRowHeight: 52,
           headingRowColor: MaterialStateProperty.all(
-            Colors.white.withOpacity(0.10),
+            Colors.white.withValues(alpha: 0.10),
           ),
           headingTextStyle: const TextStyle(
             color: Colors.white,
@@ -346,13 +346,13 @@ class _EditBeforeScreenState extends State<EditBeforeScreen> {
                 DataCell(
                   Text(
                     r.area,
-                    style: TextStyle(color: Colors.white.withOpacity(0.85)),
+                    style: TextStyle(color: Colors.white.withValues(alpha: 0.85)),
                   ),
                 ),
                 DataCell(
                   Text(
                     r.machine,
-                    style: TextStyle(color: Colors.white.withOpacity(0.85)),
+                    style: TextStyle(color: Colors.white.withValues(alpha: 0.85)),
                   ),
                 ),
                 DataCell(
@@ -360,7 +360,7 @@ class _EditBeforeScreenState extends State<EditBeforeScreen> {
                     child: Text(
                       r.riskTotal,
                       style: TextStyle(
-                        color: color.withOpacity(0.85),
+                        color: color.withValues(alpha: 0.85),
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -421,7 +421,7 @@ class _EditBeforeScreenState extends State<EditBeforeScreen> {
 
   Color _getDueDateColor(DateTime? dueDate) {
     if (dueDate == null) {
-      return Colors.white.withOpacity(0.85);
+      return Colors.white.withValues(alpha: 0.85);
     }
 
     final now = DateTime.now();
@@ -439,7 +439,7 @@ class _EditBeforeScreenState extends State<EditBeforeScreen> {
       return Colors.orangeAccent;
     } else {
       // Bình thường
-      return Colors.white.withOpacity(0.85);
+      return Colors.white.withValues(alpha: 0.85);
     }
   }
 
@@ -477,14 +477,14 @@ class _EditBeforeScreenState extends State<EditBeforeScreen> {
                         Icon(
                           Icons.search_off_rounded,
                           size: 40,
-                          color: Colors.white.withOpacity(0.5),
+                          color: Colors.white.withValues(alpha: 0.5),
                         ),
                         const SizedBox(height: 12),
                         Text(
                           "No data found", // hoặc "No data found"
                           textAlign: TextAlign.center,
                           style: TextStyle(
-                            color: Colors.white.withOpacity(0.7),
+                            color: Colors.white.withValues(alpha: 0.7),
                             fontSize: 14,
                             fontWeight: FontWeight.w500,
                           ),
@@ -498,12 +498,12 @@ class _EditBeforeScreenState extends State<EditBeforeScreen> {
                 decoration: InputDecoration(
                   hintText: "search_or_add_new".tr(context),
                   filled: true,
-                  fillColor: Colors.white.withOpacity(0.1),
+                  fillColor: Colors.white.withValues(alpha: 0.1),
                   prefixIcon: Icon(
                     Icons.search_rounded,
-                    color: Colors.white.withOpacity(0.7),
+                    color: Colors.white.withValues(alpha: 0.7),
                   ),
-                  hintStyle: TextStyle(color: Colors.white.withOpacity(0.6)),
+                  hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.6)),
                   contentPadding: const EdgeInsets.symmetric(
                     horizontal: 14,
                     vertical: 12,
@@ -531,7 +531,7 @@ class _EditBeforeScreenState extends State<EditBeforeScreen> {
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(12),
                     color: isSelected
-                        ? Colors.white.withOpacity(0.12)
+                        ? Colors.white.withValues(alpha: 0.12)
                         : Colors.transparent,
                   ),
                   child: AutoSizeText(
@@ -573,16 +573,16 @@ class _EditBeforeScreenState extends State<EditBeforeScreen> {
 
                 /// 🌫️ nền glass
                 filled: true,
-                fillColor: Colors.white.withOpacity(0.08),
+                fillColor: Colors.white.withValues(alpha: 0.08),
 
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(14),
-                  borderSide: BorderSide(color: Colors.white.withOpacity(0.35)),
+                  borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.35)),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(14),
                   borderSide: BorderSide(
-                    color: const Color(0xFF4DD0E1).withOpacity(0.45),
+                    color: const Color(0xFF4DD0E1).withValues(alpha: 0.45),
                   ),
                 ),
                 focusedBorder: OutlineInputBorder(
@@ -597,7 +597,7 @@ class _EditBeforeScreenState extends State<EditBeforeScreen> {
 
                 /// 📝 hint
                 hintStyle: TextStyle(
-                  color: Colors.white.withOpacity(0.6),
+                  color: Colors.white.withValues(alpha: 0.6),
                   fontSize: 14,
                 ),
               ),
@@ -617,7 +617,7 @@ class _EditBeforeScreenState extends State<EditBeforeScreen> {
                       : FontWeight.w500,
                   color: selectedItem?.isNotEmpty == true
                       ? Colors.white
-                      : Colors.white.withOpacity(0.6),
+                      : Colors.white.withValues(alpha: 0.6),
                 ),
               );
             },

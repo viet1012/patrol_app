@@ -27,9 +27,9 @@ class GlassZoomControl extends StatelessWidget {
           width: 96,
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.04),
+            color: Colors.white.withValues(alpha: 0.04),
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: Colors.white.withOpacity(0.5), width: 1),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.5), width: 1),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,

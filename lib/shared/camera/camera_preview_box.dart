@@ -431,9 +431,9 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
                               begin: Alignment.topCenter,
                               end: Alignment.bottomCenter,
                               colors: [
-                                Colors.white.withOpacity(.035),
+                                Colors.white.withValues(alpha: .035),
                                 Colors.transparent,
-                                Colors.black.withOpacity(.08),
+                                Colors.black.withValues(alpha: .08),
                               ],
                             ),
                           ),
@@ -446,7 +446,7 @@ class CameraPreviewBoxState extends State<CameraPreviewBox>
                         builder: (_, __) {
                           return IgnorePointer(
                             child: Container(
-                              color: Colors.white.withOpacity(
+                              color: Colors.white.withValues(alpha: 
                                 0.85 * _flashController.value,
                               ),
                             ),

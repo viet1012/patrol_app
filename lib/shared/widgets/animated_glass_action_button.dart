@@ -91,9 +91,9 @@ class _AnimatedGlassActionButtonState extends State<AnimatedGlassActionButton>
           decoration: BoxDecoration(
             color:
                 widget.backgroundColor ??
-                Colors.white.withOpacity(widget.enabled ? 0.08 : 0.04),
+                Colors.white.withValues(alpha: widget.enabled ? 0.08 : 0.04),
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: Colors.white.withOpacity(0.12)),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
           ),
           padding: const EdgeInsets.all(8),
           child: AnimatedBuilder(
@@ -108,7 +108,7 @@ class _AnimatedGlassActionButtonState extends State<AnimatedGlassActionButton>
                     size: widget.size,
                     color: widget.enabled
                         ? widget.iconColor
-                        : widget.iconColor.withOpacity(0.4),
+                        : widget.iconColor.withValues(alpha: 0.4),
                   ),
                 ),
               );
@@ -201,7 +201,7 @@ class _QrScanGlassButtonState extends State<QrScanGlassButton>
   Widget build(BuildContext context) {
     final bg =
         widget.backgroundColor ??
-        Colors.white.withOpacity(widget.enabled ? 0.08 : 0.04);
+        Colors.white.withValues(alpha: widget.enabled ? 0.08 : 0.04);
 
     return Padding(
       padding: widget.padding,
@@ -224,7 +224,7 @@ class _QrScanGlassButtonState extends State<QrScanGlassButton>
                 t: t,
                 radius: widget.radius,
                 borderWidth: widget.borderWidth,
-                color: widget.borderColor.withOpacity(borderOpacity),
+                color: widget.borderColor.withValues(alpha: borderOpacity),
                 enabled: widget.enabled,
               ),
               child: ClipRRect(
@@ -249,7 +249,7 @@ class _QrScanGlassButtonState extends State<QrScanGlassButton>
                             size: widget.iconSize,
                             color: widget.enabled
                                 ? widget.iconColor
-                                : widget.iconColor.withOpacity(0.4),
+                                : widget.iconColor.withValues(alpha: 0.4),
                           ),
 
                           // 2️⃣ Scan line chạy lên/xuống
@@ -291,9 +291,9 @@ class _QrScanGlassButtonState extends State<QrScanGlassButton>
                                               Colors.transparent,
                                               widget.enabled
                                                   ? widget.lineColor
-                                                        .withOpacity(0.9)
+                                                        .withValues(alpha: 0.9)
                                                   : widget.lineColor
-                                                        .withOpacity(0.35),
+                                                        .withValues(alpha: 0.35),
                                               Colors.transparent,
                                             ],
                                           ),
@@ -345,7 +345,7 @@ class _AnimatedBorderPainter extends CustomPainter {
     final basePaint = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = borderWidth
-      ..color = color.withOpacity(enabled ? 0.35 : 0.18);
+      ..color = color.withValues(alpha: enabled ? 0.35 : 0.18);
     canvas.drawRRect(rrect, basePaint);
 
     if (!enabled) return;
@@ -357,9 +357,9 @@ class _AnimatedBorderPainter extends CustomPainter {
       transform: GradientRotation(math.pi * 2 * t),
       colors: [
         Colors.transparent,
-        color.withOpacity(1),
-        color.withOpacity(1.0), // 🔥 ĐẬM NHẤT
-        color.withOpacity(1),
+        color.withValues(alpha: 1),
+        color.withValues(alpha: 1.0), // 🔥 ĐẬM NHẤT
+        color.withValues(alpha: 1),
         Colors.transparent,
       ],
       stops: const [

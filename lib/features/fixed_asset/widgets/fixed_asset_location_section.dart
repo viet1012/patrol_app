@@ -18,9 +18,9 @@ class FixedAssetLocationSection extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(.06),
+        color: Colors.white.withValues(alpha: .06),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white.withOpacity(.14)),
+        border: Border.all(color: Colors.white.withValues(alpha: .14)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -30,7 +30,7 @@ class FixedAssetLocationSection extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              color: Colors.white.withOpacity(.6),
+              color: Colors.white.withValues(alpha: .6),
               fontSize: 11,
               fontWeight: FontWeight.w800,
               letterSpacing: .8,

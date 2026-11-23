@@ -97,12 +97,12 @@ class FixedAssetPicSelector extends StatelessWidget {
               decoration: InputDecoration(
                 hintText: 'Tìm PIC (tên / email)',
                 filled: true,
-                fillColor: Colors.white.withOpacity(0.1),
+                fillColor: Colors.white.withValues(alpha: 0.1),
                 prefixIcon: Icon(
                   Icons.search_rounded,
-                  color: Colors.white.withOpacity(0.7),
+                  color: Colors.white.withValues(alpha: 0.7),
                 ),
-                hintStyle: TextStyle(color: Colors.white.withOpacity(0.6)),
+                hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.6)),
                 contentPadding: const EdgeInsets.symmetric(
                   horizontal: 14,
                   vertical: 12,
@@ -119,7 +119,7 @@ class FixedAssetPicSelector extends StatelessWidget {
               child: Center(
                 child: Text(
                   'Không tìm thấy PIC',
-                  style: TextStyle(color: Colors.white.withOpacity(0.7)),
+                  style: TextStyle(color: Colors.white.withValues(alpha: 0.7)),
                 ),
               ),
             ),
@@ -129,14 +129,14 @@ class FixedAssetPicSelector extends StatelessWidget {
           dropdownDecoratorProps: DropDownDecoratorProps(
             dropdownSearchDecoration: InputDecoration(
               filled: true,
-              fillColor: Colors.white.withOpacity(0.08),
+              fillColor: Colors.white.withValues(alpha: 0.08),
               isDense: compact,
               contentPadding: compact
                   ? const EdgeInsets.fromLTRB(10, 8, 6, 8)
                   : const EdgeInsets.fromLTRB(12, 10, 12, 10),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(14),
-                borderSide: BorderSide(color: _accent.withOpacity(0.45)),
+                borderSide: BorderSide(color: _accent.withValues(alpha: 0.45)),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(14),
@@ -182,7 +182,7 @@ class FixedAssetPicSelector extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              color: Colors.white.withOpacity(.6),
+              color: Colors.white.withValues(alpha: .6),
               fontSize: compact ? 13.5 : 14,
               fontWeight: FontWeight.w700,
             ),
@@ -209,7 +209,7 @@ class FixedAssetPicSelector extends StatelessWidget {
                 TextSpan(
                   text: all ? 'PIC: Tất cả' : 'PIC: ${pic.name}',
                   style: TextStyle(
-                    color: all ? Colors.white.withOpacity(.75) : Colors.white,
+                    color: all ? Colors.white.withValues(alpha: .75) : Colors.white,
                     fontSize: compact ? 13.5 : 14,
                     fontWeight: FontWeight.w700,
                   ),
@@ -218,7 +218,7 @@ class FixedAssetPicSelector extends StatelessWidget {
                   TextSpan(
                     text: '  ${_counts(pic)}',
                     style: TextStyle(
-                      color: Colors.white.withOpacity(.55),
+                      color: Colors.white.withValues(alpha: .55),
                       fontSize: 12,
                     ),
                   ),
@@ -239,7 +239,7 @@ class FixedAssetPicSelector extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
-        color: isSelected ? Colors.white.withOpacity(0.12) : Colors.transparent,
+        color: isSelected ? Colors.white.withValues(alpha: 0.12) : Colors.transparent,
       ),
       child: all
           ? Text(
@@ -274,7 +274,7 @@ class FixedAssetPicSelector extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          color: Colors.white.withOpacity(.55),
+                          color: Colors.white.withValues(alpha: .55),
                           fontSize: 11.5,
                         ),
                       ),

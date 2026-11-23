@@ -81,12 +81,12 @@ class QrScannerDialogState extends State<QrScannerDialog> {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFF121826).withOpacity(0.92),
+        color: const Color(0xFF121826).withValues(alpha: 0.92),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.white.withOpacity(0.15)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.35),
+            color: Colors.black.withValues(alpha: 0.35),
             blurRadius: 22,
             offset: const Offset(0, 10),
           ),
@@ -134,9 +134,9 @@ class QrScannerDialogState extends State<QrScannerDialog> {
                   style: const TextStyle(color: Colors.white),
                   decoration: InputDecoration(
                     hintText: 'Enter QR manually',
-                    hintStyle: TextStyle(color: Colors.white.withOpacity(0.45)),
+                    hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.45)),
                     filled: true,
-                    fillColor: Colors.white.withOpacity(0.08),
+                    fillColor: Colors.white.withValues(alpha: 0.08),
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: 12,
                       vertical: 12,
@@ -144,13 +144,13 @@ class QrScannerDialogState extends State<QrScannerDialog> {
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide(
-                        color: Colors.white.withOpacity(0.18),
+                        color: Colors.white.withValues(alpha: 0.18),
                       ),
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide(
-                        color: Colors.white.withOpacity(0.18),
+                        color: Colors.white.withValues(alpha: 0.18),
                       ),
                     ),
                     focusedBorder: OutlineInputBorder(
@@ -170,7 +170,7 @@ class QrScannerDialogState extends State<QrScannerDialog> {
                   onPressed: _submitting ? null : _submitManual,
                   style: ElevatedButton.styleFrom(
                     elevation: 0,
-                    backgroundColor: Colors.white.withOpacity(0.92),
+                    backgroundColor: Colors.white.withValues(alpha: 0.92),
                     foregroundColor: Colors.black,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -195,7 +195,7 @@ class QrScannerDialogState extends State<QrScannerDialog> {
           Text(
             'If scanning fails, type the QR code above.',
             style: TextStyle(
-              color: Colors.white.withOpacity(0.55),
+              color: Colors.white.withValues(alpha: 0.55),
               fontSize: 12,
             ),
           ),
@@ -231,7 +231,7 @@ class QrScannerDialogState extends State<QrScannerDialog> {
           const SizedBox(height: 10),
           Text(
             'Point the camera at the QR code',
-            style: TextStyle(color: Colors.white.withOpacity(0.75)),
+            style: TextStyle(color: Colors.white.withValues(alpha: 0.75)),
           ),
 
           const SizedBox(height: 12),

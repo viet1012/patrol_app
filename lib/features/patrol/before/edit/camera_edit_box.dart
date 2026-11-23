@@ -360,13 +360,13 @@ class CameraEditBoxState extends State<CameraEditBox>
 
                 BackdropFilter(
                   filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
-                  child: Container(color: Colors.white.withOpacity(0.08)),
+                  child: Container(color: Colors.white.withValues(alpha: 0.08)),
                 ),
 
                 AnimatedBuilder(
                   animation: _flashController,
                   builder: (_, __) => Container(
-                    color: Colors.white.withOpacity(
+                    color: Colors.white.withValues(alpha: 
                       0.85 * _flashController.value,
                     ),
                   ),

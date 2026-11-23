@@ -34,13 +34,13 @@ class _PatrolDialogTheme {
   );
 
   static BoxShadow get shadow => BoxShadow(
-    color: Colors.black.withOpacity(.34),
+    color: Colors.black.withValues(alpha: .34),
     blurRadius: 30,
     offset: const Offset(0, 18),
   );
 
   static BoxShadow get glassShadow => BoxShadow(
-    color: Colors.black.withOpacity(.18),
+    color: Colors.black.withValues(alpha: .18),
     blurRadius: 18,
     offset: const Offset(0, 9),
   );
@@ -65,7 +65,7 @@ class PatrolImagesDialog {
     showDialog(
       context: context,
       barrierDismissible: true,
-      barrierColor: Colors.black.withOpacity(.72),
+      barrierColor: Colors.black.withValues(alpha: .72),
       builder: (_) => _PatrolImagesDialogView(
         title: title,
         e: e,
@@ -114,7 +114,7 @@ class _PatrolImagesDialogView extends StatelessWidget {
             decoration: BoxDecoration(
               gradient: _PatrolDialogTheme.dialogGradient,
               borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: Colors.white.withOpacity(.14)),
+              border: Border.all(color: Colors.white.withValues(alpha: .14)),
               boxShadow: [_PatrolDialogTheme.shadow],
             ),
             child: Column(
@@ -126,7 +126,7 @@ class _PatrolImagesDialogView extends StatelessWidget {
                   decoration: BoxDecoration(
                     gradient: _PatrolDialogTheme.glassGradient,
                     border: Border(
-                      bottom: BorderSide(color: Colors.white.withOpacity(.07)),
+                      bottom: BorderSide(color: Colors.white.withValues(alpha: .07)),
                     ),
                   ),
                   child: Row(
@@ -135,10 +135,10 @@ class _PatrolImagesDialogView extends StatelessWidget {
                         width: 28,
                         height: 28,
                         decoration: BoxDecoration(
-                          color: _PatrolDialogTheme.primary.withOpacity(.10),
+                          color: _PatrolDialogTheme.primary.withValues(alpha: .10),
                           borderRadius: BorderRadius.circular(9),
                           border: Border.all(
-                            color: _PatrolDialogTheme.primary.withOpacity(.24),
+                            color: _PatrolDialogTheme.primary.withValues(alpha: .24),
                           ),
                         ),
                         child: const Icon(
@@ -179,7 +179,7 @@ class _PatrolImagesDialogView extends StatelessWidget {
                       IconButton(
                         onPressed: () => Navigator.pop(context),
                         style: IconButton.styleFrom(
-                          backgroundColor: Colors.white.withOpacity(.045),
+                          backgroundColor: Colors.white.withValues(alpha: .045),
                           foregroundColor: Colors.white70,
                         ),
                         icon: const Icon(Icons.close_rounded),
@@ -272,7 +272,7 @@ class _PatrolImagesDialogView extends StatelessWidget {
                                     _InfoRow2('PIC', e.pic ?? '-'),
                                     Divider(
                                       height: 10,
-                                      color: Colors.white.withOpacity(.07),
+                                      color: Colors.white.withValues(alpha: .07),
                                     ),
                                     _InfoRow2(
                                       'Created',
@@ -288,12 +288,12 @@ class _PatrolImagesDialogView extends StatelessWidget {
                                     _InfoRow2('Risk S', e.riskSev),
                                     Divider(
                                       height: 10,
-                                      color: Colors.white.withOpacity(.07),
+                                      color: Colors.white.withValues(alpha: .07),
                                     ),
                                     _RiskTotalCard(e.riskTotal),
                                     Divider(
                                       height: 10,
-                                      color: Colors.white.withOpacity(.07),
+                                      color: Colors.white.withValues(alpha: .07),
                                     ),
                                     _InfoBlock('Comment', e.comment),
                                     const SizedBox(height: 4),
@@ -402,7 +402,7 @@ class _ImageTile extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(14),
             color: Colors.transparent,
-            border: Border.all(color: Colors.white.withOpacity(.12)),
+            border: Border.all(color: Colors.white.withValues(alpha: .12)),
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(14),
@@ -450,7 +450,7 @@ class _ImageIndexBadge extends StatelessWidget {
       decoration: BoxDecoration(
         color: const Color(0xB31A2A40),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Colors.white.withOpacity(.18)),
+        border: Border.all(color: Colors.white.withValues(alpha: .18)),
       ),
       child: Text(
         '${index + 1}/$total',
@@ -475,7 +475,7 @@ class _ImageExpandBadge extends StatelessWidget {
       decoration: BoxDecoration(
         color: const Color(0xB31A2A40),
         borderRadius: BorderRadius.circular(9),
-        border: Border.all(color: Colors.white.withOpacity(.18)),
+        border: Border.all(color: Colors.white.withValues(alpha: .18)),
       ),
       child: const Icon(
         Icons.open_in_full_rounded,
@@ -498,7 +498,7 @@ class FullImageDialog {
     showDialog(
       context: context,
       barrierDismissible: true,
-      barrierColor: Colors.black.withOpacity(.78),
+      barrierColor: Colors.black.withValues(alpha: .78),
       builder: (_) => Dialog(
         insetPadding: const EdgeInsets.all(4),
         backgroundColor: Colors.transparent,
@@ -512,7 +512,7 @@ class FullImageDialog {
               decoration: BoxDecoration(
                 gradient: _PatrolDialogTheme.dialogGradient,
                 borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: Colors.white.withOpacity(.14)),
+                border: Border.all(color: Colors.white.withValues(alpha: .14)),
                 boxShadow: [_PatrolDialogTheme.shadow],
               ),
               width: MediaQuery.of(context).size.width * 0.992,
@@ -524,10 +524,10 @@ class FullImageDialog {
                     height: 48,
                     // padding: const EdgeInsets.symmetric(horizontal: 8),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(.025),
+                      color: Colors.white.withValues(alpha: .025),
                       border: Border(
                         bottom: BorderSide(
-                          color: Colors.white.withOpacity(.07),
+                          color: Colors.white.withValues(alpha: .07),
                         ),
                       ),
                     ),
@@ -554,7 +554,7 @@ class FullImageDialog {
                         IconButton(
                           onPressed: () => Navigator.pop(context),
                           style: IconButton.styleFrom(
-                            backgroundColor: Colors.white.withOpacity(.045),
+                            backgroundColor: Colors.white.withValues(alpha: .045),
                             foregroundColor: Colors.white70,
                           ),
                           icon: const Icon(Icons.close_rounded),
@@ -575,7 +575,7 @@ class FullImageDialog {
                             gradient: _PatrolDialogTheme.imageGlassGradient,
                             borderRadius: BorderRadius.circular(14),
                             border: Border.all(
-                              color: Colors.white.withOpacity(.16),
+                              color: Colors.white.withValues(alpha: .16),
                             ),
                             boxShadow: [_PatrolDialogTheme.glassShadow],
                           ),
@@ -622,7 +622,7 @@ class FullImageDialog {
                               Expanded(flex: 6, child: imageView),
                               Divider(
                                 height: 1,
-                                color: Colors.white.withOpacity(.07),
+                                color: Colors.white.withValues(alpha: .07),
                               ),
                               Expanded(
                                 flex: 4,
@@ -653,7 +653,7 @@ class FullImageDialog {
                             ),
                             VerticalDivider(
                               width: 1,
-                              color: Colors.white.withOpacity(.07),
+                              color: Colors.white.withValues(alpha: .07),
                             ),
 
                             // IMAGE
@@ -661,7 +661,7 @@ class FullImageDialog {
 
                             VerticalDivider(
                               width: 1,
-                              color: Colors.white.withOpacity(.07),
+                              color: Colors.white.withValues(alpha: .07),
                             ),
 
                             // RIGHT
@@ -707,11 +707,11 @@ class _InfoPanelLeft extends StatelessWidget {
           _InfoRow2('Machine', e.machine),
           _InfoRow2('Patrol User', e.patrol_user ?? '-'),
           _InfoRow2('PIC', e.pic ?? '-'),
-          Divider(height: 10, color: Colors.white.withOpacity(.07)),
+          Divider(height: 10, color: Colors.white.withValues(alpha: .07)),
           _InfoRow2('Created', CommonUI.fmtDate(e.createdAt)),
           _InfoRow2('Due', CommonUI.fmtDate(e.dueDate)),
           _InfoRow2('Check Info', e.checkInfo),
-          Divider(height: 10, color: Colors.white.withOpacity(.07)),
+          Divider(height: 10, color: Colors.white.withValues(alpha: .07)),
           _InfoRow2('Risk F', e.riskFreq),
           _InfoRow2('Risk P', e.riskProb),
           _InfoRow2('Risk S', e.riskSev),
@@ -778,7 +778,7 @@ class _RiskTotalCard extends StatelessWidget {
 
     final Color mainColor = CommonUI.riskColor(r);
 
-    final Color border = mainColor.withOpacity(.72);
+    final Color border = mainColor.withValues(alpha: .72);
 
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
@@ -787,7 +787,7 @@ class _RiskTotalCard extends StatelessWidget {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            mainColor.withOpacity(.16),
+            mainColor.withValues(alpha: .16),
             const Color(0x44243B56),
             const Color(0x26172A42),
           ],
@@ -796,7 +796,7 @@ class _RiskTotalCard extends StatelessWidget {
         border: Border.all(color: border, width: 1.4),
         boxShadow: [
           BoxShadow(
-            color: mainColor.withOpacity(.18),
+            color: mainColor.withValues(alpha: .18),
             blurRadius: 16,
             offset: const Offset(0, 8),
           ),
@@ -844,7 +844,7 @@ class _InfoRow2 extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 4),
       decoration: BoxDecoration(
         border: Border(
-          bottom: BorderSide(color: Colors.white.withOpacity(.06)),
+          bottom: BorderSide(color: Colors.white.withValues(alpha: .06)),
         ),
       ),
       child: Row(

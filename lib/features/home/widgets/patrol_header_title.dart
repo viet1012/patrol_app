@@ -74,9 +74,9 @@ class _TitleShine extends StatelessWidget {
               final dx = (center - .5) * bounds.width;
               return LinearGradient(
                 colors: [
-                  Colors.white.withOpacity(0),
-                  Colors.white.withOpacity(.6),
-                  Colors.white.withOpacity(0),
+                  Colors.white.withValues(alpha: 0),
+                  Colors.white.withValues(alpha: .6),
+                  Colors.white.withValues(alpha: 0),
                 ],
                 stops: const [.5 - _band / 2, .5, .5 + _band / 2],
               ).createShader(bounds.shift(Offset(dx, 0)));

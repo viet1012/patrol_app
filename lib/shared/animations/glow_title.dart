@@ -86,18 +86,18 @@ class _EmbossGlowTitleState extends State<EmbossGlowTitle>
           // Glow (động khi animate = true)
           Shadow(
             blurRadius: glow,
-            color: Color(0xFF4F8CFF).withOpacity(0.8),
+            color: Color(0xFF4F8CFF).withValues(alpha: 0.8),
           ),
           Shadow(
             blurRadius: glow * 1.5,
-            color: Color(0xFF4F8CFF).withOpacity(0.4),
+            color: Color(0xFF4F8CFF).withValues(alpha: 0.4),
           ),
 
           // Bóng đổ dưới
           Shadow(
             offset: Offset(0, 3),
             blurRadius: 6,
-            color: Colors.black.withOpacity(0.6),
+            color: Colors.black.withValues(alpha: 0.6),
           ),
         ],
       ),

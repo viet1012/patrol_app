@@ -36,19 +36,19 @@ class CommonRiskDropdown extends StatelessWidget {
         labelText: labelKey.tr(context),
 
         filled: true,
-        fillColor: fillColor ?? Colors.orange.withOpacity(0.08),
+        fillColor: fillColor ?? Colors.orange.withValues(alpha: 0.08),
 
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
           borderSide: BorderSide(
-            color: Colors.white.withOpacity(0.35),
+            color: Colors.white.withValues(alpha: 0.35),
             width: 1.2,
           ),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
           borderSide: BorderSide(
-            color: const Color(0xFF7986CB).withOpacity(0.45),
+            color: const Color(0xFF7986CB).withValues(alpha: 0.45),
           ),
         ),
         focusedBorder: OutlineInputBorder(
@@ -59,7 +59,7 @@ class CommonRiskDropdown extends StatelessWidget {
         contentPadding: const EdgeInsets.fromLTRB(12, 16, 12, 14),
 
         labelStyle: TextStyle(
-          color: Colors.white.withOpacity(0.65),
+          color: Colors.white.withValues(alpha: 0.65),
           fontSize: 14,
         ),
         floatingLabelStyle: const TextStyle(
@@ -108,7 +108,7 @@ class CommonRiskDropdown extends StatelessWidget {
               Text(
                 "(${e.score})",
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.7),
+                  color: Colors.white.withValues(alpha: 0.7),
                   fontSize: 12,
                 ),
               ),

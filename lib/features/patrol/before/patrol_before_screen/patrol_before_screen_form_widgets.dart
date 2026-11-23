@@ -111,10 +111,10 @@ extension _PatrolBeforeScreenFormWidgets on _PatrolBeforeScreenState {
       decoration: InputDecoration(
         labelText: "label_risk".tr(context),
         filled: true,
-        fillColor: Colors.deepOrange.withOpacity(0.15),
+        fillColor: Colors.deepOrange.withValues(alpha: 0.15),
         labelStyle: TextStyle(
           fontSize: 14,
-          color: Colors.white.withOpacity(0.65),
+          color: Colors.white.withValues(alpha: 0.65),
           fontWeight: FontWeight.w500,
         ),
         floatingLabelStyle: const TextStyle(
@@ -124,7 +124,7 @@ extension _PatrolBeforeScreenFormWidgets on _PatrolBeforeScreenState {
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.deepOrange.withOpacity(0.6)),
+          borderSide: BorderSide(color: Colors.deepOrange.withValues(alpha: 0.6)),
         ),
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 12,
@@ -213,14 +213,14 @@ extension _PatrolBeforeScreenFormWidgets on _PatrolBeforeScreenState {
                         Icon(
                           Icons.search_off_rounded,
                           size: 40,
-                          color: Colors.white.withOpacity(0.5),
+                          color: Colors.white.withValues(alpha: 0.5),
                         ),
                         const SizedBox(height: 12),
                         Text(
                           "No data found", // hoặc "No data found"
                           textAlign: TextAlign.center,
                           style: TextStyle(
-                            color: Colors.white.withOpacity(0.7),
+                            color: Colors.white.withValues(alpha: 0.7),
                             fontSize: 14,
                             fontWeight: FontWeight.w500,
                           ),
@@ -234,12 +234,12 @@ extension _PatrolBeforeScreenFormWidgets on _PatrolBeforeScreenState {
                 decoration: InputDecoration(
                   hintText: "search_or_add_new".tr(context),
                   filled: true,
-                  fillColor: Colors.white.withOpacity(0.1),
+                  fillColor: Colors.white.withValues(alpha: 0.1),
                   prefixIcon: Icon(
                     Icons.search_rounded,
-                    color: Colors.white.withOpacity(0.7),
+                    color: Colors.white.withValues(alpha: 0.7),
                   ),
-                  hintStyle: TextStyle(color: Colors.white.withOpacity(0.6)),
+                  hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.6)),
                   contentPadding: const EdgeInsets.symmetric(
                     horizontal: 14,
                     vertical: 12,
@@ -267,7 +267,7 @@ extension _PatrolBeforeScreenFormWidgets on _PatrolBeforeScreenState {
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(12),
                     color: isSelected
-                        ? Colors.white.withOpacity(0.12)
+                        ? Colors.white.withValues(alpha: 0.12)
                         : Colors.transparent,
                   ),
                   child: AutoSizeText(
@@ -309,16 +309,16 @@ extension _PatrolBeforeScreenFormWidgets on _PatrolBeforeScreenState {
 
                 /// 🌫️ nền glass
                 filled: true,
-                fillColor: Colors.white.withOpacity(0.08),
+                fillColor: Colors.white.withValues(alpha: 0.08),
 
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(14),
-                  borderSide: BorderSide(color: Colors.white.withOpacity(0.35)),
+                  borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.35)),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(14),
                   borderSide: BorderSide(
-                    color: const Color(0xFF4DD0E1).withOpacity(0.45),
+                    color: const Color(0xFF4DD0E1).withValues(alpha: 0.45),
                   ),
                 ),
 
@@ -334,7 +334,7 @@ extension _PatrolBeforeScreenFormWidgets on _PatrolBeforeScreenState {
 
                 /// 📝 hint
                 hintStyle: TextStyle(
-                  color: Colors.white.withOpacity(0.6),
+                  color: Colors.white.withValues(alpha: 0.6),
                   fontSize: 14,
                 ),
               ),
@@ -347,13 +347,13 @@ extension _PatrolBeforeScreenFormWidgets on _PatrolBeforeScreenState {
               FontWeight fontWeight;
 
               if (isEmpty && isRequired) {
-                textColor = Colors.red.withOpacity(.6);
+                textColor = Colors.red.withValues(alpha: .6);
                 fontWeight = FontWeight.w600;
               } else if (!isEmpty) {
                 textColor = Colors.white;
                 fontWeight = FontWeight.bold;
               } else {
-                textColor = Colors.white.withOpacity(0.6);
+                textColor = Colors.white.withValues(alpha: 0.6);
                 fontWeight = FontWeight.w500;
               }
 
@@ -383,7 +383,7 @@ extension _PatrolBeforeScreenFormWidgets on _PatrolBeforeScreenState {
                     Icon(
                       Icons.star_rounded, // ⭐
                       size: 14,
-                      color: Colors.red.withOpacity(.6),
+                      color: Colors.red.withValues(alpha: .6),
                     ),
                   ],
                 ],
@@ -422,20 +422,20 @@ extension _PatrolBeforeScreenFormWidgets on _PatrolBeforeScreenState {
 
         /// 🌫️ nền mờ
         filled: true,
-        fillColor: Colors.orange.withOpacity(0.08),
+        fillColor: Colors.orange.withValues(alpha: 0.08),
 
         /// 🔲 viền
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
           borderSide: BorderSide(
-            color: Colors.white.withOpacity(0.35),
+            color: Colors.white.withValues(alpha: 0.35),
             width: 1.2,
           ),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
           borderSide: BorderSide(
-            color: const Color(0xFF7986CB).withOpacity(0.45),
+            color: const Color(0xFF7986CB).withValues(alpha: 0.45),
           ),
         ),
 
@@ -448,7 +448,7 @@ extension _PatrolBeforeScreenFormWidgets on _PatrolBeforeScreenState {
 
         /// 📝 label bình thường
         labelStyle: TextStyle(
-          color: Colors.white.withOpacity(0.65),
+          color: Colors.white.withValues(alpha: 0.65),
           fontSize: 14,
         ),
 
@@ -498,7 +498,7 @@ extension _PatrolBeforeScreenFormWidgets on _PatrolBeforeScreenState {
               Text(
                 "(${e.score})",
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.7),
+                  color: Colors.white.withValues(alpha: 0.7),
                   fontSize: 12,
                 ),
               ),

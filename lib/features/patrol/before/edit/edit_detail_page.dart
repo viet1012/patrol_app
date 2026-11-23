@@ -206,9 +206,9 @@ class _EditDetailPageState extends State<EditDetailPage> {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.20),
+        color: Colors.black.withValues(alpha: 0.20),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withOpacity(0.10)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
       ),
       child: Column(
         children: [
@@ -337,9 +337,9 @@ class _EditDetailPageState extends State<EditDetailPage> {
                 child: Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.06),
+                    color: Colors.white.withValues(alpha: 0.06),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.white.withOpacity(0.10)),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
                   ),
                   child: Row(
                     children: [
@@ -356,10 +356,10 @@ class _EditDetailPageState extends State<EditDetailPage> {
                         height: 50,
                         alignment: Alignment.center,
                         decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.25),
+                          color: Colors.black.withValues(alpha: 0.25),
                           shape: BoxShape.circle, // 👈 QUAN TRỌNG
                           border: Border.all(
-                            color: Colors.white.withOpacity(0.15),
+                            color: Colors.white.withValues(alpha: 0.15),
                           ),
                         ),
                         child: Text(
@@ -602,7 +602,7 @@ class _EditDetailPageState extends State<EditDetailPage> {
             hintText: 'Enter $title',
             hintStyle: TextStyle(color: Colors.white38),
             filled: true,
-            fillColor: Colors.white.withOpacity(0.05),
+            fillColor: Colors.white.withValues(alpha: 0.05),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
               borderSide: BorderSide.none,
@@ -728,7 +728,7 @@ class _AddImageTile extends StatelessWidget {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(20),
           border: Border.all(color: Colors.white24, width: 1.2),
-          color: Colors.white.withOpacity(0.05),
+          color: Colors.white.withValues(alpha: 0.05),
         ),
         child: Center(
           child: Column(

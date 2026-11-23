@@ -38,13 +38,13 @@ extension _PatrolBeforeScreenCamera on _PatrolBeforeScreenState {
   Widget _buildCheckingQrOverlay() {
     return Container(
       alignment: Alignment.center,
-      color: Colors.black.withOpacity(.20),
+      color: Colors.black.withValues(alpha: .20),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
         decoration: BoxDecoration(
-          color: Colors.black.withOpacity(.72),
+          color: Colors.black.withValues(alpha: .72),
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: const Color(0xFF22C55E).withOpacity(.45)),
+          border: Border.all(color: const Color(0xFF22C55E).withValues(alpha: .45)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -74,7 +74,7 @@ extension _PatrolBeforeScreenCamera on _PatrolBeforeScreenState {
                   Text(
                     _checkingQrKey!,
                     style: TextStyle(
-                      color: Colors.white.withOpacity(.65),
+                      color: Colors.white.withValues(alpha: .65),
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
                     ),

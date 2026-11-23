@@ -71,7 +71,7 @@ class _SweepShaderCache {
       _color = color;
       _shader = SweepGradient(
         endAngle: _RadarPainter.sweepAngle,
-        colors: [color.withOpacity(0), color],
+        colors: [color.withValues(alpha: 0), color],
       ).createShader(Rect.fromCircle(center: Offset.zero, radius: radius));
     }
     return _shader!;
@@ -123,7 +123,7 @@ class _RadarPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final center = size.center(Offset.zero);
 
-    _ringPaint.color = color.withOpacity(.25);
+    _ringPaint.color = color.withValues(alpha: .25);
     canvas.drawCircle(center, _ringRadius, _ringPaint);
 
     final anim = animation;
@@ -151,14 +151,14 @@ class _RadarPainter extends CustomPainter {
 
     // Vòng ping
     final ping = (value * _pingTurns + phase) % 1;
-    _pingPaint.color = color.withOpacity(.5 * (1 - ping));
+    _pingPaint.color = color.withValues(alpha: .5 * (1 - ping));
     canvas.drawCircle(center, lerpDouble(_pingFrom, _pingTo, ping)!, _pingPaint);
 
     // Blip: sáng khi mép trước tia quét đi qua, mờ dần.
     final leading = rotation + sweepAngle;
     final since = ((leading - _blipAngle) % (2 * math.pi)) / (2 * math.pi);
     if (since < _blipFade) {
-      _blipPaint.color = color.withOpacity(1 - since / _blipFade);
+      _blipPaint.color = color.withValues(alpha: 1 - since / _blipFade);
       canvas.drawCircle(
         center + Offset.fromDirection(_blipAngle, _blipDistance),
         _blipRadius,
@@ -195,7 +195,7 @@ class ScanLinePainter extends CustomPainter {
     final t = (animation.value * _cycles) % 1;
     final y = (t < .5 ? t * 2 : 2 - t * 2) * size.height;
 
-    _linePaint.color = color.withOpacity(.6);
+    _linePaint.color = color.withValues(alpha: .6);
     canvas.drawLine(Offset(0, y), Offset(size.width, y), _linePaint);
   }
 

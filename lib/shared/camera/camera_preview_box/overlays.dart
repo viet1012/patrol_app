@@ -56,9 +56,9 @@ class _QrLockPainter extends CustomPainter {
       const Color(0xFF4DD0E1),
       const Color(0xFF4ADE80),
       progress.clamp(.20, .62).toDouble(),
-    )!.withOpacity(opacity);
+    )!.withValues(alpha: opacity);
     final glow = Paint()
-      ..color = color.withOpacity(.28 * opacity)
+      ..color = color.withValues(alpha: .28 * opacity)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 7
       ..strokeCap = StrokeCap.round
@@ -86,7 +86,7 @@ class _QrLockPainter extends CustomPainter {
       text: TextSpan(
         text: data.label,
         style: TextStyle(
-          color: Colors.white.withOpacity(opacity),
+          color: Colors.white.withValues(alpha: opacity),
           fontSize: 12,
           fontWeight: FontWeight.w700,
           letterSpacing: .4,
@@ -112,7 +112,7 @@ class _QrLockPainter extends CustomPainter {
     );
     canvas.drawRRect(
       RRect.fromRectAndRadius(rect, const Radius.circular(10)),
-      Paint()..color = const Color(0xDD111827).withOpacity(.86 * opacity),
+      Paint()..color = const Color(0xDD111827).withValues(alpha: .86 * opacity),
     );
     painter.paint(canvas, Offset(rect.left + 9, rect.top + 4.5));
   }
@@ -148,10 +148,10 @@ class _QrWarningBanner extends StatelessWidget {
         decoration: BoxDecoration(
           color: const Color(0xE6111827),
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: color.withOpacity(0.82)),
+          border: Border.all(color: color.withValues(alpha: 0.82)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.22),
+              color: Colors.black.withValues(alpha: 0.22),
               blurRadius: 9,
               offset: const Offset(0, 4),
             ),
@@ -213,12 +213,12 @@ class _QrStatusBadge extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: hasQr
-              ? const Color(0xFF22C55E).withOpacity(0.75)
-              : Colors.redAccent.withOpacity(0.50),
+              ? const Color(0xFF22C55E).withValues(alpha: 0.75)
+              : Colors.redAccent.withValues(alpha: 0.50),
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(.20),
+            color: Colors.black.withValues(alpha: .20),
             blurRadius: 8,
             offset: const Offset(0, 3),
           ),
@@ -490,7 +490,7 @@ class _CameraPowerControl extends StatelessWidget {
           decoration: BoxDecoration(
             color: const Color(0xDD111827),
             borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: color.withOpacity(.55)),
+            border: Border.all(color: color.withValues(alpha: .55)),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -552,11 +552,11 @@ class _CameraPowerControl extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: enabled ? activeColor : const Color(0xFF4B5563),
                   borderRadius: BorderRadius.circular(999),
-                  border: Border.all(color: Colors.white.withOpacity(.24)),
+                  border: Border.all(color: Colors.white.withValues(alpha: .24)),
                   boxShadow: enabled
                       ? [
                           BoxShadow(
-                            color: activeColor.withOpacity(.28),
+                            color: activeColor.withValues(alpha: .28),
                             blurRadius: 8,
                           ),
                         ]
@@ -621,7 +621,7 @@ class _HwZoomControl extends StatelessWidget {
       decoration: BoxDecoration(
         color: const Color(0xCC111827),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Colors.white.withOpacity(.25)),
+        border: Border.all(color: Colors.white.withValues(alpha: .25)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -685,7 +685,7 @@ class _HwZoomControl extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
         decoration: BoxDecoration(
           color: selected
-              ? const Color(0xFF4DD0E1).withOpacity(.25)
+              ? const Color(0xFF4DD0E1).withValues(alpha: .25)
               : Colors.transparent,
           borderRadius: BorderRadius.circular(999),
         ),
@@ -718,10 +718,10 @@ class _SttBadge extends StatelessWidget {
       decoration: BoxDecoration(
         color: const Color(0xCC111827),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withOpacity(.30)),
+        border: Border.all(color: Colors.white.withValues(alpha: .30)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(.18),
+            color: Colors.black.withValues(alpha: .18),
             blurRadius: 8,
             offset: const Offset(0, 3),
           ),

@@ -396,12 +396,12 @@ class _RedoDetailPageState extends State<RedoDetailPage> {
     return Container(
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.12),
+        color: Colors.white.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withOpacity(0.2)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 8,
             offset: const Offset(0, 4),
           ),
@@ -450,15 +450,15 @@ class _RedoDetailPageState extends State<RedoDetailPage> {
     return Container(
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.10),
+        color: Colors.white.withValues(alpha: 0.10),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: color.withOpacity(0.45),
+          color: color.withValues(alpha: 0.45),
           width: 1,
         ), // ✅ dùng color
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.12),
+            color: Colors.black.withValues(alpha: 0.12),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -511,9 +511,9 @@ class _RedoDetailPageState extends State<RedoDetailPage> {
     return Container(
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.08), // mờ nhẹ hơn một chút
+        color: Colors.white.withValues(alpha: 0.08), // mờ nhẹ hơn một chút
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: accentColor.withOpacity(0.25), width: 1),
+        border: Border.all(color: accentColor.withValues(alpha: 0.25), width: 1),
       ),
       child: SingleChildScrollView(
         child: Column(
@@ -532,7 +532,7 @@ class _RedoDetailPageState extends State<RedoDetailPage> {
             Text(
               content.isEmpty ? '-' : content,
               style: TextStyle(
-                color: Colors.white.withOpacity(0.85),
+                color: Colors.white.withValues(alpha: 0.85),
                 fontSize: 13,
                 height: 1.4,
               ),
@@ -553,9 +553,9 @@ class _RedoDetailPageState extends State<RedoDetailPage> {
     return Container(
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.22),
+        color: Colors.black.withValues(alpha: 0.22),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withOpacity(0.12)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -785,9 +785,9 @@ class _RedoDetailPageState extends State<RedoDetailPage> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
       decoration: BoxDecoration(
-        color: Colors.orangeAccent.withOpacity(0.14),
+        color: Colors.orangeAccent.withValues(alpha: 0.14),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.orangeAccent.withOpacity(0.35)),
+        border: Border.all(color: Colors.orangeAccent.withValues(alpha: 0.35)),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -826,9 +826,9 @@ class _RedoDetailPageState extends State<RedoDetailPage> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.08),
+          color: Colors.white.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: Colors.orangeAccent.withOpacity(0.35)),
+          border: Border.all(color: Colors.orangeAccent.withValues(alpha: 0.35)),
         ),
         child: Row(
           children: [
@@ -865,7 +865,7 @@ class _RedoDetailPageState extends State<RedoDetailPage> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
-                color: Colors.white70.withOpacity(.15),
+                color: Colors.white70.withValues(alpha: .15),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: const Row(
@@ -896,7 +896,7 @@ class _RedoDetailPageState extends State<RedoDetailPage> {
 
   Widget _buildRetakeSection() {
     return Card(
-      color: const Color(0xFF121826).withOpacity(.4),
+      color: const Color(0xFF121826).withValues(alpha: .4),
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
@@ -939,7 +939,7 @@ class _RedoDetailPageState extends State<RedoDetailPage> {
                     borderRadius: BorderRadius.circular(8),
                   ),
                   filled: true,
-                  fillColor: Colors.white.withOpacity(0.12),
+                  fillColor: Colors.white.withValues(alpha: 0.12),
                 ),
                 style: const TextStyle(color: Colors.white),
                 onChanged: (value) {

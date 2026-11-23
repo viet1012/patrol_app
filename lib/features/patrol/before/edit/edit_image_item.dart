@@ -63,8 +63,8 @@ class _EditImageItemState extends State<EditImageItem> {
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(20),
-                  color: Colors.black.withOpacity(0.6),
-                  border: Border.all(color: Colors.white.withOpacity(0.12)),
+                  color: Colors.black.withValues(alpha: 0.6),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
                 ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -73,7 +73,7 @@ class _EditImageItemState extends State<EditImageItem> {
                     Container(
                       padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
-                        color: Colors.redAccent.withOpacity(0.18),
+                        color: Colors.redAccent.withValues(alpha: 0.18),
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(
@@ -115,7 +115,7 @@ class _EditImageItemState extends State<EditImageItem> {
                             style: OutlinedButton.styleFrom(
                               foregroundColor: Colors.white70,
                               side: BorderSide(
-                                color: Colors.white.withOpacity(0.25),
+                                color: Colors.white.withValues(alpha: 0.25),
                               ),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(14),
@@ -132,7 +132,7 @@ class _EditImageItemState extends State<EditImageItem> {
                           child: ElevatedButton(
                             onPressed: () => Navigator.pop(context, true),
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.redAccent.withOpacity(
+                              backgroundColor: Colors.redAccent.withValues(alpha: 
                                 0.9,
                               ),
                               foregroundColor: Colors.white,

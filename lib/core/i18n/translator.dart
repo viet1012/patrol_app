@@ -78,7 +78,6 @@ extension TranslateExtension on String {
   // -----------------------------------------
   String _trLocale(String key, Locale locale, {Map<String, dynamic>? params}) {
     final t = lookupAppLocalizations(locale);
-    if (t == null) return key;
 
     switch (key) {
 

@@ -296,10 +296,10 @@ class FixedAssetStatusCard extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: idle ? Colors.white.withOpacity(.06) : color.withOpacity(.08),
+        color: idle ? Colors.white.withValues(alpha: .06) : color.withValues(alpha: .08),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: idle ? Colors.white.withOpacity(.14) : color.withOpacity(.45),
+          color: idle ? Colors.white.withValues(alpha: .14) : color.withValues(alpha: .45),
         ),
       ),
       child: Row(
@@ -321,7 +321,7 @@ class FixedAssetStatusCard extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           color: idle
-                              ? Colors.white.withOpacity(.6)
+                              ? Colors.white.withValues(alpha: .6)
                               : Colors.white,
                           fontSize: idle ? 13.5 : 15.5,
                           fontWeight: idle ? FontWeight.w500 : FontWeight.w800,
@@ -347,7 +347,7 @@ class FixedAssetStatusCard extends StatelessWidget {
                       style: TextStyle(
                         color: failed
                             ? Colors.redAccent.shade100
-                            : Colors.white.withOpacity(.65),
+                            : Colors.white.withValues(alpha: .65),
                         fontSize: 12,
                       ),
                     ),
@@ -413,9 +413,9 @@ class FixedAssetStatusCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
-        color: _violet.withOpacity(.15),
+        color: _violet.withValues(alpha: .15),
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: _violet.withOpacity(.6)),
+        border: Border.all(color: _violet.withValues(alpha: .6)),
       ),
       child: const Row(
         mainAxisSize: MainAxisSize.min,

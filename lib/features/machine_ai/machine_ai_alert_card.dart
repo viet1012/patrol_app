@@ -73,12 +73,12 @@ class _MachineAiRiskHistoryPanelState extends State<MachineAiRiskHistoryPanel> {
       margin: const EdgeInsets.only(top: 10),
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(.04),
+        color: Colors.white.withValues(alpha: .04),
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
           color: active
-              ? const Color(0xFF38BDF8).withOpacity(.35)
-              : Colors.white.withOpacity(.10),
+              ? const Color(0xFF38BDF8).withValues(alpha: .35)
+              : Colors.white.withValues(alpha: .10),
         ),
       ),
       child: Column(
@@ -115,7 +115,7 @@ class _MachineAiRiskHistoryPanelState extends State<MachineAiRiskHistoryPanel> {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            color: Colors.white.withOpacity(.55),
+                            color: Colors.white.withValues(alpha: .55),
                             fontSize: 11,
                             fontWeight: FontWeight.w700,
                           ),
@@ -171,7 +171,7 @@ class _MachineAiRiskHistoryPanelState extends State<MachineAiRiskHistoryPanel> {
                       duration: const Duration(milliseconds: 220),
                       child: Icon(
                         Icons.keyboard_arrow_down_rounded,
-                        color: Colors.white.withOpacity(.7),
+                        color: Colors.white.withValues(alpha: .7),
                       ),
                     ),
                   ),
@@ -196,7 +196,7 @@ class _MachineAiRiskHistoryPanelState extends State<MachineAiRiskHistoryPanel> {
                       ? 'Turn on AI to generate risk history and recommendations.'
                       : 'Please select a machine to enable AI risk history.',
                   style: TextStyle(
-                    color: Colors.white.withOpacity(.62),
+                    color: Colors.white.withValues(alpha: .62),
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
                   ),
@@ -385,7 +385,7 @@ class _AiReportBlock extends StatelessWidget {
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(.04),
+        color: Colors.white.withValues(alpha: .04),
         borderRadius: BorderRadius.circular(14),
       ),
       child: Column(
@@ -604,9 +604,9 @@ class _AiSectionBlock extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: section.color.withOpacity(.055),
+        color: section.color.withValues(alpha: .055),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: section.color.withOpacity(.16)),
+        border: Border.all(color: section.color.withValues(alpha: .16)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -636,7 +636,7 @@ class _AiSectionBlock extends StatelessWidget {
               child: SelectableText(
                 clean,
                 style: TextStyle(
-                  color: Colors.white.withOpacity(.90),
+                  color: Colors.white.withValues(alpha: .90),
                   fontSize: 13,
                   height: 1.35,
                   fontWeight: FontWeight.w600,
@@ -661,13 +661,13 @@ class _PlainAiText extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(.04),
+        color: Colors.white.withValues(alpha: .04),
         borderRadius: BorderRadius.circular(14),
       ),
       child: SelectableText(
         text,
         style: TextStyle(
-          color: Colors.white.withOpacity(.92),
+          color: Colors.white.withValues(alpha: .92),
           fontSize: 14,
           height: 1.55,
           fontWeight: FontWeight.w600,
@@ -692,7 +692,7 @@ class _LoadingState extends StatelessWidget {
           height: 20,
           child: CircularProgressIndicator(
             strokeWidth: 2,
-            color: Colors.cyanAccent.withOpacity(.9),
+            color: Colors.cyanAccent.withValues(alpha: .9),
           ),
         ),
         const SizedBox(width: 12),
@@ -789,7 +789,7 @@ class _EmptyState extends StatelessWidget {
           label: Text(isJp ? '再分析' : 'Retry'),
           style: OutlinedButton.styleFrom(
             foregroundColor: const Color(0xFF67E8F9),
-            side: BorderSide(color: const Color(0xFF67E8F9).withOpacity(.4)),
+            side: BorderSide(color: const Color(0xFF67E8F9).withValues(alpha: .4)),
           ),
         ),
       ],
@@ -816,7 +816,7 @@ class _TranslateJpState extends StatelessWidget {
             height: 18,
             child: CircularProgressIndicator(
               strokeWidth: 2,
-              color: Colors.cyanAccent.withOpacity(.9),
+              color: Colors.cyanAccent.withValues(alpha: .9),
             ),
           ),
           const SizedBox(width: 12),
@@ -854,7 +854,7 @@ class _TranslateJpState extends StatelessWidget {
           label: const Text('翻訳'),
           style: OutlinedButton.styleFrom(
             foregroundColor: const Color(0xFF67E8F9),
-            side: BorderSide(color: const Color(0xFF67E8F9).withOpacity(.4)),
+            side: BorderSide(color: const Color(0xFF67E8F9).withValues(alpha: .4)),
           ),
         ),
       ],

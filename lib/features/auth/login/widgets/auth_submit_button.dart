@@ -30,7 +30,7 @@ class AuthSubmitButton extends StatelessWidget {
       onPressed: isLoading ? null : onPressed,
       style: ElevatedButton.styleFrom(
         backgroundColor: const Color(0xFF2563EB),
-        disabledBackgroundColor: const Color(0xFF2563EB).withOpacity(.45),
+        disabledBackgroundColor: const Color(0xFF2563EB).withValues(alpha: .45),
         foregroundColor: Colors.white,
         elevation: elevation,
         shape: RoundedRectangleBorder(

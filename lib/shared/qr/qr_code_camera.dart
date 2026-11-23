@@ -422,7 +422,7 @@ class QrCodeCameraState extends State<QrCodeCamera>
       height: widget.size,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withOpacity(0.15)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
       ),
       child: ClipRRect(borderRadius: BorderRadius.circular(20), child: child),
     );
@@ -451,9 +451,9 @@ class QrCodeCameraState extends State<QrCodeCamera>
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
                         colors: [
-                          const Color(0xFF7CF8D6).withOpacity(0.00),
-                          const Color(0xFF7CF8D6).withOpacity(0.10),
-                          const Color(0xFF7CF8D6).withOpacity(0.00),
+                          const Color(0xFF7CF8D6).withValues(alpha: 0.00),
+                          const Color(0xFF7CF8D6).withValues(alpha: 0.10),
+                          const Color(0xFF7CF8D6).withValues(alpha: 0.00),
                         ],
                       ),
                     ),
@@ -471,14 +471,14 @@ class QrCodeCameraState extends State<QrCodeCamera>
                       borderRadius: BorderRadius.circular(99),
                       gradient: LinearGradient(
                         colors: [
-                          const Color(0xFF7CF8D6).withOpacity(0.0),
-                          const Color(0xFF7CF8D6).withOpacity(0.95),
-                          const Color(0xFF7CF8D6).withOpacity(0.0),
+                          const Color(0xFF7CF8D6).withValues(alpha: 0.0),
+                          const Color(0xFF7CF8D6).withValues(alpha: 0.95),
+                          const Color(0xFF7CF8D6).withValues(alpha: 0.0),
                         ],
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF7CF8D6).withOpacity(0.45),
+                          color: const Color(0xFF7CF8D6).withValues(alpha: 0.45),
                           blurRadius: 10,
                           spreadRadius: 1,
                         ),
@@ -509,9 +509,9 @@ class _QrBadge extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.18),
+            color: Colors.white.withValues(alpha: 0.18),
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.white.withOpacity(0.45), width: 1),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.45), width: 1),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -519,7 +519,7 @@ class _QrBadge extends StatelessWidget {
               Icon(
                 Icons.qr_code_rounded,
                 size: 18,
-                color: text.isEmpty ? Colors.red.withOpacity(.7) : Colors.white,
+                color: text.isEmpty ? Colors.red.withValues(alpha: .7) : Colors.white,
               ),
               const SizedBox(width: 8),
               AnimatedSwitcher(
@@ -582,8 +582,8 @@ class _ZoomControl extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
           decoration: BoxDecoration(
-            color: Colors.black.withOpacity(0.25),
-            border: Border.all(color: Colors.white.withOpacity(0.15)),
+            color: Colors.black.withValues(alpha: 0.25),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
             borderRadius: BorderRadius.circular(14),
           ),
           child: Row(

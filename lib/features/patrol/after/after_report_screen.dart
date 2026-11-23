@@ -683,12 +683,12 @@ class _AfterReportScreenState extends State<AfterReportScreen>
     return Container(
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.12),
+        color: Colors.white.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withOpacity(0.2)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 8,
             offset: const Offset(0, 4),
           ),
@@ -745,12 +745,12 @@ class _AfterReportScreenState extends State<AfterReportScreen>
     return Container(
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.10),
+        color: Colors.white.withValues(alpha: 0.10),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withOpacity(0.45), width: 1),
+        border: Border.all(color: color.withValues(alpha: 0.45), width: 1),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.12),
+            color: Colors.black.withValues(alpha: 0.12),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -793,9 +793,9 @@ class _AfterReportScreenState extends State<AfterReportScreen>
     return Container(
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.08), // mờ nhẹ hơn một chút
+        color: Colors.white.withValues(alpha: 0.08), // mờ nhẹ hơn một chút
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: accentColor.withOpacity(0.25), width: 1),
+        border: Border.all(color: accentColor.withValues(alpha: 0.25), width: 1),
       ),
       child: SingleChildScrollView(
         child: Column(
@@ -814,7 +814,7 @@ class _AfterReportScreenState extends State<AfterReportScreen>
             Text(
               content.isEmpty ? '-' : content,
               style: TextStyle(
-                color: Colors.white.withOpacity(0.85),
+                color: Colors.white.withValues(alpha: 0.85),
                 fontSize: 13,
                 height: 1.4,
               ),
@@ -1084,9 +1084,9 @@ class _AfterReportScreenState extends State<AfterReportScreen>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
       decoration: BoxDecoration(
-        color: Colors.orangeAccent.withOpacity(0.14),
+        color: Colors.orangeAccent.withValues(alpha: 0.14),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.orangeAccent.withOpacity(0.35)),
+        border: Border.all(color: Colors.orangeAccent.withValues(alpha: 0.35)),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -1125,9 +1125,9 @@ class _AfterReportScreenState extends State<AfterReportScreen>
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.08),
+          color: Colors.white.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: Colors.orangeAccent.withOpacity(0.35)),
+          border: Border.all(color: Colors.orangeAccent.withValues(alpha: 0.35)),
         ),
         child: Row(
           children: [
@@ -1164,7 +1164,7 @@ class _AfterReportScreenState extends State<AfterReportScreen>
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
-                color: Colors.white70.withOpacity(.15),
+                color: Colors.white70.withValues(alpha: .15),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: const Row(
@@ -1264,7 +1264,7 @@ class _AfterReportScreenState extends State<AfterReportScreen>
             hintText: 'Enter $title',
             hintStyle: TextStyle(color: Colors.white38),
             filled: true,
-            fillColor: Colors.white.withOpacity(0.05),
+            fillColor: Colors.white.withValues(alpha: 0.05),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
               borderSide: BorderSide.none,
@@ -1282,7 +1282,7 @@ class _AfterReportScreenState extends State<AfterReportScreen>
 
   Widget _buildRetakeSection(PatrolReportModel report) {
     return Card(
-      color: const Color(0xFF121826).withOpacity(.4),
+      color: const Color(0xFF121826).withValues(alpha: .4),
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Column(
@@ -1339,7 +1339,7 @@ class _AfterReportScreenState extends State<AfterReportScreen>
                       boxShadow: canSend
                           ? [
                               BoxShadow(
-                                color: const Color(0xFF1647A3).withOpacity(.38),
+                                color: const Color(0xFF1647A3).withValues(alpha: .38),
                                 blurRadius: 18,
                                 offset: const Offset(0, 8),
                               ),
@@ -1371,11 +1371,11 @@ class _AfterReportScreenState extends State<AfterReportScreen>
                                         decoration: BoxDecoration(
                                           gradient: LinearGradient(
                                             colors: [
-                                              Colors.white.withOpacity(0),
-                                              Colors.white.withOpacity(.10),
-                                              Colors.white.withOpacity(.24),
-                                              Colors.white.withOpacity(.10),
-                                              Colors.white.withOpacity(0),
+                                              Colors.white.withValues(alpha: 0),
+                                              Colors.white.withValues(alpha: .10),
+                                              Colors.white.withValues(alpha: .24),
+                                              Colors.white.withValues(alpha: .10),
+                                              Colors.white.withValues(alpha: 0),
                                             ],
                                           ),
                                         ),

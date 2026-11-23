@@ -54,7 +54,7 @@ class AuthStatusDialog extends StatelessWidget {
               width: 64,
               height: 64,
               decoration: BoxDecoration(
-                color: iconColor.withOpacity(.12),
+                color: iconColor.withValues(alpha: .12),
                 shape: BoxShape.circle,
               ),
               child: Icon(icon, color: iconColor, size: 34),

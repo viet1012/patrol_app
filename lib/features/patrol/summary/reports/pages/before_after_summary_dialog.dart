@@ -89,19 +89,19 @@ class _BeforeAfterSummaryDialogState extends State<BeforeAfterSummaryDialog> {
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
-            border: Border.all(color: Colors.white.withOpacity(0.10)),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
             boxShadow: [
               BoxShadow(
                 blurRadius: 24,
                 spreadRadius: 2,
-                color: Colors.black.withOpacity(0.35),
+                color: Colors.black.withValues(alpha: 0.35),
               ),
             ],
           ),
           child: Column(
             children: [
               _buildHeader(),
-              Divider(color: Colors.white.withOpacity(0.08), height: 1),
+              Divider(color: Colors.white.withValues(alpha: 0.08), height: 1),
               Expanded(child: _buildBody()),
             ],
           ),

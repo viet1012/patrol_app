@@ -45,7 +45,7 @@ class FixedAssetMismatchDialog extends StatelessWidget {
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(18),
-        side: BorderSide(color: _amber.withOpacity(.6)),
+        side: BorderSide(color: _amber.withValues(alpha: .6)),
       ),
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 420),
@@ -90,7 +90,7 @@ class FixedAssetMismatchDialog extends StatelessWidget {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: Colors.white.withOpacity(.65),
+                    color: Colors.white.withValues(alpha: .65),
                     fontSize: 13,
                   ),
                 ),
@@ -104,7 +104,7 @@ class FixedAssetMismatchDialog extends StatelessWidget {
                   line2: fixedAssetDash(unmappedActual!.positionAA),
                   warning: 'Không tìm thấy trong MAP',
                   color: _amber,
-                  background: _amber.withOpacity(.10),
+                  background: _amber.withValues(alpha: .10),
                 )
               else
                 _locationBlock(
@@ -117,7 +117,7 @@ class FixedAssetMismatchDialog extends StatelessWidget {
                       : '${fixedAssetDash(actual!.positionA)} / '
                             '${fixedAssetDash(actual!.positionAA)}',
                   color: _amber,
-                  background: _amber.withOpacity(.10),
+                  background: _amber.withValues(alpha: .10),
                 ),
               const SizedBox(height: 12),
               Text(
@@ -127,7 +127,7 @@ class FixedAssetMismatchDialog extends StatelessWidget {
                     : 'Vị trí đang quét không trùng MASTER.\n'
                           'Bạn có muốn vẫn lưu kết quả kiểm kê này?',
                 style: TextStyle(
-                  color: Colors.white.withOpacity(.8),
+                  color: Colors.white.withValues(alpha: .8),
                   fontSize: 13,
                   height: 1.35,
                 ),
@@ -140,7 +140,7 @@ class FixedAssetMismatchDialog extends StatelessWidget {
                       onPressed: () => Navigator.of(context).pop(false),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: Colors.white,
-                        side: BorderSide(color: Colors.white.withOpacity(.3)),
+                        side: BorderSide(color: Colors.white.withValues(alpha: .3)),
                         minimumSize: Size.fromHeight(manual ? 52 : 44),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
@@ -190,8 +190,8 @@ class FixedAssetMismatchDialog extends StatelessWidget {
             ? ''
             : '${fixedAssetDash(master.positionA)} / '
                   '${fixedAssetDash(master.positionAA)}',
-        color: Colors.white.withOpacity(.55),
-        background: Colors.white.withOpacity(.05),
+        color: Colors.white.withValues(alpha: .55),
+        background: Colors.white.withValues(alpha: .05),
       );
     }
 
@@ -218,7 +218,7 @@ class FixedAssetMismatchDialog extends StatelessWidget {
       decoration: BoxDecoration(
         color: background,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(.6)),
+        border: Border.all(color: color.withValues(alpha: .6)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

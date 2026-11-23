@@ -111,9 +111,9 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen>
   static const _appBarColor = Color(0xFF0F2027);
 
   static final BoxDecoration _glassDecorationSmall = BoxDecoration(
-    color: Colors.white.withOpacity(.10),
+    color: Colors.white.withValues(alpha: .10),
     borderRadius: BorderRadius.circular(16),
-    border: Border.all(color: Colors.white.withOpacity(.22), width: 1),
+    border: Border.all(color: Colors.white.withValues(alpha: .22), width: 1),
   );
 
   // ============================================================
@@ -448,9 +448,9 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen>
                 decoration: InputDecoration(
                   labelText: 'plant'.tr(context),
                   filled: true,
-                  fillColor: Colors.white.withOpacity(.10),
-                  border: _plantBorder(Colors.white.withOpacity(.28)),
-                  enabledBorder: _plantBorder(Colors.white.withOpacity(.28)),
+                  fillColor: Colors.white.withValues(alpha: .10),
+                  border: _plantBorder(Colors.white.withValues(alpha: .28)),
+                  enabledBorder: _plantBorder(Colors.white.withValues(alpha: .28)),
                   focusedBorder: _plantBorder(
                     const Color(0xFF7986CB),
                     width: 1.6,
@@ -496,7 +496,7 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen>
     return Container(
       padding: const EdgeInsets.only(left: 12, right: 4),
       decoration: _glassDecorationSmall.copyWith(
-        border: Border.all(color: Colors.orangeAccent.withOpacity(.6)),
+        border: Border.all(color: Colors.orangeAccent.withValues(alpha: .6)),
       ),
       child: Row(
         children: [
@@ -712,9 +712,9 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen>
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        color: color.withOpacity(.10),
+        color: color.withValues(alpha: .10),
         borderRadius: BorderRadius.circular(26),
-        border: Border.all(color: color.withOpacity(.90), width: 1.5),
+        border: Border.all(color: color.withValues(alpha: .90), width: 1.5),
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(
@@ -895,9 +895,9 @@ class _PatrolHomeScreenState extends State<PatrolHomeScreen>
           child: Ink(
             padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 24),
             decoration: BoxDecoration(
-              color: color.withOpacity(.11),
+              color: color.withValues(alpha: .11),
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: color.withOpacity(.85), width: 1),
+              border: Border.all(color: color.withValues(alpha: .85), width: 1),
             ),
             child: Row(
               children: [

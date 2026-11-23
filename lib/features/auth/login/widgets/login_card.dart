@@ -54,7 +54,7 @@ class LoginCard extends StatelessWidget {
       decoration: BoxDecoration(
         gradient: AuthStyles.cardGradient,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withOpacity(.08)),
+        border: Border.all(color: Colors.white.withValues(alpha: .08)),
         boxShadow: const [
           BoxShadow(
             color: Colors.black54,

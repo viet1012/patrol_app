@@ -37,12 +37,12 @@ class PatrolReportFilterPopup extends StatelessWidget {
           width: 260,
           height: 340,
           decoration: BoxDecoration(
-            color: const Color(0xFF172A33).withOpacity(.6),
+            color: const Color(0xFF172A33).withValues(alpha: .6),
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: Colors.white24),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.45),
+                color: Colors.black.withValues(alpha: 0.45),
                 blurRadius: 14,
                 offset: const Offset(0, 6),
               ),
@@ -96,7 +96,7 @@ class PatrolReportFilterPopup extends StatelessWidget {
                     prefixIcon: const Icon(Icons.search, size: 16),
                     prefixIconColor: Colors.white54,
                     filled: true,
-                    fillColor: Colors.black.withOpacity(0.2),
+                    fillColor: Colors.black.withValues(alpha: 0.2),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
                       borderSide: const BorderSide(color: Colors.white24),

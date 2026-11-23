@@ -25,7 +25,7 @@ class FixedAssetReprintMoveDialog extends StatelessWidget {
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(18),
-        side: BorderSide(color: _amber.withOpacity(.6)),
+        side: BorderSide(color: _amber.withValues(alpha: .6)),
       ),
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 420),
@@ -68,7 +68,7 @@ class FixedAssetReprintMoveDialog extends StatelessWidget {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: Colors.white.withOpacity(.65),
+                    color: Colors.white.withValues(alpha: .65),
                     fontSize: 13,
                   ),
                 ),
@@ -76,7 +76,7 @@ class FixedAssetReprintMoveDialog extends StatelessWidget {
               Text.rich(
                 TextSpan(
                   style: TextStyle(
-                    color: Colors.white.withOpacity(.9),
+                    color: Colors.white.withValues(alpha: .9),
                     fontSize: 14,
                     height: 1.4,
                   ),
@@ -97,7 +97,7 @@ class FixedAssetReprintMoveDialog extends StatelessWidget {
                 'Xác nhận: cập nhật vị trí thực tế theo vị trí đang ở, máy vẫn '
                 'cần in lại QR.',
                 style: TextStyle(
-                  color: Colors.white.withOpacity(.6),
+                  color: Colors.white.withValues(alpha: .6),
                   fontSize: 12.5,
                   height: 1.35,
                 ),
@@ -110,7 +110,7 @@ class FixedAssetReprintMoveDialog extends StatelessWidget {
                       onPressed: () => Navigator.of(context).pop(false),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: Colors.white,
-                        side: BorderSide(color: Colors.white.withOpacity(.3)),
+                        side: BorderSide(color: Colors.white.withValues(alpha: .3)),
                         minimumSize: const Size.fromHeight(52),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),

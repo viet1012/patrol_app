@@ -99,7 +99,7 @@ class _AfterOverviewScreenState extends State<AfterOverviewScreen> {
                       vertical: 2,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.12),
+                      color: Colors.white.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
@@ -127,7 +127,7 @@ class _AfterOverviewScreenState extends State<AfterOverviewScreen> {
                     vertical: 10,
                   ),
                   filled: true,
-                  fillColor: Colors.white.withOpacity(0.08),
+                  fillColor: Colors.white.withValues(alpha: 0.08),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide.none,
@@ -161,7 +161,7 @@ class _AfterOverviewScreenState extends State<AfterOverviewScreen> {
             ? Center(
                 child: Text(
                   'No plant selected',
-                  style: TextStyle(color: Colors.white.withOpacity(0.6)),
+                  style: TextStyle(color: Colors.white.withValues(alpha: 0.6)),
                 ),
               )
             : FutureBuilder<RiskPivotResponse>(
@@ -245,13 +245,13 @@ class _AfterOverviewScreenState extends State<AfterOverviewScreen> {
       width: double.infinity,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.25),
+        color: Colors.black.withValues(alpha: 0.25),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white.withOpacity(0.10)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
       ),
       child: Row(
         children: [
-          Icon(Icons.table_chart_rounded, color: Colors.white.withOpacity(0.8)),
+          Icon(Icons.table_chart_rounded, color: Colors.white.withValues(alpha: 0.8)),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
@@ -284,7 +284,7 @@ class _AfterOverviewScreenState extends State<AfterOverviewScreen> {
             dataRowHeight: 40,
 
             headingRowColor: MaterialStateProperty.all(
-              Colors.white.withOpacity(0.10),
+              Colors.white.withValues(alpha: 0.10),
             ),
             headingTextStyle: const TextStyle(
               color: Colors.white,
@@ -311,7 +311,7 @@ class _AfterOverviewScreenState extends State<AfterOverviewScreen> {
                   isFirst: true,
                   isLast: true,
                   borderColor: Colors.redAccent,
-                  bg: Colors.redAccent.withOpacity(0.08),
+                  bg: Colors.redAccent.withValues(alpha: 0.08),
                   child: const Text(
                     'IV',
                     style: TextStyle(color: Colors.redAccent),
@@ -324,7 +324,7 @@ class _AfterOverviewScreenState extends State<AfterOverviewScreen> {
                   isFirst: true,
                   isLast: true,
                   borderColor: Colors.red,
-                  bg: Colors.red.withOpacity(0.08),
+                  bg: Colors.red.withValues(alpha: 0.08),
                   child: const Text('V', style: TextStyle(color: Colors.red)),
                 ),
               ),
@@ -354,7 +354,7 @@ class _AfterOverviewScreenState extends State<AfterOverviewScreen> {
 
   DataRow _rowToDataRowCompact(RiskPivotRow r, {required bool isTotal}) {
     final textStyle = TextStyle(
-      color: isTotal ? Colors.white : Colors.white.withOpacity(0.85),
+      color: isTotal ? Colors.white : Colors.white.withValues(alpha: 0.85),
       fontWeight: isTotal ? FontWeight.bold : FontWeight.w500,
       fontSize: 13,
     );
@@ -379,7 +379,7 @@ class _AfterOverviewScreenState extends State<AfterOverviewScreen> {
 
     return DataRow(
       color: isTotal
-          ? MaterialStateProperty.all(Colors.white.withOpacity(0.08))
+          ? MaterialStateProperty.all(Colors.white.withValues(alpha: 0.08))
           : null,
       cells: [
         DataCell(
@@ -416,7 +416,7 @@ class _AfterOverviewScreenState extends State<AfterOverviewScreen> {
                   Icon(
                     Icons.arrow_forward_ios_rounded,
                     size: 12,
-                    color: Colors.white10.withOpacity(0.5),
+                    color: Colors.white10.withValues(alpha: 0.5),
                   ),
                 ],
               ],
@@ -434,7 +434,7 @@ class _AfterOverviewScreenState extends State<AfterOverviewScreen> {
             isFirst: true,
             isLast: true,
             borderColor: Colors.redAccent,
-            bg: Colors.redAccent.withOpacity(0.06),
+            bg: Colors.redAccent.withValues(alpha: 0.06),
             child: Text(
               (r.iv == 0) ? '-' : '${r.iv}',
               style: textStyle.copyWith(
@@ -452,7 +452,7 @@ class _AfterOverviewScreenState extends State<AfterOverviewScreen> {
             isFirst: true,
             isLast: true,
             borderColor: Colors.red,
-            bg: Colors.red.withOpacity(0.06),
+            bg: Colors.red.withValues(alpha: 0.06),
             child: Text(
               (r.v == 0) ? '-' : '${r.v}',
               style: textStyle.copyWith(

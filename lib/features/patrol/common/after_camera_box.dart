@@ -612,7 +612,7 @@ class AfterCameraBoxState extends State<AfterCameraBox>
 
             return ClipRRect(
               borderRadius: BorderRadius.circular(20),
-              child: ColoredBox(color: Colors.white.withOpacity(opacity)),
+              child: ColoredBox(color: Colors.white.withValues(alpha: opacity)),
             );
           },
         ),

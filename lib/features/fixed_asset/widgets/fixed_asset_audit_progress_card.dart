@@ -89,7 +89,7 @@ class FixedAssetAuditProgressCard extends StatelessWidget {
                       TextSpan(
                         text: '  ·  ${summary.remainingMachines} remaining',
                         style: TextStyle(
-                          color: Colors.white.withOpacity(.55),
+                          color: Colors.white.withValues(alpha: .55),
                           fontSize: 12,
                         ),
                       ),
@@ -116,7 +116,7 @@ class FixedAssetAuditProgressCard extends StatelessWidget {
             child: LinearProgressIndicator(
               value: (percent / 100.0).clamp(0.0, 1.0),
               minHeight: 6,
-              backgroundColor: Colors.white.withOpacity(.10),
+              backgroundColor: Colors.white.withValues(alpha: .10),
               valueColor: AlwaysStoppedAnimation<Color>(
                 done ? _success : _accent,
               ),
@@ -139,7 +139,7 @@ class FixedAssetAuditProgressCard extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                color: Colors.white.withOpacity(.65),
+                color: Colors.white.withValues(alpha: .65),
                 fontSize: 12,
               ),
             ),
@@ -152,7 +152,7 @@ class FixedAssetAuditProgressCard extends StatelessWidget {
       body = Text(
         '—',
         style: TextStyle(
-          color: Colors.white.withOpacity(.55),
+          color: Colors.white.withValues(alpha: .55),
           fontSize: 13.5,
           fontWeight: FontWeight.w800,
         ),
@@ -163,8 +163,8 @@ class FixedAssetAuditProgressCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(999),
         child: LinearProgressIndicator(
           minHeight: 6,
-          backgroundColor: Colors.white.withOpacity(.08),
-          valueColor: AlwaysStoppedAnimation<Color>(_accent.withOpacity(.5)),
+          backgroundColor: Colors.white.withValues(alpha: .08),
+          valueColor: AlwaysStoppedAnimation<Color>(_accent.withValues(alpha: .5)),
         ),
       );
     }
@@ -173,9 +173,9 @@ class FixedAssetAuditProgressCard extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(12, 7, 12, 9),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(.06),
+        color: Colors.white.withValues(alpha: .06),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white.withOpacity(.14)),
+        border: Border.all(color: Colors.white.withValues(alpha: .14)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -186,7 +186,7 @@ class FixedAssetAuditProgressCard extends StatelessWidget {
               Text(
                 'AUDIT PROGRESS',
                 style: TextStyle(
-                  color: Colors.white.withOpacity(.6),
+                  color: Colors.white.withValues(alpha: .6),
                   fontSize: 11,
                   fontWeight: FontWeight.w800,
                   letterSpacing: .8,
