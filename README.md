@@ -569,11 +569,10 @@ Mọi API có tiền tố `/api/fixed-assets` (`lib/core/api/fixed_asset_api.dar
 |---|---|---|
 | `CameraPreviewBox` | `lib/shared/camera/camera_preview_box.dart` (+ `camera_preview_box/*`) | Camera web (getUserMedia): quét QR bằng ZXing, chụp hoặc upload nhiều ảnh, zoom phần cứng, bật/tắt, hiển thị STT. Tự tạm dừng khi bị route khác che. |
 | `QrScannerDialog` | `lib/shared/qr/qr_scanner_dialog.dart` | Dialog quét QR, dùng ở Home. |
-| `QrCodeCamera` | `lib/shared/qr/qr_code_camera.dart` | Camera QR riêng, có badge và zoom. |
 | `VoiceInputButton` | `lib/shared/speech/voice_input_button.dart` | Nút mic chèn chữ vào ô nhập: dùng Web Speech API, hoặc ghi âm rồi gửi `POST /api/speech/transcribe`. |
 | `MachineAiRiskHistoryPanel` | `lib/features/machine_ai/machine_ai_alert_card.dart` | AI tóm tắt lịch sử rủi ro theo máy, có nút dịch sang JP. |
 | `CommonUI`, `CommonSearchableDropdown`, `CommonRiskDropdown`, `RequiredFieldFlash`, các nút Glass… | `lib/shared/widgets/` | Snackbar, hộp xác nhận, dropdown, hiệu ứng ô bắt buộc, nút kính. |
-| `ReportValidator`, `DueDateUtils`, `natural_sort`, `plant_constants` | `lib/shared/utils/` | Tiện ích validate, tính hạn, sắp xếp, hằng số plant. |
+| `DueDateUtils`, `natural_sort`, `plant_constants` | `lib/shared/utils/` | Tiện ích tính hạn, sắp xếp, hằng số plant. |
 
 ---
 
@@ -701,6 +700,7 @@ Mục này đối chiếu code FE với tài liệu BE (`patrol_be/README.md`, a
 | Import, field, hằng và method private không dùng: `_needManualSelect`, `_oldPIC`, `_isLoadingName`, `_loadingMacId`, `_lastGood*`, `showGlassDialog` (bản riêng của màn Before), `getPlants`, `normalizeGroup`, `_revertToLastGood`, … | Cảnh báo `unused_*` của analyzer. |
 | Phần dựng `Uri` chỉ để log trong `PatrolPivotApi` / `PatrolReportApi` | Interceptor của `DioClient` đã log URL đầy đủ. |
 | `test/fixed_asset_zone_lock_test.dart` | Gọi API controller không còn tồn tại, không compile được. |
+| `shared/qr/qr_code_camera.dart` (`QrCodeCamera`), `shared/animations/christmas_title.dart` (`ChristmasTitle`), `shared/utils/report_validator.dart` (`ReportValidator`), `core/models/patrol_edit_model.dart` (`PatrolEditDTO` phía FE) | Không file nào import. Camera QR đã được thay bằng `CameraPreviewBox`; `updateReportApi` dựng map trực tiếp. |
 
 **Dọn lint** (không đổi logic):
 
