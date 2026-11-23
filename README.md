@@ -701,6 +701,7 @@ Mục này đối chiếu code FE với tài liệu BE (`patrol_be/README.md`, a
 | Phần dựng `Uri` chỉ để log trong `PatrolPivotApi` / `PatrolReportApi` | Interceptor của `DioClient` đã log URL đầy đủ. |
 | `test/fixed_asset_zone_lock_test.dart` | Gọi API controller không còn tồn tại, không compile được. |
 | `shared/qr/qr_code_camera.dart` (`QrCodeCamera`), `shared/animations/christmas_title.dart` (`ChristmasTitle`), `shared/utils/report_validator.dart` (`ReportValidator`), `core/models/patrol_edit_model.dart` (`PatrolEditDTO` phía FE) | Không file nào import. Camera QR đã được thay bằng `CameraPreviewBox`; `updateReportApi` dựng map trực tiếp. |
+| `mocckMachines` (1208 dòng dữ liệu máy giả trong `machine_model.dart`), `CommonUI.warningPage`, `multiLang` (`translator.dart` + template generator), `extractFixedAssetMachineCode`, `PatrolReportTableQuery.widthOf` | Khai báo public không ai dùng. |
 
 **Dọn lint** (không đổi logic):
 

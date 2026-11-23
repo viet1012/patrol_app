@@ -644,22 +644,6 @@ class CommonUI {
       );
   }
 
-  static Widget warningPage({
-    required BuildContext context,
-    required String message,
-    String title = 'Warning',
-  }) {
-    return _baseMessagePage(
-      context: context,
-      title: title,
-      message: message,
-      icon: Icons.warning_amber_rounded,
-      iconColor: Colors.orangeAccent,
-      backgroundColor: const Color(0xFF121826),
-      buttonText: 'Go Back',
-    );
-  }
-
   static void showGoHomeDialog({
     required BuildContext context,
     String title = 'Access denied',

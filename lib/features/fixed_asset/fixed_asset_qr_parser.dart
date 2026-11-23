@@ -53,12 +53,6 @@ String _machineCodeInText(String qr) {
   return codes.length == 1 ? codes.first : '';
 }
 
-/// KVH_A-1456_1F_A34-2_Sprue Bush -> A-1456
-/// KVH_1F_A1_A1-1_A-1564-1_Cutting 2-2 -> A-1564-1
-/// A-2331 -> A-2331
-String extractFixedAssetMachineCode(String rawQr) =>
-    parseFixedAssetQr(rawQr).machineCode;
-
 /// Mã máy chuẩn hoá để so với danh sách máy (bỏ ký tự điều khiển, trim,
 /// upper-case); '' = không phải mã máy.
 String normalizeMachineCode(String value) => _validCode(_cleanQr(value));

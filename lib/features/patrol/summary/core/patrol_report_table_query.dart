@@ -21,10 +21,6 @@ class PatrolReportTableQuery {
     return columns.firstWhere((c) => c.label == label);
   }
 
-  static double widthOf(List<PatrolReportColumnSpec> columns, String label) {
-    return columnByLabel(columns, label).width;
-  }
-
   static String _norm(String? v) {
     return (v ?? '').replaceAll(String.fromCharCode(160), ' ').trim();
   }

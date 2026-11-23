@@ -135,18 +135,7 @@ extension TranslateExtension on String {
   }
 
   // -----------------------------------------
-  // 3. TRẢ VỀ { vi: x, ja: y }
-  // -----------------------------------------
-  Map<String, String> multiLang(BuildContext context, String key,
-      {Map<String, dynamic>? params}) {
-    return {
-      'vi': _trLocale(key, const Locale('vi'), params: params),
-      'ja': _trLocale(key, const Locale('ja'), params: params),
-    };
-  }
-
-  // -----------------------------------------
-  // 4. TRẢ VỀ "VI\nJA"
+  // 3. TRẢ VỀ "VI\nJA"
   // -----------------------------------------
   String combinedViJa(BuildContext context, String key,
       {Map<String, dynamic>? params}) {
