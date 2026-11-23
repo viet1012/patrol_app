@@ -8,7 +8,6 @@ import 'package:chuphinh/core/models/fixed_asset_audit_check_response.dart';
 import 'package:chuphinh/core/models/fixed_asset_audit_save_response.dart';
 import 'package:chuphinh/core/models/fixed_asset_audit_summary.dart';
 import 'package:chuphinh/core/models/fixed_asset_machine.dart';
-import 'package:chuphinh/core/models/fixed_asset_machine_location.dart';
 import 'package:chuphinh/core/models/fixed_asset_pic.dart';
 import 'package:chuphinh/core/models/fixed_asset_qr_mismatch.dart';
 import 'package:chuphinh/core/models/fixed_asset_scan_info.dart';
@@ -126,12 +125,6 @@ class FixedAssetApi {
     } on DioException catch (e) {
       throw Exception(DioErrorHandler.handle(e));
     }
-  }
-
-  /// MachineCode đã có ít nhất một record audit (global, không lọc location).
-  static Future<List<String>> fetchAuditedMachineCodes() async {
-    final codes = await _getStrings('$_base/audited-machine-codes');
-    return codes.toSet().toList();
   }
 
   /// Thông tin quyết định cho một scan: MASTER location + trạng thái kiểm kê
@@ -347,65 +340,6 @@ class FixedAssetApi {
     return Map<String, dynamic>.from(map);
   }
 
-  /// Tra location MASTER theo MachineCode.
-  ///
-  /// Không còn dùng cho AUTO scan (đã thay bằng [fetchScanInfo]); giữ lại
-  /// để không phá caller khác.
-  ///
-  /// Gọi DioClient.dio trực tiếp (không qua _retry): mỗi scan chỉ tra
-  /// đúng một lần. Lỗi được phân loại thành [FixedAssetLookupException].
-  static Future<FixedAssetMachineLocation> fetchMachineLocation(
-    String machineCode,
-  ) async {
-    Response res;
-
-    try {
-      res = await DioClient.dio.get(
-        '$_base/machine-location',
-        queryParameters: {'machineCode': machineCode},
-      );
-    } on DioException catch (e) {
-      final response = e.response;
-      if (response == null) {
-        throw FixedAssetLookupException(
-          FixedAssetLookupError.failed,
-          DioErrorHandler.handle(e),
-        );
-      }
-      res = response;
-    }
-
-    final status = res.statusCode ?? 0;
-    final message = _serverMessage(res.data) ?? '';
-    final lower = message.toLowerCase();
-
-    if (status >= 200 && status < 300) {
-      final data = res.data;
-      final map = data is Map && data['data'] is Map ? data['data'] : data;
-
-      if (map is! Map) {
-        throw const FixedAssetLookupException(FixedAssetLookupError.notFound);
-      }
-
-      return FixedAssetMachineLocation.fromJson(
-        Map<String, dynamic>.from(map),
-      );
-    }
-
-    if (status == 409 || lower.contains('multiple')) {
-      throw FixedAssetLookupException(FixedAssetLookupError.ambiguous, message);
-    }
-
-    if (status == 404 || lower.contains('not found')) {
-      throw FixedAssetLookupException(FixedAssetLookupError.notFound, message);
-    }
-
-    throw FixedAssetLookupException(
-      FixedAssetLookupError.failed,
-      message.isEmpty ? 'Server error $status' : message,
-    );
-  }
-
   static Future<List<FixedAssetMachine>> fetchMachines({
     required String fac,
     required String floor,
@@ -491,7 +425,8 @@ class FixedAssetApi {
         if (needsQrReprint != null) 'needsQrReprint': needsQrReprint,
         if (qrReplace != null) 'qrReplace': qrReplace,
         if (pic != null) 'pic': pic,
-        if (cleanQr.isNotEmpty) 'qrRaw': cleanQr,
+        // BE: FixedAssetAuditSaveRequest.qr (đặt tên ảnh after/{qr}_3.jpg).
+        if (cleanQr.isNotEmpty) 'qr': cleanQr,
       };
 
       // Chỉ luồng Thay QR gửi multipart; các luồng khác vẫn JSON. Multipart

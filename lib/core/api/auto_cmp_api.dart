@@ -33,43 +33,6 @@ class AutoCmpApi {
     }
   }
 
-  /// Search comment suggestions
-  static Future<List<AutoCmp>> search(String lang, String keyword) async {
-    final q = keyword.trim();
-    if (q.isEmpty) return [];
-
-    try {
-      final Response res = await DioClient.get(
-        '/api/suggest/search',
-        queryParameters: {'l': lang, 'q': q},
-      );
-
-      return _parseList(res.data);
-    } on DioException catch (e) {
-      throw Exception(DioErrorHandler.handle(e));
-    }
-  }
-
-  /// Search countermeasure suggestions
-  static Future<List<AutoCmp>> searchCounter(
-    String lang,
-    String keyword,
-  ) async {
-    final q = keyword.trim();
-    if (q.isEmpty) return [];
-
-    try {
-      final Response res = await DioClient.get(
-        '/api/suggest/searchCounter',
-        queryParameters: {'l': lang, 'q': q},
-      );
-
-      return _parseList(res.data);
-    } on DioException catch (e) {
-      throw Exception(DioErrorHandler.handle(e));
-    }
-  }
-
   static List<AutoCmp> _parseList(dynamic data) {
     if (data is List) {
       return data
